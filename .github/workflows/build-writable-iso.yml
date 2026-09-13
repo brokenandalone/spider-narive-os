@@ -40,6 +40,7 @@ jobs:
 
               if [[ ! -f native-foundation/build-native.sh ]]; then
                 mkdir -p /tmp/spider-native-foundation-source
+
                 tar -xzf Spider-OS-native-foundation.tar.gz \
                   -C /tmp/spider-native-foundation-source
 
@@ -69,13 +70,27 @@ jobs:
               ./build-iso.sh
             '
 
+      - name: Collect writable ISO artifacts
+        run: |
+          set -eux
+          sudo mkdir -p artifacts
+
+          sudo find native-foundation/output \
+            -maxdepth 1 \
+            -type f \
+            \( -name "*.iso" -o -name "*.iso.sha256" \) \
+            -exec cp -v {} artifacts/ \;
+
+          sudo chown -R "$USER":"$USER" artifacts
+          ls -lh artifacts
+
+          test "$(find artifacts -maxdepth 1 -name "*.iso" -type f | wc -l)" -gt 0
+
       - name: Upload writable ISO and checksum
         uses: actions/upload-artifact@v4
         with:
           name: spider-os-writable-installer-${{ github.run_number }}
-          path: |
-            native-foundation/output/*.iso
-            native-foundation/output/*.iso.sha256
+          path: artifacts/*
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
