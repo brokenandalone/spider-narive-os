@@ -37,20 +37,37 @@ jobs:
             bash -euc '
               dnf install -y cmake gcc-c++ ninja-build pkgconf-pkg-config qt6-qtbase-devel lorax curl
               cd /workspace
-if [[ ! -f native-foundation/build-native.sh ]]; then
-  mkdir -p /tmp/spider-native-foundation-source
-  tar -xzf Spider-OS-native-foundation.tar.gz -C /tmp/spider-native-foundation-source
-  cp -a /tmp/spider-native-foundation-source/build-native.sh native-foundation/
-  cp -a /tmp/spider-native-foundation-source/installer native-foundation/
-  cp -a /tmp/spider-native-foundation-source/native native-foundation/
-  cp -a /tmp/spider-native-foundation-source/system_files native-foundation/
-  cp -a /tmp/spider-native-foundation-source/tests native-foundation/
-  mkdir -p native-foundation/tools
-  cp -a /tmp/spider-native-foundation-source/tools/. native-foundation/tools/
-fi
-cd /workspace/native-foundation
-chmod +x build-native.sh build-iso.sh tools/bin/mkefiboot
-./build-iso.sh
+
+              if [[ ! -f native-foundation/build-native.sh ]]; then
+                mkdir -p /tmp/spider-native-foundation-source
+                tar -xzf Spider-OS-native-foundation.tar.gz \
+                  -C /tmp/spider-native-foundation-source
+
+                cp -a /tmp/spider-native-foundation-source/build-native.sh \
+                  native-foundation/
+
+                cp -a /tmp/spider-native-foundation-source/installer \
+                  native-foundation/
+
+                cp -a /tmp/spider-native-foundation-source/native \
+                  native-foundation/
+
+                cp -a /tmp/spider-native-foundation-source/system_files \
+                  native-foundation/
+
+                cp -a /tmp/spider-native-foundation-source/tests \
+                  native-foundation/
+
+                mkdir -p native-foundation/tools
+
+                cp -a /tmp/spider-native-foundation-source/tools/. \
+                  native-foundation/tools/
+              fi
+
+              cd /workspace/native-foundation
+              chmod +x build-native.sh build-iso.sh tools/bin/mkefiboot
+              ./build-iso.sh
+            '
 
       - name: Upload writable ISO and checksum
         uses: actions/upload-artifact@v4
