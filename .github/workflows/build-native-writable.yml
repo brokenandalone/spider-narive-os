@@ -1,0 +1,50 @@
+name: Build native writable Spider OS ISO
+
+on:
+  push:
+    branches:
+      - rebuild/native-writable-foundation-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      - name: Build ISO
+        run: |
+          sudo podman run --rm --privileged \
+            --volume "$GITHUB_WORKSPACE:/workspace:Z" \
+            quay.io/fedora/fedora:44 \
+            bash -euc '
+              dnf install -y cmake gcc-c++ ninja-build pkgconf-pkg-config qt6-qtbase-devel lorax curl
+              rm -rf /workspace/native-foundation
+              mkdir -p /workspace/native-foundation
+              tar -xzf /workspace/Spider-OS-native-foundation.tar.gz -C /workspace/native-foundation
+              cd /workspace/native-foundation
+              chmod +x build-native.sh build-iso.sh
+              FEDORA_RELEASE=44 FEDORA_KDE_VERSION=1.7 ./build-iso.sh
+            '
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: spider-os-native-writable-installer
+          path: |
+            native-foundation/output/*.iso
+            native-foundation/output/*.iso.sha256
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
