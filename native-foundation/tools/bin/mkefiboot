@@ -1,0 +1,24 @@
+#!/usr/bin/python3
+"""Run Lorax's mkefiboot with enough room for current Fedora EFI payloads."""
+
+import os
+
+from pylorax import imgutils
+from pylorax.cmdline import mkefiboot as command
+
+
+def roomy_mkefiboot(bootdir, outfile, label):
+    size_mib = int(os.environ.get("SPIDER_EFI_BOOT_SIZE_MIB", "64"))
+    if size_mib < 32:
+        raise ValueError("SPIDER_EFI_BOOT_SIZE_MIB must be at least 32")
+    return imgutils.mkdosimg(
+        None,
+        outfile,
+        size=size_mib * 1024 * 1024,
+        label=label,
+        graft={"EFI/BOOT": bootdir},
+    )
+
+
+command.mkefiboot = roomy_mkefiboot
+command.main()
