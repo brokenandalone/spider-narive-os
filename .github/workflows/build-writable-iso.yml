@@ -30,18 +30,21 @@ jobs:
       - name: Compose writable ISO in Fedora build environment
         run: |
           sudo podman run --rm --privileged \
-            --volume "$GITHUB_WORKSPACE:/workspace:Z" \
+            --volume "${{ github.workspace }}:/workspace:Z" \
             --env FEDORA_RELEASE \
             --env FEDORA_KDE_VERSION \
             quay.io/fedora/fedora:${FEDORA_RELEASE} \
-            bash -euc '
+            bash -euc "
+              set -eux
+
               dnf install -y cmake gcc-c++ ninja-build pkgconf-pkg-config qt6-qtbase-devel lorax curl
+
               cd /workspace
 
               if [[ ! -f native-foundation/build-native.sh ]]; then
                 mkdir -p /tmp/spider-native-foundation-source
 
-                tar -xzf Spider-OS-native-foundation.tar.gz \
+                tar -xzf /workspace/Spider-OS-native-foundation.tar.gz \
                   -C /tmp/spider-native-foundation-source
 
                 cp -a /tmp/spider-native-foundation-source/build-native.sh \
@@ -66,9 +69,16 @@ jobs:
               fi
 
               cd /workspace/native-foundation
-              chmod +x build-native.sh build-iso.sh tools/bin/mkefiboot
+
+              chmod +x build-native.sh
+              chmod +x build-iso.sh
+              chmod +x tools/bin/mkefiboot
+
               ./build-iso.sh
-            '
+
+              echo 'Spider OS ISO build completed'
+              find /workspace -type f -name '*.iso' -print
+            "
 
       - name: Collect writable ISO artifacts
         run: |
