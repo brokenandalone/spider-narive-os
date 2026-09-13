@@ -75,10 +75,11 @@ jobs:
           set -eux
           sudo mkdir -p artifacts
 
-          sudo find native-foundation/output \
-            -maxdepth 1 \
+          sudo find . \
             -type f \
             \( -name "*.iso" -o -name "*.iso.sha256" \) \
+            -not -path "./.git/*" \
+            -not -path "./native-foundation/.fedora-kde-iso/*" \
             -exec cp -v {} artifacts/ \;
 
           sudo chown -R "$USER":"$USER" artifacts
