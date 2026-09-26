@@ -1,0 +1,16 @@
+# Build outputs
+build/
+*.iso
+*.img
+*.elf
+*.o
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Test and coverage output
+coverage/
+.cache/
