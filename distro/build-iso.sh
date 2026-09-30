@@ -209,7 +209,8 @@ xargs -r apt-get install -y < /tmp/spider-packages.clean
 chmod +x \
     /usr/local/lib/spider-os/spider-core/bin/spider-core \
     /usr/local/lib/spider-os/webbie/webbie \
-    /usr/local/lib/spider-os/webbie/agent/webbie.py
+    /usr/local/lib/spider-os/webbie/agent/webbie.py \
+    /usr/local/lib/spider-os/the-web/shell/main.py
 
 apt-get clean
 

@@ -15,7 +15,7 @@ build/
 coverage/
 .cache/
 
-# Native ISO build outputs
-build/
-*.iso
+# Split release assets and Python cache
 *.iso.part-*
+__pycache__/
+*.py[cod]
