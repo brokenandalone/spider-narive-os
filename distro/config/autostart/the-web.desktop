@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=The Web
+Comment=Spider OS native shell
+Exec=python3 /usr/local/lib/spider-os/the-web/shell/main.py
+Terminal=false
+X-GNOME-Autostart-enabled=true
+StartupNotify=false
