@@ -29,6 +29,7 @@ jobs:
       - name: Validate Spider OS scripts
         run: |
           bash -n distro/build-iso.sh
+          bash -n distro/verify-installed-payload.sh
           test -f distro/packages/spider-os-packages.list
           test -f distro/systemd/spider-os.service
           test -f webbie/service/webbie.service

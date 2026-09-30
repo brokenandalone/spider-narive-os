@@ -643,6 +643,8 @@ rm -rf "${LIVE_ROOTFS}"
 
 echo "Updating Spider OS filesystem metadata..."
 
+bash "${ROOT}/distro/verify-installed-payload.sh" "${ROOTFS}"
+
 chroot "${ROOTFS}" \
     dpkg-query \
     -W \
