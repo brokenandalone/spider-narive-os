@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="${ROOT}/build"
+SPM_PROFILE="${SPM_PROFILE:-public}"
 
 BASE_VERSION="24.04.5"
 BASE_NAME="ubuntustudio-${BASE_VERSION}-dvd-amd64.iso"
@@ -116,6 +117,8 @@ umount "${ISO_MOUNT}"
 
 echo "Installing Spider OS files..."
 
+install -Dm755 "${ROOT}/distro/install-feature-runtimes.sh" "${ROOTFS}/tmp/install-feature-runtimes.sh"
+
 install -d "${ROOTFS}/usr/local/lib/spider-os"
 
 rsync -a \
@@ -137,6 +140,19 @@ rsync -a \
 rsync -a \
     "${ROOT}/kali-bay/" \
     "${ROOTFS}/usr/local/lib/spider-os/kali-bay/"
+
+for component in study media; do
+    rsync -a "${ROOT}/${component}/" "${ROOTFS}/usr/local/lib/spider-os/${component}/"
+done
+rsync -a "${ROOT}/branding/" "${ROOTFS}/usr/local/lib/spider-os/branding/"
+chmod +x "${ROOTFS}/usr/local/lib/spider-os/study/bin/study" \
+    "${ROOTFS}/usr/local/lib/spider-os/kali-bay/bin/kali-bay"
+install -Dm644 "${ROOT}/distro/systemd/ollama.service" \
+    "${ROOTFS}/usr/lib/systemd/system/ollama.service"
+for app in webbie study forage deep-forage kali-bay; do
+    install -Dm644 "${ROOT}/distro/config/applications/${app}.desktop" \
+        "${ROOTFS}/usr/share/applications/${app}.desktop"
+done
 
 install -d "${ROOTFS}/usr/local/lib/spider-os/branding"
 
@@ -212,6 +228,9 @@ chmod +x \
     /usr/local/lib/spider-os/webbie/agent/webbie.py \
     /usr/local/lib/spider-os/the-web/shell/main.py
 
+/bin/bash /tmp/install-feature-runtimes.sh
+rm -f /tmp/install-feature-runtimes.sh
+
 apt-get clean
 
 rm -rf \
@@ -226,7 +245,7 @@ echo "Enabling Spider OS services..."
 
 systemctl \
     --root="${ROOTFS}" \
-    enable spider-os.service
+    enable spider-os.service ollama.service
 
 systemctl \
     --root="${ROOTFS}" \
@@ -346,6 +365,8 @@ cat > "${ROOTFS}/usr/share/sddm/themes/breeze/theme.conf.user" <<'SDDM_THEME'
 background=/usr/share/backgrounds/spider-os-wallpaper.png
 SDDM_THEME
 
+"${ROOT}/distro/install-spm.sh" "${ROOTFS}" "${ROOT}" "${SPM_PROFILE}"
+
 echo "Installing Spider OS desktop integration..."
 
 install -Dm644 \
@@ -389,6 +410,19 @@ rsync -a \
 rsync -a \
     "${ROOT}/kali-bay/" \
     "${LIVE_ROOTFS}/usr/local/lib/spider-os/kali-bay/"
+
+for component in study media; do
+    rsync -a "${ROOT}/${component}/" "${LIVE_ROOTFS}/usr/local/lib/spider-os/${component}/"
+done
+rsync -a "${ROOT}/branding/" "${LIVE_ROOTFS}/usr/local/lib/spider-os/branding/"
+chmod +x "${LIVE_ROOTFS}/usr/local/lib/spider-os/study/bin/study" \
+    "${LIVE_ROOTFS}/usr/local/lib/spider-os/kali-bay/bin/kali-bay"
+install -Dm644 "${ROOT}/distro/systemd/ollama.service" \
+    "${LIVE_ROOTFS}/usr/lib/systemd/system/ollama.service"
+for app in webbie study forage deep-forage kali-bay; do
+    install -Dm644 "${ROOT}/distro/config/applications/${app}.desktop" \
+        "${LIVE_ROOTFS}/usr/share/applications/${app}.desktop"
+done
 
 chmod +x \
     "${LIVE_ROOTFS}/usr/local/lib/spider-os/spider-core/bin/spider-core" \

@@ -28,6 +28,8 @@ jobs:
 
       - name: Validate Spider OS scripts
         run: |
+          bash distro/validate-feature-complete.sh
+          bash -n distro/install-feature-runtimes.sh
           bash -n distro/build-iso.sh
           bash -n distro/verify-installed-payload.sh
           test -f distro/packages/spider-os-packages.list

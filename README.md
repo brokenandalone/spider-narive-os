@@ -40,4 +40,22 @@ globally enabled Webbie user service, and KDE autostart entries.
 
 An ISO build, installation to a writable virtual disk, and reboot are still needed
 to validate this migration end to end. Live USB boot alone does not prove installation.
-Webbie and Spider Core are resident placeholders; Forage is not implemented.
+The feature-complete branch supplies Webbie voice and local Ollama AI, Forage and
+Deep Forage, Study, Kali Bay, and the expanded The Web launcher. The builder bundles
+Whisper base.en and qwen3:1.7b; neural TTS and web search require a network connection.
+
+All ten approved backgrounds (The Web and nine workspace images), the splash, and
+logo are included in both image layers. The Web provides a background selector and
+switches its background when opening a workspace.
+
+The default GitHub workflow builds the public image. Private Kabel/AI DJ packages
+remain excluded from public distribution, following the existing profile split.
+For a personal build, place the approved normalized Kabel ZIP in
+`distro/assets/media/` and run `sudo -E ./distro/build-personal.sh`. The ZIP is ignored
+by Git. This command fails clearly if the private package is missing.
+
+Branch audit: `brokenandalone-patch-1`, `fix/install-and-boot`, and
+`fix/live-boot-branding` are already ancestors of Spider-OS1 main. The Codespace
+branch matches main. The two unmerged `spider-os-feature-complete` commits are now
+integrated, retaining the later service, installer, and live-session repairs.
+`finish-spider-os.sh` now validates the integrated source rather than overwriting it.

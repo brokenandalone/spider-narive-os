@@ -19,3 +19,8 @@ coverage/
 *.iso.part-*
 __pycache__/
 *.py[cod]
+
+# Private media packages and local transfer files
+distro/assets/media/*.zip
+*.bundle
+*.bundle.lock
