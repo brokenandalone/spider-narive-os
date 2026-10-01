@@ -120,8 +120,17 @@ jobs:
             "${ISO}" \
             "${ISO}.part-"
 
+          sha256sum "${ISO}".part-* > SHA256SUMS.parts
+          EXPECTED="$(cut -d ' ' -f1 "${ISO}.sha256")"
+          ACTUAL="$(cat "${ISO}".part-* | sha256sum | cut -d ' ' -f1)"
+          test "${ACTUAL}" = "${EXPECTED}"
+
           cat > REASSEMBLE.txt <<TXT
           SPIDER OS ISO REASSEMBLY
+
+          Download ALL part files, the ISO checksum, and SHA256SUMS.parts.
+          The number of pieces varies with image size; do not assume five.
+          Linux: sha256sum -c SHA256SUMS.parts
 
           Linux/macOS:
           cat ${ISO}.part-* > ${ISO}
@@ -166,4 +175,5 @@ jobs:
             build/"${ISO}".part-* \
             build/"${ISO}".sha256 \
             build/REASSEMBLE.txt \
+            build/SHA256SUMS.parts \
             --clobber
