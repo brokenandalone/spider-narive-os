@@ -24,10 +24,12 @@ def make_config(source_id):
         'late-commands': [
             'mkdir -p /run/spider-ci-seed /target/usr/local/lib/spider-ci',
             'mount -o ro /dev/disk/by-label/cidata /run/spider-ci-seed',
-            'cp /run/spider-ci-seed/verify-payload.sh /run/spider-ci-seed/first-boot.sh /run/spider-ci-seed/check-the-web.py /target/usr/local/lib/spider-ci/',
+            'cp /run/spider-ci-seed/verify-payload.sh /run/spider-ci-seed/first-boot.sh /run/spider-ci-seed/check-the-web.py /run/spider-ci-seed/report-boot-result.sh /target/usr/local/lib/spider-ci/',
             'bash /target/usr/local/lib/spider-ci/verify-payload.sh /target',
             'cp /run/spider-ci-seed/spider-ci.service /target/etc/systemd/system/',
             'systemctl --root=/target enable spider-ci.service',
+            # Test-only: give the verifier sole ownership of its serial console.
+            'systemctl --root=/target mask serial-getty@ttyS0.service',
             "printf '%s\\n' 'GRUB_CMDLINE_LINUX_DEFAULT=\"console=ttyS0,115200n8\"' > /target/etc/default/grub.d/99-spider-ci.cfg",
             'curtin in-target --target=/target -- update-grub',
             'echo SPIDER_INSTALL_PASSED > /dev/ttyS0',

@@ -23,11 +23,13 @@ cp "${spider_work}/iso/casper/vmlinuz" "${spider_work}/vmlinuz"
 cp "${spider_work}/iso/casper/initrd" "${spider_work}/initrd"
 cp "${spider_repo}/distro/verify-installed-payload.sh" "${spider_work}/seed/verify-payload.sh"
 cp "${spider_repo}/tests/check-the-web.py" "${spider_work}/seed/check-the-web.py"
+cp "${spider_repo}/tests/report-boot-result.sh" "${spider_work}/seed/report-boot-result.sh"
 cat > "${spider_work}/seed/first-boot.sh" <<'GUEST'
 #!/usr/bin/env bash
 set -Eeuo pipefail
-exec >>/dev/ttyS0 2>&1
-trap 'echo "SPIDER_DISK_BOOT_FAILED: line ${LINENO}: ${BASH_COMMAND}"; systemctl --no-block poweroff' ERR
+# Keep stdout/stderr connected to journald; direct tty descriptors can be
+# revoked when a serial getty takes ownership of the console.
+trap 'echo "SPIDER_CHECK_FAILED: line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 echo 'SPIDER_CHECK: installed identity and writable root'
 grep -q '^NAME="Spider OS"$' /etc/os-release
 ! grep -q 'boot=casper' /proc/cmdline
@@ -42,8 +44,7 @@ install -d -m 700 /run/spider-ci-qt
 export XDG_RUNTIME_DIR=/run/spider-ci-qt QT_QPA_PLATFORM=offscreen QT_ACCESSIBILITY=0
 timeout --signal=TERM --kill-after=5 120 dbus-run-session -- \
     python3 -u /usr/local/lib/spider-ci/check-the-web.py /usr/local/lib/spider-os
-echo SPIDER_DISK_BOOT_PASSED
-systemctl --no-block poweroff
+touch /run/spider-ci-passed
 GUEST
 cat > "${spider_work}/seed/spider-ci.service" <<'UNIT'
 [Unit]
@@ -54,7 +55,9 @@ Wants=spider-os.service ollama.service
 # Do not hold multi-user.target open while Qt or D-Bus starts a session.
 Type=exec
 ExecStart=/bin/bash /usr/local/lib/spider-ci/first-boot.sh
+ExecStopPost=/bin/bash /usr/local/lib/spider-ci/report-boot-result.sh
 RuntimeMaxSec=180
+TimeoutStopSec=20
 StandardOutput=journal+console
 StandardError=journal+console
 [Install]
@@ -84,6 +87,7 @@ run_guest() {
     wait "${spider_guest_pid}" || result=$?
     spider_guest_pid=''
     cat "${log}.qemu"
+    if [[ ${result} -ne 0 ]]; then echo "Guest exited with status ${result} (${log})" >&2; fi
     tail -n 80 "${log}"
     [[ ${result} -eq 0 ]]
 }
@@ -92,7 +96,7 @@ run_guest 5400 "${spider_test}/install.serial.log" \
     -drive "file=${spider_iso},media=cdrom,readonly=on" \
     -drive "file=${spider_work}/seed.iso,media=cdrom,readonly=on" \
     -kernel "${spider_work}/vmlinuz" -initrd "${spider_work}/initrd" \
-    -append 'boot=casper autoinstall ds=nocloud console=ttyS0,115200n8 systemd.mask=spider-ci.service'
+    -append 'boot=casper autoinstall ds=nocloud console=ttyS0,115200n8 systemd.mask=spider-ci.service systemd.mask=serial-getty@ttyS0.service'
 grep -q SPIDER_INSTALL_PASSED "${spider_test}/install.serial.log"
 echo 'Booting the installed disk with no ISO attached...'
 run_guest 900 "${spider_test}/boot.serial.log"
