@@ -19,17 +19,30 @@ LIVE_ROOTFS="${BUILD}/live-rootfs"
 
 OUTPUT="${BUILD}/Spider_OS_${BASE_VERSION}_amd64.iso"
 
-cleanup() {
+# Cleanup runs in a subshell so it never disables errexit in the builder.
+cleanup() (
     set +e
+    for directory in dev proc sys run; do
+        if mountpoint -q "${ROOTFS}/${directory}"; then
+            umount -R -l "${ROOTFS}/${directory}"
+        fi
+    done
+    if mountpoint -q "${ISO_MOUNT}"; then
+        umount -l "${ISO_MOUNT}"
+    fi
+    return 0
+)
 
-    mountpoint -q "${ROOTFS}/dev"  && umount -R -l "${ROOTFS}/dev"
-    mountpoint -q "${ROOTFS}/proc" && umount -l "${ROOTFS}/proc"
-    mountpoint -q "${ROOTFS}/sys"  && umount -l "${ROOTFS}/sys"
-    mountpoint -q "${ROOTFS}/run"  && umount -R -l "${ROOTFS}/run"
-    mountpoint -q "${ISO_MOUNT}"   && umount -l "${ISO_MOUNT}"
+unmount_chroot() {
+    for directory in run sys proc dev; do
+        if mountpoint -q "${ROOTFS}/${directory}"; then
+            umount -R "${ROOTFS}/${directory}"
+        fi
+    done
 }
 
 trap cleanup EXIT
+trap 'echo "ERROR: Spider ISO build failed at line ${LINENO}" >&2' ERR
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "Run this script with sudo."
@@ -190,6 +203,14 @@ RELEASE
 
 echo "Preparing chroot..."
 
+# Package scripts must not start services in the image using the build host's /run.
+if [[ -e "${ROOTFS}/usr/sbin/policy-rc.d" ]]; then
+    mv "${ROOTFS}/usr/sbin/policy-rc.d" "${ROOTFS}/usr/sbin/policy-rc.d.spider-original"
+fi
+printf '#!/bin/sh\nexit 101\n' > "${ROOTFS}/usr/sbin/policy-rc.d"
+chmod 755 "${ROOTFS}/usr/sbin/policy-rc.d"
+
+
 mount --rbind /dev "${ROOTFS}/dev"
 mount --make-rslave "${ROOTFS}/dev"
 
@@ -239,7 +260,11 @@ rm -rf \
     /tmp/spider-packages.clean
 CHROOT
 
-cleanup
+unmount_chroot
+rm -f "${ROOTFS}/usr/sbin/policy-rc.d"
+if [[ -e "${ROOTFS}/usr/sbin/policy-rc.d.spider-original" ]]; then
+    mv "${ROOTFS}/usr/sbin/policy-rc.d.spider-original" "${ROOTFS}/usr/sbin/policy-rc.d"
+fi
 
 echo "Enabling Spider OS services..."
 
@@ -742,6 +767,7 @@ echo "Updating ISO checksums..."
     find . \
         -type f \
         ! -name md5sum.txt \
+        ! -name boot.catalog \
         -print0 \
         | sort -z \
         | xargs -0 md5sum \
@@ -766,8 +792,12 @@ xorriso \
     -indev "${OUTPUT}" \
     -report_el_torito plain
 
-sha256sum "${OUTPUT}" \
-    > "${OUTPUT}.sha256"
+(
+    cd "${BUILD}"
+    sha256sum "$(basename "${OUTPUT}")"
+) > "${OUTPUT}.sha256"
+
+bash "${ROOT}/distro/verify-iso.sh" "${OUTPUT}"
 
 echo
 echo "=================================================="

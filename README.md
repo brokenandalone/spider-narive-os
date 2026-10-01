@@ -38,8 +38,13 @@ globally enabled Webbie user service, and KDE autostart entries.
 - Installer source IDs and paths are preserved while installed size is refreshed.
 - os-release is written safely when the upstream file is a symlink.
 
-An ISO build, installation to a writable virtual disk, and reboot are still needed
-to validate this migration end to end. Live USB boot alone does not prove installation.
+The workflow now checks the completed ISO's checksums, default installer source,
+bootstrap/backend, BIOS and UEFI boot records, and installed payload. Before publishing,
+it installs onto a disposable 64 GB virtual disk and boots that disk without the ISO.
+The test checks writable storage, core/AI services, The Web, and all ten backgrounds.
+Failures block release publication; serial logs are saved as diagnostics.
+A successful test validates the virtual machine, while physical PC hardware still
+needs testing. Live USB boot alone does not prove installation.
 The feature-complete branch supplies Webbie voice and local Ollama AI, Forage and
 Deep Forage, Study, Kali Bay, and the expanded The Web launcher. The builder bundles
 Whisper base.en and qwen3:1.7b; neural TTS and web search require a network connection.

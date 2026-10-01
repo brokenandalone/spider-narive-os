@@ -9,7 +9,7 @@ permissions:
 jobs:
   build-spider-os:
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: 330
 
     steps:
       - name: Checkout Spider OS
@@ -32,6 +32,8 @@ jobs:
           bash -n distro/install-feature-runtimes.sh
           bash -n distro/build-iso.sh
           bash -n distro/verify-installed-payload.sh
+          bash -n distro/verify-iso.sh
+          bash -n tests/qemu-install.sh
           test -f distro/packages/spider-os-packages.list
           test -f distro/systemd/spider-os.service
           test -f webbie/service/webbie.service
@@ -85,6 +87,25 @@ jobs:
           xorriso \
             -indev "${{ steps.iso.outputs.iso_path }}" \
             -report_el_torito plain
+
+      - name: Free temporary image space
+        run: |
+          sudo rm -rf build/iso-tree
+          rm -f build/ubuntustudio-24.04.5-dvd-amd64.iso
+
+      - name: Install and boot from a writable virtual disk
+        timeout-minutes: 110
+        run: sudo -E bash tests/qemu-install.sh "${{ steps.iso.outputs.iso_path }}"
+
+      - name: Save installation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spider-install-diagnostics
+          path: |
+            build/install-test/*.log*
+            build/*.boot-report.txt
+          if-no-files-found: ignore
 
       - name: Split ISO for release
         run: |
