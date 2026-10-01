@@ -47,6 +47,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             python3-yaml \
+            python3-pyqt5 \
+            dbus-bin \
             curl \
             rsync \
             squashfs-tools \
@@ -56,6 +58,11 @@ jobs:
 
       - name: Validate installer catalog updater
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Check The Web and all backgrounds
+        run: |
+          QT_QPA_PLATFORM=offscreen QT_ACCESSIBILITY=0 \
+            timeout --kill-after=5 120 dbus-run-session -- python3 -u tests/check-the-web.py .
 
       - name: Build Spider OS
         run: |

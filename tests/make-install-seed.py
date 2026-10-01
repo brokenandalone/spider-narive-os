@@ -24,7 +24,7 @@ def make_config(source_id):
         'late-commands': [
             'mkdir -p /run/spider-ci-seed /target/usr/local/lib/spider-ci',
             'mount -o ro /dev/disk/by-label/cidata /run/spider-ci-seed',
-            'cp /run/spider-ci-seed/verify-payload.sh /run/spider-ci-seed/first-boot.sh /target/usr/local/lib/spider-ci/',
+            'cp /run/spider-ci-seed/verify-payload.sh /run/spider-ci-seed/first-boot.sh /run/spider-ci-seed/check-the-web.py /target/usr/local/lib/spider-ci/',
             'bash /target/usr/local/lib/spider-ci/verify-payload.sh /target',
             'cp /run/spider-ci-seed/spider-ci.service /target/etc/systemd/system/',
             'systemctl --root=/target enable spider-ci.service',

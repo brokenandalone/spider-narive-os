@@ -22,34 +22,28 @@ mount -o loop,ro "${spider_iso}" "${spider_work}/iso"
 cp "${spider_work}/iso/casper/vmlinuz" "${spider_work}/vmlinuz"
 cp "${spider_work}/iso/casper/initrd" "${spider_work}/initrd"
 cp "${spider_repo}/distro/verify-installed-payload.sh" "${spider_work}/seed/verify-payload.sh"
+cp "${spider_repo}/tests/check-the-web.py" "${spider_work}/seed/check-the-web.py"
 cat > "${spider_work}/seed/first-boot.sh" <<'GUEST'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 exec >>/dev/ttyS0 2>&1
-trap 'echo SPIDER_DISK_BOOT_FAILED; systemctl poweroff' ERR
+trap 'echo "SPIDER_DISK_BOOT_FAILED: line ${LINENO}: ${BASH_COMMAND}"; systemctl --no-block poweroff' ERR
+echo 'SPIDER_CHECK: installed identity and writable root'
 grep -q '^NAME="Spider OS"$' /etc/os-release
 ! grep -q 'boot=casper' /proc/cmdline
 [[ "$(findmnt -no FSTYPE /)" != overlay ]]
 touch /var/lib/spider-ci-write-test
 rm /var/lib/spider-ci-write-test
 bash /usr/local/lib/spider-ci/verify-payload.sh /
+echo 'SPIDER_CHECK: system services'
 systemctl is-active --quiet spider-os.service ollama.service
-QT_QPA_PLATFORM=offscreen python3 - <<'PY'
-import sys
-sys.path.insert(0, '/usr/local/lib/spider-os/the-web/shell')
-from PyQt5.QtWidgets import QApplication
-from main import TheWeb
-app = QApplication([])
-window = TheWeb()
-assert window.background_picker.count() == 10
-assert window.wallpaper is not None and not window.wallpaper.isNull()
-for index in range(10):
-    window.background_picker.setCurrentIndex(index)
-    assert not window.wallpaper.isNull()
-window.close()
-PY
+echo 'SPIDER_CHECK: The Web and all ten backgrounds'
+install -d -m 700 /run/spider-ci-qt
+export XDG_RUNTIME_DIR=/run/spider-ci-qt QT_QPA_PLATFORM=offscreen QT_ACCESSIBILITY=0
+timeout --signal=TERM --kill-after=5 120 dbus-run-session -- \
+    python3 -u /usr/local/lib/spider-ci/check-the-web.py /usr/local/lib/spider-os
 echo SPIDER_DISK_BOOT_PASSED
-systemctl poweroff
+systemctl --no-block poweroff
 GUEST
 cat > "${spider_work}/seed/spider-ci.service" <<'UNIT'
 [Unit]
@@ -57,9 +51,12 @@ Description=Disposable installed-system verification
 After=spider-os.service ollama.service
 Wants=spider-os.service ollama.service
 [Service]
-Type=oneshot
+# Do not hold multi-user.target open while Qt or D-Bus starts a session.
+Type=exec
 ExecStart=/bin/bash /usr/local/lib/spider-ci/first-boot.sh
-TimeoutStartSec=300
+RuntimeMaxSec=180
+StandardOutput=journal+console
+StandardError=journal+console
 [Install]
 WantedBy=multi-user.target
 UNIT

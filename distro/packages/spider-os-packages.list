@@ -29,6 +29,7 @@ libvirt-clients
 virt-manager
 bridge-utils
 python3-pyqt5
+dbus-bin
 alsa-utils
 libnotify-bin
 mpv
