@@ -6,10 +6,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="${ROOT}/build"
 SPM_PROFILE="${SPM_PROFILE:-public}"
 
-BASE_VERSION="24.04.5"
-BASE_NAME="ubuntustudio-${BASE_VERSION}-dvd-amd64.iso"
-BASE_URL="https://cdimage.ubuntu.com/ubuntustudio/releases/24.04/release/${BASE_NAME}"
-SUMS_URL="https://cdimage.ubuntu.com/ubuntustudio/releases/24.04/release/SHA256SUMS"
+CONFIG="${ROOT}/distro/config/base.env"
+if [[ ! -f "${CONFIG}" ]]; then
+    echo "ERROR: Missing Spider OS base configuration: ${CONFIG}" >&2
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${CONFIG}"
+
+BASE_VERSION="${UBUNTU_IMAGE_VERSION}"
+BASE_NAME="${UBUNTU_IMAGE_NAME}"
+BASE_URL="${UBUNTU_CDIMAGE_BASE}/${UBUNTU_RELEASE_PATH}/${BASE_NAME}"
+SUMS_URL="${UBUNTU_CDIMAGE_BASE}/${UBUNTU_RELEASE_PATH}/SHA256SUMS"
 
 BASE_ISO="${BUILD}/${BASE_NAME}"
 ISO_MOUNT="${BUILD}/iso-mount"
@@ -17,7 +26,7 @@ ISO_TREE="${BUILD}/iso-tree"
 ROOTFS="${BUILD}/rootfs"
 LIVE_ROOTFS="${BUILD}/live-rootfs"
 
-OUTPUT="${BUILD}/Spider_OS_${BASE_VERSION}_amd64.iso"
+OUTPUT="${BUILD}/Spider_OS_${UBUNTU_IMAGE_VERSION}_amd64.iso"
 
 # Cleanup runs in a subshell so it never disables errexit in the builder.
 cleanup() (
@@ -283,20 +292,20 @@ SPIDER_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "Installing Spider OS system identity..."
 
 rm -f "${ROOTFS}/etc/os-release"
-cat > "${ROOTFS}/etc/os-release" <<'SPIDER_OS_RELEASE'
+cat > "${ROOTFS}/etc/os-release" <<SPIDER_OS_RELEASE
 NAME="Spider OS"
 PRETTY_NAME="Spider OS 0.1"
 ID=ubuntu
 ID_LIKE=debian
-VERSION_ID="24.04"
-VERSION="0.1 (Ubuntu 24.04 LTS base)"
-VERSION_CODENAME=noble
-UBUNTU_CODENAME=noble
+VERSION_ID="${UBUNTU_RELEASE}"
+VERSION="0.1 (Ubuntu ${UBUNTU_RELEASE} base)"
+VERSION_CODENAME=${UBUNTU_CODENAME}
+UBUNTU_CODENAME=${UBUNTU_CODENAME}
 HOME_URL="https://github.com/brokenandalone/spider-narive-os"
 SUPPORT_URL="https://github.com/brokenandalone/spider-narive-os"
 BUG_REPORT_URL="https://github.com/brokenandalone/spider-narive-os/issues"
 SPIDER_OS_VERSION="0.1"
-SPIDER_OS_BASE="Ubuntu Studio 24.04.5"
+SPIDER_OS_BASE="Ubuntu Studio ${UBUNTU_IMAGE_VERSION}"
 SPIDER_OS_SHELL="The Web"
 SPIDER_OS_AI="Webbie"
 SPIDER_OS_SEARCH="Forage"
@@ -595,7 +604,7 @@ install -d \
     "${LIVE_ROOTFS}/usr/lib"
 
 rm -f "${LIVE_ROOTFS}/etc/os-release"
-cat > "${LIVE_ROOTFS}/etc/os-release" <<'SPIDER_LIVE_RELEASE'
+cat > "${LIVE_ROOTFS}/etc/os-release" <<SPIDER_LIVE_RELEASE
 NAME="Spider OS"
 PRETTY_NAME="Spider OS 0.1"
 ID=ubuntu
@@ -649,7 +658,7 @@ chmod 755 \
 while IFS= read -r desktop_file; do
     sed -i \
         -e 's/Install Ubuntu Studio/Install Spider OS/g' \
-        -e 's/Install Ubuntu 24\.04\.5 LTS/Install Spider OS/g' \
+        -e 's/Install Ubuntu [0-9][0-9]\.[0-9][0-9][^/]*/Install Spider OS/g' \
         -e 's/Install Ubuntu/Install Spider OS/g' \
         "${desktop_file}"
 done < <(
@@ -663,7 +672,7 @@ done < <(
 # Media identity.
 if [[ -d "${ISO_TREE}/.disk" ]]; then
     printf '%s\n' \
-        'Spider OS 0.1 - Ubuntu Studio 24.04.5 base' \
+        'Spider OS 0.1 - Ubuntu Studio ${UBUNTU_IMAGE_VERSION} base' \
         > "${ISO_TREE}/.disk/info"
 fi
 
