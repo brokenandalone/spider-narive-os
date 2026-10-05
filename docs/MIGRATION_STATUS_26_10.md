@@ -45,6 +45,22 @@ Before invoking do-release-upgrade, still review:
 
 Do not use do-release-upgrade -d.
 
+## Real-machine preflight follow-up
+
+Observed after USB and service/repository checks:
+
+- 64 GB Kingston DataTraveler detected as /dev/sdb, 57.6 GiB usable, with /dev/sdb1 FAT32 label KINGSTON
+- package holds: none
+- Spider Core: active and enabled
+- Webbie user service: active and enabled
+- Webbie currently captures microphone audio through parec
+- GRUB 2.12-1ubuntu7.3
+- grub-probe reports ext2 for the ext4 root filesystem, which is normal for GRUB's ext2/ext3/ext4 filesystem module naming
+- third-party apt sources are present for Tailscale and Cloudflare/cloudflared
+- official Ubuntu Noble sources are also present
+- the third-party apt sources must be disabled before the release upgrade and restored/reconfigured only after the target release is stable
+- external backup to the 64 GB USB is still required before invoking do-release-upgrade
+
 ## Current phase
 
 ### Phase 0: Preserve working system
