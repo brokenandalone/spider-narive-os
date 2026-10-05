@@ -11,6 +11,40 @@ The upgrade is being carried in both:
 
 `spider-narive-os` is the authoritative bootable implementation because it is the repository that produced the install that actually boots. `Spider-OS1` mirrors the roadmap and migration work without replacing the mature installer/qualification logic.
 
+## Real-machine preflight result
+
+Preflight run: 2026-10-04 21:28 local
+
+Result: PASS for the checks reviewed so far.
+
+Observed on the currently booting Spider OS:
+
+- UEFI boot
+- 465.8 GB internal disk
+- 512 MB FAT32 EFI System Partition mounted at /boot/efi
+- 449 MB ext4 /boot
+- LUKS2 encrypted /dev/sda5 with existing password unlock
+- LVM inside LUKS
+- 449 GB ext4 root volume
+- approximately 385 GiB free on /
+- no dpkg audit errors
+- no failed systemd units
+- release upgrader configured with Prompt=lts
+- current Spider OS identity reports Ubuntu 24.04 / Noble base
+
+Before invoking do-release-upgrade, still review:
+
+- lsb_release output
+- non-Ubuntu apt sources
+- package holds
+- Spider Core service state
+- Webbie user-service state
+- GRUB probe/version
+- recent high-severity boot errors
+- external backup of user/project data
+
+Do not use do-release-upgrade -d.
+
 ## Current phase
 
 ### Phase 0: Preserve working system
