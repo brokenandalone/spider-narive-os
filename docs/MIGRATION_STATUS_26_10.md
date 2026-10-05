@@ -61,6 +61,19 @@ Observed after USB and service/repository checks:
 - the third-party apt sources must be disabled before the release upgrade and restored/reconfigured only after the target release is stable
 - external backup to the 64 GB USB is still required before invoking do-release-upgrade
 
+## External backup completed
+
+Status: PASS
+
+- 64 GB Kingston DataTraveler reformatted as ext4 with label `SPIDER_BACKUP`
+- backup mounted at `/media/spider/SPIDER_BACKUP`
+- pre-upgrade backup includes the user's home directory, Spider OS payload, Spider Media Center, original Spider Media Player, critical system configuration, and preflight diagnostics
+- checksum verification completed successfully with no reported failures
+- approximately 48 GiB remained free on the backup drive after the backup
+- this external backup is the recovery anchor before the in-place release upgrade
+
+Next step: temporarily disable third-party apt repositories, fully update Ubuntu 24.04/Noble, reboot once, then re-run health checks before invoking the 24.04 -> 26.04.1 release upgrade.
+
 ## Current phase
 
 ### Phase 0: Preserve working system
