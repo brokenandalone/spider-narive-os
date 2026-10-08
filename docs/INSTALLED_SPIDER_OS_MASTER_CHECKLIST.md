@@ -4,6 +4,7 @@
 **Scope:** The installed Spider OS system first. The future installer/ISO is a separate, gated deliverable.  
 **Canonical implementation repository:** `brokenandalone/spider-narive-os`  
 **Companion/staging repository:** `brokenandalone/Spider-OS1`  
+**Installed base reported by owner:** Ubuntu Studio 26 series (previously Ubuntu Studio 24.04); exact `VERSION_ID`, Plasma and kernel remain to be verified from the installed PC. The repository ISO builder and Ubuntu 24.04 GitHub CI runners are separate and do not establish the installed release.  
 **Status:** Planned checklist; unchecked items are NOT evidence that the feature is absent. Verify against the live machine before marking done.
 
 ## Completed source work (not installed-machine completion)
@@ -38,14 +39,14 @@ Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean imple
 ## Non-negotiable rules
 
 - Keep the known-booting encrypted installation usable throughout development. Do not replace known-good installed components with older scaffold code.
-- Record the actual installed Ubuntu and KDE Plasma versions first. Repository `base.env` values do not establish the installed release.
+- Treat the owner's upgraded Ubuntu Studio 26 machine as the installed-system baseline, not the repository's older 24.04 ISO builder. Confirm its exact `VERSION_ID`, Plasma version and kernel before applying package or deployment changes.
 - Preserve existing LUKS password unlock, bootloader, initramfs and Plasma startup; make recoverable backups before risky changes.
 - Keep Webbie's runtime, fast fallback model and active data local; OneDrive is optional sync/backup, never the live operating environment.
 - Default voice authorization: owner only until the second trusted speaker is enrolled and validated. Never leave the speaker gate bypassed because a second user has not enrolled. Reject other speakers, TV/movies and Webbie's own TTS. Require stronger confirmation for security-sensitive changes.
 - Source-control repositories are public: no cloud tokens, encryption keys, passwords, personal manuscripts, school submissions, private memories or LUKS secrets in Git.
 - Webbie may research automatically but must not silently rewrite code, change security settings, install packages, alter boot configuration or commit manuscript changes.
 - Every phase passes a smoke test and a rollback/restore check before proceeding.
-- No automatic migration to Ubuntu Studio 26.10 on the only working machine. Qualify a VM/USB build and an installed reboot with encryption before considering physical migration.
+- Do not assume the installed 26-series release is specifically 26.04 or 26.10 until verified. Do not trigger another distribution migration on the working machine. Qualify future migrations separately with VM/USB, encryption and reboot tests.
 
 ## Phase 0: Preserve and measure the working machine
 
@@ -223,7 +224,7 @@ Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean imple
 
 ## Phase 15: Future OS release migration and final qualification
 
-- [ ] Keep the working install as baseline; confirm the actual supported upgrade path before selecting an Ubuntu Studio release.
+- [ ] Verify the already-upgraded Ubuntu Studio 26-series installation's exact release (`VERSION_ID`), Plasma/kernel, encryption and reboot; document the current stable installed baseline.
 - [ ] Prepare a dedicated migration branch; pin GitHub Actions runner images and release dependencies.
 - [ ] Port packaging, KDE/Plasma, kernel, systemd, audio and desktop dependencies without discarding working fixes.
 - [ ] Build ISO, checksums, reproducible logs and a VM boot/install test.
@@ -252,3 +253,7 @@ Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean imple
 ## GitHub implementation batch: workspace wallpapers and Kali Bay reliability
 
 2026-10-08 UTC: [Native PR #6](https://github.com/brokenandalone/spider-narive-os/pull/6) adds visible workspace wallpaper painting with transparent scroll-panel handling, a non-mutating Kali Bay status/diagnostic path, and removes unconditional Kali package autoremove. [Pinned Ubuntu 24.04 CI run 37791751889](https://github.com/brokenandalone/spider-narive-os/actions/runs/37791751889) passed source regression, feature validation and offscreen wallpaper smoke tests at head `6961b426`. Still **not merged, deployed, or qualified on the installed Spider OS PC**. The full Kali security metapackage was not installed by this GitHub work; see `docs/KALI_BAY_WALLPAPER_RELIABILITY.md` for verification and rollback.
+
+## Installed-base correction (2026-10-08)
+
+The owner confirmed Spider OS has **already changed its installed base to Ubuntu Studio 26 series**. Prior references implying the installed computer still runs Ubuntu Studio 24.04 are outdated. Treat the 26-series environment as the upgrade target for *installed applications* once its exact release is checked using `cat /etc/os-release`, `plasmashell --version`, and `uname -r`. The existing GitHub ISO builder still describes a 24.04.5 source image, and the source checks are currently pinned to Ubuntu 24.04; neither has been ported or qualified as a 26-series ISO by this checklist correction. Do not modify boot, host apt sources, or the running Kali container on the basis of this documentation update.
