@@ -68,6 +68,17 @@ with tempfile.TemporaryDirectory() as folder:
         with patch.object(studio.shutil, 'which', return_value=None):
             studio_window.launch_music()
             assert 'No supported DAW' in studio_window.status.text()
+        assert studio_window.tool_tabs.count() == 4
+        with patch.object(studio, 'resolve_tool', return_value=['/test/ardour']), \
+             patch.object(studio.subprocess, 'Popen') as launch:
+            studio_window.refresh_tools()
+            assert all(button.isEnabled() for _, button in studio_window.tool_buttons)
+            studio_window.launch_tool(studio.TOOLS['Recording & mixing'][0])
+            launch.assert_called_once_with(['/test/ardour'])
+            assert studio_window.status.text() == 'Opened Ardour.'
+        with patch.object(studio, 'resolve_tool', return_value=None):
+            studio_window.refresh_tools()
+            assert not any(button.isEnabled() for _, button in studio_window.tool_buttons)
         studio_window.close()
         app.processEvents()
 print('SPIDER_QT: Author library and autosave', flush=True)

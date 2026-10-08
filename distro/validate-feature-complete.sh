@@ -12,12 +12,12 @@ for f in \
   kali-bay/bin/kali-bay kali-bay/ui/kali_bay.py \
   study/study.py study/store.py study/apa.py study/dashboard.py study/paper_dialog.py \
   media/ai-dj/service.py media/bin/spider-media-player \
-  studio/main.py studio/bin/studio author/main.py author/store.py author/bin/author system/apps.py media/bin/spider-media-center \
+  studio/main.py studio/tools.py studio/bin/studio author/main.py author/store.py author/bin/author system/apps.py media/bin/spider-media-center \
   system/guardian.py system/vault.py system/bin/spider-guardian system/bin/spider-vault \
   the-web/shell/main.py distro/install-spm.sh distro/build-personal.sh; do
   [[ -f "$f" ]] && ok "$f" || bad "$f missing"
 done
-python3 -m py_compile webbie/actions/gateway.py webbie/agent/webbie.py webbie/voice/whisper_listener.py webbie/brain/brain.py forage/local_index.py forage/engine.py forage/forage.py forage/deep-forage/deep_forage.py kali-bay/ui/kali_bay.py study/store.py study/study.py study/apa.py study/dashboard.py study/paper_dialog.py media/ai-dj/service.py system/guardian.py system/vault.py system/apps.py studio/main.py author/main.py author/store.py the-web/shell/main.py && ok 'Python syntax' || bad 'Python syntax'
+python3 -m py_compile webbie/actions/gateway.py webbie/agent/webbie.py webbie/voice/whisper_listener.py webbie/brain/brain.py forage/local_index.py forage/engine.py forage/forage.py forage/deep-forage/deep_forage.py kali-bay/ui/kali_bay.py study/store.py study/study.py study/apa.py study/dashboard.py study/paper_dialog.py media/ai-dj/service.py system/guardian.py system/vault.py system/apps.py studio/main.py studio/tools.py author/main.py author/store.py the-web/shell/main.py && ok 'Python syntax' || bad 'Python syntax'
 for f in distro/build-iso.sh distro/install-spm.sh distro/build-personal.sh kali-bay/bin/kali-bay media/bin/spider-media-player media/bin/spider-media-center studio/bin/studio author/bin/author webbie/actions/webbie-action; do bash -n "$f" || bad "$f syntax"; done
 ok 'Shell syntax'
 if grep -Rqi pocketsphinx webbie distro/packages/spider-os-packages.list; then bad 'PocketSphinx remains'; else ok 'Whisper replaced PocketSphinx'; fi
