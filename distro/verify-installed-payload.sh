@@ -5,6 +5,8 @@ spider_target_root="${1:?Pass the extracted installed-system root}"
 for file in \
     usr/lib/systemd/system/ollama.service \
     usr/local/lib/spider-os/study/study.py \
+    usr/local/lib/spider-os/system/guardian.py \
+    usr/local/lib/spider-os/system/vault.py \
     usr/local/lib/spider-os/forage/engine.py \
     usr/local/lib/spider-os/webbie/voice/whisper_listener.py \
     usr/local/share/spider-os/whisper/ggml-base.en.bin \

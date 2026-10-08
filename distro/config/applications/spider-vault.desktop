@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Spider Vault
+Comment=Verified local snapshots and encrypted cloud backup
+Exec=/usr/local/lib/spider-os/system/bin/spider-vault --help
+Icon=spider-os-logo
+Terminal=true
+Categories=System;Utility;
