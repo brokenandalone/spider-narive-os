@@ -283,7 +283,7 @@ class KaliBayWindow(QMainWindow):
 
         subtitle = QLabel(
             "SPIDER OS SECURITY WORKSPACE\n"
-            "Full Kali toolset · isolated from the Spider OS host"
+            "Full Kali toolset · Distrobox container with a shared host kernel"
         )
 
         subtitle.setStyleSheet(
@@ -317,6 +317,7 @@ class KaliBayWindow(QMainWindow):
             "INITIALIZE / REPAIR FULL KALI"
         )
 
+        self.setup_button = setup
         setup.clicked.connect(
             self.setup_kali
         )
@@ -470,7 +471,7 @@ class KaliBayWindow(QMainWindow):
         grid.setSpacing(14)
 
         for index, (title, summary, package) in enumerate(categories):
-            button = QPushButton(f"{title}\\n{summary}")
+            button = QPushButton(f"{title}\n{summary}")
             button.setMinimumHeight(88)
             button.setToolTip(f"Kali metapackage: {package}")
             button.clicked.connect(
@@ -603,6 +604,11 @@ class KaliBayWindow(QMainWindow):
                 "font-weight:bold;"
             )
 
+        self.setup_button.setEnabled(status != "ready")
+        self.setup_button.setText(
+            "FULL TOOLKIT INSTALLED" if status == "ready"
+            else "INITIALIZE / REPAIR FULL KALI"
+        )
         self.status.setText(
             text
         )
