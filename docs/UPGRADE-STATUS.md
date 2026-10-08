@@ -6,6 +6,65 @@ Webbie action gateway, Forage foundations, microphone watchdog, local Ollama
 models, research timer, USB memory, and the original workspace wallpaper set.
 Preserve those local configurations, including modified Webbie source.
 
+## Revised build order
+
+Build The Web desktop foundation first. Keep the tested Author, School, Studio,
+and playback repairs; integrate them into that foundation rather than rebuilding
+workspace navigation independently. Playback repair is independent and can be
+released alongside the desktop work.
+
+1. [x] Recover earlier installation confirmations and preserve local Webbie and
+   the owner’s 44px/40px button fixes. Installed-PC inventory still needs verification.
+2. [ ] Make The Web a selectable desktop session with KWin beneath it, its own
+   Start menu, taskbar, clock, and desktop surface. Keep the existing Plasma
+   session available. Desktop-session wiring is not implemented yet.
+3. [ ] Make workspace actions open or focus one tab per workspace; preserve open
+   state and honor unsaved-data checks on close. Embed Spider’s own Qt workspaces
+   where supported. External Ubuntu Studio apps keep their native windows and
+   need taskbar/window switching integration. Native module isolation is drafted.
+4. [ ] Discover installed Ubuntu Studio applications automatically and place them
+   in both the Start menu and the appropriate workspace. Discovery/category code
+   is drafted; its desktop UI integration is not implemented yet.
+5. [ ] Integrate the tested Author, School and Studio additions into workspace tabs.
+   These upgrades exist in source; owner-PC installation is not confirmed.
+6. [ ] Build and install the published Media Center repairs; verify real Play,
+   Pause, seek, local movies, compatible-copy preparation and cancellation,
+   visualizer output, and broadcast stop/start. Source regressions pass.
+7. [ ] Verify Webbie, Forage, Deep Forage, Kali Bay, Guardian, Vault and AI DJ from
+   the new desktop. Preserve previously installed models, memory and timers.
+   Voice enrollment and new AI DJ repair installation remain unconfirmed.
+8. [ ] Create Spider's own lock-screen theme using the existing secure session
+   locker; test lock, authentication, failure feedback and unlock. Do not replace
+   authentication with a custom password dialog.
+9. [ ] Finish Spider boot and desktop-loading splash screens. A Plymouth boot
+   theme already exists in `distro/config/plymouth`; installed activation is
+   unconfirmed. The new desktop session needs its own loading splash.
+10. [ ] Connect unconfirmed newer workspace wallpapers, finish visual consistency,
+    then test the packaged desktop login, lock/unlock, app launching, workspace
+    persistence, movie playback and splash transitions.
+
+### Proposed application placement
+
+| Workspace | Ubuntu Studio applications belong here |
+| --- | --- |
+| Studio | DAWs, instruments, effects, audio routing, recording, video editors and production tools |
+| Media | Music/video players and media viewing |
+| Author & Office | Writing, documents and office applications |
+| Art Lab | Painting, drawing, photography, design and 3D graphics |
+| Dev Bay | Development tools and terminal emulators |
+| School | Education, mathematics and scientific applications |
+| Forage | Browsers and research, alongside Spider search |
+| Communications | Email, chat and communications |
+| System | File management, settings, administration and remaining utilities |
+| Recovery | Backup and recovery tools, Guardian and Vault |
+| Games | Installed games |
+
+The catalog must honor XDG visibility, user overrides, executable availability,
+and actual installed application entries. These are placement rules, not claims
+that particular optional applications are already installed.
+
+## Source-tested additions awaiting installation checks
+
 The following newer additions have source tests, but no owner-PC installation
 confirmation:
 
