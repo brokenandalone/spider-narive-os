@@ -49,11 +49,11 @@ container_exists() {
 full_toolset_installed() {
     container_exists || return 1
 
-    distrobox enter \
-        --name "${NAME}" \
-        -- \
-        bash -lc \
-        'dpkg-query -W -f="${Status}" kali-linux-everything 2>/dev/null | grep -q "install ok installed"' \
+    # Status must not trigger Distrobox's first-run package installation.
+    [[ "$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" == 'true' ]] || return 1
+
+    podman exec --user 0 --tty=false "${NAME}" \
+        sh -c 'dpkg-query -W -f="${Status}" kali-linux-everything 2>/dev/null | grep -q "install ok installed"' \
         >/dev/null 2>&1
 }
 
@@ -148,6 +148,39 @@ setup_full() {
 }
 
 
+doctor() {
+    require_host_tools
+
+    echo "KALI BAY DIAGNOSTICS (READ ONLY)"
+    if ! container_exists; then
+        echo "Container: missing"
+        echo "Run 'kali-bay create' to initialize it."
+        return 0
+    fi
+
+    local state
+    state="$(podman inspect --format '{{.State.Status}}' "${NAME}" 2>/dev/null)" \
+        || die "Unable to inspect Kali Bay."
+    echo "Container: ${state}"
+
+    if [[ "${state}" != 'running' ]]; then
+        echo "No package repair attempted; start Kali Bay before investigating packages."
+        return 0
+    fi
+
+    # Direct Podman execution avoids triggering Distrobox's setup flow.
+    podman exec --user 0 --tty=false "${NAME}" sh -c '
+        echo "Package database audit:"
+        dpkg --audit || true
+        echo "Previously failing packages:"
+        dpkg-query -W -f="${Package}: ${Status}\\n" systemd udev kali-linux-everything 2>/dev/null || true
+        echo "Running package-manager processes:"
+        ps -eo pid,comm,args | grep -E "[a]pt-get|[d]pkg" || true
+    '
+    echo "No host configuration or container packages were modified."
+}
+
+
 update_kali() {
     require_host_tools
 
@@ -166,8 +199,6 @@ update_kali() {
             sudo env \
                 DEBIAN_FRONTEND=noninteractive \
                 apt-get full-upgrade \
-                -y
-            sudo apt-get autoremove \
                 -y
             sudo apt-get clean
         '
@@ -312,6 +343,9 @@ case "${1:-ui}" in
     status)
         status
         ;;
+    doctor)
+        doctor
+        ;;
 
     info)
         info
@@ -325,6 +359,7 @@ Usage:
   kali-bay terminal
   kali-bay update
   kali-bay status
+  kali-bay doctor
   kali-bay info
   kali-bay category <metapackage> <title>
 EOF
