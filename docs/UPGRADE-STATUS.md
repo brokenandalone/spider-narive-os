@@ -35,7 +35,13 @@ released alongside the desktop work.
    and their corresponding workspace. Visibility/override/localization tests pass.
 5. [x] Connect Author, School and Studio to native tabs, preserving existing
    on-disk data and selectively patching installed import compatibility.
-6. [ ] Build and install the published Media Center repairs; verify real Play,
+6. [x] Build and package the Media Center playback repairs as a verified Linux
+   ASAR upgrade, with locked dependencies, archive checksums and a backup installer.
+   [Media PR #2](https://github.com/brokenandalone/Spider-Media-Center/pull/2)
+   contains build commit `7811bafbbbf85fc4bb309f3aee0102c7e8d6c27a`.
+   Ten playback regressions, real FFmpeg conversion, complete archive byte checks
+   and tampered-archive rejection passed.
+   [ ] Install the packaged Media Center repairs; verify real Play,
    Pause, seek, local movies, compatible-copy preparation and cancellation,
    visualizer output, and broadcast stop/start. Source regressions pass.
 7. [ ] Verify Webbie, Forage, Deep Forage, Kali Bay, Guardian, Vault and AI DJ from
