@@ -8,7 +8,7 @@ bad(){ printf 'ERR %s\n' "$1"; fail=1; }
 for f in \
   webbie/actions/gateway.py webbie/actions/webbie-action \
   webbie/agent/webbie.py webbie/voice/whisper_listener.py webbie/brain/brain.py \
-  forage/forage.py forage/engine.py forage/deep-forage/deep_forage.py \
+  forage/local_index.py forage/forage.py forage/engine.py forage/deep-forage/deep_forage.py \
   kali-bay/bin/kali-bay kali-bay/ui/kali_bay.py \
   study/study.py study/store.py \
   media/ai-dj/service.py media/bin/spider-media-player \
@@ -17,7 +17,7 @@ for f in \
   the-web/shell/main.py distro/install-spm.sh distro/build-personal.sh; do
   [[ -f "$f" ]] && ok "$f" || bad "$f missing"
 done
-python3 -m py_compile webbie/actions/gateway.py webbie/agent/webbie.py webbie/voice/whisper_listener.py webbie/brain/brain.py forage/engine.py forage/forage.py forage/deep-forage/deep_forage.py kali-bay/ui/kali_bay.py study/store.py study/study.py media/ai-dj/service.py system/guardian.py system/vault.py system/apps.py studio/main.py the-web/shell/main.py && ok 'Python syntax' || bad 'Python syntax'
+python3 -m py_compile webbie/actions/gateway.py webbie/agent/webbie.py webbie/voice/whisper_listener.py webbie/brain/brain.py forage/local_index.py forage/engine.py forage/forage.py forage/deep-forage/deep_forage.py kali-bay/ui/kali_bay.py study/store.py study/study.py media/ai-dj/service.py system/guardian.py system/vault.py system/apps.py studio/main.py the-web/shell/main.py && ok 'Python syntax' || bad 'Python syntax'
 for f in distro/build-iso.sh distro/install-spm.sh distro/build-personal.sh kali-bay/bin/kali-bay media/bin/spider-media-player media/bin/spider-media-center studio/bin/studio author/bin/author webbie/actions/webbie-action; do bash -n "$f" || bad "$f syntax"; done
 ok 'Shell syntax'
 if grep -Rqi pocketsphinx webbie distro/packages/spider-os-packages.list; then bad 'PocketSphinx remains'; else ok 'Whisper replaced PocketSphinx'; fi

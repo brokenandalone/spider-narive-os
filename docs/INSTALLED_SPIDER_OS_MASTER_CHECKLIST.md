@@ -6,6 +6,32 @@
 **Companion/staging repository:** `brokenandalone/Spider-OS1`  
 **Status:** Planned checklist; unchecked items are NOT evidence that the feature is absent. Verify against the live machine before marking done.
 
+## Completed source work (not installed-machine completion)
+
+Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean implemented source and named regression validation. All upgrades are on open, stacked PR branches; none of these batches has been merged or deployed by this session. Full phase gates below remain pending live verification.
+
+- [x] Spider Guardian read-only health report and private diagnostics file. Native [PR #2](https://github.com/brokenandalone/spider-narive-os/pull/2); source and desktop CI passed.
+- [x] Selected-source verified local snapshots, transaction-safe SQLite backups and restore into a new directory. Native PR #2; recovery regressions passed.
+- [x] Optional encrypted OneDrive-copy implementation, upload guard and disabled daily snapshot timer. Native PR #2; policy tests passed. Real authentication/upload/restore is pending.
+- [x] Automatic source CI on pinned Ubuntu 24.04 runners in both repositories. All three previous source batches passed GitHub checks.
+- [x] Native Studio app/launcher and missing-DAW dependency messages. Native [PR #3](https://github.com/brokenandalone/spider-narive-os/pull/3); source and GUI smoke tests passed.
+- [x] Independent Author launcher with Kate/Writer routing and separate project folders. Native PR #3; this is an editor foundation, not the full manuscript library.
+- [x] Media Center launcher naming and recovered legacy-executable compatibility. Native PR #3; resolver tests passed; live playback is pending.
+- [x] Separate Studio/Author entry points in The Web and scrolling card area. Native PR #3; desktop smoke tests passed.
+- [x] Webbie fixed-action gateway, exact-request approvals, expiry and replay prevention. Native [PR #4](https://github.com/brokenandalone/spider-narive-os/pull/4); 37 native source tests and GitHub desktop checks passed.
+- [x] Nine workspace modes and role guidance for a future assistant adapter. Native PR #4; not connected to the live voice agent.
+- [x] Forage selected-source text index, source URIs/provenance, stale/deleted-source handling and atomic rebuild. Current `upgrades/forage-local-index` batch; 46 native source tests passed locally. GitHub CI status is recorded on the batch PR.
+
+## Immediate remaining delivery steps
+
+- [ ] Merge the validated stacked source PRs in dependency order.
+- [ ] Inventory/backup the installed files and preserve local-only Webbie, media and boot fixes.
+- [ ] Deploy selected modules and verify their real launch/close/relaunch behavior.
+- [ ] Configure OneDrive locally, then prove encrypted upload/download and restore.
+- [ ] Verify the microphone and both authorized voice profiles, conversations, interruption and dismissal.
+- [ ] Connect the action gateway through a trusted approval UI and authenticated voice/session adapter.
+- [ ] Select Forage source folders on the PC and verify real searches and source links.
+
 ## Non-negotiable rules
 
 - Keep the known-booting encrypted installation usable throughout development. Do not replace known-good installed components with older scaffold code.

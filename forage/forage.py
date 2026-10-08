@@ -477,6 +477,8 @@ class ForageWindow(
                     )
                 )
 
+                source_url = html.escape(item.get('url', ''), quote=True)
+                freshness = 'Source changed since indexing; rebuild to refresh.' if item.get('stale') else 'Indexed source'
                 chunks.append(
                     f"""
                     <div style="
@@ -485,9 +487,9 @@ class ForageWindow(
                         border:1px solid #35263f;
                         border-radius:8px;
                     ">
-                    <b>{title}</b>
+                    <a href="{source_url}"><b>{title}</b></a>
                     <p>{snippet}</p>
-                    <small>{path}</small>
+                    <small>{path}<br>{freshness}</small>
                     </div>
                     """
                 )
