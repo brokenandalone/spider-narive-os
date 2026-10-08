@@ -6,6 +6,16 @@ Webbie action gateway, Forage foundations, microphone watchdog, local Ollama
 models, research timer, USB memory, and the original workspace wallpaper set.
 Preserve those local configurations, including modified Webbie source.
 
+## Published desktop build
+
+The desktop release candidate is published in [PR #11](https://github.com/brokenandalone/spider-narive-os/pull/11),
+commit `e8566713e199a53540d01bf4673c4171440c62b0`.
+All 71 Python regression tests and the native Qt desktop integration passed,
+along with feature validation and shell syntax checks. The integration covers
+15 tabs, seven embedded workspaces, persistent editing/state/wallpapers,
+installed-application launching and safe closure. This checks the build source;
+the installed-PC acceptance items below remain open.
+
 ## Revised build order
 
 Build The Web desktop foundation first. Keep the tested Author, School, Studio,
@@ -49,7 +59,7 @@ released alongside the desktop work.
 | --- | --- |
 | Studio | DAWs, instruments, effects, audio routing, recording, video editors and production tools |
 | Media | Music/video players and media viewing |
-| Author & Office | Writing, documents and office applications |
+| Author | Writing, documents and office applications |
 | Art Lab | Painting, drawing, photography, design and 3D graphics |
 | Dev Bay | Development tools and terminal emulators |
 | School | Education, mathematics and scientific applications |
