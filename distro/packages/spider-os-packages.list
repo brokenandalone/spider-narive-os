@@ -42,3 +42,5 @@ libreoffice-writer
 okular
 xdg-utils
 kate
+
+python3-docx

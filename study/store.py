@@ -328,5 +328,11 @@ class StudyStore:
 
         self.db.commit()
 
+    def all_assignments(self):
+        return self.db.execute(
+            'SELECT a.id, a.title, a.due, a.status, c.name AS course '
+            'FROM assignments a JOIN courses c ON c.id=a.course_id ORDER BY a.id'
+        ).fetchall()
+
     def close(self):
         self.db.close()

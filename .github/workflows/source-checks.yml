@@ -14,7 +14,7 @@ jobs:
       - name: Install test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-yaml python3-pyqt5 dbus-bin
+          sudo apt-get install -y python3-yaml python3-docx python3-pyqt5 dbus-bin
       - name: Source and recovery regression tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
       - name: Validate feature scripts
@@ -28,3 +28,8 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_ACCESSIBILITY: '0'
         run: timeout --kill-after=5 120 dbus-run-session -- python3 -u tests/check-the-web.py .
+      - name: School dashboard and APA export smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_ACCESSIBILITY: '0'
+        run: timeout --kill-after=5 120 dbus-run-session -- python3 -u tests/check-school-ui.py

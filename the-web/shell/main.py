@@ -70,7 +70,7 @@ class TheWeb(QMainWindow):
         self.background_picker = QComboBox()
         for label, name in [('The Web', 'default'), ('Forage / Deep Forage', 'forage'),
                             ('Studio', 'studio'), ('Author', 'author'), ('Art Lab', 'art-lab'), ('Dev Bay', 'dev-bay'),
-                            ('Study', 'study'), ('Media', 'media'), ('Kali Bay', 'kali-bay'),
+                            ('School', 'study'), ('Media', 'media'), ('Kali Bay', 'kali-bay'),
                             ('System', 'system'), ('Recovery', 'recovery')]:
             self.background_picker.addItem(label, name)
         self.background_picker.currentIndexChanged.connect(
@@ -80,7 +80,7 @@ class TheWeb(QMainWindow):
         side = QVBoxLayout(); body.addLayout(side)
         for label, fn in [
             ('WEBBIE', self.open_webbie), ('FORAGE', self.open_forage), ('DEEP FORAGE', self.open_deep_forage),
-            ('KALI BAY', self.open_kali), ('MEDIA CENTER', self.open_media), ('STUDY', self.open_study),
+            ('KALI BAY', self.open_kali), ('MEDIA CENTER', self.open_media), ('SCHOOL', self.open_study),
             ('STUDIO', self.open_studio), ('AUTHOR', self.open_author),
             ('TERMINAL', self.open_terminal), ('SYSTEM SETTINGS', self.open_settings),
         ]:
@@ -104,7 +104,7 @@ class TheWeb(QMainWindow):
             ('Deep Forage','Research','Multi-source research and synthesis',self.open_deep_forage),
             ('Kali Bay','Security workspace','Isolated full Kali environment',self.open_kali),
             ('Media Center','Spider Media Center','Music, video and recovered media package',self.open_media),
-            ('Study','Education workspace','Courses, assignments, notes, research',self.open_study),
+            ('School','Education workspace','Dashboard, assignments, notes and APA papers',self.open_study),
             ('Studio','Native creative workspace','Music, artwork and production tools',self.open_studio),
             ('Author','Independent writing workspace','Local manuscript editing and persistent session',self.open_author),
         ]
@@ -167,7 +167,7 @@ class TheWeb(QMainWindow):
             self.launch(command,'author','Author editor opened.',cwd=AUTHOR_HOME)
         except (AppUnavailable, OSError) as error:
             self.status.setText(str(error))
-    def open_study(self): self.launch(['python3',SPIDER_ROOT/'study/study.py'],'study','Study opened.')
+    def open_study(self): self.launch(['python3',SPIDER_ROOT/'study/study.py'],'study','School opened.')
     def open_terminal(self): self.launch(['konsole'],'default','Terminal opened.')
     def open_settings(self): self.launch(['systemsettings'],'system','System Settings opened.')
 

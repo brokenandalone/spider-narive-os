@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from PyQt5.QtCore import (
-    Qt,
+    Qt, QTimer,
 )
 from PyQt5.QtGui import (
     QBrush,
@@ -15,7 +15,7 @@ from PyQt5.QtGui import (
     QPixmap,
 )
 from PyQt5.QtWidgets import (
-    QApplication,
+    QApplication, QDialog, QAbstractItemView,
     QFileDialog,
     QHBoxLayout,
     QInputDialog,
@@ -57,6 +57,8 @@ sys.path.insert(
 )
 
 from store import StudyStore
+from dashboard import overview
+from paper_dialog import PaperDialog
 
 
 WALLPAPER = (
@@ -79,7 +81,7 @@ class StudyWindow(QMainWindow):
         self.wallpaper = None
 
         self.setWindowTitle(
-            "Study | Spider OS"
+            "School | Spider OS"
         )
 
         self.resize(
@@ -238,7 +240,7 @@ class StudyWindow(QMainWindow):
         )
 
         title = QLabel(
-            "STUDY"
+            "SCHOOL"
         )
 
         title.setFont(
@@ -314,6 +316,19 @@ class StudyWindow(QMainWindow):
         outer.addLayout(
             actions
         )
+
+        school_actions = QHBoxLayout()
+        self.add_action(school_actions, "APA PAPER", self.create_apa_paper)
+        self.add_action(school_actions, "MY SNHU", self.open_snhu)
+        self.add_action(school_actions, "APA GUIDE", self.open_apa_guide)
+        outer.addLayout(school_actions)
+        self.dashboard = QLabel()
+        self.dashboard.setWordWrap(True)
+        outer.addWidget(self.dashboard)
+        self.refresh_dashboard()
+        self.dashboard_timer = QTimer(self)
+        self.dashboard_timer.timeout.connect(self.refresh_dashboard)
+        self.dashboard_timer.start(30000)
 
         splitter = QSplitter(
             Qt.Horizontal
@@ -435,6 +450,8 @@ class StudyWindow(QMainWindow):
             0,
             3,
         )
+
+        self.assignment_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         self.assignment_table.setHorizontalHeaderLabels(
             [
@@ -580,7 +597,7 @@ class StudyWindow(QMainWindow):
         )
 
         footer = QLabel(
-            "STUDY · SPIDER OS · YOUR LIFE. ONE WEB."
+            "SCHOOL · SPIDER OS · YOUR LIFE. ONE WEB."
         )
 
         footer.setAlignment(
@@ -770,6 +787,8 @@ class StudyWindow(QMainWindow):
         ):
             return
 
+        self.save_notes(quiet=True)
+
         self.current_course_id = (
             self.store.add_course(
                 name
@@ -837,6 +856,7 @@ class StudyWindow(QMainWindow):
     # --------------------------------------------------------
 
     def load_assignments(self):
+        self.refresh_dashboard()
         self.assignment_table.setRowCount(
             0
         )
@@ -932,7 +952,7 @@ class StudyWindow(QMainWindow):
             self,
             "Due Date",
             (
-                "Due date or date/time "
+                "Due date YYYY-MM-DD "
                 "(optional):"
             ),
         )
@@ -1142,6 +1162,51 @@ class StudyWindow(QMainWindow):
             self.status.setText(
                 "Deep Forage has not been installed yet."
             )
+
+    def refresh_dashboard(self):
+        summary = overview(self.store.all_assignments())
+        text = (f"Across all courses: {summary['open']} open · {summary['complete']} complete · "
+                f"{summary['overdue']} overdue · {summary['undated']} need an ISO date")
+        if summary['upcoming']:
+            next_due = summary['upcoming'][0]
+            text += f"\nNext outstanding: {next_due['course']} / {next_due['title']} / {next_due['due']}"
+        self.dashboard.setText(text)
+
+    def open_snhu(self):
+        self.launch(['xdg-open', 'https://my.snhu.edu/'])
+
+    def open_apa_guide(self):
+        self.launch(['xdg-open', 'https://apastyle.apa.org/instructional-aids/student-paper-setup-guide.pdf'])
+
+    def create_apa_paper(self):
+        course = self.store.course(self.current_course_id) if self.current_course_id else None
+        dialog = PaperDialog(self, course['name'] if course else '')
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        values = dialog.values()
+        if any(not values[key] for key in ('title','author','institution','course','instructor','due')):
+            QMessageBox.warning(self, 'APA paper', 'Complete all title-page fields.'); return
+        folder = self.store.course_folder(self.current_course_id) / 'Assignments'
+        path, _ = QFileDialog.getSaveFileName(self, 'Save APA paper', str(folder / 'paper.docx'), 'Word (*.docx)')
+        if not path:
+            return
+        if not path.lower().endswith('.docx'):
+            path += '.docx'
+        overwrite = False
+        if Path(path).exists():
+            overwrite = QMessageBox.question(self, 'Replace document',
+                'Replace this document?') == QMessageBox.Yes
+            if not overwrite:
+                return
+        try:
+            from apa import create_paper
+            create_paper(path, **values, overwrite=overwrite)
+        except ImportError:
+            QMessageBox.warning(self, 'APA paper', 'APA export needs python3-docx. Install the School dependency and retry.')
+            return
+        except Exception as error:
+            QMessageBox.warning(self, 'APA paper', str(error)); return
+        self.status.setText(f'APA paper saved: {path}')
 
     def open_writer(self):
         if self.current_course_id:
