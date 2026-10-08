@@ -215,3 +215,7 @@
 ## GitHub implementation batch: workspace launchers
 
 2026-10-08 UTC: Native Studio source/launcher, an independent Author editor launcher, common media resolution and Media Center menu naming are implemented in the workspace-launcher branch. The Web exposes Studio and Author separately, and packaging includes their modules. See `docs/WORKSPACE_LAUNCHER_REPAIRS.md` for the deliberately limited Author foundation and the remaining installed-machine checks. No live checkbox is marked complete from source tests.
+
+## GitHub implementation batch: Webbie action gateway
+
+2026-10-08 UTC: A local fixed-action registry, request-bound approval queue and workspace mode context are implemented under `webbie/actions`. The existing voice agent and its installed fixes are preserved. See `docs/WEBBIE_ACTION_GATEWAY.md` for the trust boundary and pending voice/approval-surface integration. No live-machine checkbox is marked complete.
