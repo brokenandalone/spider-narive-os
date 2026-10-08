@@ -10,7 +10,7 @@ KALI_HOME="${DATA_DIR}/home"
 READY_FILE="${STATE_DIR}/full-toolset.ready"
 
 SCRIPT_DIR="$(
-    cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+    cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")"
     pwd
 )"
 
