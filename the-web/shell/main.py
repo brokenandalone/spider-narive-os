@@ -51,7 +51,7 @@ class TheWeb(QMainWindow):
         side = QVBoxLayout(); body.addLayout(side)
         for label, fn in [
             ('WEBBIE', self.open_webbie), ('FORAGE', self.open_forage), ('DEEP FORAGE', self.open_deep_forage),
-            ('KALI BAY', self.open_kali), ('MEDIA', self.open_media), ('STUDY', self.open_study),
+            ('KALI BAY', self.open_kali), ('KALI PURPLE', self.open_kali_purple), ('MEDIA', self.open_media), ('STUDY', self.open_study),
             ('TERMINAL', self.open_terminal), ('SYSTEM SETTINGS', self.open_settings),
         ]:
             b=QPushButton(label); b.setMinimumWidth(190); b.clicked.connect(fn); side.addWidget(b)
@@ -64,7 +64,8 @@ class TheWeb(QMainWindow):
             ('Webbie','Resident voice AI','Talk, launch, organize, assist',self.open_webbie),
             ('Forage','Search & discovery','Local knowledge + web search',self.open_forage),
             ('Deep Forage','Research','Multi-source research and synthesis',self.open_deep_forage),
-            ('Kali Bay','Security workspace','Isolated full Kali environment',self.open_kali),
+            ('Kali Bay','Security workspace','Offensive assessment and tools',self.open_kali),
+            ('Kali Purple','Defensive security','Identify, protect, detect, respond, recover',self.open_kali_purple),
             ('Media','Spider Media Player','Available when a media package is installed',self.open_media),
             ('Study','Education workspace','Courses, assignments, notes, research',self.open_study),
         ]
@@ -109,6 +110,7 @@ class TheWeb(QMainWindow):
     def open_forage(self): self.launch(['python3',SPIDER_ROOT/'forage/forage.py'],'forage','Forage opened.')
     def open_deep_forage(self): self.launch(['python3',SPIDER_ROOT/'forage/deep-forage/deep_forage.py'],'forage','Deep Forage opened.')
     def open_kali(self): self.launch([SPIDER_ROOT/'kali-bay/bin/kali-bay'],'kali-bay','Kali Bay opened.')
+    def open_kali_purple(self): self.launch([SPIDER_ROOT/'kali-bay/bin/kali-bay','purple'],'kali-bay','Kali Purple opened.')
     def open_media(self):
         if not Path('/opt/spider-media-player/spider-media-player').is_file():
             self.set_workspace('media')
