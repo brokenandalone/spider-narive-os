@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Study
+Name=School
 GenericName=Spider OS Education Workspace
 Comment=Learn, read, research, analyze, write, and achieve
 Exec=/usr/local/lib/spider-os/study/bin/study
