@@ -53,7 +53,7 @@ full_toolset_installed() {
         --name "${NAME}" \
         -- \
         bash -lc \
-        'dpkg-query -W -f="${Status}" kali-linux-everything 2>/dev/null | grep -q "install ok installed"' \
+        'dpkg-query -W -f="\${Status}" kali-linux-everything 2>/dev/null | grep -q "install ok installed"' \
         >/dev/null 2>&1
 }
 
