@@ -8,7 +8,7 @@
 
 ## Completed source work (not installed-machine completion)
 
-Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean implemented source and named regression validation. All upgrades are on open, stacked PR branches; none of these batches has been merged or deployed by this session. Full phase gates below remain pending live verification.
+Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean implemented source and named regression validation. All upgrades are on open, stacked PR branches; none of these batches has been merged or deployed by this session. Full phase gates below remain pending live verification.
 
 - [x] Spider Guardian read-only health report and private diagnostics file. Native [PR #2](https://github.com/brokenandalone/spider-narive-os/pull/2); source and desktop CI passed.
 - [x] Selected-source verified local snapshots, transaction-safe SQLite backups and restore into a new directory. Native PR #2; recovery regressions passed.
@@ -21,12 +21,15 @@ Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean imple
 - [x] Webbie fixed-action gateway, exact-request approvals, expiry and replay prevention. Native [PR #4](https://github.com/brokenandalone/spider-narive-os/pull/4); 37 native source tests and GitHub desktop checks passed.
 - [x] Nine workspace modes and role guidance for a future assistant adapter. Native PR #4; not connected to the live voice agent.
 - [x] Forage selected-source text index, source URIs/provenance, stale/deleted-source handling and atomic rebuild. Current `upgrades/forage-local-index` batch; 46 native source tests passed locally. GitHub CI status is recorded on the batch PR.
+- [x] The Web visible workspace wallpaper painting and transparent scroll panel, with offscreen pixel regression. Native [PR #6](https://github.com/brokenandalone/spider-narive-os/pull/6), head `6961b426`; [GitHub source and desktop checks passed](https://github.com/brokenandalone/spider-narive-os/actions/runs/37791751889) on 2026-10-08. Physical-display verification is still pending.
+- [x] Kali Bay source hardening: read-only status/doctor checks avoiding Distrobox reinitialization, regression coverage and removal of automatic `apt-get autoremove`. Native PR #6, head `6961b426`; same passing CI run. Full Kali toolset and real-PC status checks are still pending.
 
 ## Immediate remaining delivery steps
 
 - [ ] Merge the validated stacked source PRs in dependency order.
 - [ ] Inventory/backup the installed files and preserve local-only Webbie, media and boot fixes.
 - [ ] Deploy selected modules and verify their real launch/close/relaunch behavior.
+- [ ] Back up current The Web and Kali Bay scripts, then verify actual purple wallpaper display and safe Kali status/doctor behavior on the PC.
 - [ ] Configure OneDrive locally, then prove encrypted upload/download and restore.
 - [ ] Verify the microphone and both authorized voice profiles, conversations, interruption and dismissal.
 - [ ] Connect the action gateway through a trusted approval UI and authenticated voice/session adapter.
@@ -245,3 +248,7 @@ Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean imple
 ## GitHub implementation batch: Webbie action gateway
 
 2026-10-08 UTC: A local fixed-action registry, request-bound approval queue and workspace mode context are implemented under `webbie/actions`. The existing voice agent and its installed fixes are preserved. See `docs/WEBBIE_ACTION_GATEWAY.md` for the trust boundary and pending voice/approval-surface integration. No live-machine checkbox is marked complete.
+
+## GitHub implementation batch: workspace wallpapers and Kali Bay reliability
+
+2026-10-08 UTC: [Native PR #6](https://github.com/brokenandalone/spider-narive-os/pull/6) adds visible workspace wallpaper painting with transparent scroll-panel handling, a non-mutating Kali Bay status/diagnostic path, and removes unconditional Kali package autoremove. [Pinned Ubuntu 24.04 CI run 37791751889](https://github.com/brokenandalone/spider-narive-os/actions/runs/37791751889) passed source regression, feature validation and offscreen wallpaper smoke tests at head `6961b426`. Still **not merged, deployed, or qualified on the installed Spider OS PC**. The full Kali security metapackage was not installed by this GitHub work; see `docs/KALI_BAY_WALLPAPER_RELIABILITY.md` for verification and rollback.
