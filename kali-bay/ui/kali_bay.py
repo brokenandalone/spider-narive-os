@@ -7,9 +7,9 @@ from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import (
-    QBrush,
+    QColor,
     QFont,
-    QPalette,
+    QPainter,
     QPixmap,
 )
 from PyQt5.QtWidgets import (
@@ -147,6 +147,41 @@ PURPLE_CATEGORIES = [
 ]
 
 
+class WallpaperSurface(QWidget):
+    """Paint the workspace artwork on the content surface itself.
+
+    QMainWindow palette wallpapers disappear beneath the central QWidget.
+    Keep the image untouched and paint it behind the dashboard widgets.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._image = QPixmap()
+        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+
+    def set_wallpaper(self, image):
+        self._image = image if image is not None else QPixmap()
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        if not self._image.isNull():
+            scaled = self._image.scaled(
+                self.size(),
+                Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation,
+            )
+            x = (self.width() - scaled.width()) // 2
+            y = (self.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+            # Gentle scrim keeps controls legible without burying the image.
+            painter.fillRect(self.rect(), QColor(7, 5, 10, 75))
+        else:
+            painter.fillRect(self.rect(), QColor(7, 5, 10))
+        painter.end()
+
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -178,15 +213,6 @@ class KaliBayWindow(QMainWindow):
     def build_ui(self):
         self.setStyleSheet(
             """
-            QWidget#root {
-                background: rgba(
-                    7,
-                    5,
-                    10,
-                    225
-                );
-            }
-
             QLabel {
                 color: #f3eef6;
             }
@@ -240,15 +266,10 @@ class KaliBayWindow(QMainWindow):
             """
         )
 
-        root = QWidget()
-
-        root.setObjectName(
-            "root"
-        )
-
-        self.setCentralWidget(
-            root
-        )
+        root = WallpaperSurface()
+        self.wallpaper_surface = root
+        root.setObjectName("root")
+        self.setCentralWidget(root)
 
         outer = QVBoxLayout(
             root
@@ -380,7 +401,7 @@ class KaliBayWindow(QMainWindow):
             QTabWidget::pane {
                 border: 1px solid #5b3376;
                 border-radius: 10px;
-                background: rgba(11, 8, 18, 180);
+                background: rgba(11, 8, 18, 70);
             }
             QTabBar::tab {
                 background: #241335;
@@ -485,54 +506,9 @@ class KaliBayWindow(QMainWindow):
         return page
 
     def load_wallpaper(self):
-        if not WALLPAPER.exists():
-            return
-
-        self._wallpaper = QPixmap(
-            str(WALLPAPER)
-        )
-
-        self.apply_wallpaper()
-
-    def apply_wallpaper(self):
-        if (
-            self._wallpaper is None
-            or self._wallpaper.isNull()
-        ):
-            return
-
-        scaled = self._wallpaper.scaled(
-            self.size(),
-            Qt.KeepAspectRatioByExpanding,
-            Qt.SmoothTransformation,
-        )
-
-        palette = QPalette(
-            self.palette()
-        )
-
-        palette.setBrush(
-            QPalette.Window,
-            QBrush(scaled),
-        )
-
-        self.setPalette(
-            palette
-        )
-
-        self.setAutoFillBackground(
-            True
-        )
-
-    def resizeEvent(
-        self,
-        event,
-    ):
-        self.apply_wallpaper()
-
-        super().resizeEvent(
-            event
-        )
+        image = QPixmap(str(WALLPAPER)) if WALLPAPER.is_file() else QPixmap()
+        self._wallpaper = image
+        self.wallpaper_surface.set_wallpaper(image)
 
     def manager_status(self):
         try:
