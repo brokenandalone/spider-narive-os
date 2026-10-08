@@ -7,7 +7,10 @@ from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDialo
     QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from store import AuthorStore
+if __package__:
+    from .store import AuthorStore
+else:
+    from store import AuthorStore
 
 
 class AuthorWindow(QMainWindow):

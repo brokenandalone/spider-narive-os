@@ -1,22 +1,45 @@
 #!/usr/bin/env python3
-import os, subprocess, sys
+"""The Web desktop: native workspace tabs, installed applications and taskbar."""
+import json
+import os
 from pathlib import Path
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QFont, QPainter, QPixmap
-from PyQt5.QtWidgets import QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QPushButton, QScrollArea, QVBoxLayout, QWidget
+import shutil
+import subprocess
+import sys
+
+from PyQt5.QtCore import Qt, QTimer, QSize, QDateTime
+from PyQt5.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap
+from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGridLayout,
+    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
+    QMessageBox, QMenu, QPushButton, QScrollArea, QShortcut, QSplashScreen, QTabWidget,
+    QVBoxLayout, QWidget)
 
 SPIDER_ROOT = Path('/usr/local/lib/spider-os')
 if not SPIDER_ROOT.exists():
     SPIDER_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
-from apps import AppUnavailable, AUTHOR_HOME, author_command, media_command, studio_command
-WORKSPACE_IMAGES = {'author': 'system'}
+from apps import AppUnavailable, media_command
+from app_catalog import WORKSPACES, discover_apps, launch_command
+from desktop import list_tasks, wm_command, x11_properties
+from wallpapers import WallpaperCatalog
+from workspaces import create_native
 
-WALLPAPER = SPIDER_ROOT / 'branding' / 'wallpapers' / 'spider-os-wallpaper.png'
+WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
+STYLE = '''
+QWidget { color:#f5eff8; font-family:'Sans Serif'; }
+QWidget#root { background:transparent; }
+QWidget#panel, QDialog, QTabWidget::pane { background:rgba(18,13,24,240); border:1px solid #3c2946; border-radius:10px; }
+QTabWidget#workspaceTabs[home='true']::pane { background:transparent; border:none; }
+QPushButton { font-size:14px; background:rgba(70,25,105,230); border:1px solid #7e22ce; border-radius:8px; padding:7px 12px; color:white; text-align:left; }
+QPushButton:hover, QPushButton:checked { background:#6b21a8; border-color:#c084fc; }
+QLineEdit, QComboBox, QListWidget { background:#17111f; color:#f5eff8; border:1px solid #5b21b6; border-radius:7px; padding:6px; }
+QTabBar::tab { background:#17111f; padding:10px 14px; color:#c7b9d1; }
+QTabBar::tab:selected { background:#6b21a8; color:white; }
+QScrollArea { background:transparent; border:none; }
+'''
+
 
 class WallpaperWidget(QWidget):
-    """Paint the background on the actual central widget, not behind it."""
-
     def __init__(self):
         super().__init__()
         self._background = QPixmap()
@@ -28,160 +51,329 @@ class WallpaperWidget(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         if not self._background.isNull() and self.width() and self.height():
-            image = self._background.scaled(
-                self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            x = (image.width() - self.width()) // 2
-            y = (image.height() - self.height()) // 2
+            image = self._background.scaled(self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            x = (image.width() - self.width()) // 2; y = (image.height() - self.height()) // 2
             painter.drawPixmap(0, 0, image, x, y, self.width(), self.height())
         else:
             painter.fillRect(self.rect(), QColor(8, 6, 11))
-        painter.fillRect(self.rect(), QColor(8, 6, 11, 120))
-        painter.end()
+        painter.fillRect(self.rect(), QColor(8, 6, 11, 95))
+
+
+def button(label, callback):
+    widget = QPushButton(label)
+    widget.setMinimumHeight(44)
+    widget.clicked.connect(callback)
+    return widget
+
+
+class StartMenu(QDialog):
+    def __init__(self, shell):
+        super().__init__(shell, Qt.Popup)
+        self.shell = shell
+        self.setObjectName('panel'); self.setStyleSheet(STYLE); self.resize(580, 650)
+        layout = QVBoxLayout(self)
+        heading = QLabel('SPIDER OS  /  Start'); heading.setFont(QFont('Sans Serif', 22, QFont.Bold)); layout.addWidget(heading)
+        self.search = QLineEdit(); self.search.setPlaceholderText('Find a workspace or installed app'); layout.addWidget(self.search)
+        self.results = QListWidget(); self.results.setIconSize(QSize(28, 28)); layout.addWidget(self.results, 1)
+        self.search.textChanged.connect(self.populate); self.results.itemActivated.connect(self.activate)
+        actions = QHBoxLayout(); layout.addLayout(actions)
+        actions.addWidget(button('Refresh apps', shell.refresh_apps))
+        actions.addWidget(button('Lock', shell.lock_session))
+        actions.addWidget(button('Log out', shell.logout))
+        self.populate()
+
+    def populate(self):
+        query = self.search.text().casefold(); self.results.clear()
+        for workspace, label in WORKSPACES.items():
+            if workspace != 'default' and query in label.casefold():
+                item = QListWidgetItem('Workspace  /  ' + label); item.setData(Qt.UserRole, ('workspace', workspace)); self.results.addItem(item)
+        for app in self.shell.installed_apps:
+            if query in (app.name + ' ' + app.comment + ' ' + WORKSPACES[app.workspace]).casefold():
+                item = QListWidgetItem(QIcon.fromTheme(app.icon), app.name + '  /  ' + WORKSPACES[app.workspace])
+                item.setData(Qt.UserRole, ('app', app.desktop_id)); self.results.addItem(item)
+        if self.results.count():
+            self.results.setCurrentRow(0)
+
+    def activate(self, item):
+        kind, ident = item.data(Qt.UserRole); self.hide()
+        if kind == 'workspace': self.shell.open_workspace(ident)
+        else: self.shell.open_installed(ident)
+
+    def show_menu(self, dock):
+        if self.isVisible():
+            self.hide(); return
+        self.populate(); self.move(dock.x(), max(dock.screen().geometry().top(), dock.y() - self.height() - 8))
+        self.show(); self.raise_(); self.search.setFocus()
+
+
+class Taskbar(QWidget):
+    def __init__(self, shell):
+        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
+        self.shell = shell; self.setObjectName('panel'); self.setStyleSheet(STYLE)
+        self.setWindowTitle('The Web Taskbar')
+        layout = QHBoxLayout(self); layout.setContentsMargins(8, 4, 8, 4)
+        self.start = button('Start', lambda: shell.start_menu.show_menu(self)); self.start.setIcon(QIcon(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png'))); layout.addWidget(self.start)
+        layout.addWidget(button('The Web', shell.show_desktop))
+        self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
+        layout.addWidget(button('Lock', shell.lock_session))
+        self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
+        self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(2000)
+        self.last_tasks = None; self.refresh()
+
+    def position(self):
+        geometry = QApplication.primaryScreen().geometry()
+        self.setGeometry(geometry.left(), geometry.bottom() - 55, geometry.width(), 56)
+        if self.shell.desktop_mode: x11_properties(self, 'DOCK', QApplication.primaryScreen())
+
+    def refresh(self):
+        self.clock.setText(QDateTime.currentDateTime().toString('ddd d MMM  HH:mm'))
+        excluded = {f'0x{int(self.winId()):08x}', f'0x{int(self.shell.winId()):08x}'}
+        tasks = list_tasks(excluded) if self.shell.desktop_mode else []
+        signature = tuple((task.ident, task.title) for task in tasks)
+        if signature == self.last_tasks: return
+        self.last_tasks = signature
+        while self.tasks.count():
+            item = self.tasks.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+        for task in tasks[:2]:
+            widget = button(task.title[:18], lambda checked=False, ident=task.ident: wm_command('-i', '-a', ident))
+            widget.setMaximumWidth(150); widget.setToolTip(task.title); self.tasks.addWidget(widget)
+        if len(tasks) > 2:
+            more = button(f'{len(tasks) - 2} more windows', lambda: None); menu = QMenu(more)
+            for task in tasks[2:]:
+                action = menu.addAction(task.title); action.triggered.connect(lambda checked=False, ident=task.ident: wm_command('-i', '-a', ident))
+            more.setMenu(menu); self.tasks.addWidget(more)
+        self.tasks.addStretch(1)
 
 
 class TheWeb(QMainWindow):
-    def __init__(self):
+    def __init__(self, desktop_mode=False, restore=True):
         super().__init__()
-        self.wallpaper = None
-        self.setWindowTitle('The Web | Spider OS')
-        self.resize(1280, 820)
-        self.setMinimumSize(1000, 650)
-        self.build_ui()
-        self.load_wallpaper()
+        self.desktop_mode = desktop_mode; self.current_workspace = 'default'; self.workspace_widgets = {}; self.app_lists = {}
+        self.wallpaper_catalog = WallpaperCatalog(SPIDER_ROOT); self.wallpaper = None
+        self.state_path = self.wallpaper_catalog.config.parent / 'desktop.json'
+        self.installed_apps = discover_apps(desktops='TheWeb:KDE')
+        self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(STYLE)
+        if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
+        self.build_ui(); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
+        self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
+        self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
         self.set_workspace('default')
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.refresh_status)
-        self.timer.start(5000)
-        self.refresh_status()
+        if restore: self.restore_state()
+        self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_status); self.timer.start(15000)
+        QTimer.singleShot(0, self.refresh_status)
 
     def build_ui(self):
-        self.setStyleSheet('''
-            QWidget#root { color:#f5eff8; }
-            QLabel { color:#f5eff8; }
-            QPushButton { background:rgba(70,25,105,225); border:1px solid #7e22ce; border-radius:9px; padding:11px; color:white; font-weight:bold; text-align:left; }
-            QPushButton:hover { background:#6b21a8; border-color:#c084fc; }
-            QFrame#card { background:rgba(18,13,24,225); border:1px solid #3c2946; border-radius:12px; }
-        ''')
         root = WallpaperWidget(); root.setObjectName('root'); self.background_surface = root; self.setCentralWidget(root)
-        outer = QVBoxLayout(root); outer.setContentsMargins(28,24,28,24)
-        title = QLabel('SPIDER OS'); title.setFont(QFont('Sans Serif', 34, QFont.Bold)); title.setStyleSheet('color:#c084fc;')
-        outer.addWidget(title)
-        tagline = QLabel('YOUR LIFE. ONE WEB.'); tagline.setStyleSheet('color:#a99caf; font-size:14px; font-weight:bold;'); outer.addWidget(tagline)
+        outer = QVBoxLayout(root); outer.setContentsMargins(20, 16, 20, 12)
+        header = QHBoxLayout(); outer.addLayout(header)
+        logo = QLabel(); logo.setPixmap(QPixmap(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png')).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)); header.addWidget(logo)
+        title = QLabel('THE WEB'); title.setStyleSheet('font-size:26px; font-weight:bold; color:#e9d5ff; letter-spacing:2px;'); header.addWidget(title)
+        header.addWidget(QLabel('YOUR LIFE. ONE WEB.'), 1)
+        header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
+        self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
+        home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
+        welcome = QLabel('Your workspaces'); welcome.setFont(QFont('Sans Serif', 22, QFont.Bold)); home_layout.addWidget(welcome)
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
+        content = QWidget(); content.setObjectName('root'); scroll.setWidget(content); grid = QGridLayout(content); grid.setAlignment(Qt.AlignTop | Qt.AlignLeft); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(14)
+        for index, (workspace, label) in enumerate((k, v) for k, v in WORKSPACES.items() if k != 'default'):
+            shortcut = button(label, lambda checked=False, name=workspace: self.open_workspace(name)); shortcut.setFixedWidth(175)
+            grid.addWidget(shortcut, index // 4, index % 4)
+        home.setProperty('workspace', 'default'); self.tabs.addTab(home, 'The Web'); self.workspace_widgets['default'] = home
+        self.tabs.tabBar().setTabButton(0, self.tabs.tabBar().RightSide, None)
+        wallpaper_row = QHBoxLayout(); outer.addLayout(wallpaper_row)
         self.background_picker = QComboBox()
-        for label, name in [('The Web', 'default'), ('Forage / Deep Forage', 'forage'),
-                            ('Studio', 'studio'), ('Author', 'author'), ('Art Lab', 'art-lab'), ('Dev Bay', 'dev-bay'),
-                            ('School', 'study'), ('Media', 'media'), ('Kali Bay', 'kali-bay'),
-                            ('System', 'system'), ('Recovery', 'recovery')]:
-            self.background_picker.addItem(label, name)
-        self.background_picker.currentIndexChanged.connect(
-            lambda index: self.set_workspace(self.background_picker.itemData(index)))
-        outer.addWidget(self.background_picker)
-        body = QHBoxLayout(); outer.addLayout(body, 1)
-        side = QVBoxLayout(); body.addLayout(side)
-        for label, fn in [
-            ('WEBBIE', self.open_webbie), ('FORAGE', self.open_forage), ('DEEP FORAGE', self.open_deep_forage),
-            ('KALI BAY', self.open_kali), ('MEDIA CENTER', self.open_media), ('SCHOOL', self.open_study),
-            ('STUDIO', self.open_studio), ('AUTHOR', self.open_author),
-            ('TERMINAL', self.open_terminal), ('SYSTEM SETTINGS', self.open_settings),
-        ]:
-            b=QPushButton(label); b.setMinimumWidth(190); b.clicked.connect(fn); side.addWidget(b)
-        side.addStretch(1)
-        scroll = QScrollArea(); scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet('QScrollArea { background: transparent; border: none; }')
-        scroll.viewport().setAutoFillBackground(False)
-        scroll.viewport().setAttribute(Qt.WA_TranslucentBackground, True)
-        body.addWidget(scroll, 1)
-        content = QWidget(); content.setObjectName('workspaceContent')
-        content.setStyleSheet('QWidget#workspaceContent { background: transparent; }')
-        scroll.setWidget(content); center = QVBoxLayout(content)
-        heading = QLabel('THE WEB'); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); heading.setStyleSheet('color:#e9d5ff;'); center.addWidget(heading)
-        intro = QLabel('Native Spider OS home · Webbie · research · security · media · study'); intro.setStyleSheet('color:#b2a5ba;'); center.addWidget(intro)
-        grid = QGridLayout(); center.addLayout(grid, 1)
-        cards = [
-            ('Webbie','Resident voice AI','Talk, launch, organize, assist',self.open_webbie),
-            ('Forage','Search & discovery','Local knowledge + web search',self.open_forage),
-            ('Deep Forage','Research','Multi-source research and synthesis',self.open_deep_forage),
-            ('Kali Bay','Security workspace','Isolated full Kali environment',self.open_kali),
-            ('Media Center','Spider Media Center','Music, video and recovered media package',self.open_media),
-            ('School','Education workspace','Dashboard, assignments, notes and APA papers',self.open_study),
-            ('Studio','Native creative workspace','Music, artwork and production tools',self.open_studio),
-            ('Author','Independent writing workspace','Local manuscript editing and persistent session',self.open_author),
-        ]
-        for i,(name,sub,desc,fn) in enumerate(cards):
-            frame=QFrame(); frame.setObjectName('card'); lay=QVBoxLayout(frame)
-            n=QLabel(name); n.setStyleSheet('font-size:20px;font-weight:bold;color:#d8b4fe;'); lay.addWidget(n)
-            s=QLabel(sub); s.setStyleSheet('font-weight:bold;color:#bca9c8;'); lay.addWidget(s)
-            d=QLabel(desc); d.setWordWrap(True); d.setStyleSheet('color:#96899f;'); lay.addWidget(d); lay.addStretch(1)
-            o=QPushButton('OPEN'); o.clicked.connect(fn); lay.addWidget(o)
-            grid.addWidget(frame, i//2, i%2)
-        self.service_status = QLabel(); self.service_status.setStyleSheet('color:#978b9f; padding-top:8px;'); center.addWidget(self.service_status)
-        self.status = QLabel('Spider OS ready.'); self.status.setStyleSheet('color:#c7b9d1; padding-top:5px;'); outer.addWidget(self.status)
+        for name, label in WORKSPACES.items(): self.background_picker.addItem(label, name)
+        self.background_picker.setMinimumHeight(40)
+        self.background_picker.currentIndexChanged.connect(lambda index: self.open_workspace(self.background_picker.itemData(index)))
+        wallpaper_row.addWidget(self.background_picker)
+        self.wallpaper_picker = QComboBox(); self.wallpaper_picker.setMinimumHeight(40); self.wallpaper_picker.setIconSize(QSize(64, 36))
+        self.wallpaper_picker.addItem('Original workspace background', 'original')
+        for entry in self.wallpaper_catalog.entries:
+            self.wallpaper_picker.addItem(QIcon(str(SPIDER_ROOT / entry['file'])), entry['group'] + ' / ' + entry['label'], entry['id'])
+        self.wallpaper_picker.currentIndexChanged.connect(self.choose_wallpaper); wallpaper_row.addWidget(self.wallpaper_picker, 1)
+        self.status = QLabel('Spider OS ready.'); self.service_status = QLabel(); outer.addWidget(self.status); outer.addWidget(self.service_status)
 
-    def load_wallpaper(self):
-        if WALLPAPER.exists(): self.wallpaper=QPixmap(str(WALLPAPER)); self.apply_wallpaper()
-    def apply_wallpaper(self):
-        if self.wallpaper is not None and not self.wallpaper.isNull():
-            self.background_surface.set_background(self.wallpaper)
+    def application_panel(self, workspace):
+        panel = QWidget(); panel.setObjectName('panel'); layout = QVBoxLayout(panel)
+        layout.addWidget(QLabel('Installed apps  /  ' + WORKSPACES[workspace]))
+        apps = QListWidget(); apps.setMinimumWidth(230); apps.setMaximumWidth(340); apps.setIconSize(QSize(28, 28)); layout.addWidget(apps)
+        apps.itemActivated.connect(lambda item: self.open_installed(item.data(Qt.UserRole)))
+        self.app_lists[workspace] = apps; self.populate_app_list(workspace)
+        layout.addWidget(button('Refresh installed apps', self.refresh_apps))
+        if workspace == 'media': layout.addWidget(button('Open Spider Media Center', self.launch_media))
+        if workspace == 'system': layout.addWidget(button('System settings', self.open_settings))
+        if workspace == 'dev-bay': layout.addWidget(button('Terminal', self.open_terminal))
+        if workspace == 'recovery':
+            for label, path in [('Guardian', 'system/bin/spider-guardian'), ('Vault', 'system/bin/spider-vault')]:
+                if (SPIDER_ROOT / path).is_file(): layout.addWidget(button(label, lambda checked=False, p=path: self.launch([SPIDER_ROOT / p], workspace)))
+        return panel
 
-    def set_workspace(self,name):
-        image = WALLPAPER if name == 'default' else SPIDER_ROOT / 'branding' / 'workspaces' / f'{WORKSPACE_IMAGES.get(name, name)}.png'
-        if image.exists():
-            self.wallpaper = QPixmap(str(image))
-            self.apply_wallpaper()
-        if hasattr(self, 'background_picker'):
-            index = self.background_picker.findData(name)
-            if index >= 0:
-                self.background_picker.blockSignals(True)
-                self.background_picker.setCurrentIndex(index)
-                self.background_picker.blockSignals(False)
-        runtime=Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))/'spider-os'
-        try: runtime.mkdir(parents=True,exist_ok=True); (runtime/'workspace').write_text(name,encoding='utf-8')
-        except Exception: pass
+    def populate_app_list(self, workspace):
+        apps = self.app_lists[workspace]; apps.clear()
+        for app in self.installed_apps:
+            if app.workspace == workspace:
+                item = QListWidgetItem(QIcon.fromTheme(app.icon), app.name); item.setData(Qt.UserRole, app.desktop_id); item.setToolTip(app.comment); apps.addItem(item)
+        if not apps.count():
+            item = QListWidgetItem('No installed apps found.'); item.setToolTip('Refresh after installing an app in this workspace.'); item.setFlags(Qt.NoItemFlags); apps.addItem(item)
 
-    def launch(self,cmd,workspace='default',message='Opened.',cwd=None):
+    def refresh_apps(self):
+        self.installed_apps = discover_apps(desktops='TheWeb:KDE')
+        for name in self.app_lists: self.populate_app_list(name)
+        self.start_menu.populate(); self.status.setText(f'{len(self.installed_apps)} installed apps found.')
+
+    def open_workspace(self, name):
+        if name not in WORKSPACES: return
+        if name not in self.workspace_widgets:
+            page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
+            layout = QHBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8); layout.addWidget(self.application_panel(name))
+            try: native = create_native(name, SPIDER_ROOT)
+            except Exception as error:
+                native = None; self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
+            page.native = native
+            if native:
+                native.setParent(page); native.setWindowFlags(Qt.Widget)
+                area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native); layout.addWidget(area, 1); native.show()
+            else:
+                surface = QWidget(); surface.setObjectName('root'); body = QVBoxLayout(surface)
+                heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
+                body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1); layout.addWidget(surface, 1)
+            self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
+        self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
+        if self.desktop_mode: wm_command('-k', 'on')
+        self.raise_(); self.activateWindow()
+
+    def open_installed(self, ident):
+        app = next((a for a in self.installed_apps if a.desktop_id == ident), None)
+        if not app: return
+        self.open_workspace(app.workspace)
+        try: self.launch(launch_command(app), app.workspace, 'Opened ' + app.name + '.')
+        except RuntimeError as error: self.status.setText(str(error))
+
+    def can_close(self, page):
+        native = getattr(page, 'native', None)
+        worker = getattr(native, 'worker', None)
+        if worker and worker.isRunning():
+            self.status.setText('Research is still running. Keep this workspace open until it finishes.'); return False
+        if hasattr(native, 'save_notes'):
+            try: native.save_notes(quiet=True)
+            except Exception as error:
+                self.status.setText('Notes could not be saved: ' + str(error)); return False
+        return native is None or native.close()
+
+    def close_tab(self, index):
+        page = self.tabs.widget(index)
+        if page.property('workspace') == 'default' or not self.can_close(page): return
+        name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); page.deleteLater(); self.save_state()
+
+    def tab_changed(self, index):
+        if index >= 0:
+            self.set_workspace(self.tabs.widget(index).property('workspace')); self.save_state()
+
+    def set_workspace(self, name):
+        self.tabs.setProperty('home', name == 'default'); self.tabs.style().unpolish(self.tabs); self.tabs.style().polish(self.tabs)
+        self.current_workspace = name; self.wallpaper = QPixmap(str(self.wallpaper_catalog.path(name))); self.background_surface.set_background(self.wallpaper)
+        for picker, ident in [(self.background_picker, name), (self.wallpaper_picker, self.wallpaper_catalog.selected_id(name))]:
+            picker.blockSignals(True); picker.setCurrentIndex(max(0, picker.findData(ident))); picker.blockSignals(False)
+        runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'spider-os'
+        try: runtime.mkdir(parents=True, exist_ok=True); (runtime / 'workspace').write_text(name)
+        except OSError: pass
+
+    def choose_wallpaper(self, index):
+        try:
+            self.wallpaper_catalog.select(self.current_workspace, self.wallpaper_picker.itemData(index)); self.set_workspace(self.current_workspace); self.status.setText('Wallpaper saved for this workspace.')
+        except (OSError, ValueError) as error: self.status.setText('Could not save wallpaper: ' + str(error))
+
+    def save_state(self):
+        if getattr(self, '_restoring', False): return
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True); temporary = self.state_path.with_suffix('.tmp')
+            temporary.write_text(json.dumps({'open': list(self.workspace_widgets), 'active': self.current_workspace})); temporary.replace(self.state_path)
+        except OSError as error: self.status.setText('Could not save desktop state: ' + str(error))
+
+    def restore_state(self):
+        self._restoring = True
+        try:
+            data = json.loads(self.state_path.read_text())
+            for name in data.get('open', []):
+                if name in WORKSPACES and name != 'default': self.open_workspace(name)
+            name = data.get('active', 'default')
+            if name in self.workspace_widgets: self.open_workspace(name)
+        except (OSError, ValueError, TypeError): pass
+        finally: self._restoring = False
+
+    def launch(self, command, workspace='default', message='Opened.'):
         self.set_workspace(workspace)
-        try: subprocess.Popen([str(x) for x in cmd],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True,cwd=cwd); self.status.setText(message)
-        except Exception as e: self.status.setText(str(e))
+        try:
+            subprocess.Popen([str(x) for x in command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            if self.desktop_mode: wm_command('-k', 'off')
+            self.status.setText(message)
+        except OSError as error: self.status.setText(str(error))
 
-    def open_webbie(self): self.launch(['python3',SPIDER_ROOT/'webbie/ui/webbie-ui.py'],'default','Webbie opened.')
-    def open_forage(self): self.launch(['python3',SPIDER_ROOT/'forage/forage.py'],'forage','Forage opened.')
-    def open_deep_forage(self): self.launch(['python3',SPIDER_ROOT/'forage/deep-forage/deep_forage.py'],'forage','Deep Forage opened.')
-    def open_kali(self): self.launch([SPIDER_ROOT/'kali-bay/bin/kali-bay'],'kali-bay','Kali Bay opened.')
-    def open_media(self):
-        try:
-            self.launch(media_command(),'media','Spider Media Center opened.')
-        except AppUnavailable as error:
-            self.status.setText(str(error))
-    def open_studio(self):
-        try:
-            self.launch(studio_command(SPIDER_ROOT),'studio','Spider Studio opened.')
-        except AppUnavailable as error:
-            self.status.setText(str(error))
-    def open_author(self):
-        try:
-            command = author_command()
-            AUTHOR_HOME.mkdir(parents=True,exist_ok=True)
-            for directory in ('Manuscripts','Lore','Snapshots'):
-                (AUTHOR_HOME/directory).mkdir(exist_ok=True)
-            self.launch(command,'author','Author editor opened.',cwd=AUTHOR_HOME)
-        except (AppUnavailable, OSError) as error:
-            self.status.setText(str(error))
-    def open_study(self): self.launch(['python3',SPIDER_ROOT/'study/study.py'],'study','School opened.')
-    def open_terminal(self): self.launch(['konsole'],'default','Terminal opened.')
-    def open_settings(self): self.launch(['systemsettings'],'system','System Settings opened.')
+    def launch_media(self):
+        try: self.launch(media_command(), 'media', 'Spider Media Center opened.')
+        except AppUnavailable as error: self.status.setText(str(error))
 
-    def is_active(self,cmd):
-        try: return subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=2).returncode == 0
-        except Exception: return False
+    def open_media(self): self.open_workspace('media')
+    def open_studio(self): self.open_workspace('studio')
+    def open_author(self): self.open_workspace('author')
+    def open_study(self): self.open_workspace('study')
+    def open_webbie(self): self.open_workspace('webbie')
+    def open_forage(self): self.open_workspace('forage')
+    def open_deep_forage(self): self.open_workspace('deep-forage')
+    def open_kali(self): self.open_workspace('kali-bay')
+    def open_terminal(self): self.launch(['konsole'], 'dev-bay', 'Terminal opened.')
+    def open_settings(self): self.launch(['systemsettings'], 'system', 'System Settings opened.')
+    def show_desktop(self): self.open_workspace('default')
+
+    def lock_session(self):
+        # Calls the secure KDE locker; the shell never receives passwords.
+        try:
+            result = subprocess.run(['dbus-send', '--session', '--print-reply', '--reply-timeout=3000', '--dest=org.freedesktop.ScreenSaver', '/ScreenSaver', 'org.freedesktop.ScreenSaver.Lock'], capture_output=True, text=True, timeout=4)
+            self.status.setText('Session locked.' if result.returncode == 0 else 'Secure session locker is unavailable: ' + result.stderr.strip())
+        except (OSError, subprocess.TimeoutExpired) as error: self.status.setText('Unable to lock: ' + str(error))
+
+    def logout(self):
+        if QMessageBox.question(self, 'Log out', 'Save your work and log out of The Web?', QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+            self.close()
+
     def refresh_status(self):
-        webbie=self.is_active(['systemctl','--user','is-active','--quiet','webbie.service'])
-        core=self.is_active(['systemctl','is-active','--quiet','spider-os.service'])
-        ollama=self.is_active(['systemctl','is-active','--quiet','ollama.service'])
-        dj=self.is_active(['systemctl','--user','is-active','--quiet','spider-ai-dj.service'])
-        self.service_status.setText(f"Webbie: {'ONLINE' if webbie else 'OFFLINE'}   ·   Core: {'ONLINE' if core else 'OFFLINE'}   ·   Local AI: {'ONLINE' if ollama else 'OFFLINE'}   ·   AI DJ: {'ONLINE' if dj else 'OFFLINE'}")
+        states = []
+        for label, unit, user in [('Webbie', 'webbie.service', True), ('Local AI', 'ollama.service', False), ('AI DJ', 'spider-ai-dj.service', True)]:
+            try:
+                command = ['systemctl'] + (['--user'] if user else []) + ['is-active', '--quiet', unit]
+                active = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1).returncode == 0
+            except (OSError, subprocess.TimeoutExpired): active = False
+            states.append(label + ': ' + ('ONLINE' if active else 'OFFLINE'))
+        self.service_status.setText('  ·  '.join(states))
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.taskbar.show(); self.taskbar.position()
+        if self.desktop_mode:
+            geometry = QApplication.primaryScreen().geometry(); self.setGeometry(geometry.left(), geometry.top(), geometry.width(), geometry.height() - 56)
+            x11_properties(self, 'DESKTOP'); self.lower()
+
+    def closeEvent(self, event):
+        # Save all editors before closing any of their stores.
+        for page in self.workspace_widgets.values():
+            native = getattr(page, 'native', None); worker = getattr(native, 'worker', None)
+            if worker and worker.isRunning(): self.status.setText('Research is still running.'); event.ignore(); return
+            if hasattr(native, 'flush') and not native.flush(): event.ignore(); return
+            if hasattr(native, 'save_notes'):
+                try: native.save_notes(quiet=True)
+                except Exception as error: self.status.setText('Notes could not be saved: ' + str(error)); event.ignore(); return
+        self.save_state()
+        for page in self.workspace_widgets.values():
+            if not self.can_close(page): event.ignore(); return
+        self.timer.stop(); self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
 
 
 def main():
-    app=QApplication(sys.argv); app.setApplicationName('The Web'); w=TheWeb(); w.showMaximized(); sys.exit(app.exec_())
-if __name__=='__main__': main()
+    app = QApplication(sys.argv); app.setApplicationName('The Web'); app.setQuitOnLastWindowClosed(True)
+    splash = QSplashScreen(QPixmap(str(SPIDER_ROOT / 'branding/splash/spider-os-splash.png')).scaled(960, 540, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+    splash.show(); splash.showMessage('Opening The Web…', Qt.AlignBottom | Qt.AlignHCenter, QColor('#e9d5ff')); app.processEvents()
+    window = TheWeb(desktop_mode='--desktop-session' in sys.argv); window.showMaximized() if not window.desktop_mode else window.show()
+    splash.finish(window); sys.exit(app.exec_())
+
+if __name__ == '__main__': main()

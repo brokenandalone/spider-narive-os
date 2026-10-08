@@ -15,33 +15,33 @@ released alongside the desktop work.
 
 1. [x] Recover earlier installation confirmations and preserve local Webbie and
    the owner’s 44px/40px button fixes. Installed-PC inventory still needs verification.
-2. [ ] Make The Web a selectable desktop session with KWin beneath it, its own
-   Start menu, taskbar, clock, and desktop surface. Keep the existing Plasma
-   session available. Desktop-session wiring is not implemented yet.
-3. [ ] Make workspace actions open or focus one tab per workspace; preserve open
-   state and honor unsaved-data checks on close. Embed Spider’s own Qt workspaces
-   where supported. External Ubuntu Studio apps keep their native windows and
-   need taskbar/window switching integration. Native module isolation is drafted.
-4. [ ] Discover installed Ubuntu Studio applications automatically and place them
-   in both the Start menu and the appropriate workspace. Discovery/category code
-   is drafted; its desktop UI integration is not implemented yet.
-5. [ ] Integrate the tested Author, School and Studio additions into workspace tabs.
-   These upgrades exist in source; owner-PC installation is not confirmed.
+2. [x] Implement the selectable The Web X11 desktop session, its own Start,
+   taskbar, clock and desktop surface. KDE infrastructure/secure locker remain;
+   Plasma remains selectable and returns on shell failure. Installed login QA pending.
+3. [x] Implement one persistent tab per workspace. Seven native Qt workspaces
+   embed; unsaved editors/notes and running research block closure. External
+   applications retain native windows, switched from the taskbar. Qt integration passes.
+4. [x] Discover installed XDG/Flatpak/Snap applications and place them in Start
+   and their corresponding workspace. Visibility/override/localization tests pass.
+5. [x] Connect Author, School and Studio to native tabs, preserving existing
+   on-disk data and selectively patching installed import compatibility.
 6. [ ] Build and install the published Media Center repairs; verify real Play,
    Pause, seek, local movies, compatible-copy preparation and cancellation,
    visualizer output, and broadcast stop/start. Source regressions pass.
 7. [ ] Verify Webbie, Forage, Deep Forage, Kali Bay, Guardian, Vault and AI DJ from
    the new desktop. Preserve previously installed models, memory and timers.
    Voice enrollment and new AI DJ repair installation remain unconfirmed.
-8. [ ] Create Spider's own lock-screen theme using the existing secure session
-   locker; test lock, authentication, failure feedback and unlock. Do not replace
-   authentication with a custom password dialog.
-9. [ ] Finish Spider boot and desktop-loading splash screens. A Plymouth boot
-   theme already exists in `distro/config/plymouth`; installed activation is
-   unconfirmed. The new desktop session needs its own loading splash.
-10. [ ] Connect unconfirmed newer workspace wallpapers, finish visual consistency,
-    then test the packaged desktop login, lock/unlock, app launching, workspace
-    persistence, movie playback and splash transitions.
+8. [x] Package Spider-branded secure lock-screen artwork using KDE's existing
+   locker and authentication. Appearance setter backs up the previous config.
+   Real automatic lock, password failure and unlock verification remain pending.
+9. [x] Add the desktop-loading splash; retain the existing Spider Plymouth theme
+   and boot configuration. Active installed boot-theme verification remains pending.
+10. [x] Package and connect all recovered wallpaper collections: 59 artwork files,
+    including today's seven new workspace designs and matching alternates, with
+    independent saved choices and preserved original defaults.
+11. [ ] Install this release candidate and verify real SDDM login, KWin focus,
+    window switching, lock/unlock, logout, multiple monitors, movies and splash
+    transitions on the owner PC. Source/Qt checks cannot establish those results.
 
 ### Proposed application placement
 
@@ -76,8 +76,9 @@ confirmation:
 | AI DJ HTTP reliability | `media/ai-dj/service.py` | Restart the user service; check health and prepare a spoken transition. |
 | Media playback, visible errors, local compatibility preparation and radio state | Separate `brokenandalone/Spider-Media-Center` repository | Update the actual packaged application, then test Play/Pause/seek, a local movie, compatibility cancellation, and stop/start broadcast. |
 
-The seven-workspace wallpaper pack was prepared previously; its newer wallpaper
-connections have no installation confirmation. Do not replace the confirmed
+The seven-workspace wallpaper pack and expanded earlier collection are now
+packaged in `branding/wallpapers/collection/`. Their source integration is tested;
+owner-PC installation remains unconfirmed. Do not replace the confirmed
 original wallpapers merely because alternatives exist.
 
 The Media Center code repairs do not update an installed Kabel 7.5 executable.

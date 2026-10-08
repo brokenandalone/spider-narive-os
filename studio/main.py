@@ -23,7 +23,10 @@ SPIDER_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from tools import TOOLS, resolve_tool
+if __package__:
+    from .tools import TOOLS, resolve_tool
+else:
+    from tools import TOOLS, resolve_tool
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 

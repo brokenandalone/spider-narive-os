@@ -44,3 +44,6 @@ xdg-utils
 kate
 
 python3-docx
+
+# The Web X11 taskbar/window switching
+wmctrl
