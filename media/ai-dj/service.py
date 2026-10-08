@@ -24,7 +24,7 @@ def track_text(track):
 
 def ollama_script(current, nxt):
     prompt = (
-        "You are Nova, the local AI radio host inside Spider Media Player on Spider OS. "
+        "You are Nova, the local AI radio host inside Spider Media Center on Spider OS. "
         "Write a natural radio transition of no more than 35 words. "
         "Do not quote lyrics. Do not invent facts about the artists. "
         f"The song ending is: {track_text(current)}. "
@@ -96,7 +96,7 @@ def cleanup():
 
 
 class Handler(BaseHTTPRequestHandler):
-    def headers(self, status=200):
+    def response_headers(self, status=200):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -108,24 +108,30 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_OPTIONS(self):
-        self.headers(204)
+        self.response_headers(204)
 
     def do_GET(self):
         if self.path == "/health":
-            self.headers(200)
+            self.response_headers(200)
             self.wfile.write(json.dumps({"ok": True, "service": "Spider AI DJ", "port": PORT}).encode())
             return
-        self.headers(404)
+        self.response_headers(404)
         self.wfile.write(b'{"error":"not found"}')
 
     def do_POST(self):
         if self.path != "/dj/prepare":
-            self.headers(404)
+            self.response_headers(404)
             self.wfile.write(b'{"error":"not found"}')
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            if length <= 0 or length > 65536:
+                self.response_headers(413 if length > 65536 else 400)
+                self.wfile.write(b'{"error":"invalid request size"}')
+                return
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+            if not isinstance(body, dict):
+                raise ValueError("Request must be a JSON object")
             current = body.get("currentTrack") or {}
             nxt = body.get("nextTrack") or {}
             script = ollama_script(current, nxt)
@@ -138,10 +144,13 @@ class Handler(BaseHTTPRequestHandler):
                 "script": script,
                 "audioFile": audio.resolve().as_uri(),
             }
-            self.headers(200)
+            self.response_headers(200)
             self.wfile.write(json.dumps(response).encode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as error:
+            self.response_headers(400)
+            self.wfile.write(json.dumps({"error": str(error)}).encode("utf-8"))
         except Exception as error:
-            self.headers(500)
+            self.response_headers(500)
             self.wfile.write(json.dumps({"error": str(error)}).encode("utf-8"))
 
 
