@@ -70,6 +70,31 @@ with tempfile.TemporaryDirectory() as folder:
             assert 'No supported DAW' in studio_window.status.text()
         studio_window.close()
         app.processEvents()
+print('SPIDER_QT: Author library and autosave', flush=True)
+spec = importlib.util.spec_from_file_location('author_ui', root / 'author/main.py')
+author = importlib.util.module_from_spec(spec); spec.loader.exec_module(author)
+with tempfile.TemporaryDirectory() as folder:
+    author_window = author.AuthorWindow(folder)
+    book = author_window.store.create_book('Smoke book')
+    chapter = author_window.store.create_chapter(book, 'One', 'Original')
+    author_window.load_books(); author_window.books.setCurrentRow(0)
+    author_window.chapters.setCurrentRow(0)
+    assert author_window.editor.toPlainText() == 'Original'
+    author_window.editor.setPlainText('Autosaved text')
+    author_window.canon.setPlainText('Canon rule')
+    author_window.autosave()
+    assert author_window.store.chapter(chapter)['content'] == 'Autosaved text'
+    assert author_window.store.canon(book) == 'Canon rule'
+    from unittest.mock import patch as author_patch
+    with author_patch.object(author_window.store, 'save', side_effect=OSError('disk full')), \
+         author_patch.object(author.QMessageBox, 'warning'):
+        author_window.editor.setPlainText('Unsaved text')
+        assert author_window.flush() is False
+        assert author_window.editor.toPlainText() == 'Unsaved text'
+    author_window.close()
+    reopened = author.AuthorWindow(folder)
+    assert reopened.store.chapter(chapter)['content'] == 'Unsaved text'
+    reopened.close()
 print('SPIDER_QT: Forage source-link rendering', flush=True)
 spec = importlib.util.spec_from_file_location('forage_ui', root / 'forage/forage.py')
 forage = importlib.util.module_from_spec(spec)
