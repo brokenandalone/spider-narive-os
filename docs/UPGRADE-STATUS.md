@@ -49,6 +49,9 @@ released alongside the desktop work.
 10. [x] Package and connect all recovered wallpaper collections: 59 artwork files,
     including today's seven new workspace designs and matching alternates, with
     independent saved choices and preserved original defaults.
+    Final placement audit corrected two Study tags and included original
+    workspace backgrounds in the installer package; existing installed images
+    are never overwritten.
 11. [ ] Install this release candidate and verify real SDDM login, KWin focus,
     window switching, lock/unlock, logout, multiple monitors, movies and splash
     transitions on the owner PC. Source/Qt checks cannot establish those results.

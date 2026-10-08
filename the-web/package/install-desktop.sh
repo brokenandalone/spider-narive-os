@@ -42,6 +42,12 @@ install -m644 "$source_root/branding/wallpapers/collection.json" "$root/branding
 for relative in branding/wallpapers/spider-os-wallpaper.png branding/splash/spider-os-splash.png branding/icons/spider-os-logo.png; do
     if [[ ! -s "$root/$relative" ]]; then install -Dm644 "$source_root/$relative" "$root/$relative"; fi
 done
+# Fill missing workspace originals without replacing installed backgrounds.
+for image in "$source_root"/branding/workspaces/*.png; do
+    [[ -f "$image" ]] || continue
+    target="$root/branding/workspaces/$(basename "$image")"
+    if [[ ! -s "$target" ]]; then install -Dm644 "$image" "$target"; fi
+done
 # Supply missing native app source only. Never replace existing owner workspace code.
 for workspace in author studio study; do
     if [[ ! -d "$root/$workspace" && -d "$source_root/$workspace" ]]; then cp -a "$source_root/$workspace" "$root/"; fi
