@@ -2,7 +2,7 @@
 import os, subprocess, sys
 from pathlib import Path
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QBrush, QFont, QPalette, QPixmap
+from PyQt5.QtGui import QColor, QFont, QPainter, QPixmap
 from PyQt5.QtWidgets import QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 SPIDER_ROOT = Path('/usr/local/lib/spider-os')
@@ -13,6 +13,31 @@ from apps import AppUnavailable, AUTHOR_HOME, author_command, media_command, stu
 WORKSPACE_IMAGES = {'author': 'system'}
 
 WALLPAPER = SPIDER_ROOT / 'branding' / 'wallpapers' / 'spider-os-wallpaper.png'
+
+class WallpaperWidget(QWidget):
+    """Paint the background on the actual central widget, not behind it."""
+
+    def __init__(self):
+        super().__init__()
+        self._background = QPixmap()
+
+    def set_background(self, pixmap):
+        self._background = pixmap
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        if not self._background.isNull() and self.width() and self.height():
+            image = self._background.scaled(
+                self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            x = (image.width() - self.width()) // 2
+            y = (image.height() - self.height()) // 2
+            painter.drawPixmap(0, 0, image, x, y, self.width(), self.height())
+        else:
+            painter.fillRect(self.rect(), QColor(8, 6, 11))
+        painter.fillRect(self.rect(), QColor(8, 6, 11, 120))
+        painter.end()
+
 
 class TheWeb(QMainWindow):
     def __init__(self):
@@ -31,13 +56,13 @@ class TheWeb(QMainWindow):
 
     def build_ui(self):
         self.setStyleSheet('''
-            QWidget#root { background: rgba(8,6,11,150); color:#f5eff8; }
+            QWidget#root { color:#f5eff8; }
             QLabel { color:#f5eff8; }
             QPushButton { background:rgba(70,25,105,225); border:1px solid #7e22ce; border-radius:9px; padding:11px; color:white; font-weight:bold; text-align:left; }
             QPushButton:hover { background:#6b21a8; border-color:#c084fc; }
             QFrame#card { background:rgba(18,13,24,225); border:1px solid #3c2946; border-radius:12px; }
         ''')
-        root = QWidget(); root.setObjectName('root'); self.setCentralWidget(root)
+        root = WallpaperWidget(); root.setObjectName('root'); self.background_surface = root; self.setCentralWidget(root)
         outer = QVBoxLayout(root); outer.setContentsMargins(28,24,28,24)
         title = QLabel('SPIDER OS'); title.setFont(QFont('Sans Serif', 34, QFont.Bold)); title.setStyleSheet('color:#c084fc;')
         outer.addWidget(title)
@@ -62,8 +87,14 @@ class TheWeb(QMainWindow):
             b=QPushButton(label); b.setMinimumWidth(190); b.clicked.connect(fn); side.addWidget(b)
         side.addStretch(1)
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame); body.addWidget(scroll, 1)
-        content = QWidget(); scroll.setWidget(content); center = QVBoxLayout(content)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet('QScrollArea { background: transparent; border: none; }')
+        scroll.viewport().setAutoFillBackground(False)
+        scroll.viewport().setAttribute(Qt.WA_TranslucentBackground, True)
+        body.addWidget(scroll, 1)
+        content = QWidget(); content.setObjectName('workspaceContent')
+        content.setStyleSheet('QWidget#workspaceContent { background: transparent; }')
+        scroll.setWidget(content); center = QVBoxLayout(content)
         heading = QLabel('THE WEB'); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); heading.setStyleSheet('color:#e9d5ff;'); center.addWidget(heading)
         intro = QLabel('Native Spider OS home · Webbie · research · security · media · study'); intro.setStyleSheet('color:#b2a5ba;'); center.addWidget(intro)
         grid = QGridLayout(); center.addLayout(grid, 1)
@@ -90,9 +121,8 @@ class TheWeb(QMainWindow):
     def load_wallpaper(self):
         if WALLPAPER.exists(): self.wallpaper=QPixmap(str(WALLPAPER)); self.apply_wallpaper()
     def apply_wallpaper(self):
-        if self.wallpaper is None or self.wallpaper.isNull(): return
-        p=QPalette(self.palette()); p.setBrush(QPalette.Window,QBrush(self.wallpaper.scaled(self.size(),Qt.KeepAspectRatioByExpanding,Qt.SmoothTransformation))); self.setPalette(p); self.setAutoFillBackground(True)
-    def resizeEvent(self,e): self.apply_wallpaper(); super().resizeEvent(e)
+        if self.wallpaper is not None and not self.wallpaper.isNull():
+            self.background_surface.set_background(self.wallpaper)
 
     def set_workspace(self,name):
         image = WALLPAPER if name == 'default' else SPIDER_ROOT / 'branding' / 'workspaces' / f'{WORKSPACE_IMAGES.get(name, name)}.png'

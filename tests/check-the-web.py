@@ -16,8 +16,22 @@ main.SPIDER_ROOT = root
 main.WALLPAPER = root / 'branding' / 'wallpapers' / 'spider-os-wallpaper.png'
 print('SPIDER_QT: application', flush=True)
 app = QApplication([])
+# Regression: the actual visible central widget must render the image.
+from PyQt5.QtGui import QColor, QPixmap
+surface = main.WallpaperWidget()
+surface.resize(120, 80)
+red = QPixmap(20, 20); red.fill(QColor(255, 0, 0))
+blue = QPixmap(20, 20); blue.fill(QColor(0, 0, 255))
+surface.set_background(red)
+red_pixel = surface.grab().toImage().pixelColor(4, 4)
+surface.set_background(blue)
+blue_pixel = surface.grab().toImage().pixelColor(4, 4)
+assert red_pixel.red() > red_pixel.blue(), red_pixel.name()
+assert blue_pixel.blue() > blue_pixel.red(), blue_pixel.name()
+surface.close()
 print('SPIDER_QT: construct The Web', flush=True)
 window = main.TheWeb()
+assert isinstance(window.centralWidget(), main.WallpaperWidget)
 assert window.background_picker.count() == 11
 for index in range(11):
     name = window.background_picker.itemData(index)

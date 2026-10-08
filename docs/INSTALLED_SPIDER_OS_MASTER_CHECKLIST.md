@@ -4,11 +4,12 @@
 **Scope:** The installed Spider OS system first. The future installer/ISO is a separate, gated deliverable.  
 **Canonical implementation repository:** `brokenandalone/spider-narive-os`  
 **Companion/staging repository:** `brokenandalone/Spider-OS1`  
+**Installed base confirmed by owner:** Ubuntu Studio **26.04 LTS**. **Target:** Ubuntu Studio **26.10**, after the stable release and compatibility checks. The live Plasma and kernel versions still require verification. The repository ISO builder and Ubuntu 24.04 GitHub CI runners are separate and do not establish the installed release.  
 **Status:** Planned checklist; unchecked items are NOT evidence that the feature is absent. Verify against the live machine before marking done.
 
 ## Completed source work (not installed-machine completion)
 
-Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean implemented source and named regression validation. All upgrades are on open, stacked PR branches; none of these batches has been merged or deployed by this session. Full phase gates below remain pending live verification.
+Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean implemented source and named regression validation. All upgrades are on open, stacked PR branches; none of these batches has been merged or deployed by this session. Full phase gates below remain pending live verification.
 
 - [x] Spider Guardian read-only health report and private diagnostics file. Native [PR #2](https://github.com/brokenandalone/spider-narive-os/pull/2); source and desktop CI passed.
 - [x] Selected-source verified local snapshots, transaction-safe SQLite backups and restore into a new directory. Native PR #2; recovery regressions passed.
@@ -21,12 +22,15 @@ Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean imple
 - [x] Webbie fixed-action gateway, exact-request approvals, expiry and replay prevention. Native [PR #4](https://github.com/brokenandalone/spider-narive-os/pull/4); 37 native source tests and GitHub desktop checks passed.
 - [x] Nine workspace modes and role guidance for a future assistant adapter. Native PR #4; not connected to the live voice agent.
 - [x] Forage selected-source text index, source URIs/provenance, stale/deleted-source handling and atomic rebuild. Current `upgrades/forage-local-index` batch; 46 native source tests passed locally. GitHub CI status is recorded on the batch PR.
+- [x] The Web visible workspace wallpaper painting and transparent scroll panel, with offscreen pixel regression. Native [PR #6](https://github.com/brokenandalone/spider-narive-os/pull/6), head `6961b426`; [GitHub source and desktop checks passed](https://github.com/brokenandalone/spider-narive-os/actions/runs/37791751889) on 2026-10-08. Physical-display verification is still pending.
+- [x] Kali Bay source hardening: read-only status/doctor checks avoiding Distrobox reinitialization, regression coverage and removal of automatic `apt-get autoremove`. Native PR #6, head `6961b426`; same passing CI run. Full Kali toolset and real-PC status checks are still pending.
 
 ## Immediate remaining delivery steps
 
 - [ ] Merge the validated stacked source PRs in dependency order.
 - [ ] Inventory/backup the installed files and preserve local-only Webbie, media and boot fixes.
 - [ ] Deploy selected modules and verify their real launch/close/relaunch behavior.
+- [ ] Back up current The Web and Kali Bay scripts, then verify actual purple wallpaper display and safe Kali status/doctor behavior on the PC.
 - [ ] Configure OneDrive locally, then prove encrypted upload/download and restore.
 - [ ] Verify the microphone and both authorized voice profiles, conversations, interruption and dismissal.
 - [ ] Connect the action gateway through a trusted approval UI and authenticated voice/session adapter.
@@ -35,14 +39,14 @@ Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean imple
 ## Non-negotiable rules
 
 - Keep the known-booting encrypted installation usable throughout development. Do not replace known-good installed components with older scaffold code.
-- Record the actual installed Ubuntu and KDE Plasma versions first. Repository `base.env` values do not establish the installed release.
+- Treat Ubuntu Studio 26.04 LTS as the current installed baseline, and Ubuntu Studio 26.10 as the requested migration target. Record the actual Plasma version, kernel and release metadata before modifying packages or deploying.
 - Preserve existing LUKS password unlock, bootloader, initramfs and Plasma startup; make recoverable backups before risky changes.
 - Keep Webbie's runtime, fast fallback model and active data local; OneDrive is optional sync/backup, never the live operating environment.
 - Default voice authorization: owner only until the second trusted speaker is enrolled and validated. Never leave the speaker gate bypassed because a second user has not enrolled. Reject other speakers, TV/movies and Webbie's own TTS. Require stronger confirmation for security-sensitive changes.
 - Source-control repositories are public: no cloud tokens, encryption keys, passwords, personal manuscripts, school submissions, private memories or LUKS secrets in Git.
 - Webbie may research automatically but must not silently rewrite code, change security settings, install packages, alter boot configuration or commit manuscript changes.
 - Every phase passes a smoke test and a rollback/restore check before proceeding.
-- No automatic migration to Ubuntu Studio 26.10 on the only working machine. Qualify a VM/USB build and an installed reboot with encryption before considering physical migration.
+- Do not upgrade the only working 26.04 machine to the 26.10 beta. Prepare and test the 26.10 upgrade first, then require final release availability, verified backups, working encrypted boot and a recovery/rollback plan.
 
 ## Phase 0: Preserve and measure the working machine
 
@@ -220,7 +224,9 @@ Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean imple
 
 ## Phase 15: Future OS release migration and final qualification
 
-- [ ] Keep the working install as baseline; confirm the actual supported upgrade path before selecting an Ubuntu Studio release.
+- [ ] Verify Ubuntu Studio 26.04 LTS release metadata, Plasma/kernel, encryption and reboot; document the current known-good installed baseline.
+- [ ] Prepare Ubuntu Studio 26.10 migration and compatibility inventory before the final 2026-10-15 release; no unsupported `do-release-upgrade -d` on the working PC.
+- [ ] After Ubuntu Studio 26.10 stable is officially released and upgrade availability confirmed, back up and qualify in a disposable VM/snapshot before proposing the real-machine upgrade.
 - [ ] Prepare a dedicated migration branch; pin GitHub Actions runner images and release dependencies.
 - [ ] Port packaging, KDE/Plasma, kernel, systemd, audio and desktop dependencies without discarding working fixes.
 - [ ] Build ISO, checksums, reproducible logs and a VM boot/install test.
@@ -245,3 +251,21 @@ Updated 2026-10-07, America/Indiana/Indianapolis. Checked items below mean imple
 ## GitHub implementation batch: Webbie action gateway
 
 2026-10-08 UTC: A local fixed-action registry, request-bound approval queue and workspace mode context are implemented under `webbie/actions`. The existing voice agent and its installed fixes are preserved. See `docs/WEBBIE_ACTION_GATEWAY.md` for the trust boundary and pending voice/approval-surface integration. No live-machine checkbox is marked complete.
+
+## GitHub implementation batch: workspace wallpapers and Kali Bay reliability
+
+2026-10-08 UTC: [Native PR #6](https://github.com/brokenandalone/spider-narive-os/pull/6) adds visible workspace wallpaper painting with transparent scroll-panel handling, a non-mutating Kali Bay status/diagnostic path, and removes unconditional Kali package autoremove. [Pinned Ubuntu 24.04 CI run 37791751889](https://github.com/brokenandalone/spider-narive-os/actions/runs/37791751889) passed source regression, feature validation and offscreen wallpaper smoke tests at head `6961b426`. Still **not merged, deployed, or qualified on the installed Spider OS PC**. The full Kali security metapackage was not installed by this GitHub work; see `docs/KALI_BAY_WALLPAPER_RELIABILITY.md` for verification and rollback.
+
+## Installed-base correction (2026-10-08)
+
+The owner confirmed Spider OS is installed on **Ubuntu Studio 26.04 LTS** and wishes to upgrade to **Ubuntu Studio 26.10** when ready. Prior references implying the installed computer still runs Ubuntu Studio 24.04 are outdated. Treat 26.04 as the current installed environment and 26.10 as the requested migration target. Verify `cat /etc/os-release`, `plasmashell --version`, and `uname -r` before changes. The existing GitHub ISO builder still describes a 24.04.5 source image, and the source checks are currently pinned to Ubuntu 24.04; neither has been ported or qualified as a 26-series ISO by this checklist correction. Do not modify boot, host apt sources, or the running Kali container on the basis of this documentation update.
+
+## Ubuntu Studio 26.10 target confirmation (2026-10-08)
+
+- [x] Record user choice: **current installed Ubuntu Studio 26.04 LTS; target Ubuntu Studio 26.10**. This is a documented plan, **not a completed upgrade**.
+- [ ] Wait for the official 26.10 stable release, scheduled for 2026-10-15, and confirm the upgrade path has been enabled. Do not use development-release flags on the production machine.
+- [ ] Inventory installed Plasma, PipeWire, kernel, graphics, encrypted boot, Webbie/Ollama, Studio, Author, Media Center, Forage and Kali Bay versions and local modifications.
+- [ ] Create and verify backups, LUKS recovery materials, and a bootable recovery path; test rollback and an upgrade trial on a separate VM/drive.
+- [ ] After stable release and all gates pass, upgrade the installed 26.04 system to 26.10 and verify every workspace and service before declaring the migration complete.
+
+References: [Ubuntu Studio 26.10 beta announcement](https://ubuntustudio.org/2026/), [Ubuntu Studio 26.10 release notes](https://discourse.ubuntu.com/t/ubuntu-studio-26-10-release-notes/88657).
