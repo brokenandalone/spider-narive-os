@@ -8,6 +8,7 @@ for file in \
     usr/local/lib/spider-os/system/guardian.py \
     usr/local/lib/spider-os/system/vault.py \
     usr/local/lib/spider-os/system/apps.py \
+    usr/local/lib/spider-os/webbie/actions/gateway.py \
     usr/local/lib/spider-os/studio/main.py \
     usr/share/applications/studio.desktop \
     usr/share/applications/author.desktop \
@@ -34,6 +35,7 @@ for file in \
     spider-core/bin/spider-core \
     webbie/webbie \
     webbie/agent/webbie.py \
+    webbie/actions/webbie-action \
     the-web/shell/main.py \
     studio/bin/studio \
     author/bin/author \
