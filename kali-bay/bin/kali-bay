@@ -167,8 +167,8 @@ update_kali() {
                 DEBIAN_FRONTEND=noninteractive \
                 apt-get full-upgrade \
                 -y
-            sudo apt-get autoremove \
-                -y
+            # Never remove packages automatically from the fully provisioned
+            # Kali Bay security environment. Review unused packages manually.
             sudo apt-get clean
         '
 
@@ -278,13 +278,17 @@ info() {
 
 launch_ui() {
     exec python3 \
-        "${KALI_ROOT}/ui/kali_bay.py"
+        "${KALI_ROOT}/ui/kali_bay.py" "$@"
 }
 
 
 case "${1:-ui}" in
     ui)
         launch_ui
+        ;;
+
+    offensive|purple)
+        launch_ui "--${1}"
         ;;
 
     create)
@@ -323,6 +327,8 @@ Usage:
   kali-bay
   kali-bay setup
   kali-bay terminal
+  kali-bay offensive
+  kali-bay purple
   kali-bay update
   kali-bay status
   kali-bay info
