@@ -13,6 +13,7 @@ for file in \
     usr/share/applications/studio.desktop \
     usr/share/applications/author.desktop \
     usr/local/lib/spider-os/forage/engine.py \
+    usr/local/lib/spider-os/forage/local_index.py \
     usr/local/lib/spider-os/webbie/voice/whisper_listener.py \
     usr/local/share/spider-os/whisper/ggml-base.en.bin \
     usr/share/applications/study.desktop \
