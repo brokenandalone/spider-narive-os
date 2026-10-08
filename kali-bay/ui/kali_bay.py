@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -54,7 +55,7 @@ WALLPAPER = (
 )
 
 
-CATEGORIES = [
+OFFENSIVE_CATEGORIES = [
     (
         "INFORMATION GATHERING",
         "OSINT, discovery, enumeration",
@@ -117,6 +118,34 @@ CATEGORIES = [
     ),
 ]
 
+PURPLE_CATEGORIES = [
+    (
+        "IDENTIFY",
+        "Inventory, visibility and risk discovery",
+        "kali-tools-identify",
+    ),
+    (
+        "PROTECT",
+        "Hardening and preventative controls",
+        "kali-tools-protect",
+    ),
+    (
+        "DETECT",
+        "Threat monitoring and detection tools",
+        "kali-tools-detect",
+    ),
+    (
+        "RESPOND",
+        "Incident investigation and containment",
+        "kali-tools-respond",
+    ),
+    (
+        "RECOVER",
+        "Recovery and digital evidence workflows",
+        "kali-tools-recover",
+    ),
+]
+
 
 class KaliBayWindow(QMainWindow):
     def __init__(self):
@@ -141,6 +170,10 @@ class KaliBayWindow(QMainWindow):
         self.build_ui()
         self.load_wallpaper()
         self.refresh_status()
+        if "--purple" in sys.argv[1:]:
+            self.security_tabs.setCurrentIndex(1)
+        elif "--offensive" in sys.argv[1:]:
+            self.security_tabs.setCurrentIndex(0)
 
     def build_ui(self):
         self.setStyleSheet(
@@ -332,90 +365,52 @@ class KaliBayWindow(QMainWindow):
             controls
         )
 
-        heading = QLabel(
-            "TOOL CATEGORIES"
-        )
-
+        heading = QLabel("SECURITY SECTIONS")
         heading.setStyleSheet(
-            """
-            color:#a78bfa;
-            font-size:18px;
-            font-weight:bold;
-            padding-top:12px;
-            """
+            "color:#a78bfa;font-size:18px;font-weight:bold;padding-top:12px;"
         )
+        outer.addWidget(heading)
 
-        outer.addWidget(
-            heading
+        # Tabs share the existing, fully configured Kali Bay container.
+        # They do not start a second Kali environment or any SOC services.
+        self.security_tabs = QTabWidget()
+        self.security_tabs.setObjectName("securitySections")
+        self.security_tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #5b3376;
+                border-radius: 10px;
+                background: rgba(11, 8, 18, 180);
+            }
+            QTabBar::tab {
+                background: #241335;
+                color: #d6c9e2;
+                border: 1px solid #5b3376;
+                padding: 12px 20px;
+                min-width: 155px;
+                font-weight: bold;
+            }
+            QTabBar::tab:selected {
+                background: #6b21a8;
+                color: white;
+                border-color: #c084fc;
+            }
+        """)
+        self.security_tabs.addTab(
+            self.build_category_page(
+                OFFENSIVE_CATEGORIES,
+                "Assessment and penetration-testing tools for authorized labs.",
+            ),
+            "OFFENSIVE",
         )
-
-        scroll = QScrollArea()
-
-        scroll.setWidgetResizable(
-            True
+        self.security_tabs.addTab(
+            self.build_category_page(
+                PURPLE_CATEGORIES,
+                "Kali Purple: Identify • Protect • Detect • Respond • Recover. "
+                "Tools are installed; SOC services require separate configuration.",
+            ),
+            "PURPLE DEFENSE",
         )
-
-        scroll.setFrameShape(
-            QScrollArea.NoFrame
-        )
-
-        container = QWidget()
-
-        container.setStyleSheet(
-            "background:transparent;"
-        )
-
-        grid = QGridLayout(
-            container
-        )
-
-        grid.setSpacing(
-            14
-        )
-
-        for index, (
-            title,
-            description,
-            package,
-        ) in enumerate(
-            CATEGORIES
-        ):
-            button = QPushButton(
-                f"{title}\n"
-                f"{description}"
-            )
-
-            button.setMinimumHeight(
-                88
-            )
-
-            button.clicked.connect(
-                lambda checked=False,
-                p=package,
-                t=title:
-                self.open_category(
-                    p,
-                    t,
-                )
-            )
-
-            row = index // 3
-            column = index % 3
-
-            grid.addWidget(
-                button,
-                row,
-                column,
-            )
-
-        scroll.setWidget(
-            container
-        )
-
-        outer.addWidget(
-            scroll,
-            1,
-        )
+        outer.addWidget(self.security_tabs, 1)
 
         warning = QLabel(
             "Kali Bay is intended for systems, networks, "
@@ -455,6 +450,38 @@ class KaliBayWindow(QMainWindow):
         outer.addWidget(
             footer
         )
+
+    def build_category_page(self, categories, description):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+
+        note = QLabel(description)
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#c7b9d2;padding:5px 0 12px;")
+        layout.addWidget(note)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        container = QWidget()
+        container.setStyleSheet("background:transparent;")
+        grid = QGridLayout(container)
+        grid.setSpacing(14)
+
+        for index, (title, summary, package) in enumerate(categories):
+            button = QPushButton(f"{title}\\n{summary}")
+            button.setMinimumHeight(88)
+            button.setToolTip(f"Kali metapackage: {package}")
+            button.clicked.connect(
+                lambda checked=False, p=package, t=title:
+                self.open_category(p, t)
+            )
+            grid.addWidget(button, index // 3, index % 3)
+
+        scroll.setWidget(container)
+        layout.addWidget(scroll, 1)
+        return page
 
     def load_wallpaper(self):
         if not WALLPAPER.exists():
