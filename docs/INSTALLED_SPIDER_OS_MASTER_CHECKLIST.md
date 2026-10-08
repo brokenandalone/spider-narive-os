@@ -4,7 +4,7 @@
 **Scope:** The installed Spider OS system first. The future installer/ISO is a separate, gated deliverable.  
 **Canonical implementation repository:** `brokenandalone/spider-narive-os`  
 **Companion/staging repository:** `brokenandalone/Spider-OS1`  
-**Installed base reported by owner:** Ubuntu Studio 26 series (previously Ubuntu Studio 24.04); exact `VERSION_ID`, Plasma and kernel remain to be verified from the installed PC. The repository ISO builder and Ubuntu 24.04 GitHub CI runners are separate and do not establish the installed release.  
+**Installed base confirmed by owner:** Ubuntu Studio **26.04 LTS**. **Target:** Ubuntu Studio **26.10**, after the stable release and compatibility checks. The live Plasma and kernel versions still require verification. The repository ISO builder and Ubuntu 24.04 GitHub CI runners are separate and do not establish the installed release.  
 **Status:** Planned checklist; unchecked items are NOT evidence that the feature is absent. Verify against the live machine before marking done.
 
 ## Completed source work (not installed-machine completion)
@@ -39,14 +39,14 @@ Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean imple
 ## Non-negotiable rules
 
 - Keep the known-booting encrypted installation usable throughout development. Do not replace known-good installed components with older scaffold code.
-- Treat the owner's upgraded Ubuntu Studio 26 machine as the installed-system baseline, not the repository's older 24.04 ISO builder. Confirm its exact `VERSION_ID`, Plasma version and kernel before applying package or deployment changes.
+- Treat Ubuntu Studio 26.04 LTS as the current installed baseline, and Ubuntu Studio 26.10 as the requested migration target. Record the actual Plasma version, kernel and release metadata before modifying packages or deploying.
 - Preserve existing LUKS password unlock, bootloader, initramfs and Plasma startup; make recoverable backups before risky changes.
 - Keep Webbie's runtime, fast fallback model and active data local; OneDrive is optional sync/backup, never the live operating environment.
 - Default voice authorization: owner only until the second trusted speaker is enrolled and validated. Never leave the speaker gate bypassed because a second user has not enrolled. Reject other speakers, TV/movies and Webbie's own TTS. Require stronger confirmation for security-sensitive changes.
 - Source-control repositories are public: no cloud tokens, encryption keys, passwords, personal manuscripts, school submissions, private memories or LUKS secrets in Git.
 - Webbie may research automatically but must not silently rewrite code, change security settings, install packages, alter boot configuration or commit manuscript changes.
 - Every phase passes a smoke test and a rollback/restore check before proceeding.
-- Do not assume the installed 26-series release is specifically 26.04 or 26.10 until verified. Do not trigger another distribution migration on the working machine. Qualify future migrations separately with VM/USB, encryption and reboot tests.
+- Do not upgrade the only working 26.04 machine to the 26.10 beta. Prepare and test the 26.10 upgrade first, then require final release availability, verified backups, working encrypted boot and a recovery/rollback plan.
 
 ## Phase 0: Preserve and measure the working machine
 
@@ -224,7 +224,9 @@ Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean imple
 
 ## Phase 15: Future OS release migration and final qualification
 
-- [ ] Verify the already-upgraded Ubuntu Studio 26-series installation's exact release (`VERSION_ID`), Plasma/kernel, encryption and reboot; document the current stable installed baseline.
+- [ ] Verify Ubuntu Studio 26.04 LTS release metadata, Plasma/kernel, encryption and reboot; document the current known-good installed baseline.
+- [ ] Prepare Ubuntu Studio 26.10 migration and compatibility inventory before the final 2026-10-15 release; no unsupported `do-release-upgrade -d` on the working PC.
+- [ ] After Ubuntu Studio 26.10 stable is officially released and upgrade availability confirmed, back up and qualify in a disposable VM/snapshot before proposing the real-machine upgrade.
 - [ ] Prepare a dedicated migration branch; pin GitHub Actions runner images and release dependencies.
 - [ ] Port packaging, KDE/Plasma, kernel, systemd, audio and desktop dependencies without discarding working fixes.
 - [ ] Build ISO, checksums, reproducible logs and a VM boot/install test.
@@ -256,4 +258,14 @@ Updated 2026-10-08, America/Indiana/Indianapolis. Checked items below mean imple
 
 ## Installed-base correction (2026-10-08)
 
-The owner confirmed Spider OS has **already changed its installed base to Ubuntu Studio 26 series**. Prior references implying the installed computer still runs Ubuntu Studio 24.04 are outdated. Treat the 26-series environment as the upgrade target for *installed applications* once its exact release is checked using `cat /etc/os-release`, `plasmashell --version`, and `uname -r`. The existing GitHub ISO builder still describes a 24.04.5 source image, and the source checks are currently pinned to Ubuntu 24.04; neither has been ported or qualified as a 26-series ISO by this checklist correction. Do not modify boot, host apt sources, or the running Kali container on the basis of this documentation update.
+The owner confirmed Spider OS is installed on **Ubuntu Studio 26.04 LTS** and wishes to upgrade to **Ubuntu Studio 26.10** when ready. Prior references implying the installed computer still runs Ubuntu Studio 24.04 are outdated. Treat 26.04 as the current installed environment and 26.10 as the requested migration target. Verify `cat /etc/os-release`, `plasmashell --version`, and `uname -r` before changes. The existing GitHub ISO builder still describes a 24.04.5 source image, and the source checks are currently pinned to Ubuntu 24.04; neither has been ported or qualified as a 26-series ISO by this checklist correction. Do not modify boot, host apt sources, or the running Kali container on the basis of this documentation update.
+
+## Ubuntu Studio 26.10 target confirmation (2026-10-08)
+
+- [x] Record user choice: **current installed Ubuntu Studio 26.04 LTS; target Ubuntu Studio 26.10**. This is a documented plan, **not a completed upgrade**.
+- [ ] Wait for the official 26.10 stable release, scheduled for 2026-10-15, and confirm the upgrade path has been enabled. Do not use development-release flags on the production machine.
+- [ ] Inventory installed Plasma, PipeWire, kernel, graphics, encrypted boot, Webbie/Ollama, Studio, Author, Media Center, Forage and Kali Bay versions and local modifications.
+- [ ] Create and verify backups, LUKS recovery materials, and a bootable recovery path; test rollback and an upgrade trial on a separate VM/drive.
+- [ ] After stable release and all gates pass, upgrade the installed 26.04 system to 26.10 and verify every workspace and service before declaring the migration complete.
+
+References: [Ubuntu Studio 26.10 beta announcement](https://ubuntustudio.org/2026/), [Ubuntu Studio 26.10 release notes](https://discourse.ubuntu.com/t/ubuntu-studio-26-10-release-notes/88657).
