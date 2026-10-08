@@ -3,11 +3,15 @@ import os, subprocess, sys
 from pathlib import Path
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QBrush, QFont, QPalette, QPixmap
-from PyQt5.QtWidgets import QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 SPIDER_ROOT = Path('/usr/local/lib/spider-os')
 if not SPIDER_ROOT.exists():
     SPIDER_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(SPIDER_ROOT / 'system'))
+from apps import AppUnavailable, AUTHOR_HOME, author_command, media_command, studio_command
+WORKSPACE_IMAGES = {'author': 'system'}
+
 WALLPAPER = SPIDER_ROOT / 'branding' / 'wallpapers' / 'spider-os-wallpaper.png'
 
 class TheWeb(QMainWindow):
@@ -40,7 +44,7 @@ class TheWeb(QMainWindow):
         tagline = QLabel('YOUR LIFE. ONE WEB.'); tagline.setStyleSheet('color:#a99caf; font-size:14px; font-weight:bold;'); outer.addWidget(tagline)
         self.background_picker = QComboBox()
         for label, name in [('The Web', 'default'), ('Forage / Deep Forage', 'forage'),
-                            ('Studio', 'studio'), ('Art Lab', 'art-lab'), ('Dev Bay', 'dev-bay'),
+                            ('Studio', 'studio'), ('Author', 'author'), ('Art Lab', 'art-lab'), ('Dev Bay', 'dev-bay'),
                             ('Study', 'study'), ('Media', 'media'), ('Kali Bay', 'kali-bay'),
                             ('System', 'system'), ('Recovery', 'recovery')]:
             self.background_picker.addItem(label, name)
@@ -51,12 +55,15 @@ class TheWeb(QMainWindow):
         side = QVBoxLayout(); body.addLayout(side)
         for label, fn in [
             ('WEBBIE', self.open_webbie), ('FORAGE', self.open_forage), ('DEEP FORAGE', self.open_deep_forage),
-            ('KALI BAY', self.open_kali), ('MEDIA', self.open_media), ('STUDY', self.open_study),
+            ('KALI BAY', self.open_kali), ('MEDIA CENTER', self.open_media), ('STUDY', self.open_study),
+            ('STUDIO', self.open_studio), ('AUTHOR', self.open_author),
             ('TERMINAL', self.open_terminal), ('SYSTEM SETTINGS', self.open_settings),
         ]:
             b=QPushButton(label); b.setMinimumWidth(190); b.clicked.connect(fn); side.addWidget(b)
         side.addStretch(1)
-        center = QVBoxLayout(); body.addLayout(center, 1)
+        scroll = QScrollArea(); scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame); body.addWidget(scroll, 1)
+        content = QWidget(); scroll.setWidget(content); center = QVBoxLayout(content)
         heading = QLabel('THE WEB'); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); heading.setStyleSheet('color:#e9d5ff;'); center.addWidget(heading)
         intro = QLabel('Native Spider OS home · Webbie · research · security · media · study'); intro.setStyleSheet('color:#b2a5ba;'); center.addWidget(intro)
         grid = QGridLayout(); center.addLayout(grid, 1)
@@ -65,8 +72,10 @@ class TheWeb(QMainWindow):
             ('Forage','Search & discovery','Local knowledge + web search',self.open_forage),
             ('Deep Forage','Research','Multi-source research and synthesis',self.open_deep_forage),
             ('Kali Bay','Security workspace','Isolated full Kali environment',self.open_kali),
-            ('Media','Spider Media Player','Available when a media package is installed',self.open_media),
+            ('Media Center','Spider Media Center','Music, video and recovered media package',self.open_media),
             ('Study','Education workspace','Courses, assignments, notes, research',self.open_study),
+            ('Studio','Native creative workspace','Music, artwork and production tools',self.open_studio),
+            ('Author','Independent writing workspace','Local manuscript editing and persistent session',self.open_author),
         ]
         for i,(name,sub,desc,fn) in enumerate(cards):
             frame=QFrame(); frame.setObjectName('card'); lay=QVBoxLayout(frame)
@@ -86,7 +95,7 @@ class TheWeb(QMainWindow):
     def resizeEvent(self,e): self.apply_wallpaper(); super().resizeEvent(e)
 
     def set_workspace(self,name):
-        image = WALLPAPER if name == 'default' else SPIDER_ROOT / 'branding' / 'workspaces' / f'{name}.png'
+        image = WALLPAPER if name == 'default' else SPIDER_ROOT / 'branding' / 'workspaces' / f'{WORKSPACE_IMAGES.get(name, name)}.png'
         if image.exists():
             self.wallpaper = QPixmap(str(image))
             self.apply_wallpaper()
@@ -100,9 +109,9 @@ class TheWeb(QMainWindow):
         try: runtime.mkdir(parents=True,exist_ok=True); (runtime/'workspace').write_text(name,encoding='utf-8')
         except Exception: pass
 
-    def launch(self,cmd,workspace='default',message='Opened.'):
+    def launch(self,cmd,workspace='default',message='Opened.',cwd=None):
         self.set_workspace(workspace)
-        try: subprocess.Popen([str(x) for x in cmd],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True); self.status.setText(message)
+        try: subprocess.Popen([str(x) for x in cmd],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True,cwd=cwd); self.status.setText(message)
         except Exception as e: self.status.setText(str(e))
 
     def open_webbie(self): self.launch(['python3',SPIDER_ROOT/'webbie/ui/webbie-ui.py'],'default','Webbie opened.')
@@ -110,11 +119,24 @@ class TheWeb(QMainWindow):
     def open_deep_forage(self): self.launch(['python3',SPIDER_ROOT/'forage/deep-forage/deep_forage.py'],'forage','Deep Forage opened.')
     def open_kali(self): self.launch([SPIDER_ROOT/'kali-bay/bin/kali-bay'],'kali-bay','Kali Bay opened.')
     def open_media(self):
-        if not Path('/opt/spider-media-player/spider-media-player').is_file():
-            self.set_workspace('media')
-            self.status.setText('Spider Media Player package is not installed in this image.')
-            return
-        self.launch(['/usr/local/bin/spider-media-player'],'media','Spider Media Player opened.')
+        try:
+            self.launch(media_command(),'media','Spider Media Center opened.')
+        except AppUnavailable as error:
+            self.status.setText(str(error))
+    def open_studio(self):
+        try:
+            self.launch(studio_command(SPIDER_ROOT),'studio','Spider Studio opened.')
+        except AppUnavailable as error:
+            self.status.setText(str(error))
+    def open_author(self):
+        try:
+            command = author_command()
+            AUTHOR_HOME.mkdir(parents=True,exist_ok=True)
+            for directory in ('Manuscripts','Lore','Snapshots'):
+                (AUTHOR_HOME/directory).mkdir(exist_ok=True)
+            self.launch(command,'author','Author editor opened.',cwd=AUTHOR_HOME)
+        except (AppUnavailable, OSError) as error:
+            self.status.setText(str(error))
     def open_study(self): self.launch(['python3',SPIDER_ROOT/'study/study.py'],'study','Study opened.')
     def open_terminal(self): self.launch(['konsole'],'default','Terminal opened.')
     def open_settings(self): self.launch(['systemsettings'],'system','System Settings opened.')

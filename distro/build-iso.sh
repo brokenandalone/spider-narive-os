@@ -154,7 +154,7 @@ rsync -a \
     "${ROOT}/kali-bay/" \
     "${ROOTFS}/usr/local/lib/spider-os/kali-bay/"
 
-for component in study media system; do
+for component in study media system studio author; do
     rsync -a "${ROOT}/${component}/" "${ROOTFS}/usr/local/lib/spider-os/${component}/"
 done
 rsync -a "${ROOT}/branding/" "${ROOTFS}/usr/local/lib/spider-os/branding/"
@@ -165,7 +165,7 @@ install -Dm644 "${ROOT}/distro/systemd/ollama.service" \
 for unit in spider-vault.service spider-vault.timer; do
     install -Dm644 "${ROOT}/system/service/${unit}" "${ROOTFS}/usr/lib/systemd/user/${unit}"
 done
-for app in webbie study forage deep-forage kali-bay spider-guardian spider-vault; do
+for app in webbie study forage deep-forage kali-bay spider-guardian spider-vault studio author; do
     install -Dm644 "${ROOT}/distro/config/applications/${app}.desktop" \
         "${ROOTFS}/usr/share/applications/${app}.desktop"
 done
@@ -439,7 +439,7 @@ rsync -a \
     "${ROOT}/kali-bay/" \
     "${LIVE_ROOTFS}/usr/local/lib/spider-os/kali-bay/"
 
-for component in study media system; do
+for component in study media system studio author; do
     rsync -a "${ROOT}/${component}/" "${LIVE_ROOTFS}/usr/local/lib/spider-os/${component}/"
 done
 rsync -a "${ROOT}/branding/" "${LIVE_ROOTFS}/usr/local/lib/spider-os/branding/"
@@ -450,7 +450,7 @@ install -Dm644 "${ROOT}/distro/systemd/ollama.service" \
 for unit in spider-vault.service spider-vault.timer; do
     install -Dm644 "${ROOT}/system/service/${unit}" "${LIVE_ROOTFS}/usr/lib/systemd/user/${unit}"
 done
-for app in webbie study forage deep-forage kali-bay spider-guardian spider-vault; do
+for app in webbie study forage deep-forage kali-bay spider-guardian spider-vault studio author; do
     install -Dm644 "${ROOT}/distro/config/applications/${app}.desktop" \
         "${LIVE_ROOTFS}/usr/share/applications/${app}.desktop"
 done

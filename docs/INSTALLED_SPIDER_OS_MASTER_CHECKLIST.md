@@ -211,3 +211,7 @@
 - Add blockers under their phase; do not skip a safety gate because an exciting feature is waiting.
 - Revisit priority order after each phase, but preserve the rule: **working installed system -> reliable Webbie -> recovery/OneDrive -> workspaces -> future distribution release**.
 - Keep `docs/SPIDER_OS_26_10_MASTER_PLAN.md` as the broader release roadmap; use this document as the ordered installed-system execution checklist.
+
+## GitHub implementation batch: workspace launchers
+
+2026-10-08 UTC: Native Studio source/launcher, an independent Author editor launcher, common media resolution and Media Center menu naming are implemented in the workspace-launcher branch. The Web exposes Studio and Author separately, and packaging includes their modules. See `docs/WORKSPACE_LAUNCHER_REPAIRS.md` for the deliberately limited Author foundation and the remaining installed-machine checks. No live checkbox is marked complete from source tests.

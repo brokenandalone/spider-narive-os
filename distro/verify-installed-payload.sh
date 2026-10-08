@@ -7,6 +7,10 @@ for file in \
     usr/local/lib/spider-os/study/study.py \
     usr/local/lib/spider-os/system/guardian.py \
     usr/local/lib/spider-os/system/vault.py \
+    usr/local/lib/spider-os/system/apps.py \
+    usr/local/lib/spider-os/studio/main.py \
+    usr/share/applications/studio.desktop \
+    usr/share/applications/author.desktop \
     usr/local/lib/spider-os/forage/engine.py \
     usr/local/lib/spider-os/webbie/voice/whisper_listener.py \
     usr/local/share/spider-os/whisper/ggml-base.en.bin \
@@ -30,7 +34,10 @@ for file in \
     spider-core/bin/spider-core \
     webbie/webbie \
     webbie/agent/webbie.py \
-    the-web/shell/main.py
+    the-web/shell/main.py \
+    studio/bin/studio \
+    author/bin/author \
+    media/bin/spider-media-center
 do
     test -x "${spider_target_root}/usr/local/lib/spider-os/${file}"
 done

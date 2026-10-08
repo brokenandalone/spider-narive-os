@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Spider Studio
+Comment=Spider OS studio workspace
+Exec=/usr/local/lib/spider-os/studio/bin/studio
+Icon=spider-os-logo
+Terminal=false
+Categories=AudioVideo;
+StartupNotify=true
