@@ -19,6 +19,7 @@ managed=(
   author/store.py
   author/web_features.py
   author/speech.py
+  author/publishing.py
   the-web/shell/main.py
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py
