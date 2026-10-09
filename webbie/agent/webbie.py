@@ -36,6 +36,7 @@ sys.path.insert(
 
 from brain import respond
 from tts import speak
+from workspace_names import context_name
 
 
 CONFIG_FILE = (
@@ -148,20 +149,8 @@ def current_workspace():
 
 
 def current_name():
-    workspace = current_workspace()
-
-    names = CONFIG.get(
-        "context_names",
-        {},
-    )
-
-    return names.get(
-        workspace,
-        CONFIG.get(
-            "default_user_name",
-            "Cory",
-        ),
-    )
+    # Preserve explicit owner choices; Author defaults to Writer.
+    return context_name(current_workspace(), CONFIG)
 
 
 def write_state(**updates):
