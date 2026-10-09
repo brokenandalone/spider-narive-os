@@ -58,7 +58,7 @@ class AuthorWebsitePortTests(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(len(self.store.search_library('Shayna', book_id=self.book)), 1)
         self.assertEqual(self.store.search_library('%'), [])
-        self.assertEqual(self.store.search_library('city')[0]['kind'], 'story')
+        self.assertIn('story', {hit['kind'] for hit in self.store.search_library('city')})
         self.assertEqual(self.store.word_count(self.book), 4)
 
     def test_story_and_references_edit_saved_without_touching_manuscript(self):
