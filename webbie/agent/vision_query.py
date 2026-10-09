@@ -27,7 +27,8 @@ def visual_question(command):
 def ask_vision(question, runtime=None, timeout=65):
     if not visual_question(question):
         return None
-    base = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+    candidate = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+    base = candidate if candidate.is_dir() else Path.home() / '.cache' / 'spider-os' / 'private-run'
     directory = Path(runtime) if runtime is not None else base / 'spider-os'
     path = directory / VISION_SOCKET
     # Opening the user-owned socket is all a voice request can do. No
