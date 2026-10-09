@@ -25,6 +25,9 @@
 - [x] User confirmed all personal files remained present after the power outage. This is not a validated independent backup or a storage-health report.
 - [x] Source-built a read-only, privacy-limited installed-system audit for Author/Study record counts, Spider startup-branding hints, Kali state, desktop/Media files and user services (PR #18, merged into combined PR #17). **Not run on the owner PC yet.**
 - [x] The combined PR #17 source batch includes Webbie face/chat, window Close/Minimize/Maximize, audio/mute, Media MPRIS client, System/Recovery health panels and build receipts. Not installed on the owner PC; install in one selective batch with backup after source qualification.
+- [x] Owner's post-audit response on Oct 9 confirmed **System/Recovery dashboards (#5) and media playback controls (#4) working** in the currently used Plasma desktop. This is user-observed UI functionality, not proof of full streaming, recovery or backup testing.
+- [x] Oct 9 post-outage inventory: Webbie/Ollama/AI DJ/PipeWire/WirePlumber **active**; Kali Bay container **exited**, not missing; Author DB readable with 20 books, 39 chapters, 20 fingerprints; school DB 1 course, 0 assignments.
+- [x] PR #21 source-built floating click-through Webbie face, fullscreen auto-hide, explicit night sleep and optional sign-in OneDrive folder sync. Dedicated add-on installer exists; PC installation, mouse-pass-through, fullscreen, OAuth and cloud transfer all **still unchecked**.
 
 ## New: floating Webbie and deferred OneDrive sign-in
 
