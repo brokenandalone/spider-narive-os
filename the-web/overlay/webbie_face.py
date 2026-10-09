@@ -5,6 +5,7 @@ Never replaces Webbie's agent, intercepts input, or changes KWin/Plasma settings
 """
 import ctypes
 import ctypes.util
+import fcntl
 from datetime import datetime, timedelta
 import json
 import os
@@ -209,6 +210,16 @@ def main(argv=None):
         return 0
     if os.environ.get('XDG_SESSION_TYPE', '').lower() != 'x11':
         print('Webbie overlay: currently supported only in X11 sessions; nothing changed.', file=sys.stderr)
+        return 0
+    # XDG and KDE can both process autostarts; never create two floating faces.
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'spider-os'
+    runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock = runtime / 'webbie-face-overlay.lock'
+    handle = lock.open('a+', encoding='utf-8')
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print('Webbie overlay already running.')
         return 0
     app = QApplication(sys.argv)
     window = WebbieOverlay()
