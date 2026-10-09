@@ -62,7 +62,11 @@ def legacy_studio(upstream):
     result = upstream
     result = one_replace(result, '    QFrame, QGridLayout, QScrollArea, QTabWidget,\n', '    QFrame,\n')
     result = one_replace(result,
-        "sys.path.insert(0, str(Path(__file__).resolve().parent))\nfrom tools import TOOLS, resolve_tool\n", '')
+        "sys.path.insert(0, str(Path(__file__).resolve().parent))\n"
+        "if __package__:\n"
+        "    from .tools import TOOLS, resolve_tool\n"
+        "else:\n"
+        "    from tools import TOOLS, resolve_tool\n", '')
     style = (
         "            QWidget { background: #0c0a10; color: #eeeaf3; }\n"
         "            QTabBar::tab { background:#21172d; color:#e9d5ff; padding:8px; }\n"
