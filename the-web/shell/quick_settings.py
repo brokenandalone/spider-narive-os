@@ -10,6 +10,7 @@ import shutil
 import subprocess
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from gtk_compat import appearance_snapshot
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox
 
 STATUS_COMMANDS = {
@@ -89,7 +90,7 @@ def quick_snapshot(runner=read_command, power_supply=Path('/sys/class/power_supp
         if match:
             mic_level = max(0,min(100,round(float(match.group(1))*100)))
             mic = ('Muted' if '[MUTED]' in microphone else 'Available') + f' · {mic_level}%'
-    return {
+    snapshot = {
         'Network': state[0][:70] if state else 'NetworkManager status unavailable',
         'Wi-Fi radio': wifi_state[0][:70] if wifi_state else 'Unknown',
         'Bluetooth': blue,
@@ -97,6 +98,8 @@ def quick_snapshot(runner=read_command, power_supply=Path('/sys/class/power_supp
         'Power': battery_summary(power_supply),
         'Brightness': bright,
     }
+    snapshot.update(appearance_snapshot())
+    return snapshot
 
 
 def settings_command():
@@ -137,7 +140,8 @@ class QuickSettingsPanel(QWidget):
         title.setStyleSheet('font-weight:bold;font-size:17px;')
         layout.addWidget(title)
         self.status = {}
-        for key in ('Network', 'Wi-Fi radio', 'Bluetooth', 'Microphone', 'Power', 'Brightness'):
+        for key in ('Network', 'Wi-Fi radio', 'Bluetooth', 'Microphone', 'Power', 'Brightness',
+                    'KDE colors', 'GTK 3', 'GTK 4'):
             label = QLabel(key + ': Checking…')
             label.setWordWrap(True)
             label.setTextFormat(Qt.PlainText)
@@ -166,7 +170,7 @@ class QuickSettingsPanel(QWidget):
         self.settings_button.clicked.connect(self.open_settings)
         controls.addWidget(self.settings_button)
         layout.addLayout(controls)
-        self.help = QLabel('Connections, Bluetooth and power policy are changed in KDE Settings. No device changes run automatically.')
+        self.help = QLabel('KDE/GTK entries show configured preferences, not guaranteed app appearance. GTK 4/libadwaita may use the desktop color-scheme portal. Changes to KDE and GTK still belong in system settings.')
         self.help.setWordWrap(True)
         self.help.setTextFormat(Qt.PlainText)
         layout.addWidget(self.help)
