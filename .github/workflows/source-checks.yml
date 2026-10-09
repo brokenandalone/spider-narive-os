@@ -22,6 +22,10 @@ jobs:
           bash distro/validate-feature-complete.sh
           bash -n system/bin/spider-guardian
           bash -n system/bin/spider-vault
+          bash -n kali-bay/bin/kali-bay
+          bash -n kali-bay/package/install-kali-bay.sh
+          bash kali-bay/package/install-kali-bay.sh --check
+          python3 -m py_compile kali-bay/ui/kali_bay.py
           python3 -m py_compile system/guardian.py system/vault.py
       - name: Shell and wallpaper smoke test
         env:
