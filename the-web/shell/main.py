@@ -500,7 +500,8 @@ class TheWeb(QMainWindow):
     def closeEvent(self, event):
         assistant = getattr(self, 'webbie_assistant', None)
         if assistant is not None and ((assistant.worker and assistant.worker.isRunning()) or
-                                      (assistant.camera_worker and assistant.camera_worker.isRunning())):
+                                      (assistant.camera_worker and assistant.camera_worker.isRunning()) or
+                                      assistant.face_controls.active()):
             self.status.setText('Webbie is still finishing a request. Wait before logging out.')
             event.ignore(); return
         # Save all editors before closing any of their stores.
