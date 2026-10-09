@@ -272,6 +272,17 @@ class TheWeb(QMainWindow):
         self.webbie_overlay.sleep(not self.webbie_overlay.face_sleeping)
         self.face_button.setText('Wake Webbie face' if self.webbie_overlay.face_sleeping else 'Sleep Webbie face')
 
+    def show_author_review(self, passage):
+        self.open_workspace('author')
+        if self.webbie_assistant.pending:
+            self.status.setText('Webbie is still answering. Review request was not sent.')
+            return
+        self.webbie_assistant.entry.setText(passage.replace('\\n', '  '))
+        self.webbie_dock.show()
+        self.webbie_dock.raise_()
+        self.webbie_assistant.entry.setFocus()
+        self.status.setText('Review request prepared for Webbie. Check the passage and press Send to share it.')
+
     def update_webbie_context(self):
         name = self.current_workspace
         label = WORKSPACES.get(name, 'The Web')
@@ -338,6 +349,8 @@ class TheWeb(QMainWindow):
             except Exception as error:
                 native = None; self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
             page.native = native
+            if name == 'author' and native is not None and hasattr(native, 'show_webbie_review') is False:
+                native.show_webbie_review = self.show_author_review
             if native:
                 native.setParent(page); native.setWindowFlags(Qt.Widget)
                 area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native); layout.addWidget(area, 1); native.show()
