@@ -32,6 +32,8 @@ jobs:
         run: |
           python3 -m py_compile system/release_batch.py
           python3 system/release_batch.py --check
+          python3 -m py_compile system/release_readiness.py
+          python3 system/release_readiness.py --json > /tmp/spider-release-readiness.json
           bash -n the-web/package/install-author-webbie.sh
           bash -n the-web/package/rollback-author-webbie.sh
           bash -n the-web/package/check-webbie-vision-readiness.sh
