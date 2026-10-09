@@ -28,7 +28,7 @@ done
 stamp="$(date +%Y%m%d-%H%M%S)"
 backup="$root/upgrade-backups/the-web-$stamp"
 install -d "$backup" "$root/the-web" "$root/branding/wallpapers" /usr/share/xsessions /usr/local/bin
-for relative in the-web/shell author/main.py studio/main.py study/study.py; do
+for relative in the-web/shell author/main.py studio/main.py study/study.py system/apps.py; do
     if [[ -e "$root/$relative" ]]; then
         install -d "$backup/$(dirname "$relative")"
         cp -a "$root/$relative" "$backup/$relative"
@@ -48,11 +48,28 @@ for image in "$source_root"/branding/workspaces/*.png; do
     target="$root/branding/workspaces/$(basename "$image")"
     if [[ ! -s "$target" ]]; then install -Dm644 "$image" "$target"; fi
 done
-# Supply missing native app source only. Never replace existing owner workspace code.
+# Reconcile partially installed workspaces file-by-file. A pre-existing directory
+# does not mean new Author, Studio or APA modules exist. Never replace existing
+# owner files, project databases, manuscripts or application customizations.
 for workspace in author studio study; do
-    if [[ ! -d "$root/$workspace" && -d "$source_root/$workspace" ]]; then cp -a "$source_root/$workspace" "$root/"; fi
+    source_dir="$source_root/$workspace"
+    [[ -d "$source_dir" ]] || continue
+    while IFS= read -r -d '' candidate; do
+        relative="${candidate#"$source_dir/"}"
+        target="$root/$workspace/$relative"
+        if [[ ! -e "$target" && ! -L "$target" ]]; then
+            install -d "$(dirname "$target")"
+            cp -a -- "$candidate" "$target"
+            printf 'Added missing %s source: %s\\n' "$workspace" "$relative"
+        fi
+    done < <(find "$source_dir" -type f -print0)
 done
 if [[ ! -f "$root/system/apps.py" ]]; then install -Dm644 "$source_root/system/apps.py" "$root/system/apps.py"; fi
+# The owner's known nine-line Author launcher difference and Studio spacing
+# customizations can be reconciled exactly. Unknown differences are skipped.
+if ! python3 "$source_root/the-web/package/reconcile-native.py" "$source_root" "$root"; then
+    echo 'One or more native workspaces needs a manual code review; existing files were preserved.' >&2
+fi
 python3 "$source_root/the-web/package/patch-native-imports.py" "$root"
 install -m755 "$source_root/the-web/session/the-web-session" /usr/local/bin/the-web-session
 install -m644 "$source_root/distro/config/sessions/the-web.desktop" /usr/share/xsessions/the-web.desktop
