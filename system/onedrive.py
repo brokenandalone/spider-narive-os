@@ -55,7 +55,8 @@ def status(config=CONFIG, rclone_config=RCLONE, folder=FOLDER):
     elif remote != 'onedrive':
         label = 'Paused: OneDrive authorization unavailable. Webbie continues locally.'
     else:
-        label = 'OneDrive configured. Background workspace sync enabled.'
+        label = ('OneDrive account configured. Background sync is enabled; '
+                 'the Microsoft session has not been live-tested here.')
     return {'connected': bool(optin and remote == 'onedrive' and installed),
             'enabled': optin, 'remoteConfigured': remote == 'onedrive',
             'rcloneAvailable': installed, 'status': label,
@@ -66,6 +67,8 @@ def enable(config=CONFIG, rclone_config=RCLONE, folder=FOLDER):
     if read_remote_type(rclone_config) != 'onedrive':
         raise ValueError('Create the named Microsoft OneDrive remote first.')
     folder = Path(folder)
+    if folder.is_symlink():
+        raise ValueError('Refusing to sync a symbolic-link workspace folder')
     folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     destination = Path(config)
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -107,7 +110,7 @@ def sync_folder(config=CONFIG, rclone_config=RCLONE, folder=FOLDER, runner=subpr
     if not info['connected']:
         return 'offline'
     folder = Path(folder)
-    if not folder.is_dir(): return 'offline'
+    if not folder.is_dir() or folder.is_symlink(): return 'unsafe workspace'
     try:
         # Never upload links that escape the selected folder.
         if not any(entry.is_file() and not entry.is_symlink() for entry in folder.rglob('*')):
@@ -145,7 +148,8 @@ def connect():
         print('Not connected. Webbie continues working locally.')
         return 1
     enable()
-    print('Connected. The private Webbie workspace folder is:', FOLDER)
+    print('OneDrive configuration saved. Workspace folder:', FOLDER)
+    print('Cloud access is verified by an actual background copy, not config alone.')
     print('Background sync is optional and never blocks Webbie.')
     # Triggering a timer asynchronously never makes sign-in wait for the cloud.
     if shutil.which('systemctl'):
