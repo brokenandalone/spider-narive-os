@@ -68,15 +68,20 @@ class VolumePanel(QWidget):
         self.slider.sliderReleased.connect(self.change)
         self.mute.clicked.connect(self.switch_mute)
         self.worker=None
+        self._available=False
         self.refresh()
 
     def refresh(self):
-        level, muted=volume_state()
-        if level is None:
-            self.slider.setEnabled(False); self.mute.setEnabled(False)
+        # Even a read-only wpctl call can stall for two seconds on a broken
+        # sound service. Run ALL volume commands off the Qt GUI event loop.
+        self._run()
+
+    def _render_state(self, state):
+        level, muted=state
+        self._available=level is not None
+        if not self._available:
             self.status.setText('Audio unavailable. Check PipeWire and WirePlumber.')
             return
-        self.slider.setEnabled(True); self.mute.setEnabled(True)
         self.slider.setValue(level)
         self.status.setText(f'Output: {level}%' + (' · Muted' if muted else ''))
 
@@ -86,12 +91,25 @@ class VolumePanel(QWidget):
     def switch_mute(self):
         self._run(mute=True)
 
+    def _failed(self, error):
+        self._available=False
+        self.status.setText(error)
+
+    def _finished(self):
+        self.slider.setEnabled(self._available)
+        self.mute.setEnabled(self._available)
+
     def _run(self, value=None, mute=False):
         if self.worker and self.worker.isRunning(): return
         self.slider.setEnabled(False); self.mute.setEnabled(False)
         self.worker=VolumeWorker(value=value,mute=mute,parent=self)
-        self.worker.result.connect(lambda _: self.refresh())
-        self.worker.error.connect(self.status.setText)
-        self.worker.finished.connect(lambda: (
-            self.slider.setEnabled(True),self.mute.setEnabled(True)))
+        self.worker.result.connect(self._render_state)
+        self.worker.error.connect(self._failed)
+        self.worker.finished.connect(self._finished)
         self.worker.start()
+
+    def closeEvent(self, event):
+        if self.worker and self.worker.isRunning():
+            event.ignore()
+        else:
+            event.accept()
