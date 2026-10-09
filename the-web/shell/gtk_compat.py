@@ -62,5 +62,5 @@ def appearance_snapshot(config_home=None):
     return {
         'GTK 3': gtk_summary(gtk3),
         'GTK 4': gtk_summary(gtk4) + ' (not authoritative for libadwaita)',
-        'KDE colors': kde.get('colorscheme', 'not specified'),
+        'KDE colors': kde.get('ColorScheme', 'not specified'),
     }
