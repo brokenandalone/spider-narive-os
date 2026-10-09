@@ -26,6 +26,7 @@ from workspaces import create_native
 from workspace_files import workspace_folders, file_open_command
 from system_panel import SystemPanel, StatusWorker
 from webbie_panel import WebbiePanel
+from webbie_overlay import WebbieOverlay
 from media_panel import MediaPanel
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
@@ -187,7 +188,7 @@ class TheWeb(QMainWindow):
         self.installed_apps = discover_apps(desktops='TheWeb:KDE')
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(STYLE)
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-        self.build_ui(); self.setup_webbie_assistant(); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
+        self.build_ui(); self.setup_webbie_assistant(); self.webbie_overlay = WebbieOverlay(SPIDER_ROOT); self.face_button.setText('Wake Webbie face' if self.webbie_overlay.face_sleeping else 'Sleep Webbie face'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
@@ -204,6 +205,8 @@ class TheWeb(QMainWindow):
         title = QLabel('THE WEB'); title.setStyleSheet('font-size:26px; font-weight:bold; color:#e9d5ff; letter-spacing:2px;'); header.addWidget(title)
         header.addWidget(QLabel('YOUR LIFE. ONE WEB.'), 1)
         header.addWidget(button('Ask Webbie', self.toggle_webbie_assistant))
+        self.face_button = button('Sleep Webbie face', self.toggle_webbie_face)
+        header.addWidget(self.face_button)
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
         self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
@@ -264,6 +267,10 @@ class TheWeb(QMainWindow):
             self.webbie_dock.show()
             self.webbie_dock.raise_()
             self.webbie_assistant.entry.setFocus()
+
+    def toggle_webbie_face(self):
+        self.webbie_overlay.sleep(not self.webbie_overlay.face_sleeping)
+        self.face_button.setText('Wake Webbie face' if self.webbie_overlay.face_sleeping else 'Sleep Webbie face')
 
     def update_webbie_context(self):
         name = self.current_workspace
@@ -495,7 +502,7 @@ class TheWeb(QMainWindow):
         worker = getattr(self, 'status_worker', None)
         if worker and worker.isRunning(): worker.wait(3000)
         if worker and worker.isRunning(): event.ignore(); return
-        self.timer.stop(); self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
+        self.timer.stop(); self.webbie_overlay.stop(); self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
 
 
 def main():
