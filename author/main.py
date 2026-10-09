@@ -39,7 +39,7 @@ class AuthorWindow(QMainWindow):
         self.editor = QTextEdit(); self.editor.setAcceptRichText(False)
         self.canon = QTextEdit(); self.canon.setAcceptRichText(False)
         tabs.addTab(self.editor, 'Chapter'); tabs.addTab(self.canon, 'Canon notes')
-        self.toolkit = AuthorToolkit(self.store, self.current_chapter)
+        self.toolkit = AuthorToolkit(self.store, self.current_chapter, self.flush)
         self.toolkit.jumpRequested.connect(self.jump_to_search_result)
         tabs.addTab(self.toolkit, 'Writing Studio')
         self.editor.setEnabled(False); self.canon.setEnabled(False)
