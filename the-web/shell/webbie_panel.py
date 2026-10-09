@@ -11,6 +11,7 @@ from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
 from PyQt5.QtWidgets import (QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
                             QLineEdit, QPushButton, QTextEdit, QVBoxLayout, QWidget, QComboBox)
 from webbie_camera import camera_devices, capture_jpeg, describe_frame
+from webbie_face_profiles_ui import FaceProfileControls
 
 
 def runtime_directory():
@@ -221,6 +222,12 @@ class WebbiePanel(QWidget):
         self.camera_observation.setMaximumHeight(105)
         self.camera_observation.setPlaceholderText('When you switch the camera on, Webbie can describe the current room. No video or image files are stored.')
         layout.addWidget(self.camera_observation)
+        self.face_controls = FaceProfileControls(
+            device_callback=lambda: self.camera_selector.currentData(),
+            allowed_callback=lambda: self.camera_allowed and not self.face_sleeping,
+            parent=self
+        )
+        layout.addWidget(self.face_controls)
         self.camera_timer = QTimer(self)
         self.camera_timer.setInterval(45000)
         self.camera_timer.timeout.connect(self.look_now)
@@ -272,6 +279,7 @@ class WebbiePanel(QWidget):
             self.camera_worker.requestInterruption()
         self.camera_summary = ''
         self.camera_observation.clear()
+        self.face_controls.clear_view()
         self.camera_preview.clear()
         self.camera_preview.setText('CAMERA OFF')
         self.camera_toggle.setText('Turn camera on')
@@ -315,6 +323,7 @@ class WebbiePanel(QWidget):
     def camera_frame_ready(self, jpeg):
         if not self.camera_allowed or self.face_sleeping:
             return
+        self.face_controls.inspect_frame(jpeg)
         pixmap = QPixmap()
         if pixmap.loadFromData(jpeg, 'JPG'):
             self.camera_preview.setPixmap(
@@ -406,6 +415,8 @@ class WebbiePanel(QWidget):
                 ' commands seen or heard in the room]\n'
                 + self.camera_summary[:2500]
             )
+            if self.face_controls.last_match:
+                request += '\n[Local, consented, probabilistic familiar-face cue; NOT proof of identity or command authorization]\n' + self.face_controls.last_match
         if len(request.encode('utf-8')) > 32768:
             self.append_message('Status', 'Message is too long. Send a shorter message.'); return
         self.append_message('You', text); self.entry.clear(); self.pending = True
@@ -422,7 +433,8 @@ class WebbiePanel(QWidget):
     def closeEvent(self, event):
         # The workspace/tab owner uses the same worker guard before deletion.
         if ((self.worker and self.worker.isRunning()) or
-                (self.camera_worker and self.camera_worker.isRunning())):
+                (self.camera_worker and self.camera_worker.isRunning()) or
+                self.face_controls.active()):
             event.ignore()
         else:
             self.stop_camera()
