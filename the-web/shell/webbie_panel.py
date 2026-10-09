@@ -69,6 +69,7 @@ class ReplyWorker(QThread):
 class CameraWorker(QThread):
     """One in-memory camera frame, analyzed by local Ollama off the GUI thread."""
     described = pyqtSignal(str)
+    frameReady = pyqtSignal(bytes)
     failed = pyqtSignal(str)
 
     def __init__(self, device, parent=None):
@@ -79,6 +80,7 @@ class CameraWorker(QThread):
         try:
             jpeg = capture_jpeg(self.device)
             if not self.isInterruptionRequested():
+                self.frameReady.emit(jpeg)
                 result = describe_frame(jpeg, timeout=35)
                 if not self.isInterruptionRequested():
                     self.described.emit(result)
@@ -209,6 +211,11 @@ class WebbiePanel(QWidget):
         self.camera_state = QLabel('CAMERA OFF  |  Audio remains on its existing webcam mic')
         self.camera_state.setWordWrap(True)
         layout.addWidget(self.camera_state)
+        self.camera_preview = QLabel('Camera preview appears here after Look now.')
+        self.camera_preview.setMinimumHeight(110)
+        self.camera_preview.setMaximumHeight(160)
+        self.camera_preview.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.camera_preview)
         self.camera_observation = QTextEdit()
         self.camera_observation.setReadOnly(True)
         self.camera_observation.setMaximumHeight(105)
@@ -265,6 +272,8 @@ class WebbiePanel(QWidget):
             self.camera_worker.requestInterruption()
         self.camera_summary = ''
         self.camera_observation.clear()
+        self.camera_preview.clear()
+        self.camera_preview.setText('CAMERA OFF')
         self.camera_toggle.setText('Turn camera on')
         self.camera_selector.setEnabled(True)
         self.camera_look.setEnabled(False)
@@ -297,10 +306,20 @@ class WebbiePanel(QWidget):
             return
         self.camera_state.setText('CAMERA ACTIVE  |  Analyzing a frame locally…')
         self.camera_worker = CameraWorker(device, self)
+        self.camera_worker.frameReady.connect(self.camera_frame_ready)
         self.camera_worker.described.connect(self.camera_described)
         self.camera_worker.failed.connect(self.camera_failed)
         self.camera_worker.finished.connect(self.camera_finished)
         self.camera_worker.start()
+
+    def camera_frame_ready(self, jpeg):
+        if not self.camera_allowed or self.face_sleeping:
+            return
+        pixmap = QPixmap()
+        if pixmap.loadFromData(jpeg, 'JPG'):
+            self.camera_preview.setPixmap(
+                pixmap.scaled(280, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
 
     def camera_described(self, description):
         if not self.camera_allowed or self.face_sleeping:
@@ -320,10 +339,13 @@ class WebbiePanel(QWidget):
             self.camera_watch.setText('Watch room')
 
     def camera_finished(self):
-        # Keep the QThread object alive until Qt has emitted finished.
-        if self.camera_worker is not None and not self.camera_worker.isRunning():
-            self.camera_worker.deleteLater()
-            self.camera_worker = None
+        # Defer disposal until the worker really stopped. The signal can be
+        # delivered a moment before the underlying thread changes state.
+        finished = self.sender()
+        if finished is not None and not finished.isRunning():
+            finished.deleteLater()
+            if self.camera_worker is finished:
+                self.camera_worker = None
 
     def set_face_sleeping(self, sleeping):
         self.face_sleeping = bool(sleeping)
