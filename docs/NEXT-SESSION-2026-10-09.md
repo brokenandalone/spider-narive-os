@@ -8,7 +8,7 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
 - Dell / Spider OS boots again following the power outage. All personal data
   reported present. Root cause of the temporary boot failure is unknown.
 - The Web and KDE Plasma desktop exist and work. Only a few desktop bugs remain.
-- Owner reports the login selector shows X11 above Plasma/The Web, but has **not yet verified the active session type**. Run `echo "$XDG_SESSION_TYPE"` from Konsole before installing the X11-specific overlay; verify actual mouse pass-through and fullscreen hiding after installation.
+- **Confirmed in Konsole:** `XDG_SESSION_TYPE=x11` and `DESKTOP_SESSION=the-web`. The active Spider OS session uses The Web on X11, which matches the Webbie click-through overlay target. Actual click-through, fullscreen hiding and night-sleep behaviors still require on-PC testing.
 - Author SQLite audit: **20 books, 39 chapters, 20 imported source fingerprints**.
   Original DOCX backup placement and chapter-content QA still need review.
 - Webbie, Ollama, AI DJ, PipeWire and WirePlumber: active in Oct 9 read-only
@@ -64,7 +64,7 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
 
 ## Tomorrow: safe sequence (only after user is at their PC)
 
-1. Check the actual current session using `echo "$XDG_SESSION_TYPE"` in Konsole. The owner sees X11 in the login selector, but that alone does not prove the selected active session. The click-through overlay is X11-only and needs actual mouse/fullscreen testing.
+1. **Session confirmed:** `XDG_SESSION_TYPE=x11`, `DESKTOP_SESSION=the-web`. No more login-session checks required for X11 eligibility. Test actual click-through and fullscreen hiding after installing the add-on.
 2. Confirm recent independent backup of Author and originals. Do not reimport
    the verified 20-book database. Verify source revision and add-on prerequisites.
 3. If installing only PR #21, fetch the **exact pinned revision** above and
@@ -95,7 +95,7 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
   needs explicit permission boundaries and never enables silently.
 - For future room awareness, should Webbie see only on request, or remain
   active for an explicitly approved session with a permanent visual indicator?
-- Pending: Confirm the active session with `echo "$XDG_SESSION_TYPE"`; the owner only confirmed X11 appears as a login option.
+- **Resolved:** The owner ran `echo "$XDG_SESSION_TYPE"` and `echo "$DESKTOP_SESSION"`; results were `x11` and `the-web`.
 
 ## Never overwrite
 
