@@ -154,3 +154,19 @@ phoneme synchronization. Live listening identity is not inferred.
 Priority order: desktop reliability, Webbie, Media, System/Recovery, creative
 workflows, Kali/expansion. See UPGRADE-PRIORITIES.md. Owner installation and
 real audio/window-manager validation remain pending.
+
+## Combined desktop batch — 9 October 2026
+
+The expanded PR #17 branch groups the face/chat/window work with normal X11
+minimize/maximize/restore actions, adaptive taskbar overflow, Ctrl+W tab closing,
+a Webbie shortcut, output volume/mute via WirePlumber, a taskbar Audio entry,
+native Media transport via selected MPRIS players, dark diagnostic tables/menus,
+version/commit installation receipts with managed-file hashes, actionable health
+findings and JSON report export. Unsupported players still use their own controls.
+The MPRIS client does not automatically add MPRIS support to Media Center.
+
+103 regressions plus native Qt integration passed. No owner-PC install is
+claimed. Full notification center/tray, global dark/light theme switching, device
+selection/mixer/media keys, accurate phoneme lip sync and installed voice
+qualification remain pending in MASTER-UPGRADE-CHECKLIST.md. Install the combined
+branch once and log out/in once after the source batch is finished.

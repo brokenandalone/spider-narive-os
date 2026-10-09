@@ -20,12 +20,13 @@ if not SPIDER_ROOT.exists():
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
 from app_catalog import WORKSPACES, discover_apps, launch_command
-from desktop import list_tasks, wm_command, close_window, x11_properties
+from desktop import list_tasks, wm_command, close_window, minimize_window, maximize_window, x11_properties
 from wallpapers import WallpaperCatalog
 from workspaces import create_native
 from workspace_files import workspace_folders, file_open_command
 from system_panel import SystemPanel, StatusWorker
 from webbie_panel import WebbiePanel
+from media_panel import MediaPanel
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
 STYLE = '''
@@ -36,6 +37,12 @@ QTabWidget#workspaceTabs[home='true']::pane { background:transparent; border:non
 QPushButton { font-size:14px; background:rgba(70,25,105,230); border:1px solid #7e22ce; border-radius:8px; padding:7px 12px; color:white; text-align:left; }
 QPushButton:hover, QPushButton:checked { background:#6b21a8; border-color:#c084fc; }
 QLineEdit, QComboBox, QListWidget { background:#17111f; color:#f5eff8; border:1px solid #5b21b6; border-radius:7px; padding:6px; }
+QTextEdit, QTableWidget { background:#17111f; alternate-background-color:#24182f; color:#f5eff8; border:1px solid #5b21b6; selection-background-color:#6b21a8; }
+QHeaderView::section { background:#2d193b; color:#f5eff8; padding:6px; border:1px solid #3c2946; }
+QMenu { background:#17111f; color:#f5eff8; border:1px solid #7e22ce; }
+QMenu::item { padding:8px 18px; }
+QMenu::item:selected { background:#6b21a8; }
+QToolTip { background:#24182f; color:#f5eff8; border:1px solid #7e22ce; }
 QTabBar::tab { background:#17111f; padding:10px 14px; color:#c7b9d1; }
 QTabBar::tab:selected { background:#6b21a8; color:white; }
 QScrollArea { background:transparent; border:none; }
@@ -117,8 +124,10 @@ class Taskbar(QWidget):
         layout = QHBoxLayout(self); layout.setContentsMargins(8, 4, 8, 4)
         self.start = button('Start', lambda: shell.start_menu.show_menu(self)); self.start.setIcon(QIcon(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png'))); layout.addWidget(self.start)
         layout.addWidget(button('The Web', shell.show_desktop))
+        webbie = button('Webbie', shell.open_webbie); webbie.setIcon(QIcon(str(SPIDER_ROOT / 'branding/webbie/webbie-face-v1.png'))); layout.addWidget(webbie)
         self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
         layout.addWidget(button('Lock', shell.lock_session))
+        layout.addWidget(button('Audio', shell.open_audio))
         self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(2000)
         self.last_tasks = None; self.refresh()
@@ -132,28 +141,41 @@ class Taskbar(QWidget):
         self.clock.setText(QDateTime.currentDateTime().toString('ddd d MMM  HH:mm'))
         excluded = {f'0x{int(self.winId()):08x}', f'0x{int(self.shell.winId()):08x}'}
         tasks = list_tasks(excluded) if self.shell.desktop_mode else []
-        signature = tuple((task.ident, task.title) for task in tasks)
+        screen_width = QApplication.primaryScreen().geometry().width()
+        visible_count = max(0, min(2, (screen_width - 800) // 210))
+        signature = (screen_width, tuple((task.ident, task.title) for task in tasks))
         if signature == self.last_tasks: return
         self.last_tasks = signature
         while self.tasks.count():
             item = self.tasks.takeAt(0)
             if item.widget(): item.widget().deleteLater()
-        for task in tasks[:2]:
+        for task in tasks[:visible_count]:
             group = QWidget(); row = QHBoxLayout(group); row.setContentsMargins(0, 0, 0, 0); row.setSpacing(2)
             widget = button(task.title[:18], lambda checked=False, ident=task.ident: wm_command('-i', '-a', ident))
-            widget.setMaximumWidth(150); widget.setToolTip(task.title); row.addWidget(widget)
+            widget.setMaximumWidth(150); widget.setToolTip(task.title + '\nRight-click for Minimize, Maximize / Restore and Close.'); row.addWidget(widget)
+            widget.setContextMenuPolicy(Qt.CustomContextMenu)
+            menu = QMenu(widget)
+            action = menu.addAction('Minimize'); action.triggered.connect(lambda checked=False, ident=task.ident: self.minimize(ident))
+            action = menu.addAction('Maximize / Restore'); action.triggered.connect(lambda checked=False, ident=task.ident: maximize_window(ident))
+            action = menu.addAction('Close'); action.triggered.connect(lambda checked=False, ident=task.ident: close_window(ident))
+            widget.customContextMenuRequested.connect(lambda point, target=widget, context=menu: context.exec_(target.mapToGlobal(point)))
             close = button('×', lambda checked=False, ident=task.ident: close_window(ident))
             close.setFixedWidth(44); close.setAccessibleName('Close ' + task.title)
             close.setToolTip('Close ' + task.title + ' (the app can ask to save)'); row.addWidget(close)
             self.tasks.addWidget(group)
-        if len(tasks) > 2:
-            more = button(f'{len(tasks) - 2} more windows', lambda: None); menu = QMenu(more)
-            for task in tasks[2:]:
+        if len(tasks) > visible_count:
+            more = button(f'Windows ({len(tasks) - visible_count})', lambda: None); menu = QMenu(more)
+            for task in tasks[visible_count:]:
                 window_menu = menu.addMenu(task.title)
                 action = window_menu.addAction('Activate'); action.triggered.connect(lambda checked=False, ident=task.ident: wm_command('-i', '-a', ident))
                 action = window_menu.addAction('Close'); action.triggered.connect(lambda checked=False, ident=task.ident: close_window(ident))
+                action = window_menu.addAction('Minimize'); action.triggered.connect(lambda checked=False, ident=task.ident: self.minimize(ident))
+                action = window_menu.addAction('Maximize / Restore'); action.triggered.connect(lambda checked=False, ident=task.ident: maximize_window(ident))
             more.setMenu(menu); self.tasks.addWidget(more)
         self.tasks.addStretch(1)
+
+    def minimize(self, ident):
+        if not minimize_window(ident): self.shell.status.setText('Minimize is unavailable for this display connection.')
 
 
 class TheWeb(QMainWindow):
@@ -167,6 +189,7 @@ class TheWeb(QMainWindow):
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.build_ui(); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
+        self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
         self.set_workspace('default')
         if restore: self.restore_state()
@@ -247,7 +270,10 @@ class TheWeb(QMainWindow):
         if name not in self.workspace_widgets:
             page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
             layout = QHBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8); layout.addWidget(self.application_panel(name))
-            try: native = WebbiePanel(SPIDER_ROOT) if name == 'webbie' else create_native(name, SPIDER_ROOT)
+            try:
+                if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
+                elif name == 'media': native = MediaPanel(self.launch_media)
+                else: native = create_native(name, SPIDER_ROOT)
             except Exception as error:
                 native = None; self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
             page.native = native
@@ -352,6 +378,11 @@ class TheWeb(QMainWindow):
     def open_author(self): self.open_workspace('author')
     def open_study(self): self.open_workspace('study')
     def open_webbie(self): self.open_workspace('webbie')
+
+    def open_audio(self):
+        self.open_workspace('system')
+        panel = self.workspace_widgets['system'].native
+        panel.tabs.setCurrentWidget(panel.audio_page)
     def open_forage(self): self.open_workspace('forage')
     def open_deep_forage(self): self.open_workspace('deep-forage')
     def open_kali(self): self.open_workspace('kali-bay')

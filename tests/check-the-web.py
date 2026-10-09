@@ -23,7 +23,8 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         assert (pixel.red()>pixel.blue()) == (color=='red')
     surface.close()
     window=main.TheWeb(restore=False);window.show()
-    with patch.object(main, 'list_tasks', return_value=[Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]), patch.object(main, 'close_window') as close:
+    with patch.object(main, 'list_tasks', return_value=[Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]), patch.object(main, 'close_window') as close, patch.object(main.QApplication, 'primaryScreen') as screen, patch.object(main, 'minimize_window', return_value=True) as minimize, patch.object(main, 'maximize_window') as maximize:
+        screen.return_value.geometry.return_value.width.return_value = 1280
         window.desktop_mode = True; window.taskbar.refresh()
         group = window.taskbar.tasks.itemAt(0).widget()
         close_button = next(item for item in group.findChildren(QPushButton) if item.text() == '×')
@@ -31,6 +32,10 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         overflow = window.taskbar.tasks.itemAt(2).widget().menu()
         overflow.actions()[0].menu().actions()[1].trigger()
         close.assert_called_with('0x00000103')
+        overflow.actions()[0].menu().actions()[2].trigger(); minimize.assert_called_with('0x00000103')
+        overflow.actions()[0].menu().actions()[3].trigger(); maximize.assert_called_with('0x00000103')
+        screen.return_value.geometry.return_value.width.return_value = 900
+        window.taskbar.refresh(); assert window.taskbar.tasks.itemAt(0).widget().menu() is not None
         window.desktop_mode = False; window.taskbar.refresh()
     for name in main.WORKSPACES:
         window.open_workspace(name)
@@ -46,6 +51,20 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
             app.processEvents()
             assert panel.audio.toPlainText() == 'PipeWire test'
             assert panel.refresh_button.isEnabled()
+    media_panel = window.workspace_widgets['media'].native
+    with patch('media_panel.discover_players', return_value=['org.mpris.MediaPlayer2.vlc']), patch('media_panel.player_state', return_value='Paused'), patch('media_panel.control') as transport:
+        media_panel.refresh(); assert media_panel.worker.wait(3000); app.processEvents()
+        assert not media_panel.controls[0].isEnabled()
+        media_panel.players.setCurrentIndex(1); media_panel.refresh('PlayPause')
+        assert media_panel.worker.wait(3000); app.processEvents()
+        transport.assert_called_once_with('org.mpris.MediaPlayer2.vlc', 'PlayPause')
+        assert media_panel.status.text() == 'Paused' and media_panel.controls[0].isEnabled()
+    system = window.workspace_widgets['system'].native
+    with patch('system_panel.adjust_audio') as audio_change, patch('system_panel.collect', return_value={'volume': 'Output: 45%', 'services': []}):
+        system.change_audio('Up'); assert system.worker.wait(3000); app.processEvents()
+        audio_change.assert_called_once_with('Up'); assert system.volume.text() == 'Output: 45%'
+        assert all(button.isEnabled() for button in system.audio_buttons)
+    window.open_audio(); assert system.tabs.currentWidget() is system.audio_page
     author=window.workspace_widgets['author'].native
     window.open_author();window.open_author();assert window.workspace_widgets['author'].native is author
     assert window.tabs.count()==15

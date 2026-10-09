@@ -42,6 +42,31 @@ def close_window(ident):
     wm_command('-i', '-c', ident)
 
 
+def maximize_window(ident):
+    if not isinstance(ident, str) or not re.fullmatch(r'0x[0-9a-fA-F]+', ident) or int(ident, 16) == 0:
+        raise ValueError('Invalid X11 window ID')
+    wm_command('-i', '-r', ident, '-b', 'toggle,maximized_vert,maximized_horz')
+
+
+def minimize_window(ident):
+    if not isinstance(ident, str) or not re.fullmatch(r'0x[0-9a-fA-F]+', ident) or int(ident, 16) == 0:
+        raise ValueError('Invalid X11 window ID')
+    library = ctypes.util.find_library('X11')
+    if not library or not os.environ.get('DISPLAY'): return False
+    x = ctypes.CDLL(library)
+    x.XOpenDisplay.argtypes = [ctypes.c_char_p]; x.XOpenDisplay.restype = ctypes.c_void_p
+    x.XDefaultScreen.argtypes = [ctypes.c_void_p]; x.XDefaultScreen.restype = ctypes.c_int
+    x.XIconifyWindow.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int]; x.XIconifyWindow.restype = ctypes.c_int
+    x.XFlush.argtypes = [ctypes.c_void_p]; x.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    display = x.XOpenDisplay(None)
+    if not display: return False
+    try:
+        result = x.XIconifyWindow(display, int(ident, 16), x.XDefaultScreen(display))
+        x.XFlush(display); return bool(result)
+    finally:
+        x.XCloseDisplay(display)
+
+
 def x11_properties(window, kind, screen=None):
     """EWMH desktop/dock types; dock reserves only its bottom-screen interval."""
     if not os.environ.get('DISPLAY') or os.environ.get('QT_QPA_PLATFORM') == 'offscreen':
