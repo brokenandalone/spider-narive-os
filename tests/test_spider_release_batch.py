@@ -54,11 +54,11 @@ class BatchReleaseTests(unittest.TestCase):
         self.assertFalse(self.target.exists())
 
     def test_partial_copy_failure_restores_first_file_and_leaves_second_untouched(self):
-        self.target.write_text('VALUE = 1\\n')
+        self.target.write_text('VALUE = 1\n')
         source2 = self.source_root / 'second.py'
         target2 = self.target_root / 'second.py'
-        source2.write_text('VALUE = 200\\n')
-        target2.write_text('VALUE = 100\\n')
+        source2.write_text('VALUE = 200\n')
+        target2.write_text('VALUE = 100\n')
         second = batch.Item(source2, target2, uid=os.geteuid(), gid=os.getegid(),
                             reference='second.py')
         original_copy = batch.atomic_copy
@@ -73,8 +73,8 @@ class BatchReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, 'simulated'):
                 batch.apply([self.entry, second], self.backup_root,
                             self.source_root, (), self.true_baseline)
-        self.assertEqual(self.target.read_text(), 'VALUE = 1\\n')
-        self.assertEqual(target2.read_text(), 'VALUE = 100\\n')
+        self.assertEqual(self.target.read_text(), 'VALUE = 1\n')
+        self.assertEqual(target2.read_text(), 'VALUE = 100\n')
 
     def test_known_previous_version_is_backed_up_and_restorable(self):
         self.target.write_text('VALUE = 1\n')
