@@ -33,6 +33,45 @@ class PopupTests(unittest.TestCase):
             self.assertFalse(toast.isVisible())
             toast.close()
 
+    def test_identical_notifications_with_distinct_ids_both_appear(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base=Path(temporary)
+            state=base/'notifications.json'
+            journal=base/'external-notifications.jsonl'
+            save_state(state,{'dnd':False,'items':[]})
+            toast=NotificationToast(state_path=state)
+            data={'app':'Mail','title':'Same event','message':'Identical text',
+                  'time':'2026-10-09T15:00:00'}
+            data['id']='event-one'
+            journal.write_text(json.dumps(data)+'\n')
+            toast.refresh()
+            first=toast.last_key
+            toast.hide()
+            data['id']='event-two'
+            journal.write_text(json.dumps(data)+'\n')
+            toast.refresh()
+            self.assertTrue(toast.isVisible())
+            self.assertNotEqual(toast.last_key,first)
+            self.assertEqual(toast.message.text(),'Identical text')
+            toast.close()
+
+    def test_external_markup_is_rendered_as_plain_text(self):
+        from PyQt5.QtCore import Qt
+        with tempfile.TemporaryDirectory() as temporary:
+            base=Path(temporary)
+            state=base/'notifications.json'
+            journal=base/'external-notifications.jsonl'
+            save_state(state,{'dnd':False,'items':[]})
+            toast=NotificationToast(state_path=state)
+            journal.write_text(json.dumps({'app':'Mail','title':'<b>Fake alert</b>',
+                'message':'<a href="https://invalid.example">Unexpected link</a>',
+                'time':'t','id':'plain-text-test'})+'\n')
+            toast.refresh()
+            self.assertEqual(toast.title.textFormat(),Qt.PlainText)
+            self.assertEqual(toast.message.textFormat(),Qt.PlainText)
+            self.assertTrue(toast.isVisible())
+            toast.close()
+
     def test_journal_symlink_is_not_read(self):
         with tempfile.TemporaryDirectory() as temporary:
             base=Path(temporary)
