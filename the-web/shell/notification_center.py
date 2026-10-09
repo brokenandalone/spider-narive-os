@@ -51,6 +51,7 @@ class NotificationCenter(QWidget):
         self.dnd.setChecked(self.state['dnd'])
         self.dnd.toggled.connect(self.set_dnd)
         layout.addWidget(self.dnd)
+        self.external_path=self.path.parent/'external-notifications.jsonl'
         self.history=QListWidget()
         self.history.setAccessibleName('The Web notification history')
         layout.addWidget(self.history)
@@ -64,6 +65,14 @@ class NotificationCenter(QWidget):
 
     def refresh(self):
         self.history.clear()
+        try:
+            if not self.external_path.is_symlink() and self.external_path.stat().st_size < 131072:
+                lines=self.external_path.read_text(encoding='utf-8').splitlines()[-100:]
+                for line in reversed(lines):
+                    event=json.loads(line)
+                    self.history.addItem(str(event.get('app','App'))[:40]+' · '+str(event.get('title',''))[:80]+'  '+str(event.get('message',''))[:300])
+        except (OSError,ValueError,UnicodeError,TypeError):
+            pass
         for item in reversed(self.state['items']):
             self.history.addItem(item['title'][:80]+'  '+item['message'][:300])
 
