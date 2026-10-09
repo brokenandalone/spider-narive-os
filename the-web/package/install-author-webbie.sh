@@ -13,6 +13,7 @@ root=/usr/local/lib/spider-os
 baseline_refs=(
   b2a1953e815479324c8a53a68ad51d813438f496
   fb0f6eb5a54cce0bc86ec081a67d18ccff4fc46e
+  eec8e47c128a2f796ff5d16d549f8a2b105e32f8
 )
 managed=(
   author/main.py
@@ -23,6 +24,12 @@ managed=(
   the-web/shell/main.py
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py
+  the-web/shell/webbie_camera.py
+  the-web/shell/webbie_faces.py
+  the-web/shell/webbie_face_profiles_ui.py
+  the-web/shell/webbie_vision_bridge.py
+  webbie/agent/vision_query.py
+  webbie/agent/webbie.py
 )
 if [[ $mode == --apply && $EUID -ne 0 ]]; then
     echo 'Use sudo bash ... --apply from your normal Spider OS user.' >&2
@@ -35,6 +42,7 @@ fi
 command -v git >/dev/null || { echo 'Missing git.' >&2; exit 2; }
 command -v python3 >/dev/null || { echo 'Missing python3.' >&2; exit 2; }
 command -v cmp >/dev/null || { echo 'Missing cmp.' >&2; exit 2; }
+command -v ffmpeg >/dev/null || { echo 'Webcam vision requires ffmpeg. Install the Ubuntu ffmpeg package first.' >&2; exit 2; }
 git -c "safe.directory=$source_root" -C "$source_root" rev-parse --is-inside-work-tree >/dev/null ||
   { echo 'Run from a GitHub worktree of Spider OS.' >&2; exit 2; }
 
@@ -137,7 +145,22 @@ for relative in "${managed[@]}"; do
     mv -f -- "$staging" "$installed"
     echo "Installed: $relative"
 done
+# Write the rollback record only after all managed code copies succeeded.
+# Names are a fixed, audited list; never include user document paths.
+manifest="$backup/rollback-manifest.tsv"
+for relative in "${managed[@]}"; do
+    if [[ -f "$backup/$relative" ]]; then
+        action=existing
+    else
+        action=new
+    fi
+    sha="$(sha256sum -- "$root/$relative" | cut -d' ' -f1)"
+    printf '%s\t%s\t%s\n' "$relative" "$action" "$sha" >> "$manifest"
+done
+chmod 0600 "$manifest"
 echo
 echo "Author/Webbie code upgraded. Safe backup: $backup"
+echo "To inspect recovery: sudo bash $source_root/the-web/package/rollback-author-webbie.sh --check $backup"
 echo 'The active desktop stays running. Save your work and log out later to load the upgraded UI.'
+echo 'Webcam vision uses locally installed Ollama gemma3:4b. The microphone configuration is unchanged.'
 echo 'Private manuscripts, Webbie voice service, photos, documents and original DOCX files were untouched.'

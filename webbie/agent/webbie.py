@@ -36,6 +36,7 @@ sys.path.insert(
 
 from brain import respond
 from tts import speak
+from vision_query import visual_question, ask_vision
 
 
 CONFIG_FILE = (
@@ -519,16 +520,19 @@ def handle_command(command, voice=False):
         last_input="voice" if voice else "text",
     )
 
-    built_in = handle_builtin(command)
-
-    if built_in:
-        reply = built_in
-
+    # Visual questions are routed only after the ordinary wake-word flow.
+    # Camera consent remains entirely inside The Web; no enrollment required.
+    if voice and visual_question(command):
+        reply = ask_vision(command)
     else:
-        reply = respond(
-            command,
-            context_name=current_name(),
-        )
+        built_in = handle_builtin(command)
+        if built_in:
+            reply = built_in
+        else:
+            reply = respond(
+                command,
+                context_name=current_name(),
+            )
 
     if voice:
         say(reply)
