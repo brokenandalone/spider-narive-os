@@ -12,6 +12,8 @@ When the owner explicitly asks to install:
 5. Install only after explicit owner installation instruction and successful installed-PC preflight. Webbie OneDrive OAuth remains optional and independently user initiated.
 6. Perform one deliberate application activation/log-out sequence and one comprehensive acceptance checklist. Source CI never substitutes for installed PC verification.
 7. If a feature is not release-ready, clearly mark it deferred rather than silently swapping in an old or contradictory build.
+8. **Mandatory post-install guided onboarding:** after the batch is installed AND verified on the owner's Dell, give a clear, step-by-step, user-facing walkthrough for **every newly installed feature**, rather than assuming installation equals usability. Do not mark onboarding complete just because GitHub CI passed or UI buttons are present. Maintain a release-specific feature inventory and mark each feature demonstrated, deferred or requiring optional owner setup.
+9. For every installed feature, explain where to open it, first-use setup and permissions, everyday use, available controls/customizations, how to disable/reset it, common troubleshooting and safe rollback/recovery. Demonstrate one practical task at a time, let the owner complete any login/consent steps themselves, and give exact labels/commands only after verifying them against the installed build.
 
 **There is no daily install quota or scheduled daily installation.** A user-requested session is the batching boundary. Multiple separately requested installation sessions, including on the same day, are allowed.
 
@@ -61,6 +63,17 @@ An intentional The Web session relogin activates the X11 portrait. OneDrive
 continues local-only until the user manually chooses Connect OneDrive; it
 enables the independent user-level sync timer only after sign-in. Webcam
 access remains off until the user enables it.
+
+## Required post-install owner walkthrough
+
+**Owner request, October 9, 2026:** once all the requested upgrades have been installed, provide a feature-by-feature, step-by-step tutorial for using, configuring and controlling every new function. This is a **required deliverable**, not an optional add-on.
+
+- Start with a manifest-derived `Installed / Deferred / Needs setup` index so no uninstalled feature is presented as working.
+- Explain normal desktop basics first: The Web taskbar/windows and Start, Quick Settings, notifications/tray, volume/microphone, appearance including KDE/GTK distinctions, files, displays, lock/logout and backups.
+- Cover Webbie as its own guided section: wake/sleep, visible face, voice commands, workspace modes/names, camera and screen permissions, recognition opt-in, privacy controls and how to stop watching/listening. Do not claim identity or voice authorization until verified.
+- Walk through Author, School/Study, Studio, Forage/Deep Forage, Kali Bay, Media Center/AI DJ, Recovery, System and any additional installed features. Confirm whether OneDrive is still unconnected and guide only user-initiated sign-in if desired.
+- For **each** feature, show exact UI path, first-run prerequisites, example task, controls, disable/reset, troubleshooting and where any backups/rollback receipt are stored. Separate owner-only consent actions from automatic operations. Prefer live owner-PC verification over source-level guesses.
+- Save a release-specific `POST-INSTALL-FEATURE-GUIDE.md` after acceptance, based on the final installed manifest and actual working UI. Keep it current if later install batches add or change features. Mark onboarding complete only after walking through the features with the owner.
 
 ## Single-chat ownership
 The user requested ONE active Spider OS build chat as the source of direction. Other chats should not write to Spider OS branches concurrently. GitHub handoff and master checklist record status. If a competing branch changes, fetch and compare its latest commit before continuing. Do not claim other chats can be automatically stopped or merged by editing this file.
