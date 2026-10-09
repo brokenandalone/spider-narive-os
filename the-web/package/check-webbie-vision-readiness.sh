@@ -55,7 +55,7 @@ for path in \
   /usr/local/lib/spider-os/the-web/shell/main.py \
   /usr/local/lib/spider-os/the-web/shell/webbie_panel.py \
   /usr/local/lib/spider-os/webbie/agent/webbie.py \
-  '/home/spider/Documents/Spider OS/Author/library.sqlite3'
+  "$HOME/Documents/Spider OS/Author/library.sqlite3"
 do
   if [[ -f "$path" ]]; then
     echo "PRESENT: $path"
