@@ -57,6 +57,19 @@ class ExternalTrayTests(unittest.TestCase):
             self.assertEqual(panel.items[0]['icon_name'],'application-icon')
             panel.close()
 
+    def test_icon_names_are_restricted_to_theme_not_files(self):
+        detail={'id':'org.example.App/StatusNotifierItem','service':'org.example.App',
+                'title':'Music Service','status':'Active','icon_name':'audio-x-generic',
+                'menu':False}
+        with patch('tray_panel.get_status_items',return_value=[detail['id']]), \
+             patch('tray_panel.get_item_details',return_value=detail):
+            panel=TrayPanel()
+            panel.worker.wait(3000)
+            APP.processEvents()
+            self.assertEqual(panel.list.count(),1)
+            self.assertEqual(panel.items[0]['icon_name'],'audio-x-generic')
+            panel.close()
+
     def test_tray_panel_lists_background_apps(self):
         with patch('tray_panel.get_status_items',return_value=[]):
             panel=TrayPanel()
