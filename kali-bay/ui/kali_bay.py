@@ -7,9 +7,9 @@ from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import (
-    QBrush,
+    QColor,
     QFont,
-    QPalette,
+    QPainter,
     QPixmap,
 )
 from PyQt5.QtWidgets import (
@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -54,7 +55,7 @@ WALLPAPER = (
 )
 
 
-CATEGORIES = [
+OFFENSIVE_CATEGORIES = [
     (
         "INFORMATION GATHERING",
         "OSINT, discovery, enumeration",
@@ -117,6 +118,69 @@ CATEGORIES = [
     ),
 ]
 
+PURPLE_CATEGORIES = [
+    (
+        "IDENTIFY",
+        "Inventory, visibility and risk discovery",
+        "kali-tools-identify",
+    ),
+    (
+        "PROTECT",
+        "Hardening and preventative controls",
+        "kali-tools-protect",
+    ),
+    (
+        "DETECT",
+        "Threat monitoring and detection tools",
+        "kali-tools-detect",
+    ),
+    (
+        "RESPOND",
+        "Incident investigation and containment",
+        "kali-tools-respond",
+    ),
+    (
+        "RECOVER",
+        "Recovery and digital evidence workflows",
+        "kali-tools-recover",
+    ),
+]
+
+
+class WallpaperSurface(QWidget):
+    """Paint the workspace artwork on the content surface itself.
+
+    QMainWindow palette wallpapers disappear beneath the central QWidget.
+    Keep the image untouched and paint it behind the dashboard widgets.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._image = QPixmap()
+        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+
+    def set_wallpaper(self, image):
+        self._image = image if image is not None else QPixmap()
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        if not self._image.isNull():
+            scaled = self._image.scaled(
+                self.size(),
+                Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation,
+            )
+            x = (self.width() - scaled.width()) // 2
+            y = (self.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+            # Gentle scrim keeps controls legible without burying the image.
+            painter.fillRect(self.rect(), QColor(7, 5, 10, 75))
+        else:
+            painter.fillRect(self.rect(), QColor(7, 5, 10))
+        painter.end()
+
 
 class KaliBayWindow(QMainWindow):
     def __init__(self):
@@ -141,19 +205,14 @@ class KaliBayWindow(QMainWindow):
         self.build_ui()
         self.load_wallpaper()
         self.refresh_status()
+        if "--purple" in sys.argv[1:]:
+            self.security_tabs.setCurrentIndex(1)
+        elif "--offensive" in sys.argv[1:]:
+            self.security_tabs.setCurrentIndex(0)
 
     def build_ui(self):
         self.setStyleSheet(
             """
-            QWidget#root {
-                background: rgba(
-                    7,
-                    5,
-                    10,
-                    225
-                );
-            }
-
             QLabel {
                 color: #f3eef6;
             }
@@ -207,15 +266,10 @@ class KaliBayWindow(QMainWindow):
             """
         )
 
-        root = QWidget()
-
-        root.setObjectName(
-            "root"
-        )
-
-        self.setCentralWidget(
-            root
-        )
+        root = WallpaperSurface()
+        self.wallpaper_surface = root
+        root.setObjectName("root")
+        self.setCentralWidget(root)
 
         outer = QVBoxLayout(
             root
@@ -250,7 +304,7 @@ class KaliBayWindow(QMainWindow):
 
         subtitle = QLabel(
             "SPIDER OS SECURITY WORKSPACE\n"
-            "Full Kali toolset · isolated from the Spider OS host"
+            "Full Kali toolset · Distrobox container with a shared host kernel"
         )
 
         subtitle.setStyleSheet(
@@ -284,6 +338,7 @@ class KaliBayWindow(QMainWindow):
             "INITIALIZE / REPAIR FULL KALI"
         )
 
+        self.setup_button = setup
         setup.clicked.connect(
             self.setup_kali
         )
@@ -332,90 +387,52 @@ class KaliBayWindow(QMainWindow):
             controls
         )
 
-        heading = QLabel(
-            "TOOL CATEGORIES"
-        )
-
+        heading = QLabel("SECURITY SECTIONS")
         heading.setStyleSheet(
-            """
-            color:#a78bfa;
-            font-size:18px;
-            font-weight:bold;
-            padding-top:12px;
-            """
+            "color:#a78bfa;font-size:18px;font-weight:bold;padding-top:12px;"
         )
+        outer.addWidget(heading)
 
-        outer.addWidget(
-            heading
+        # Tabs share the existing, fully configured Kali Bay container.
+        # They do not start a second Kali environment or any SOC services.
+        self.security_tabs = QTabWidget()
+        self.security_tabs.setObjectName("securitySections")
+        self.security_tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #5b3376;
+                border-radius: 10px;
+                background: rgba(11, 8, 18, 70);
+            }
+            QTabBar::tab {
+                background: #241335;
+                color: #d6c9e2;
+                border: 1px solid #5b3376;
+                padding: 12px 20px;
+                min-width: 155px;
+                font-weight: bold;
+            }
+            QTabBar::tab:selected {
+                background: #6b21a8;
+                color: white;
+                border-color: #c084fc;
+            }
+        """)
+        self.security_tabs.addTab(
+            self.build_category_page(
+                OFFENSIVE_CATEGORIES,
+                "Assessment and penetration-testing tools for authorized labs.",
+            ),
+            "OFFENSIVE",
         )
-
-        scroll = QScrollArea()
-
-        scroll.setWidgetResizable(
-            True
+        self.security_tabs.addTab(
+            self.build_category_page(
+                PURPLE_CATEGORIES,
+                "Kali Purple: Identify • Protect • Detect • Respond • Recover. "
+                "Tools are installed; SOC services require separate configuration.",
+            ),
+            "PURPLE DEFENSE",
         )
-
-        scroll.setFrameShape(
-            QScrollArea.NoFrame
-        )
-
-        container = QWidget()
-
-        container.setStyleSheet(
-            "background:transparent;"
-        )
-
-        grid = QGridLayout(
-            container
-        )
-
-        grid.setSpacing(
-            14
-        )
-
-        for index, (
-            title,
-            description,
-            package,
-        ) in enumerate(
-            CATEGORIES
-        ):
-            button = QPushButton(
-                f"{title}\n"
-                f"{description}"
-            )
-
-            button.setMinimumHeight(
-                88
-            )
-
-            button.clicked.connect(
-                lambda checked=False,
-                p=package,
-                t=title:
-                self.open_category(
-                    p,
-                    t,
-                )
-            )
-
-            row = index // 3
-            column = index % 3
-
-            grid.addWidget(
-                button,
-                row,
-                column,
-            )
-
-        scroll.setWidget(
-            container
-        )
-
-        outer.addWidget(
-            scroll,
-            1,
-        )
+        outer.addWidget(self.security_tabs, 1)
 
         warning = QLabel(
             "Kali Bay is intended for systems, networks, "
@@ -456,55 +473,85 @@ class KaliBayWindow(QMainWindow):
             footer
         )
 
+    def build_category_page(self, categories, description):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+
+        note = QLabel(description)
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#c7b9d2;padding:5px 0 12px;")
+        layout.addWidget(note)
+
+        # Explicit, allowlisted tools only. Buttons never scan a network,
+        # install packages, start monitoring, or elevate permissions.
+        items = (
+            [
+                ("Wireshark", "wireshark"),
+                ("Burp Suite", "burpsuite"),
+                ("OWASP ZAP", "zaproxy"),
+                ("Ghidra", "ghidra"),
+                ("Nmap terminal", "nmap"),
+                ("Metasploit terminal", "msfconsole"),
+            ]
+            if categories is OFFENSIVE_CATEGORIES
+            else [
+                ("Wireshark", "wireshark"),
+                ("Network inventory shell", "nmap"),
+                ("Suricata shell", "suricata"),
+                ("YARA shell", "yara"),
+                ("Lynis shell", "lynis"),
+                ("ClamTK", "clamtk"),
+            ]
+        )
+        featured = QLabel("DIRECT SECURITY TOOL LAUNCHERS")
+        featured.setStyleSheet(
+            "color:#a78bfa;font-size:15px;font-weight:bold;"
+        )
+        layout.addWidget(featured)
+        featured_grid = QGridLayout()
+        featured_grid.setSpacing(8)
+        for position, (title, tool_id) in enumerate(items):
+            button = QPushButton(title)
+            button.setMinimumHeight(44)
+            button.setToolTip(
+                "Checks availability inside the existing Kali container. "
+                "Does not install software or execute security tests."
+            )
+            button.clicked.connect(
+                lambda checked=False, ident=tool_id: self.open_tool(ident)
+            )
+            featured_grid.addWidget(
+                button, position // 3, position % 3
+            )
+        layout.addLayout(featured_grid)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        container = QWidget()
+        container.setStyleSheet("background:transparent;")
+        grid = QGridLayout(container)
+        grid.setSpacing(14)
+
+        for index, (title, summary, package) in enumerate(categories):
+            button = QPushButton(f"{title}\n{summary}")
+            button.setMinimumHeight(88)
+            button.setToolTip(f"Kali metapackage: {package}")
+            button.clicked.connect(
+                lambda checked=False, p=package, t=title:
+                self.open_category(p, t)
+            )
+            grid.addWidget(button, index // 3, index % 3)
+
+        scroll.setWidget(container)
+        layout.addWidget(scroll, 1)
+        return page
+
     def load_wallpaper(self):
-        if not WALLPAPER.exists():
-            return
-
-        self._wallpaper = QPixmap(
-            str(WALLPAPER)
-        )
-
-        self.apply_wallpaper()
-
-    def apply_wallpaper(self):
-        if (
-            self._wallpaper is None
-            or self._wallpaper.isNull()
-        ):
-            return
-
-        scaled = self._wallpaper.scaled(
-            self.size(),
-            Qt.KeepAspectRatioByExpanding,
-            Qt.SmoothTransformation,
-        )
-
-        palette = QPalette(
-            self.palette()
-        )
-
-        palette.setBrush(
-            QPalette.Window,
-            QBrush(scaled),
-        )
-
-        self.setPalette(
-            palette
-        )
-
-        self.setAutoFillBackground(
-            True
-        )
-
-    def resizeEvent(
-        self,
-        event,
-    ):
-        self.apply_wallpaper()
-
-        super().resizeEvent(
-            event
-        )
+        image = QPixmap(str(WALLPAPER)) if WALLPAPER.is_file() else QPixmap()
+        self._wallpaper = image
+        self.wallpaper_surface.set_wallpaper(image)
 
     def manager_status(self):
         try:
@@ -576,6 +623,11 @@ class KaliBayWindow(QMainWindow):
                 "font-weight:bold;"
             )
 
+        self.setup_button.setEnabled(status != "ready")
+        self.setup_button.setText(
+            "FULL TOOLKIT INSTALLED" if status == "ready"
+            else "INITIALIZE / REPAIR FULL KALI"
+        )
         self.status.setText(
             text
         )
@@ -636,6 +688,42 @@ class KaliBayWindow(QMainWindow):
             ],
             start_new_session=True,
         )
+
+    def open_tool(self, tool_id):
+        # Read-only preflight: no implicit Distrobox initialization, apt,
+        # host changes, network scans, or background SOC services.
+        try:
+            result = subprocess.run(
+                [str(MANAGER), "tool-check", tool_id],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=12,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            QMessageBox.warning(
+                self, "Kali Bay", f"Tool check failed: {exc}"
+            )
+            return
+
+        if result.returncode != 0:
+            message = (
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "The tool is unavailable in the running Kali container."
+            )
+            QMessageBox.information(self, "Kali Bay", message)
+            return
+
+        try:
+            subprocess.Popen(
+                [str(MANAGER), "tool", tool_id],
+                start_new_session=True,
+            )
+        except OSError as exc:
+            QMessageBox.warning(
+                self, "Kali Bay", f"Could not open tool: {exc}"
+            )
 
     def open_category(
         self,
