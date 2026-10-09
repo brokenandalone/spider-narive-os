@@ -26,6 +26,14 @@
 - [x] Source-built a read-only, privacy-limited installed-system audit for Author/Study record counts, Spider startup-branding hints, Kali state, desktop/Media files and user services (PR #18, merged into combined PR #17). **Not run on the owner PC yet.**
 - [x] The combined PR #17 source batch includes Webbie face/chat, window Close/Minimize/Maximize, audio/mute, Media MPRIS client, System/Recovery health panels and build receipts. Not installed on the owner PC; install in one selective batch with backup after source qualification.
 
+## New: floating Webbie and deferred OneDrive sign-in
+
+- [x] Source-built a separate, translucent **click-through** Webbie face in the lower-left of Plasma X11 and The Web X11, with KWin fullscreen hide, speaking-marker mouth animation, night sleep until 8 AM, and default user autostart. **Installed-PC verification pending.**
+- [x] Source-built optional Microsoft OneDrive connection via explicit user-invoked rclone OAuth, with Webbie local operation independent from all cloud tasks and a separate timed background folder sync. **Owner sign-in, cloud transfer and feature verification pending.**
+- [ ] Verify visible click-through on buttons, actual fullscreen video hiding, night sleep and voice continuity on the owner PC; support Plasma Wayland only after compositor-specific qualification.
+- [ ] Verify user-selected OneDrive remote/authentication and a harmless selected-folder upload. Do not auto-upload private Webbie history, memory, manuscripts or other user files.
+- [ ] Decide whether to offer secure memory sync or full OneDrive search only after explicit user permission and encryption design; selected-folder sync is not yet Webbie cloud memory.
+
 ## 1. Boot, disk and irreplaceable data — urgent
 
 - [ ] Collect a read-only post-outage boot/SMART/journal and drive-health inventory; document the exact cause if detectable. Do not run destructive filesystem repair blindly.
