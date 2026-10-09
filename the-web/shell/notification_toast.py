@@ -16,7 +16,8 @@ def newest_event(path):
         return {'app':str(data.get('app','Application'))[:60],
                 'title':str(data.get('title',''))[:100],
                 'message':str(data.get('message',''))[:240],
-                'time':str(data.get('time',''))[:50]}
+                'time':str(data.get('time',''))[:50],
+                'id':str(data.get('id',''))[:40]}
     except (OSError,ValueError,UnicodeError,TypeError):
         return None
 
@@ -46,12 +47,12 @@ class NotificationToast(QWidget):
         self.dismiss_timer.timeout.connect(self.hide)
         # Ignore existing history when the desktop launches.
         first=newest_event(self.journal)
-        if first:self.last_key=(first['time'],first['title'],first['message'])
+        if first:self.last_key=(first['id'] or first['time'],first['title'],first['message'])
 
     def refresh(self):
         newest=newest_event(self.journal)
         if not newest:return
-        key=(newest['time'],newest['title'],newest['message'])
+        key=(newest['id'] or newest['time'],newest['title'],newest['message'])
         if self.last_key==key:return
         self.last_key=key
         if load_state(self.state_path)['dnd']:return
