@@ -149,7 +149,15 @@ class WebbieOverlay(QWidget):
         self.move_corner()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
-        self.timer.start(350)
+        self.timer.start(1400)  # Fullscreen polling is separate from mouth frames.
+        self.mouth_timer = QTimer(self)
+        self.mouth_timer.timeout.connect(self.tick_mouth)
+        self.mouth_timer.start(135)
+
+    def tick_mouth(self):
+        if self.allowed:
+            self.phase += 1
+            self.update()
 
     def move_corner(self):
         screen = QApplication.primaryScreen()
@@ -173,7 +181,6 @@ class WebbieOverlay(QWidget):
                 self.allowed = False
                 return
             self.allowed = True
-        self.phase += 1
         self.update()
 
     def paintEvent(self, event):
