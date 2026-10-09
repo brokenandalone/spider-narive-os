@@ -164,7 +164,7 @@ class WebbieOverlay(QWidget):
         screen = QApplication.primaryScreen()
         if not screen: return
         box = screen.availableGeometry()
-        self.move(box.left() + 12, box.bottom() - SIZE - BOTTOM_MARGIN + 1)
+        self.move(box.right() - SIZE - 11, box.bottom() - SIZE - BOTTOM_MARGIN + 1)
 
     def refresh(self):
         self.move_corner()
