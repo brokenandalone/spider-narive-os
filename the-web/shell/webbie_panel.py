@@ -1,7 +1,12 @@
 """Webbie portrait and asynchronous chat; preserve the installed voice agent."""
 from html import escape
+import configparser
+import json
 import math
 import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 import socket
 import stat
@@ -87,6 +92,25 @@ class SpeakingPortrait(QLabel):
             painter.drawPixmap(self.rect(), self.opened)
 
 
+def cloud_state_label():
+    """Local-only check; no network, sign-in dialog or waiting for Microsoft."""
+    setting = Path.home() / '.config/spider-os/onedrive.json'
+    remote = Path.home() / '.config/rclone/rclone.conf'
+    try:
+        if json.loads(setting.read_text()).get('enabled') is not True:
+            return 'OneDrive: not connected. Webbie stays local.'
+        if not shutil.which('rclone'):
+            return 'OneDrive: paused (rclone unavailable).'
+        parser = configparser.RawConfigParser(interpolation=None)
+        if remote.is_symlink(): return 'OneDrive: configuration requires review.'
+        parser.read(remote)
+        if parser.get('webbie_onedrive', 'type', fallback='') == 'onedrive':
+            return 'OneDrive: connected. Background folder sync is available.'
+    except (OSError, ValueError, TypeError, configparser.Error):
+        pass
+    return 'OneDrive: not connected. Webbie stays local.'
+
+
 class WebbiePanel(QWidget):
     def __init__(self, root):
         super().__init__()
@@ -98,6 +122,7 @@ class WebbiePanel(QWidget):
             QPushButton { background:#6d28d9; color:white; border:1px solid #8b5cf6; border-radius:8px; padding:8px 16px; }
             QPushButton:disabled { background:#342343; color:#b5a5c0; }
         ''')
+        self.root = Path(root)
         self.runtime = runtime_directory(); self.worker = None; self.pending = False; self.phase = 0; self.mouth_frame = 0
         layout = QVBoxLayout(self)
         header = QHBoxLayout(); layout.addLayout(header)
@@ -113,6 +138,28 @@ class WebbiePanel(QWidget):
         note = QLabel('Wake: Hey Webbie · Hey Web')
         note.setToolTip('Lip movement follows the speaking signal. Word-level synchronization and listening detection are not yet available.')
         note.setWordWrap(True); details.addWidget(note)
+        # These are explicit user actions. Neither OneDrive nor the overlay is
+        # a dependency of the resident voice agent or its normal replies.
+        extras = QHBoxLayout(); layout.addLayout(extras)
+        sleep_btn = QPushButton('Sleep face tonight')
+        sleep_btn.setToolTip('Hide the screen portrait until 8 AM. Webbie continues running.')
+        sleep_btn.clicked.connect(lambda: self.face_mode('sleep-tonight'))
+        extras.addWidget(sleep_btn)
+        wake_btn = QPushButton('Wake face')
+        wake_btn.clicked.connect(lambda: self.face_mode('wake'))
+        extras.addWidget(wake_btn)
+        self.cloud_label = QLabel(cloud_state_label())
+        self.cloud_label.setWordWrap(True); layout.addWidget(self.cloud_label)
+        cloud_actions = QHBoxLayout(); layout.addLayout(cloud_actions)
+        connect_btn = QPushButton('Connect OneDrive')
+        connect_btn.clicked.connect(self.connect_onedrive); cloud_actions.addWidget(connect_btn)
+        folder_btn = QPushButton('OneDrive folder')
+        folder_btn.clicked.connect(self.open_onedrive_folder); cloud_actions.addWidget(folder_btn)
+        pause_btn = QPushButton('Pause OneDrive')
+        pause_btn.clicked.connect(self.pause_onedrive); cloud_actions.addWidget(pause_btn)
+        self.cloud_timer = QTimer(self); self.cloud_timer.timeout.connect(
+            lambda: self.cloud_label.setText(cloud_state_label()))
+        self.cloud_timer.start(10000)
         self.chat = QTextEdit(); self.chat.setReadOnly(True); layout.addWidget(self.chat, 1)
         self.chat.setPlainText('Ask Webbie below.')
         row = QHBoxLayout(); layout.addLayout(row)
@@ -134,6 +181,61 @@ class WebbiePanel(QWidget):
         else:
             self.face.mouth_opacity = 0; self.mouth_frame = 0
         self.face.update()
+
+    def face_mode(self, mode):
+        script = self.root / 'the-web/overlay/webbie_face.py'
+        if not script.is_file():
+            self.append_message('Status', 'The Webbie overlay has not been installed yet.')
+            return
+        try:
+            subprocess.Popen([sys.executable, str(script), mode],
+                             stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+            self.append_message('Status',
+                'Webbie face will wake at 8 AM.' if mode == 'sleep-tonight' else 'Webbie face waking.')
+        except OSError as error:
+            self.append_message('Status', 'Could not change face display: ' + str(error))
+
+    def connect_onedrive(self):
+        script = self.root / 'system/onedrive.py'
+        if not script.is_file():
+            self.append_message('Status', 'The OneDrive integration is not installed yet.')
+            return
+        console = shutil.which('konsole')
+        if not console:
+            self.append_message('Status', 'Konsole is needed for Microsoft sign-in.')
+            return
+        try:
+            subprocess.Popen([console, '-e', sys.executable, str(script), 'connect'],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+            self.append_message('Status', 'OneDrive sign-in is open in Konsole. Webbie stays available.')
+        except OSError as error:
+            self.append_message('Status', 'Unable to open OneDrive sign-in: ' + str(error))
+
+    def open_onedrive_folder(self):
+        folder = Path.home() / 'Documents/Spider OS/Webbie/OneDrive'
+        if not folder.is_dir():
+            self.append_message('Status', 'Connect OneDrive first. Your Webbie cloud folder is not yet set up.')
+            return
+        try:
+            subprocess.Popen(['xdg-open', str(folder)], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as error:
+            self.append_message('Status', 'Unable to open folder: ' + str(error))
+
+    def pause_onedrive(self):
+        script = self.root / 'system/onedrive.py'
+        if not script.is_file():
+            return
+        try:
+            subprocess.Popen([sys.executable, str(script), 'pause'], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.cloud_label.setText('OneDrive: pausing. Webbie continues locally.')
+        except OSError:
+            self.append_message('Status', 'Could not pause OneDrive. Check the connection settings.')
 
     def append_message(self, who, text):
         self.chat.append('<b>' + escape(who) + ':</b> ' + escape(text).replace('\n', '<br>'))
