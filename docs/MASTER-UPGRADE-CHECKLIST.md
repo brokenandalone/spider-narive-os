@@ -5,6 +5,26 @@
 
 **Installation plan:** build the related desktop changes together, publish one combined branch, install once, then log out/in once. Boot branding, voice-agent replacement and Kali package changes require separate qualification and are not silently included.
 
+## Unified cross-chat status and release gate (2026-10-09)
+
+**Authority:** this checklist + [cross-chat handoff](CROSS-CHAT-CONSOLIDATION-2026-10-09.md) + [installation policy](INSTALL-RELEASE-POLICY.md), updated from the accessible Spider OS conversations, GitHub branch history and installed-PC audit. Chat-history retrieval outside the conversation was unavailable; do not claim every chat message has been independently verified. GitHub code and individual PR green checks are *not* proof of a combined or installed build.
+
+- [x] Owner requests **one bundled installation per request**, not one installation per day, with one preflight, one backup manifest, one activation and rollback. Continue GitHub builds between requests. No unsolicited Dell installation.
+- [x] Confirmed in Konsole: `XDG_SESSION_TYPE=x11`, `DESKTOP_SESSION=the-web`. X11 is the supported floating-face target; full-screen/click-through still require real-device verification.
+- [x] Installed-PC audit: native desktop boots after outage; Webbie/Ollama/AI DJ/PipeWire/WirePlumber active; Kali container preserved but exited; Author DB 20 books/39 chapters/20 imported fingerprints; School DB 1 course/0 assignments; System/Recovery dashboards and basic media controls owner-confirmed. **No independent backup/boot integrity/feature completeness implied.**
+- [x] Owner's Webbie naming: **Spider** in Kali Bay, **Justin** in Studio, **Student** in School/Study, **Writer** in Author, **Cory** everywhere else; custom overrides must survive.
+- [x] Owner's quiet-sleep behavior: she stays visible with dimmed closed eyes and `Zzz`, ignores ordinary speech until deliberate wake, keeps listening hardware active only as needed for wake recognition and **keeps existing background jobs running**. No timed auto-wake. Face hides only during fullscreen video.
+- [x] Owner's OneDrive decision: **Connect OneDrive** appears on demand; Microsoft OAuth and remote sync remain deferred until owner signs in; no login prompt or network dependency blocks Webbie. Only explicitly placed Webbie share-folder files may sync; no private manuscripts/history by default.
+- [x] Other chat's latest **PR #23** at `83d692b4` passed source CI (Author Story Bible/search/read aloud/focus/review/export, opt-in camera/watch-room, optional consenting Cory/Shayna face cues, rollback/readiness script). This is **a tested sub-batch**, not the unified deliverable or installed verification.
+- [x] PR #25 source-tested shared quiet sleep; PR #21 source-tested click-through face/OneDrive; PR #22 source-tested context/model preference; PR #24 source-tested local one-frame vision. **Their combinations have NOT been fully qualified.**
+- [ ] Reconcile **both competing portrait implementations** (`the-web/shell/webbie_overlay.py` and `the-web/overlay/webbie_face.py`) into one visible overlay process and one shared sleep format. Prevent duplicate autostart, conflicting face controls and swallowed clicks.
+- [ ] Reconcile the Author/camera **shared panel** and **resident Webbie agent** with workspace names, OneDrive, sleep and vision code. Camera-off default, one-frame permission and optional session watch must remain explicit; visual similarity never authorizes voice commands.
+- [ ] Consolidate Author/OneDrive/Webbie installers into **one owner-requested release transaction** with zero unrecognized-file overwrites, staged backups, manifest and tested selective rollback. Include only features proven compatible; never reinstall the OS.
+- [ ] Create an integration PR and demonstrate green combined CI (native Qt/Author/camera/sleep/OneDrive/source checks and installer/rollback dry runs). Current integration branch is **staged but not tested**; **do not install it**.
+- [ ] Owner-PC preflight: establish independent, restorable Author and original DOCX backups, verify customized Webbie agent hashes, check `ffmpeg`, webcam, local vision-capable Ollama, X11, optional `rclone`, user-systemd access and free disk; stop on blockers.
+- [ ] Owner-PC acceptance after explicitly requested bundled install: no regression in voice/TTS/AI DJ or startup; tabs, desktop windows, Webbie click-through/fullscreen/night mode, opt-in camera and OneDrive deferred login, Author manuscripts and exports, Kali and Media Center.
+- [ ] Separate later work: authenticated speaker authorization (Cory and Shayna only), screen-sharing with visible control, taskbar tray/notifications/quick settings, global dark mode, Media Center radio/TV/visualizer/casting, Forage research, Kali tool qualification, startup GRUB/Plymouth branding and installer/ISO boot QA.
+
 ## Confirmed accomplishments and source builds
 
 - [x] Installed native Spider OS boots; owner recovered it after Oct 9 power outage. Cause of failed boot and health of disk still unknown.
@@ -23,7 +43,7 @@
 - [x] PR #17 source-built Webbie's ethereal violet woman portrait, speech-gated lip animation, responsive typed chat and safe window Close controls. Not yet confirmed installed; lip motion is approximate, not phoneme-synchronized.
 
 - [x] User confirmed all personal files remained present after the power outage. This is not a validated independent backup or a storage-health report.
-- [x] Source-built a read-only, privacy-limited installed-system audit for Author/Study record counts, Spider startup-branding hints, Kali state, desktop/Media files and user services (PR #18, merged into combined PR #17). **Not run on the owner PC yet.**
+- [x] Source-built a read-only, privacy-limited installed-system audit for Author/Study record counts, Spider startup-branding hints, Kali state, desktop/Media files and user services (PR #18, merged into combined PR #17). **Run on the owner PC October 9 with reported inventory; newer revisions remain source-only.**
 - [x] The combined PR #17 source batch includes Webbie face/chat, window Close/Minimize/Maximize, audio/mute, Media MPRIS client, System/Recovery health panels and build receipts. Not installed on the owner PC; install in one selective batch with backup after source qualification.
 - [x] Owner's post-audit response on Oct 9 confirmed **System/Recovery dashboards (#5) and media playback controls (#4) working** in the currently used Plasma desktop. This is user-observed UI functionality, not proof of full streaming, recovery or backup testing.
 - [x] Oct 9 post-outage inventory: Webbie/Ollama/AI DJ/PipeWire/WirePlumber **active**; Kali Bay container **exited**, not missing; Author DB readable with 20 books, 39 chapters, 20 fingerprints; school DB 1 course, 0 assignments.
@@ -31,7 +51,7 @@
 
 ## New: floating Webbie and deferred OneDrive sign-in
 
-- [x] Source-built a separate, translucent **click-through** Webbie face in the lower-left of Plasma X11 and The Web X11, with KWin fullscreen hide, speaking-marker mouth animation, night sleep until 8 AM, and default user autostart. **Installed-PC verification pending.**
+- [x] Source-built a separate, translucent **click-through** Webbie face in the lower-left of Plasma X11 and The Web X11, with KWin fullscreen hide, speaking-marker mouth animation, visible quiet-sleep overlay on the later PR #25 branch (the original PR #21 build hid until 8 AM), and user autostart. **Installed-PC verification pending.**
 - [x] Source-built optional Microsoft OneDrive connection via explicit user-invoked rclone OAuth, with Webbie local operation independent from all cloud tasks and a separate timed background folder sync. **Owner sign-in, cloud transfer and feature verification pending.**
 - [ ] Verify visible click-through on buttons, actual fullscreen video hiding, night sleep and voice continuity on the owner PC; support Plasma Wayland only after compositor-specific qualification.
 - [ ] Verify user-selected OneDrive remote/authentication and a harmless selected-folder upload. Do not auto-upload private Webbie history, memory, manuscripts or other user files.
