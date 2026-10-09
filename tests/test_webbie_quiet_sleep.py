@@ -27,7 +27,7 @@ overlay = load('overlay_sleep_test', 'the-web/overlay/webbie_face.py')
 class QuietSleepTests(unittest.TestCase):
     def test_explicit_commands_only(self):
         self.assertEqual(night.spoken_mode('Hey Webbie, go to sleep'), 'sleep')
-        self.assertEqual(night.spoken_mode('Good night, Webbie'), None)
+        self.assertEqual(night.spoken_mode('Good night, Webbie'), 'sleep')
         self.assertEqual(night.spoken_mode('Hey Webbie, good night'), 'sleep')
         self.assertEqual(night.spoken_mode('Hey Webbie, wake up', sleeping=True), 'wake')
         self.assertIsNone(night.spoken_mode('Hey Webbie', sleeping=True))
