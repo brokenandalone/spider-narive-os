@@ -86,8 +86,13 @@ class CameraSecurityTests(unittest.TestCase):
         # microphone service configuration.
         text = (ROOT / 'the-web/package/install-author-webbie.sh').read_text()
         self.assertNotIn('webbie/voice/', text)
-        self.assertNotIn('webbie/agent/', text)
+        self.assertIn('webbie/agent/vision_query.py', text)
+        self.assertIn('webbie/agent/webbie.py', text)
         self.assertIn('webbie_camera.py', text)
+        # The already-working webcam mic, transcription and service unit
+        # are not replaced by the camera module installer.
+        self.assertNotIn('webbie/voice/whisper_listener.py', text)
+        self.assertNotIn('webbie/service/webbie.service', text)
 
     def test_device_validation_rejects_arbitrary_paths(self):
         for name in ('../../etc/shadow', '/dev/null', '/dev/video99;sh', '/tmp/video0'):
