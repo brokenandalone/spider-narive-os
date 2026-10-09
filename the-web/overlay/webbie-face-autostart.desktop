@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Webbie Floating Face
+Comment=Click-through violet Webbie portrait; auto-hide during fullscreen and night sleep
+Exec=/usr/bin/python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py
+TryExec=/usr/bin/python3
+Terminal=false
+X-GNOME-Autostart-enabled=true
