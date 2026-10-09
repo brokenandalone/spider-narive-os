@@ -16,9 +16,13 @@ Owner-PC verification remains necessary.
   This includes fullscreen videos. Unknown fullscreen status also hides it.
 - Uses Webbie's existing speaking marker for an approximate mouth animation;
   sound/phoneme-accurate lip sync is not claimed.
-- The Web's Webbie tab has **Sleep face tonight** and **Wake face** buttons.
-  Sleeping hides the portrait until 8:00 AM local the next morning, or until
-  manually woken. This does not shut down Webbie's resident voice service.
+- The Web's Webbie tab provides **Put Webbie to sleep** and **Wake face** actions.
+  Quiet sleep leaves her portrait visible with closed eyes. Ordinary speech is ignored
+  until an explicit wake command; background jobs and services keep running.
+  The microphone/transcription listener remains active solely to hear the wake
+  phrase, so this is NOT a hardware mute. Exact wake/sleep voice behavior requires
+  the separate, reviewed agent upgrade; installing the visual add-on alone does
+  not change the live agent.
 - X11 only for now. Plasma Wayland input/stacking and fullscreen tracking need
   compositor-specific qualification. To check: `echo "$XDG_SESSION_TYPE"`.
 - Auto-start via a normal per-user desktop entry in both Plasma X11 and The Web
@@ -28,7 +32,7 @@ Owner-PC verification remains necessary.
 Manual controls after installation:
 
 ```bash
-python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py sleep-tonight
+python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py sleep
 python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py wake
 python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py status
 ```
@@ -100,7 +104,7 @@ also be started manually in the existing **X11** session. No reboot required.
 
 KDE application menu entries:
 - **Webbie: Connect OneDrive**
-- **Webbie: Sleep Face Tonight**
+- **Webbie: Sleep Quietly**
 - **Webbie: Wake Face**
 
 If `rclone` is missing, OneDrive connection cannot begin until you choose
@@ -114,7 +118,7 @@ requested during boot or installation.
 - Test Webbie overlay on both selected X11 sessions.
 - Click several real buttons and window controls *through the visible face*.
 - Play fullscreen video and check the face disappears and returns.
-- Sleep face tonight; verify it stays away, then wake it.
+- Sleep Webbie; verify her face remains visible with closed eyes and no conversational voice responses. Explicitly wake her again.
 - Ensure Webbie voice still replies even when rclone is absent/unconnected.
 - Only after consent, complete OAuth and put a harmless sample note in the
   dedicated share. Check background transfer independently. No personal files
