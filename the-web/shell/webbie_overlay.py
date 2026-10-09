@@ -97,12 +97,15 @@ class WebbieOverlay(QWidget):
         self.move(geometry.left() + 10, geometry.bottom() - self.height() - 58)
 
     def refresh(self):
-        if self.face_sleeping or fullscreen_active():
+        # Sleeping means visibly resting, not disappearing. Fullscreen media
+        # retains exclusive use of the screen.
+        if fullscreen_active():
             self.hide()
             return
         self.place()
+        self.portrait.sleeping = self.face_sleeping
         state, _ = observed_state(self.runtime)
-        if state == 'speaking':
+        if state == 'speaking' and not self.face_sleeping:
             self.portrait.mouth_opacity = (0, .4, .9, .5, 0, .8, .2)[self.mouth_frame % 7]
             self.mouth_frame += 1
         else:
