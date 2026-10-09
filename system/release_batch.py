@@ -44,6 +44,7 @@ APP_FILES = (
     'the-web/shell/quick_settings.py',
     'the-web/shell/appearance.py',
     'the-web/shell/gtk_compat.py',
+    'the-web/shell/theme_sync_plan.py',
     'the-web/shell/window_overview.py',
     'the-web/shell/notification_center.py',
     'the-web/shell/notification_bridge.py', 'the-web/shell/notification_toast.py',
