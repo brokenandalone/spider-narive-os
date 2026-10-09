@@ -1,7 +1,7 @@
-"""Native notification history for The Web's existing taskbar.
+"""The Web notifications from local alerts and the optional external DBus bridge.
 
-Stores only notifications explicitly posted by The Web. A future separate
-freedesktop DBus service is needed to display third-party app notifications.
+History, clear and Do Not Disturb operate without a network connection and do
+not read app-supplied files or launch actions from notification messages.
 """
 import json
 from pathlib import Path
@@ -39,6 +39,31 @@ def save_state(path,state):
     finally:
         if os.path.exists(tmp): os.unlink(tmp)
 
+
+def clear_external_history(path):
+    """Clear the user-owned external alert log, never a symlink target.
+
+    Replace atomically with an empty private file so external notifications
+    already in the old inode cannot reappear after Clear history.
+    """
+    import os
+    import tempfile
+    path=Path(path)
+    if path.is_symlink() or path.parent.is_symlink():
+        raise OSError('Refusing a symlinked notification journal')
+    if not path.exists():
+        return
+    if not path.is_file():
+        raise OSError('Notification journal is not a regular file')
+    fd,temp=tempfile.mkstemp(prefix='.notifications-clear-',dir=path.parent)
+    try:
+        os.fchmod(fd,0o600)
+        os.close(fd)
+        os.replace(temp,path)
+    finally:
+        if os.path.exists(temp):os.unlink(temp)
+
+
 class NotificationCenter(QWidget):
     def __init__(self,parent=None,path=None):
         super().__init__(parent)
@@ -46,7 +71,7 @@ class NotificationCenter(QWidget):
         self.path=Path(path) if path is not None else Path.home()/'.local/state/spider-os/notifications.json'
         self.state=load_state(self.path)
         layout=QVBoxLayout(self)
-        layout.addWidget(QLabel('Notifications from The Web'))
+        layout.addWidget(QLabel('Notifications from The Web and supported applications'))
         self.dnd=QCheckBox('Do Not Disturb')
         self.dnd.setChecked(self.state['dnd'])
         self.dnd.toggled.connect(self.set_dnd)
@@ -60,7 +85,7 @@ class NotificationCenter(QWidget):
         self.clear_button.clicked.connect(self.clear)
         controls.addWidget(self.clear_button)
         layout.addLayout(controls)
-        layout.addWidget(QLabel('Other applications require a system notification bridge.'))
+        layout.addWidget(QLabel('External application alerts appear when a compatible session notification service is available.'))
         self.refresh()
 
     def refresh(self):
@@ -69,7 +94,11 @@ class NotificationCenter(QWidget):
             if not self.external_path.is_symlink() and self.external_path.stat().st_size < 131072:
                 lines=self.external_path.read_text(encoding='utf-8').splitlines()[-100:]
                 for line in reversed(lines):
-                    event=json.loads(line)
+                    try:
+                        event=json.loads(line)
+                        if not isinstance(event,dict):continue
+                    except (ValueError,TypeError):
+                        continue
                     self.history.addItem(str(event.get('app','App'))[:40]+' · '+str(event.get('title',''))[:80]+'  '+str(event.get('message',''))[:300])
         except (OSError,ValueError,UnicodeError,TypeError):
             pass
@@ -89,6 +118,11 @@ class NotificationCenter(QWidget):
         save_state(self.path,self.state)
 
     def clear(self):
-        self.state['items']=[]
-        save_state(self.path,self.state)
+        # Both journals must clear, otherwise third-party alerts immediately
+        # return when a user presses the ordinary OS "Clear history" control.
+        # Reject unsafe journal paths before touching either history file.
+        clear_external_history(self.external_path)
+        new_state={'dnd':self.state['dnd'],'items':[]}
+        save_state(self.path,new_state)
+        self.state=new_state
         self.refresh()
