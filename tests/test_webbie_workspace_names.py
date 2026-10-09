@@ -1,4 +1,4 @@
-"""Author Bay calls the user Writer unless the owner chooses another name."""
+"""Webbie calls the user Writer in Author and Student in School."""
 import importlib.util
 import json
 from pathlib import Path
@@ -16,7 +16,8 @@ class WorkspaceNameTests(unittest.TestCase):
         self.assertEqual(names.context_name('author', {}), 'Writer')
         self.assertEqual(names.context_name('studio', {}), 'Justin')
         self.assertEqual(names.context_name('kali-bay', {}), 'Spider')
-        self.assertEqual(names.context_name('study', {}), 'Cory')
+        self.assertEqual(names.context_name('study', {}), 'Student')
+        self.assertEqual(names.context_name('school', {}), 'Student')
 
     def test_owner_preferences_take_priority(self):
         config = {'default_user_name': 'Owner',
@@ -24,6 +25,7 @@ class WorkspaceNameTests(unittest.TestCase):
         self.assertEqual(names.context_name('author', config), 'Novelist')
         self.assertEqual(names.context_name('studio', config), 'J')
         self.assertEqual(names.context_name('forage', config), 'Owner')
+        self.assertEqual(names.context_name('study', config), 'Student')
 
     def test_invalid_overrides_do_not_confuse_agent(self):
         self.assertEqual(names.context_name('author', {'context_names': {'author': '   '}}),
@@ -34,6 +36,8 @@ class WorkspaceNameTests(unittest.TestCase):
     def test_default_config_contains_writer(self):
         data = json.loads((ROOT / 'webbie/config/default.json').read_text())
         self.assertEqual(data['context_names']['author'], 'Writer')
+        self.assertEqual(data['context_names']['study'], 'Student')
+        self.assertEqual(data['context_names']['school'], 'Student')
 
 
 if __name__ == '__main__':
