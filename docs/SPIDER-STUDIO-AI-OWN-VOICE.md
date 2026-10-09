@@ -35,6 +35,31 @@ A **Studio AI** tab with:
 - Section regeneration/extend and lyric repair when provider supports those operations. Export full mix + WAV/FLAC audio + converted vocal/estimated instrumental stems + session JSON; later DAW handoff and conventional recording/mixing.
 - Webbie can prepare descriptions, operate a permission-gated job queue, report genuine progress/errors, and compare output against owner feedback. She never falsely claims she heard or rendered a song without the corresponding result.
 
+
+## Suno v6 feature benchmark (confirmed October 9, 2026)
+
+Official release: https://about.suno.com/blog/introducing-v6 (September 9, 2026). Official FAQ: https://help.suno.com/en/articles/13924481 and https://help.suno.com/en/articles/6141377; own-voice workflow https://help.suno.com/en/articles/11362369.
+
+Suno **v6 / v6-wild / v6-mini** are distinct quality/creativity/speed choices; the classic creative controls are **Weirdness** (Safe -> Chaos; 50 nominal), **Style Influence** (Loose -> Strong), and **Audio Influence** (appears when a suitable audio reference/upload is selected). v6 also documents a **Variety** slider that adjusts/rephrases style prompts (0 means no changes) and **Max Mode**, costing extra credits to devote more computation to longer songs, covers and vocal/style consistency.
+
+The product should provide distinct user-facing sliders (0-100): Weirdness, Style Influence, Audio Influence and Variety, and a Standard/Max-quality switch. Keep their values in saved session/variant metadata. These are *product-level intentions*, not compatible magic numbers in every model: each backend capability adapter must display which controls are implemented, approximate, or unavailable. For ACE-Step, possible separately testable adapters include sampling-temperature/seed for exploration, prompt/caption and guidance for style adherence, audio_cover_strength for source/reference influence, and steps/quality settings; do not hard-code linear slider mappings without testing actual results.
+
+Add **Creative / Experimental / Quick** modes as *Spider Studio modes*, not claims that we run Suno's proprietary v6, v6-wild or v6-mini checkpoints. Use multi-take and side-by-side audition, seed control, explicit user-intended style tags and non-destructive song variants.
+
+**Primary voice behavior clarified:** a user may supply 15 seconds to 4 minutes of singing to Suno's Voices workflow, pick up to 2 minutes, verify voice ownership, then generate new performances with the uploaded reference (official Suno help). Spider Studio must prioritize **generate a NEW sung take in the owner's vocal identity while cleaning timing/intonation/production**, without demanding that the original waveform remain unchanged. Actual-take preservation is an additional, selectable mode, not the default Suno-style workflow. Avoid oversmoothing, unrequested pitch shifts and complete removal of rasp/screams. Offer amount of cleanup and "identity preservation" as separate controls only where technically supported.
+
+The Suno v6 FAQ says custom-trained models migrate to v6. Some older Suno Voice help still tells users to choose v5.5, which is inconsistent with the September v6 retirement announcement; do not assert exact v6 Voice-model compatibility without checking the current Create UI or an updated voice-specific support statement.
+
+v6's benchmark also includes natural-language **edit a selected section**, **replace a lyric**, **multi-source mashups**, **sample/isolate/build around a riff**, **image/video/music reference inputs**, and up-to-8-minute renders; Suno Studio 2.0 adds MIDI, built-in synth/effects, automation, and a chat bar. These are long-term feature comparisons, not implemented source behavior.
+
+### Voice-first sequence and acceptance test
+
+1. Owner records/imports 30-120 seconds of dry expressive singing in their own voice, including clean, gritty and higher register takes. Any voice profile requires owner consent and local storage by default.
+2. Save a private singer profile and run a new text-to-song vocal generation plus (as needed) locally licensed singing voice conversion. Keep the original unchanged; optional cleanup controls should target pitch/timing/noise while preserving distinctive character.
+3. Expose four creative sliders and save every setting with every take; if backend cannot honor one, say so and disable/explain it.
+4. With *the same* lyrics/style, A/B compare generated vocals and full arrangements against owner's existing Suno v6 output, listen for audible identity, syllables, grit, belting/screams and timing.
+5. Permit local remix/instrument variants and source-preserving edits; measure actual GPU, quality, time, and costs, and don't imply parity until demonstrated.
+
 ## Before any model installation
 
 Read-only installed PC audit: GPU vendor/model, dedicated VRAM, system RAM, disk, GPU driver, Python, FFmpeg, Ollama and existing PipeWire/Studio usage. Qualify 2B/offload/CPU options if no suitable GPU; large CPU jobs may be impractically slow. Reserve VRAM for Webbie/desktop; throttle/queue jobs and allow cancel. Download exact version-pinned models only after informed owner approval; prefer off-machine fallback only when voluntarily chosen, with explicit price and privacy disclosure.
