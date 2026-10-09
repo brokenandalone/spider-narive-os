@@ -23,6 +23,18 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         assert (pixel.red()>pixel.blue()) == (color=='red')
     surface.close()
     window=main.TheWeb(restore=False);window.show()
+    # Appearance is a user-chosen shell preference, not a KDE/GTK mutation.
+    # Keep the original wallpaper catalog and all native Author data intact.
+    assert window.appearance=='dark'
+    assert 'color:#f5eff8' in window.styleSheet()
+    assert window.taskbar.styleSheet()==window.styleSheet()
+    window.choose_appearance('light')
+    assert window.appearance=='light'
+    assert 'color:#241332' in window.styleSheet()
+    assert window.background_surface.appearance=='light'
+    assert window.taskbar.styleSheet()==window.styleSheet()
+    assert window.start_menu.styleSheet()==window.styleSheet()
+    assert (Path(folder)/'spider-os/appearance.json').is_file()
     with patch.object(main, 'list_tasks', return_value=[Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]), patch.object(main, 'close_window') as close, patch.object(main.QApplication, 'primaryScreen') as screen, patch.object(main, 'minimize_window', return_value=True) as minimize, patch.object(main, 'maximize_window') as maximize:
         screen.return_value.geometry.return_value.width.return_value = 1280
         window.desktop_mode = True; window.taskbar.refresh()
@@ -108,6 +120,9 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))
     window.open_author();assert window.close()
     reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
+    assert reopened.appearance=='light'
+    assert reopened.background_surface.appearance=='light'
+    assert reopened.taskbar.styleSheet()==reopened.styleSheet()
     assert reopened.workspace_widgets['author'].native.store.chapter(chapter)['content']=='Edited inside the workspace tab'
     assert reopened.wallpaper_catalog.selected_id('deep-forage')==wallpaper_id
     assert reopened.close();app.processEvents()
