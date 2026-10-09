@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt, QTimer, QSize, QDateTime
 from PyQt5.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGridLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-    QMessageBox, QMenu, QPushButton, QScrollArea, QShortcut, QSplashScreen, QTabWidget,
+    QMessageBox, QMenu, QPushButton, QScrollArea, QShortcut, QSplashScreen, QTabWidget, QDockWidget,
     QVBoxLayout, QWidget)
 
 SPIDER_ROOT = Path('/usr/local/lib/spider-os')
@@ -187,7 +187,7 @@ class TheWeb(QMainWindow):
         self.installed_apps = discover_apps(desktops='TheWeb:KDE')
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(STYLE)
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-        self.build_ui(); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
+        self.build_ui(); self.setup_webbie_assistant(); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
@@ -203,6 +203,7 @@ class TheWeb(QMainWindow):
         logo = QLabel(); logo.setPixmap(QPixmap(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png')).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)); header.addWidget(logo)
         title = QLabel('THE WEB'); title.setStyleSheet('font-size:26px; font-weight:bold; color:#e9d5ff; letter-spacing:2px;'); header.addWidget(title)
         header.addWidget(QLabel('YOUR LIFE. ONE WEB.'), 1)
+        header.addWidget(button('Ask Webbie', self.toggle_webbie_assistant))
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
         self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
@@ -226,6 +227,59 @@ class TheWeb(QMainWindow):
             self.wallpaper_picker.addItem(QIcon(str(SPIDER_ROOT / entry['file'])), entry['group'] + ' / ' + entry['label'], entry['id'])
         self.wallpaper_picker.currentIndexChanged.connect(self.choose_wallpaper); wallpaper_row.addWidget(self.wallpaper_picker, 1)
         self.status = QLabel('Spider OS ready.'); self.service_status = QLabel(); outer.addWidget(self.status); outer.addWidget(self.service_status)
+
+
+    # One persistent Webbie panel covers every native and generic workspace.
+    # It reuses the existing user-owned UNIX socket with no daemon changes.
+    WEBBIE_MODES = {
+        'default': 'Normal', 'webbie': 'Normal',
+        'author': 'Author Editor', 'studio': 'Studio Producer',
+        'study': 'School Tutor', 'media': 'AI DJ',
+        'forage': 'Researcher', 'deep-forage': 'Researcher',
+        'dev-bay': 'Developer', 'art-lab': 'Creative Assistant',
+        'communications': 'Communications Assistant',
+        'kali-bay': 'Security Assistant', 'system': 'System Technician',
+        'recovery': 'Recovery Assistant', 'games': 'Normal',
+    }
+
+    def setup_webbie_assistant(self):
+        self.webbie_assistant = WebbiePanel(SPIDER_ROOT)
+        self.webbie_dock = QDockWidget('WEBBIE | WORKSPACE ASSISTANT', self)
+        self.webbie_dock.setObjectName('webbieWorkspaceDock')
+        self.webbie_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.webbie_dock.setWidget(self.webbie_assistant)
+        self.webbie_dock.setMinimumWidth(330)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.webbie_dock)
+        self.webbie_dock.hide()
+        self.webbie_dock.visibilityChanged.connect(
+            lambda visible: self.update_webbie_context() if visible else None
+        )
+        self.update_webbie_context()
+
+    def toggle_webbie_assistant(self):
+        if self.webbie_dock.isVisible():
+            self.webbie_dock.hide()
+        else:
+            self.update_webbie_context()
+            self.webbie_dock.show()
+            self.webbie_dock.raise_()
+            self.webbie_assistant.entry.setFocus()
+
+    def update_webbie_context(self):
+        name = self.current_workspace
+        label = WORKSPACES.get(name, 'The Web')
+        summary = ''
+        page = self.workspace_widgets.get(name)
+        native = getattr(page, 'native', None) if page else None
+        if native is not None and hasattr(native, 'webbie_context'):
+            try:
+                summary = str(native.webbie_context())[:600]
+            except Exception:
+                summary = ''
+        self.webbie_assistant.set_workspace_context(
+            label, mode=self.WEBBIE_MODES.get(name, 'Normal'), summary=summary
+        )
+        self.webbie_dock.setWindowTitle('WEBBIE | ' + label)
 
     def application_panel(self, workspace):
         panel = QWidget(); panel.setObjectName('panel'); layout = QVBoxLayout(panel)
@@ -290,6 +344,7 @@ class TheWeb(QMainWindow):
                 layout.addWidget(surface, 1)
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
+        self.update_webbie_context()
         # Workspace navigation must never activate KDE Show Desktop, which hides
         # normal application windows, including Firefox and the file manager.
         self.raise_(); self.activateWindow()
@@ -331,6 +386,7 @@ class TheWeb(QMainWindow):
     def set_workspace(self, name):
         self.tabs.setProperty('home', name == 'default'); self.tabs.style().unpolish(self.tabs); self.tabs.style().polish(self.tabs)
         self.current_workspace = name; self.wallpaper = QPixmap(str(self.wallpaper_catalog.path(name))); self.background_surface.set_background(self.wallpaper)
+        if hasattr(self, 'webbie_assistant'): self.update_webbie_context()
         for picker, ident in [(self.background_picker, name), (self.wallpaper_picker, self.wallpaper_catalog.selected_id(name))]:
             picker.blockSignals(True); picker.setCurrentIndex(max(0, picker.findData(ident))); picker.blockSignals(False)
         runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'spider-os'
@@ -377,7 +433,7 @@ class TheWeb(QMainWindow):
     def open_studio(self): self.open_workspace('studio')
     def open_author(self): self.open_workspace('author')
     def open_study(self): self.open_workspace('study')
-    def open_webbie(self): self.open_workspace('webbie')
+    def open_webbie(self): self.toggle_webbie_assistant()
 
     def open_audio(self):
         self.open_workspace('system')
@@ -421,6 +477,10 @@ class TheWeb(QMainWindow):
             x11_properties(self, 'DESKTOP'); self.lower()
 
     def closeEvent(self, event):
+        assistant = getattr(self, 'webbie_assistant', None)
+        if assistant is not None and assistant.worker and assistant.worker.isRunning():
+            self.status.setText('Webbie is still replying. Wait before logging out.')
+            event.ignore(); return
         # Save all editors before closing any of their stores.
         for page in self.workspace_widgets.values():
             native = getattr(page, 'native', None); worker = getattr(native, 'worker', None)
