@@ -54,3 +54,30 @@ explicitly pending. Add `--json` for a structured report. No services are restar
 and no settings, logs, models or manuscripts are changed or printed.
 
 To return to the previous desktop, log out and select **Plasma**. Source backups are retained under `/usr/local/lib/spider-os/upgrade-backups/`; the prior lock-screen config is `~/.config/kscreenlockerrc.before-the-web` when one existed.
+
+### Webbie face and external window closing
+
+Webbie now has a native tab with an ethereal violet woman portrait, lips that
+animate during the installed agent's speaking marker, and asynchronous typed
+chat. Existing voice agent/settings are preserved. The first animation has no
+word-level timing; microphone listening is not inferred from a socket file.
+Taskbar windows have a visible × Close control. Additional windows have
+Activate/Close menu actions. Closing uses WM_DELETE_WINDOW, retaining each
+app's save prompts. The desktop installer deploys both versioned face assets.
+
+### Combined desktop controls
+
+Right-click a taskbar window for Minimize, Maximize/Restore or Close. The Windows
+menu offers the same actions, and smaller screens use the menu to avoid crowding.
+Ctrl+W closes the current workspace tab while retaining worker/save guards.
+Taskbar Webbie and Audio buttons open their native tabs. System's Audio tab offers
+output volume +/- and mute; increases are capped at 100%. The Media tab selects
+an MPRIS-compatible player for transport and +/-10-second seek; Media Center
+keeps its own controls if it does not advertise MPRIS.
+
+System/Recovery show installed build receipts, managed-file integrity, health
+findings and exportable JSON. Receipts are written only after deployed managed
+files match the source. Existing voice agent, Kali UI, private content and base
+boot configuration are preserved. Build all changes first, install once, and
+log out/in once. Notification center/tray and full global theme switching remain
+planned. See docs/MASTER-UPGRADE-CHECKLIST.md.
