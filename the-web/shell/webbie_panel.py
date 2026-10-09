@@ -191,7 +191,9 @@ class WebbiePanel(QWidget):
         self.root = Path(root)
         self.runtime = runtime_directory(); self.worker = None; self.pending = False; self.phase = 0; self.mouth_frame = 0
         self.workspace_label = 'The Web'; self.workspace_mode = 'Normal'; self.workspace_summary = ''
+        self.preferred_address = 'Cory'
         self.face_sleeping = face_asleep()
+        self._observed_sleep = self.face_sleeping
         self.camera_worker = None
         self.vision_bridge = None
         self.camera_allowed = False
@@ -445,7 +447,8 @@ class WebbiePanel(QWidget):
     def refresh_state(self):
         # Update promptly if Webbie woke/slept by spoken command.
         state_now = face_asleep()
-        if state_now != self.face_sleeping:
+        if state_now != self._observed_sleep:
+            self._observed_sleep = state_now
             self.set_face_sleeping(state_now)
         state, label = observed_state(self.runtime, self.pending)
         if self.face_sleeping:
@@ -465,7 +468,8 @@ class WebbiePanel(QWidget):
         # independent click-through portrait. This never stops other services.
         try:
             set_face_sleep(mode)
-            self.set_face_sleeping(face_asleep())
+            self._observed_sleep = face_asleep()
+            self.set_face_sleeping(self._observed_sleep)
             self.append_message('Status',
                 'Webbie is sleeping quietly; background work continues.' if mode == 'sleep'
                 else 'Webbie is awake.')
