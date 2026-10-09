@@ -117,6 +117,14 @@ if [[ ! -e "$overlay_entry" && ! -L "$overlay_entry" ]]; then
 fi
 # This timer runs independently of Webbie, skips work until optional sign-in,
 # and does not delay desktop or assistant startup.
+# Expose explicit on-demand controls in Plasma as well as The Web.
+install -d -o "$user" -g "$(id -gn "$user")" "$user_home/.local/share/applications"
+for launcher in "$source_root"/the-web/overlay/launchers/*.desktop; do
+  target="$user_home/.local/share/applications/$(basename "$launcher")"
+  if [[ ! -e "$target" && ! -L "$target" ]]; then
+    install -o "$user" -g "$(id -gn "$user")" -m644 "$launcher" "$target"
+  fi
+done
 uid="$(id -u "$user")"
 if [[ -S "/run/user/$uid/bus" ]]; then
     runuser -u "$user" -- env XDG_RUNTIME_DIR="/run/user/$uid"       DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus"       systemctl --user daemon-reload || true
