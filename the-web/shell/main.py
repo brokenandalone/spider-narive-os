@@ -20,11 +20,12 @@ if not SPIDER_ROOT.exists():
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
 from app_catalog import WORKSPACES, discover_apps, launch_command
-from desktop import list_tasks, wm_command, x11_properties
+from desktop import list_tasks, wm_command, close_window, x11_properties
 from wallpapers import WallpaperCatalog
 from workspaces import create_native
 from workspace_files import workspace_folders, file_open_command
 from system_panel import SystemPanel, StatusWorker
+from webbie_panel import WebbiePanel
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
 STYLE = '''
@@ -138,12 +139,19 @@ class Taskbar(QWidget):
             item = self.tasks.takeAt(0)
             if item.widget(): item.widget().deleteLater()
         for task in tasks[:2]:
+            group = QWidget(); row = QHBoxLayout(group); row.setContentsMargins(0, 0, 0, 0); row.setSpacing(2)
             widget = button(task.title[:18], lambda checked=False, ident=task.ident: wm_command('-i', '-a', ident))
-            widget.setMaximumWidth(150); widget.setToolTip(task.title); self.tasks.addWidget(widget)
+            widget.setMaximumWidth(150); widget.setToolTip(task.title); row.addWidget(widget)
+            close = button('×', lambda checked=False, ident=task.ident: close_window(ident))
+            close.setFixedWidth(44); close.setAccessibleName('Close ' + task.title)
+            close.setToolTip('Close ' + task.title + ' (the app can ask to save)'); row.addWidget(close)
+            self.tasks.addWidget(group)
         if len(tasks) > 2:
             more = button(f'{len(tasks) - 2} more windows', lambda: None); menu = QMenu(more)
             for task in tasks[2:]:
-                action = menu.addAction(task.title); action.triggered.connect(lambda checked=False, ident=task.ident: wm_command('-i', '-a', ident))
+                window_menu = menu.addMenu(task.title)
+                action = window_menu.addAction('Activate'); action.triggered.connect(lambda checked=False, ident=task.ident: wm_command('-i', '-a', ident))
+                action = window_menu.addAction('Close'); action.triggered.connect(lambda checked=False, ident=task.ident: close_window(ident))
             more.setMenu(menu); self.tasks.addWidget(more)
         self.tasks.addStretch(1)
 
@@ -239,7 +247,7 @@ class TheWeb(QMainWindow):
         if name not in self.workspace_widgets:
             page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
             layout = QHBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8); layout.addWidget(self.application_panel(name))
-            try: native = create_native(name, SPIDER_ROOT)
+            try: native = WebbiePanel(SPIDER_ROOT) if name == 'webbie' else create_native(name, SPIDER_ROOT)
             except Exception as error:
                 native = None; self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
             page.native = native

@@ -54,3 +54,13 @@ explicitly pending. Add `--json` for a structured report. No services are restar
 and no settings, logs, models or manuscripts are changed or printed.
 
 To return to the previous desktop, log out and select **Plasma**. Source backups are retained under `/usr/local/lib/spider-os/upgrade-backups/`; the prior lock-screen config is `~/.config/kscreenlockerrc.before-the-web` when one existed.
+
+### Webbie face and external window closing
+
+Webbie now has a native tab with an ethereal violet woman portrait, lips that
+animate during the installed agent's speaking marker, and asynchronous typed
+chat. Existing voice agent/settings are preserved. The first animation has no
+word-level timing; microphone listening is not inferred from a socket file.
+Taskbar windows have a visible × Close control. Additional windows have
+Activate/Close menu actions. Closing uses WM_DELETE_WINDOW, retaining each
+app's save prompts. The desktop installer deploys both versioned face assets.

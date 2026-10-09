@@ -3,6 +3,7 @@ import ctypes
 import ctypes.util
 from dataclasses import dataclass
 import os
+import re
 import shutil
 import subprocess
 
@@ -32,6 +33,13 @@ def wm_command(*arguments):
     executable = shutil.which('wmctrl')
     if executable:
         subprocess.Popen([executable, *arguments], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def close_window(ident):
+    """Request WM_DELETE_WINDOW; retain the application's unsaved-work prompt."""
+    if not isinstance(ident, str) or not re.fullmatch(r'0x[0-9a-fA-F]+', ident) or int(ident, 16) == 0:
+        raise ValueError('Invalid X11 window ID')
+    wm_command('-i', '-c', ident)
 
 
 def x11_properties(window, kind, screen=None):

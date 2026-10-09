@@ -140,3 +140,17 @@ curl --fail -H 'Content-Type: application/json' \
 A successful prepare response includes `script` and a local `audioFile` URL.
 Listen to the result before calling the installed AI DJ verified. This work does
 not migrate the OS base or replace owner-modified Webbie files.
+
+## Webbie portrait and window closing — 9 October 2026
+
+Source additions: native Webbie panel with violet ethereal woman portrait, mouth
+movement gated by the installed agent's speaking marker, asynchronous typed
+requests, input recovery on errors, and safe Close controls on taskbar windows
+and overflow entries. Desktop installer includes both portrait assets and backs
+up the previous face directory. Existing Webbie agent, voice enrollment, models
+and standalone UI are retained. Lip movement is a speaking animation, not
+phoneme synchronization. Live listening identity is not inferred.
+
+Priority order: desktop reliability, Webbie, Media, System/Recovery, creative
+workflows, Kali/expansion. See UPGRADE-PRIORITIES.md. Owner installation and
+real audio/window-manager validation remain pending.

@@ -6,12 +6,13 @@ import tempfile
 from unittest.mock import patch
 root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'the-web/shell'))
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QPushButton
 from PyQt5.QtGui import QColor,QPixmap
 from PyQt5.QtCore import Qt
 import main
 main.SPIDER_ROOT = root
 from app_catalog import InstalledApp
+from desktop import Task
 
 app=QApplication([])
 with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_value=Path(folder)), patch.dict(os.environ,{'XDG_CONFIG_HOME':folder}), patch.object(main.TheWeb,'refresh_status'):
@@ -22,6 +23,15 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         assert (pixel.red()>pixel.blue()) == (color=='red')
     surface.close()
     window=main.TheWeb(restore=False);window.show()
+    with patch.object(main, 'list_tasks', return_value=[Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]), patch.object(main, 'close_window') as close:
+        window.desktop_mode = True; window.taskbar.refresh()
+        group = window.taskbar.tasks.itemAt(0).widget()
+        close_button = next(item for item in group.findChildren(QPushButton) if item.text() == '×')
+        close_button.click(); close.assert_called_with('0x00000101')
+        overflow = window.taskbar.tasks.itemAt(2).widget().menu()
+        overflow.actions()[0].menu().actions()[1].trigger()
+        close.assert_called_with('0x00000103')
+        window.desktop_mode = False; window.taskbar.refresh()
     for name in main.WORKSPACES:
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name

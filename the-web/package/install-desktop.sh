@@ -17,7 +17,7 @@ if [[ -z "$user" || "$user" == root ]]; then echo 'Run sudo from your normal des
 user_home="$(getent passwd "$user" | cut -d: -f6)"
 root=/usr/local/lib/spider-os
 # Reject incomplete packages before installing dependencies or changing files.
-for relative in the-web/shell/main.py the-web/shell/system_panel.py the-web/shell/system_status.py the-web/session/the-web-session the-web/session/apply-lock-screen.py the-web/package/patch-native-imports.py the-web/package/reconcile-native.py branding/wallpapers/collection.json distro/config/sessions/the-web.desktop system/apps.py; do
+for relative in the-web/shell/main.py the-web/shell/system_panel.py the-web/shell/system_status.py the-web/shell/webbie_panel.py branding/webbie/webbie-face-v1.png branding/webbie/webbie-face-speaking-v1.png the-web/session/the-web-session the-web/session/apply-lock-screen.py the-web/package/patch-native-imports.py the-web/package/reconcile-native.py branding/wallpapers/collection.json distro/config/sessions/the-web.desktop system/apps.py; do
     test -s "$source_root/$relative" || { echo "Incomplete build: $relative" >&2; exit 1; }
 done
 if [[ -f "$source_root/SHA256SUMS" ]]; then
@@ -45,7 +45,7 @@ done
 stamp="$(date +%Y%m%d-%H%M%S)"
 backup="$root/upgrade-backups/the-web-$stamp"
 install -d "$backup" "$root/the-web" "$root/branding/wallpapers" /usr/share/xsessions /usr/local/bin
-for relative in the-web/shell author/main.py studio/main.py study/study.py system/apps.py; do
+for relative in the-web/shell branding/webbie author/main.py studio/main.py study/study.py system/apps.py; do
     if [[ -e "$root/$relative" ]]; then
         install -d "$backup/$(dirname "$relative")"
         cp -a "$root/$relative" "$backup/$relative"
@@ -53,6 +53,8 @@ for relative in the-web/shell author/main.py studio/main.py study/study.py syste
 done
 cp -a "$source_root/the-web/shell" "$root/the-web/"
 cp -a "$source_root/the-web/session" "$root/the-web/"
+install -Dm644 "$source_root/branding/webbie/webbie-face-v1.png" "$root/branding/webbie/webbie-face-v1.png"
+install -Dm644 "$source_root/branding/webbie/webbie-face-speaking-v1.png" "$root/branding/webbie/webbie-face-speaking-v1.png"
 cp -a "$source_root/branding/wallpapers/collection" "$root/branding/wallpapers/"
 install -m644 "$source_root/branding/wallpapers/collection.json" "$root/branding/wallpapers/collection.json"
 # Existing original backgrounds are retained. Supply only missing required assets.
