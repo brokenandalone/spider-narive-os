@@ -1,7 +1,7 @@
 """StatusNotifier applications panel for The Web's existing taskbar."""
-from PyQt5.QtCore import QThread,pyqtSignal
-from PyQt5.QtWidgets import QWidget,QVBoxLayout,QLabel,QListWidget,QPushButton
-from status_tray import get_status_items,activate_item,split_item
+from PyQt5.QtCore import QThread,pyqtSignal,Qt
+from PyQt5.QtWidgets import QWidget,QVBoxLayout,QLabel,QListWidget,QPushButton,QMenu
+from status_tray import get_status_items,activate_item,split_item,get_item_details,secondary_activate_item
 
 class TrayWorker(QThread):
     ready=pyqtSignal(object)
@@ -10,9 +10,12 @@ class TrayWorker(QThread):
         super().__init__(parent);self.operation=operation;self.item=item
     def run(self):
         try:
-            if self.operation=='list':self.ready.emit(get_status_items())
+            if self.operation=='list':
+                self.ready.emit([get_item_details(item) for item in get_status_items()])
             elif self.operation=='activate':
                 activate_item(self.item);self.ready.emit(None)
+            elif self.operation=='secondary':
+                secondary_activate_item(self.item);self.ready.emit(None)
         except (OSError,ValueError,RuntimeError) as error:
             self.error.emit(str(error))
 
@@ -27,6 +30,8 @@ class TrayPanel(QWidget):
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         self.list=QListWidget();layout.addWidget(self.list)
+        self.list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self.show_app_menu)
         self.refresh_button=QPushButton('Refresh background apps')
         self.refresh_button.clicked.connect(self.refresh)
         layout.addWidget(self.refresh_button)
@@ -53,9 +58,9 @@ class TrayPanel(QWidget):
             self.items=result
             self.list.clear()
             for item in result:
-                try:service,_=split_item(item)
-                except ValueError:continue
-                self.list.addItem(service)
+                if not isinstance(item,dict):continue
+                self.list.addItem(str(item.get('title',item.get('service','App')))[:90]
+                    +' · '+str(item.get('status','Unknown'))[:28])
             self.status.setText(f'{len(result)} background apps found.' if result else
                  'No registered StatusNotifier apps found. A watcher service may be unavailable.')
         else:
@@ -63,7 +68,20 @@ class TrayPanel(QWidget):
     def open_selected(self):
         index=self.list.currentRow()
         if index<0 or index>=len(self.items):return
-        self._run('activate',self.items[index])
+        self._run('activate',self.items[index]['id'])
+    def show_app_menu(self,point):
+        index=self.list.indexAt(point).row()
+        if index<0 or index>=len(self.items):return
+        item=self.items[index]
+        menu=QMenu(self)
+        menu.addAction('Open application',lambda:self._run('activate',item['id']))
+        menu.addAction('Secondary action',lambda:self._run('secondary',item['id']))
+        if item.get('menu'):
+            menu.addSeparator()
+            note=menu.addAction('Application provides a native menu')
+            note.setEnabled(False)
+        menu.exec_(self.list.mapToGlobal(point))
+
     def closeEvent(self,event):
         if self.worker and self.worker.isRunning():event.ignore()
         else:event.accept()
