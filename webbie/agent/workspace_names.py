@@ -3,7 +3,8 @@
 Owner preferences take precedence. Defaults are not proof of identity or voice
 authorization. Use only as friendly forms of address after authorization.
 """
-DEFAULT_NAMES = {'author': 'Writer', 'studio': 'Justin', 'kali-bay': 'Spider'}
+DEFAULT_NAMES = {'author': 'Writer', 'study': 'Student', 'school': 'Student',
+                 'studio': 'Justin', 'kali-bay': 'Spider'}
 
 
 def context_name(workspace, config=None):
