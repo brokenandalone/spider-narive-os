@@ -109,7 +109,8 @@ class VisionBridge(QObject):
             self.pending = None
 
     def _finish_socket(self, peer, reply):
-        data = str(reply).encode('utf-8')[:MAX_RESPONSE]
+        # Bound the reply by characters first, then trim to valid UTF-8.
+        data = str(reply).encode('utf-8')[:MAX_RESPONSE].decode('utf-8', errors='ignore').encode('utf-8')
         if peer is not None:
             peer.write(data)
             peer.flush()
