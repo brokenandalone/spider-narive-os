@@ -355,7 +355,12 @@ class WebbiePanel(QWidget):
         self.camera_summary = description[:3000]
         self.camera_observation.setPlainText(self.camera_summary)
         if self.vision_bridge is not None:
-            self.vision_bridge.reply(self.camera_summary)
+            description = self.camera_summary
+            if self.face_controls.last_match:
+                description += ('\nPossible enrolled familiar face: ' +
+                    self.face_controls.last_match +
+                    '. A visual similarity is not identity proof.')
+            self.vision_bridge.reply(description)
         self.camera_state.setText(
             'CAMERA ACTIVE  |  Watching locally' if self.camera_continuous
             else 'CAMERA ON  |  Latest snapshot ready'
