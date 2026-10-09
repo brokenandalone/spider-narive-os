@@ -17,7 +17,7 @@ if [[ -z "$user" || "$user" == root ]]; then echo 'Run sudo from your normal des
 user_home="$(getent passwd "$user" | cut -d: -f6)"
 root=/usr/local/lib/spider-os
 # Reject incomplete packages before installing dependencies or changing files.
-for relative in the-web/shell/main.py the-web/shell/system_panel.py the-web/shell/system_status.py the-web/shell/webbie_panel.py the-web/shell/media_panel.py the-web/shell/media_transport.py the-web/shell/audio_controls.py the-web/shell/build_info.py branding/webbie/webbie-face-v1.png branding/webbie/webbie-face-speaking-v1.png the-web/session/the-web-session the-web/session/apply-lock-screen.py the-web/package/patch-native-imports.py the-web/package/reconcile-native.py branding/wallpapers/collection.json distro/config/sessions/the-web.desktop system/apps.py; do
+for relative in the-web/shell/main.py the-web/shell/system_panel.py the-web/shell/system_status.py the-web/shell/webbie_panel.py the-web/shell/media_panel.py the-web/shell/media_transport.py the-web/shell/audio_controls.py the-web/shell/build_info.py the-web/overlay/webbie_face.py the-web/overlay/webbie-face-autostart.desktop system/onedrive.py system/service/webbie-onedrive.service system/service/webbie-onedrive.timer branding/webbie/webbie-face-v1.png branding/webbie/webbie-face-speaking-v1.png the-web/session/the-web-session the-web/session/apply-lock-screen.py the-web/package/patch-native-imports.py the-web/package/reconcile-native.py branding/wallpapers/collection.json distro/config/sessions/the-web.desktop system/apps.py; do
     test -s "$source_root/$relative" || { echo "Incomplete build: $relative" >&2; exit 1; }
 done
 if [[ -f "$source_root/SHA256SUMS" ]]; then
@@ -45,7 +45,7 @@ done
 stamp="$(date +%Y%m%d-%H%M%S)"
 backup="$root/upgrade-backups/the-web-$stamp"
 install -d "$backup" "$root/the-web" "$root/branding/wallpapers" /usr/share/xsessions /usr/local/bin
-for relative in the-web/shell the-web/install-receipt.json branding/webbie author/main.py studio/main.py study/study.py system/apps.py; do
+for relative in the-web/shell the-web/overlay the-web/install-receipt.json branding/webbie system/onedrive.py author/main.py studio/main.py study/study.py system/apps.py; do
     if [[ -e "$root/$relative" ]]; then
         install -d "$backup/$(dirname "$relative")"
         cp -a "$root/$relative" "$backup/$relative"
@@ -53,6 +53,12 @@ for relative in the-web/shell the-web/install-receipt.json branding/webbie autho
 done
 cp -a "$source_root/the-web/shell" "$root/the-web/"
 cp -a "$source_root/the-web/session" "$root/the-web/"
+# Self-contained click-through face and optional cloud adapter. Neither
+# replaces the existing Webbie agent, models, or conversation state.
+cp -a "$source_root/the-web/overlay" "$root/the-web/"
+install -Dm755 "$source_root/system/onedrive.py" "$root/system/onedrive.py"
+install -Dm644 "$source_root/system/service/webbie-onedrive.service" /usr/lib/systemd/user/webbie-onedrive.service
+install -Dm644 "$source_root/system/service/webbie-onedrive.timer" /usr/lib/systemd/user/webbie-onedrive.timer
 install -Dm644 "$source_root/branding/webbie/webbie-face-v1.png" "$root/branding/webbie/webbie-face-v1.png"
 install -Dm644 "$source_root/branding/webbie/webbie-face-speaking-v1.png" "$root/branding/webbie/webbie-face-speaking-v1.png"
 cp -a "$source_root/branding/wallpapers/collection" "$root/branding/wallpapers/"
@@ -103,6 +109,23 @@ if [[ -f "$user_home/.config/autostart/the-web.desktop" ]]; then
 fi
 printf '[Desktop Entry]\nType=Application\nName=The Web\nHidden=true\n' > "$user_home/.config/autostart/the-web.desktop"
 chown "$user:$(id -gn "$user")" "$user_home/.config/autostart/the-web.desktop"
+# Launch the overlay in the next Plasma or The Web X11 login. Preserve an
+# existing user override rather than overwriting it.
+overlay_entry="$user_home/.config/autostart/webbie-floating-face.desktop"
+if [[ ! -e "$overlay_entry" && ! -L "$overlay_entry" ]]; then
+    install -o "$user" -g "$(id -gn "$user")" -m644       "$source_root/the-web/overlay/webbie-face-autostart.desktop" "$overlay_entry"
+fi
+# This timer runs independently of Webbie, skips work until optional sign-in,
+# and does not delay desktop or assistant startup.
+uid="$(id -u "$user")"
+if [[ -S "/run/user/$uid/bus" ]]; then
+    runuser -u "$user" -- env XDG_RUNTIME_DIR="/run/user/$uid"       DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus"       systemctl --user daemon-reload || true
+    if ! runuser -u "$user" -- env XDG_RUNTIME_DIR="/run/user/$uid"       DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus"       systemctl --user enable --now webbie-onedrive.timer; then
+        echo 'OneDrive timer registration postponed. Run as your user: systemctl --user enable --now webbie-onedrive.timer'
+    fi
+else
+    echo 'OneDrive timer can be enabled after login: systemctl --user enable --now webbie-onedrive.timer'
+fi
 /usr/local/bin/the-web-session --check
 python3 "$root/the-web/shell/build_info.py" "$source_root" "$root" "$backup"
 if ! runuser -u "$user" -- python3 "$root/the-web/session/apply-lock-screen.py"; then
