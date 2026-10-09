@@ -41,7 +41,10 @@ released alongside the desktop work.
    contains build commit `7811bafbbbf85fc4bb309f3aee0102c7e8d6c27a`.
    Ten playback regressions, real FFmpeg conversion, complete archive byte checks
    and tampered-archive rejection passed.
-   [ ] Install the packaged Media Center repairs; verify real Play,
+   Installation confirmed by the owner on 8 October 2026 at 20:07 local time:
+   all four package checksum checks passed and the archive was installed.
+   Backup: `/opt/spider-media-center/resources/app.asar.before-playback-20261008-200747-1055870`.
+   [ ] Verify real Play,
    Pause, seek, local movies, compatible-copy preparation and cancellation,
    visualizer output, and broadcast stop/start. Source regressions pass.
 7. [ ] Verify Webbie, Forage, Deep Forage, Kali Bay, Guardian, Vault and AI DJ from
