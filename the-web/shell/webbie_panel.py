@@ -99,6 +99,7 @@ class WebbiePanel(QWidget):
             QPushButton:disabled { background:#342343; color:#b5a5c0; }
         ''')
         self.runtime = runtime_directory(); self.worker = None; self.pending = False; self.phase = 0; self.mouth_frame = 0
+        self.workspace_label = 'The Web'; self.workspace_mode = 'Normal'; self.workspace_summary = ''
         layout = QVBoxLayout(self)
         header = QHBoxLayout(); layout.addLayout(header)
         self.face = SpeakingPortrait(root)
@@ -113,6 +114,13 @@ class WebbiePanel(QWidget):
         note = QLabel('Wake: Hey Webbie · Hey Web')
         note.setToolTip('Lip movement follows the speaking signal. Word-level synchronization and listening detection are not yet available.')
         note.setWordWrap(True); details.addWidget(note)
+        self.context = QLabel('Workspace: The Web  |  Normal')
+        self.context.setWordWrap(True)
+        self.context.setAccessibleName('Active Webbie workspace and mode')
+        layout.addWidget(self.context)
+        self.disclosure = QLabel('Only the workspace name and selected title are shared with local Webbie when you send a message. Files and chapter text are not sent automatically.')
+        self.disclosure.setWordWrap(True)
+        layout.addWidget(self.disclosure)
         self.chat = QTextEdit(); self.chat.setReadOnly(True); layout.addWidget(self.chat, 1)
         self.chat.setPlainText('Ask Webbie below.')
         row = QHBoxLayout(); layout.addLayout(row)
@@ -138,15 +146,31 @@ class WebbiePanel(QWidget):
     def append_message(self, who, text):
         self.chat.append('<b>' + escape(who) + ':</b> ' + escape(text).replace('\n', '<br>'))
 
+    def set_workspace_context(self, label, mode='Normal', summary=''):
+        self.workspace_label = str(label)[:90]
+        self.workspace_mode = str(mode)[:70]
+        self.workspace_summary = str(summary)[:600]
+        description = f'Workspace: {self.workspace_label}  |  {self.workspace_mode}'
+        if self.workspace_summary:
+            description += '\nSelected: ' + self.workspace_summary
+        self.context.setText(description)
+
+    def prepare_request(self, text):
+        fields = [f'Workspace: {self.workspace_label}', f'Mode: {self.workspace_mode}']
+        if self.workspace_summary:
+            fields.append('Selected title: ' + self.workspace_summary)
+        return '[Spider OS workspace context; advisory only]\n' + '\n'.join(fields) + '\n[User request]\n' + text
+
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
             return
-        if len(text.encode('utf-8')) > 32768:
+        request = self.prepare_request(text)
+        if len(request.encode('utf-8')) > 32768:
             self.append_message('Status', 'Message is too long. Send a shorter message.'); return
         self.append_message('You', text); self.entry.clear(); self.pending = True
         self.send_button.setEnabled(False); self.entry.setEnabled(False); self.refresh_state()
-        self.worker = ReplyWorker(text, self.runtime / 'webbie.sock', self)
+        self.worker = ReplyWorker(request, self.runtime / 'webbie.sock', self)
         self.worker.reply.connect(lambda reply: self.append_message('Webbie', reply))
         self.worker.failed.connect(lambda message: self.append_message('Status', message))
         self.worker.finished.connect(self.request_finished); self.worker.start()
