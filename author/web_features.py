@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 class AuthorToolkit(QWidget):
     jumpRequested = pyqtSignal(dict)
     reviewRequested = pyqtSignal(str)
+    editRequested = pyqtSignal()
 
     def __init__(self, store, current_chapter, save_editor=None, editor=None):
         super().__init__()
@@ -94,6 +95,9 @@ class AuthorToolkit(QWidget):
         selected = QPushButton('Review selected passage with Webbie (preview first)')
         selected.clicked.connect(self.review_selection)
         t.addWidget(selected)
+        approve = QPushButton('Apply reviewed rewrite (requires approval)')
+        approve.clicked.connect(self.editRequested.emit)
+        t.addWidget(approve)
         self.stats = QLabel('No project selected'); t.addWidget(self.stats)
         export = QPushButton('Export current book to DOCX'); export.clicked.connect(self.export_docx)
         t.addWidget(export)
