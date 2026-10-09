@@ -279,6 +279,61 @@ category_shell() {
 }
 
 
+# No arbitrary executable names, shell fragments or arguments are accepted.
+# Kali GUI programs run as the existing container user, never as root.
+tool_metadata() {
+    TOOL_BINARY=""
+    TOOL_MODE=""
+    case "${1:-}" in
+        wireshark|burpsuite|zaproxy|ghidra|clamtk)
+            TOOL_BINARY="$1"
+            TOOL_MODE="gui"
+            ;;
+        nmap|msfconsole|suricata|yara|lynis)
+            TOOL_BINARY="$1"
+            TOOL_MODE="terminal"
+            ;;
+        *)
+            die "Unknown tool identifier. Refusing arbitrary command execution."
+            ;;
+    esac
+}
+
+tool_check() {
+    tool_metadata "${1:-}"
+    require_host_tools
+    container_exists || die "Kali Bay does not exist yet. No setup was started."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali Bay."
+    [[ "${running}" == "true" ]] \
+        || die "Kali Bay is stopped. Start it deliberately from the terminal."
+    podman exec --user 0 --tty=false "${NAME}" \
+        sh -c 'command -v "$1" >/dev/null 2>&1' sh "${TOOL_BINARY}" \
+        || die "${TOOL_BINARY} is not installed in Kali Bay."
+    printf 'ready\n'
+}
+
+launch_tool() {
+    local tool_id="${1:-}"
+    tool_check "${tool_id}" >/dev/null
+    if [[ "${TOOL_MODE}" == "gui" ]]; then
+        exec distrobox enter --name "${NAME}" -- "${TOOL_BINARY}"
+    fi
+
+    # CLI choices only open a labeled interactive workbench. They do not
+    # run a scan or start a daemon without a subsequent user command.
+    if command -v konsole >/dev/null 2>&1; then
+        exec konsole --hold -e distrobox enter --name "${NAME}" -- \
+            bash -lc 'printf "KALI BAY: %s is installed.\n" "$1"; printf "No action has been run.\n"; exec bash' \
+            kali-bay "${TOOL_BINARY}"
+    fi
+    exec distrobox enter --name "${NAME}" -- \
+        bash -lc 'printf "KALI BAY: %s is installed.\n" "$1"; printf "No action has been run.\n"; exec bash' \
+        kali-bay "${TOOL_BINARY}"
+}
+
+
 status() {
     if full_toolset_installed; then
         echo "ready"
@@ -309,13 +364,22 @@ info() {
 
 launch_ui() {
     exec python3 \
-        "${KALI_ROOT}/ui/kali_bay.py"
+        "${KALI_ROOT}/ui/kali_bay.py" "$@"
 }
 
 
 case "${1:-ui}" in
     ui)
         launch_ui
+        ;;
+    offensive|purple)
+        launch_ui "--$1"
+        ;;
+    tool-check)
+        tool_check "${2:-}"
+        ;;
+    tool)
+        launch_tool "${2:-}"
         ;;
 
     create)
@@ -360,6 +424,9 @@ Usage:
   kali-bay update
   kali-bay status
   kali-bay doctor
+  kali-bay tool-check <approved-id>
+  kali-bay tool <approved-id>
+  kali-bay offensive|purple
   kali-bay info
   kali-bay category <metapackage> <title>
 EOF
