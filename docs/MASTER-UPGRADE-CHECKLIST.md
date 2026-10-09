@@ -22,6 +22,10 @@
 - [x] Prepared private `Spider-Author-Private-Content-Import.zip`; owner extracted it. Actual SQLite import and retention of the original DOCX files remain unconfirmed.
 - [x] PR #17 source-built Webbie's ethereal violet woman portrait, speech-gated lip animation, responsive typed chat and safe window Close controls. Not yet confirmed installed; lip motion is approximate, not phoneme-synchronized.
 
+- [x] User confirmed all personal files remained present after the power outage. This is not a validated independent backup or a storage-health report.
+- [x] Source-built a read-only, privacy-limited installed-system audit for Author/Study record counts, Spider startup-branding hints, Kali state, desktop/Media files and user services (PR #18, merged into combined PR #17). **Not run on the owner PC yet.**
+- [x] The combined PR #17 source batch includes Webbie face/chat, window Close/Minimize/Maximize, audio/mute, Media MPRIS client, System/Recovery health panels and build receipts. Not installed on the owner PC; install in one selective batch with backup after source qualification.
+
 ## 1. Boot, disk and irreplaceable data — urgent
 
 - [ ] Collect a read-only post-outage boot/SMART/journal and drive-health inventory; document the exact cause if detectable. Do not run destructive filesystem repair blindly.
