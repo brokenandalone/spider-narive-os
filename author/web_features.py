@@ -7,6 +7,10 @@ import difflib
 from pathlib import Path
 from PyQt5.QtCore import Qt, pyqtSignal
 if __package__:
+    from .publishing import export_pdf, export_epub
+else:
+    from publishing import export_pdf, export_epub
+if __package__:
     from .speech import LocalReader
 else:
     from speech import LocalReader
@@ -101,6 +105,13 @@ class AuthorToolkit(QWidget):
         self.stats = QLabel('No project selected'); t.addWidget(self.stats)
         export = QPushButton('Export current book to DOCX'); export.clicked.connect(self.export_docx)
         t.addWidget(export)
+        for label, extension, handler in (
+            ('Export ebook (EPUB 3)', 'epub', export_epub),
+            ('Export reading PDF', 'pdf', export_pdf),
+        ):
+            btn = QPushButton(label)
+            btn.clicked.connect(lambda checked=False, suffix=extension, task=handler: self.export_other(suffix, task))
+            t.addWidget(btn)
         compare = QPushButton('Compare current chapter with last saved version'); compare.clicked.connect(self.compare)
         t.addWidget(compare)
         self.compare_result = QTextEdit(); self.compare_result.setReadOnly(True)
@@ -276,6 +287,24 @@ class AuthorToolkit(QWidget):
             'Writer requests a continuity and prose review for "' + title +
             '". Suggest improvements but do not edit the manuscript.\n\n' + selection
         )
+
+    def export_other(self, suffix, task):
+        if self.book_id is None:
+            return
+        if self.save_editor is not None and not self.save_editor():
+            return
+        try:
+            self.save_current()
+            book = next(b for b in self.store.books() if b['id'] == self.book_id)
+            destination, _ = QFileDialog.getSaveFileName(
+                self, 'Export manuscript as ' + suffix.upper(),
+                book['title'] + '.' + suffix,
+                suffix.upper() + ' (*.' + suffix + ')'
+            )
+            if destination:
+                task(self.store, self.book_id, destination)
+        except Exception as exc:
+            QMessageBox.warning(self, 'Export', str(exc))
 
     def export_docx(self):
         if self.book_id is None: return
