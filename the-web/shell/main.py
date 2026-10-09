@@ -33,6 +33,7 @@ from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 from media_panel import MediaPanel
 from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
+from window_overview import WindowOverview
 from appearance import LIGHT_STYLE, appearance_file, load_theme, save_theme
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
@@ -108,6 +109,7 @@ class StartMenu(QDialog):
         self.search.textChanged.connect(self.populate); self.results.itemActivated.connect(self.activate)
         actions = QHBoxLayout(); layout.addLayout(actions)
         actions.addWidget(button('Refresh apps', shell.refresh_apps))
+        actions.addWidget(button('Windows', shell.toggle_window_overview))
         actions.addWidget(button('Lock', shell.lock_session))
         actions.addWidget(button('Log out', shell.logout))
         self.populate()
@@ -569,6 +571,25 @@ class TheWeb(QMainWindow):
         self.start_menu.setStyleSheet(stylesheet)
         self.taskbar.setStyleSheet(stylesheet)
         self.status.setText('The Web appearance: ' + theme + '. KDE/GTK applications unchanged.')
+
+    def toggle_window_overview(self):
+        panel=getattr(self,'window_overview',None)
+        if panel is None:
+            def ignored_windows():
+                return (
+                    f'0x{int(self.winId()):08x}',
+                    f'0x{int(self.taskbar.winId()):08x}',
+                )
+            self.window_overview=WindowOverview(self,excluded=ignored_windows)
+            panel=self.window_overview
+        if panel.isVisible():
+            panel.hide()
+        else:
+            panel.refresh()
+            panel.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
+            panel.resize(590,380)
+            panel.show()
+            panel.raise_()
 
     def toggle_quick_settings(self):
         panel=getattr(self, 'quick_settings_panel', None)
