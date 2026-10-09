@@ -13,6 +13,7 @@ root=/usr/local/lib/spider-os
 baseline_refs=(
   b2a1953e815479324c8a53a68ad51d813438f496
   fb0f6eb5a54cce0bc86ec081a67d18ccff4fc46e
+  eec8e47c128a2f796ff5d16d549f8a2b105e32f8
 )
 managed=(
   author/main.py
@@ -23,6 +24,7 @@ managed=(
   the-web/shell/main.py
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py
+  the-web/shell/webbie_camera.py
 )
 if [[ $mode == --apply && $EUID -ne 0 ]]; then
     echo 'Use sudo bash ... --apply from your normal Spider OS user.' >&2
@@ -35,6 +37,7 @@ fi
 command -v git >/dev/null || { echo 'Missing git.' >&2; exit 2; }
 command -v python3 >/dev/null || { echo 'Missing python3.' >&2; exit 2; }
 command -v cmp >/dev/null || { echo 'Missing cmp.' >&2; exit 2; }
+command -v ffmpeg >/dev/null || { echo 'Webcam vision requires ffmpeg. Install the Ubuntu ffmpeg package first.' >&2; exit 2; }
 git -c "safe.directory=$source_root" -C "$source_root" rev-parse --is-inside-work-tree >/dev/null ||
   { echo 'Run from a GitHub worktree of Spider OS.' >&2; exit 2; }
 
@@ -140,4 +143,5 @@ done
 echo
 echo "Author/Webbie code upgraded. Safe backup: $backup"
 echo 'The active desktop stays running. Save your work and log out later to load the upgraded UI.'
+echo 'Webcam vision uses locally installed Ollama gemma3:4b. The microphone configuration is unchanged.'
 echo 'Private manuscripts, Webbie voice service, photos, documents and original DOCX files were untouched.'
