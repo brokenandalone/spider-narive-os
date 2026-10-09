@@ -5,7 +5,7 @@ source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 if [[ ! -d "$source_root/the-web/overlay" ]]; then
   echo "Incomplete Webbie add-on package." >&2; exit 1
 fi
-for file in the-web/overlay/webbie_face.py the-web/overlay/webbie-face-autostart.desktop system/onedrive.py system/service/webbie-onedrive.service system/service/webbie-onedrive.timer branding/webbie/webbie-face-v1.png branding/webbie/webbie-face-speaking-v1.png; do
+for file in the-web/overlay/webbie_face.py the-web/overlay/webbie-face-autostart.desktop the-web/overlay/launchers/webbie-onedrive-connect.desktop the-web/overlay/launchers/webbie-face-sleep-tonight.desktop the-web/overlay/launchers/webbie-face-wake.desktop system/onedrive.py system/service/webbie-onedrive.service system/service/webbie-onedrive.timer branding/webbie/webbie-face-v1.png branding/webbie/webbie-face-speaking-v1.png; do
   [[ -s "$source_root/$file" ]] || { echo "Missing: $file" >&2; exit 1; }
 done
 # No boot, encryption, agent, existing shell or private-data changes.
@@ -62,6 +62,16 @@ if [[ ! -e "$autostart" && ! -L "$autostart" ]]; then
 else
   echo "Preserved existing Webbie overlay autostart override."
 fi
+# KDE Plasma and The Web can both discover these user-owned menu actions.
+install -d -o "$user" -g "$group" "$home/.local/share/applications"
+for launcher in "$source_root"/the-web/overlay/launchers/*.desktop; do
+  destination="$home/.local/share/applications/$(basename "$launcher")"
+  if [[ ! -e "$destination" && ! -L "$destination" ]]; then
+    install -o "$user" -g "$group" -m644 "$launcher" "$destination"
+  else
+    echo "Preserved existing app launcher: $(basename "$launcher")"
+  fi
+done
 uid="$(id -u "$user")"
 if [[ -S "/run/user/$uid/bus" ]]; then
   runuser -u "$user" -- env XDG_RUNTIME_DIR="/run/user/$uid" \
