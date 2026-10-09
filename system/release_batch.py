@@ -317,22 +317,27 @@ def user_info(for_apply=False):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('--check', '--apply', '--rollback-check', '--rollback'))
+    parser.add_argument('action', choices=('check', 'apply', 'rollback-check', 'rollback'))
     parser.add_argument('backup', nargs='?', default=None)
+    if argv is None:
+        argv = sys.argv[1:]
+    # Accept familiar --check/--apply flags while retaining a single mode.
+    if argv and argv[0] in ('--check', '--apply', '--rollback-check', '--rollback'):
+        argv = [argv[0][2:], *argv[1:]]
     args = parser.parse_args(argv)
     try:
-        active = args.action in ('--apply', '--rollback')
+        active = args.action in ('apply', 'rollback')
         home, uid, gid = user_info(for_apply=active)
         items = prepare_items(home=home, uid=uid, gid=gid)
         backup_root = INSTALL_ROOT / 'upgrade-backups'
-        if args.action == '--check':
+        if args.action == 'check':
             return 0 if report(inspect(items)) else 3
-        if args.action == '--apply':
+        if args.action == 'apply':
             apply(items, backup_root)
             return 0
         if not args.backup:
             parser.error('Rollback requires the exact backup path from the installation receipt.')
-        rollback(items, args.backup, backup_root, dry_run=args.action == '--rollback-check')
+        rollback(items, args.backup, backup_root, dry_run=args.action == 'rollback-check')
         return 0
     except (OSError, ValueError, RuntimeError, KeyError, TypeError) as error:
         print('Spider OS batch stopped: ' + str(error), file=sys.stderr)
