@@ -11,7 +11,8 @@ import subprocess
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from gtk_compat import appearance_snapshot
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox
+from theme_sync_plan import plan_theme, render_plan
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QMessageBox
 
 STATUS_COMMANDS = {
     'connection': ('nmcli', '-t', '-f', 'STATE', 'general'),
@@ -162,6 +163,11 @@ class QuickSettingsPanel(QWidget):
         self.appearance_selector.currentIndexChanged.connect(self.choose_appearance)
         appearance_row.addWidget(self.appearance_selector)
         layout.addLayout(appearance_row)
+        self.theme_sync_preview = QPushButton('Preview KDE / GTK coordination')
+        self.theme_sync_preview.setAccessibleName('Preview system appearance synchronization')
+        self.theme_sync_preview.setToolTip('Read-only. Checks the installed Breeze scheme, KDE and GTK settings without changing them.')
+        self.theme_sync_preview.clicked.connect(self.preview_system_theme)
+        layout.addWidget(self.theme_sync_preview)
         controls = QHBoxLayout()
         self.refresh_button = QPushButton('Refresh')
         self.refresh_button.clicked.connect(self.refresh)
@@ -192,6 +198,16 @@ class QuickSettingsPanel(QWidget):
         else:
             self._appearance_value = candidate
             self.help.setText('The Web appearance saved. KDE, GTK and other apps remain unchanged.')
+
+    def preview_system_theme(self):
+        # This is deliberately a preview, not an Apply button. External GTK
+        # apps may have their own choices, and Plasma must own its own palette.
+        desired = self.appearance_selector.currentData()
+        try:
+            report = render_plan(plan_theme(desired))
+        except (OSError, ValueError) as error:
+            report = 'Cannot preview KDE/GTK appearance: ' + str(error)
+        QMessageBox.information(self, 'Spider OS | KDE and GTK appearance', report)
 
     def refresh(self):
         if self.worker and self.worker.isRunning():
