@@ -134,6 +134,50 @@ class BatchReleaseTests(unittest.TestCase):
         self.assertNotIn('rclone.conf', targets)
         self.assertNotIn('kali-vg', targets)
 
+    def test_realistic_multi_component_layout_roundtrip(self):
+        """Author, desktop, Webbie agent, portrait, and OneDrive change together."""
+        components = (
+            'author/main.py',
+            'the-web/shell/main.py',
+            'the-web/shell/webbie_panel.py',
+            'the-web/overlay/webbie_face.py',
+            'webbie/agent/webbie.py',
+            'webbie/agent/night_mode.py',
+            'system/onedrive.py',
+        )
+        items = []
+        for index, relative in enumerate(components):
+            source = self.source_root / relative
+            target = self.target_root / relative
+            source.parent.mkdir(parents=True, exist_ok=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text('BUILD = 2\n', encoding='utf-8')
+            if index % 2 == 0:
+                target.write_text('BUILD = 1\n', encoding='utf-8')
+            items.append(batch.Item(source, target, uid=os.geteuid(),
+                                    gid=os.getegid(), reference=relative))
+        custom_library = self.base / 'home/Author/library.sqlite'
+        custom_original = self.base / 'home/Author/Originals/book.docx'
+        custom_library.parent.mkdir(parents=True, exist_ok=True)
+        custom_original.parent.mkdir(parents=True, exist_ok=True)
+        custom_library.write_bytes(b'PRIVATE SQLITE DATA')
+        custom_original.write_bytes(b'ORIGINAL WORD BYTES')
+        receipt = batch.apply(items, self.backup_root, self.source_root, (),
+                              self.true_baseline)
+        self.assertEqual(len(batch.json.loads((receipt / 'manifest.json').read_text())['files']),
+                         len(items))
+        for item in items:
+            self.assertEqual(item.target.read_text(), 'BUILD = 2\n')
+        batch.rollback(items, receipt, self.backup_root, dry_run=True)
+        batch.rollback(items, receipt, self.backup_root, dry_run=False)
+        for index, item in enumerate(items):
+            if index % 2 == 0:
+                self.assertEqual(item.target.read_text(), 'BUILD = 1\n')
+            else:
+                self.assertFalse(item.target.exists())
+        self.assertEqual(custom_library.read_bytes(), b'PRIVATE SQLITE DATA')
+        self.assertEqual(custom_original.read_bytes(), b'ORIGINAL WORD BYTES')
+
     def test_cli_accepts_single_check_flag(self):
         with patch.object(batch, 'user_info', return_value=(self.base / 'user', 1000, 1000)):
             with patch.object(batch, 'prepare_items', return_value=[self.entry]):
