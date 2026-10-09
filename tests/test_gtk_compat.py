@@ -13,6 +13,29 @@ import gtk_compat
 
 
 class GTKCompatibilityTests(unittest.TestCase):
+    def test_portal_values_and_legacy_variant(self):
+        for value, expected in [(0, 'No preference'), (1, 'Dark preferred'),
+                                (2, 'Light preferred'), (99, 'No preference (unknown portal value)')]:
+            for wrapper in ('<uint32 %d>', '<<uint32 %d>>'):
+                self.assertEqual(gtk_compat.portal_preference(
+                    lambda args: '(' + wrapper % value + ',)'), expected)
+
+    def test_portal_fallback_reads_only_public_color_preference(self):
+        calls=[]
+        def runner(args):
+            calls.append(args)
+            return None if len(calls)==1 else '(<<uint32 2>>,)'
+        self.assertEqual(gtk_compat.portal_preference(runner), 'Light preferred')
+        self.assertEqual(calls, list(gtk_compat.PORTAL_COMMANDS))
+        self.assertTrue(all(args[-2:]==('org.freedesktop.appearance', 'color-scheme') for args in calls))
+        self.assertIn('Unavailable', gtk_compat.portal_preference(lambda args:None))
+
+    def test_portal_malformed_output_is_not_echoed_or_interpreted(self):
+        for value in ('(<uint32 1>>,)', '(<uint32 4294967296>,)', '(<int32 1>,)',
+                      '<b>Private garbage uint32 1</b>', '', '("1",)'):
+            self.assertEqual(gtk_compat.portal_preference(lambda args:value),
+                             'Unknown (unexpected portal reply)')
+
     def test_inventory_of_real_preferences_from_fixture_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             config=Path(tmp)

@@ -65,7 +65,7 @@ class ThemeSyncPlanningTests(unittest.TestCase):
             self.assertNotIn('Custom:dark',sync.render_plan(report))
 
     def test_malicious_theme_names_refused(self):
-        for mode in ('../Dark', 'custom', '', None, 12, True):
+        for mode in ('../Dark', 'custom', '', None, 12, True, [], {}):
             with self.assertRaises(ValueError):
                 sync.plan_theme(mode,env={},data_roots=(),snapshot=lambda:{})
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,11 +84,29 @@ class ThemeSyncPlanningTests(unittest.TestCase):
             self.assertTrue(panel.worker.wait(4000))
             APP.processEvents()
             panel.theme_sync_preview.click()
-            plan.assert_called_once_with('dark')
+            plan.assert_called_once_with('dark', portal=panel._portal_preference)
             info.assert_called_once()
             self.assertIn('READ-ONLY',info.call_args.args[2])
             self.assertEqual(calls,[])
             panel.close()
+
+    def test_portal_mismatch_and_unknown_status_are_explained(self):
+        for portal, fragment in [('Light preferred', 'differs'),
+                                 ('No preference', 'own default'),
+                                 ('Unavailable', 'could not be verified')]:
+            report=sync.plan_theme('dark', env={'XDG_CURRENT_DESKTOP':'The-Web'},
+                data_roots=(), which=lambda name:None, snapshot=lambda:{}, portal=portal)
+            self.assertIn(fragment, ' '.join(report['notes']))
+            self.assertIn(portal, sync.render_plan(report))
+            self.assertFalse(any('desktop is not confirmed' in p for p in report['blockers']))
+        report=sync.plan_theme('dark', env={'XDG_CURRENT_DESKTOP':'NOTKDE'},
+            data_roots=(), which=lambda name:None, snapshot=lambda:{}, portal='Dark preferred')
+        self.assertEqual(report['notes'], [])
+        self.assertTrue(any('desktop is not confirmed' in p for p in report['blockers']))
+
+    def test_relative_xdg_data_home_is_ignored(self):
+        roots=sync.default_data_roots({'XDG_DATA_HOME':'relative', 'XDG_DATA_DIRS':'relative:/usr/share'})
+        self.assertTrue(all(root.is_absolute() for root in roots))
 
 
 if __name__=='__main__':

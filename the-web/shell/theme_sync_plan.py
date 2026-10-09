@@ -33,6 +33,8 @@ def available_scheme(scheme, data_roots):
 def default_data_roots(env):
     entries = []
     home = Path(env.get('XDG_DATA_HOME') or (Path.home() / '.local/share'))
+    if not home.is_absolute():
+        home = Path.home() / '.local/share'
     entries.append(home)
     for value in (env.get('XDG_DATA_DIRS') or '/usr/local/share:/usr/share').split(':'):
         if value.startswith('/'):
@@ -41,9 +43,9 @@ def default_data_roots(env):
 
 
 def plan_theme(mode, *, env=None, data_roots=None, which=shutil.which,
-               snapshot=appearance_snapshot):
+               snapshot=appearance_snapshot, portal='Not checked yet'):
     """Return a preview, not commands or permission to mutate appearance."""
-    if mode not in SCHEMES or not isinstance(mode, str):
+    if not isinstance(mode, str) or mode not in SCHEMES:
         raise ValueError('Unknown appearance mode')
     env = dict(os.environ if env is None else env)
     roots = tuple(default_data_roots(env) if data_roots is None else data_roots)
@@ -60,9 +62,17 @@ def plan_theme(mode, *, env=None, data_roots=None, which=shutil.which,
         problems.append(target + '.colors was not found in the configured theme directories.')
     if override:
         problems.append('GTK_THEME is overridden in the environment; GTK apps may ignore desktop appearance.')
-    if not ('KDE' in desktop.upper() or 'PLASMA' in desktop.upper()
-            or 'THEWEB' in desktop.upper()):
+    desktops = {part.upper() for part in desktop.split(':')}
+    if not desktops.intersection({'KDE', 'PLASMA', 'THEWEB', 'THE-WEB'}):
         problems.append('The current desktop is not confirmed as KDE or The Web.')
+
+    notes = []
+    if portal.startswith(('Unavailable', 'Unknown', 'Not checked')):
+        notes.append('The app color preference could not be verified. Refresh Quick Settings and check the desktop portal in KDE Settings.')
+    elif portal.startswith('No preference'):
+        notes.append('The desktop does not request a light or dark app appearance; apps may choose their own default.')
+    elif portal != ('Dark preferred' if mode == 'dark' else 'Light preferred'):
+        notes.append('The app color preference differs from the selected The Web appearance. Apps following the portal may look different.')
 
     steps = [
         f'Plasma/Qt: after approval, use the installed native color-scheme tool to select {DESKTOP_NAMES[mode]} (if compatible).',
@@ -77,6 +87,8 @@ def plan_theme(mode, *, env=None, data_roots=None, which=shutil.which,
         'installed': present,
         'plasma_tool_present': bool(plasma_tool),
         'existing': settings,
+        'portal': portal,
+        'notes': notes,
         'blockers': problems,
         'steps': steps,
         'dry_run': True,
@@ -92,6 +104,7 @@ def render_plan(plan):
         'Desktop: ' + plan['desktop'],
         'Theme file: ' + ('found' if plan['installed'] else 'not found'),
         'Plasma colors tool: ' + ('found' if plan['plasma_tool_present'] else 'not found'),
+        'App color preference (last refresh): ' + plan.get('portal', 'Not checked yet'),
         '',
         'CURRENT PREFERENCES (not guaranteed rendered appearance)',
     ]
@@ -100,6 +113,9 @@ def render_plan(plan):
     lines.extend(('', 'PROPOSED WORK (not executed):'))
     for index, step in enumerate(plan['steps'], 1):
         lines.append(f'  {index}. {step}')
+    if plan.get('notes'):
+        lines.extend(('', 'APP APPEARANCE:'))
+        lines.extend('  • ' + note for note in plan['notes'])
     if plan['blockers']:
         lines.extend(('', 'BEFORE ANY SYSTEM-WIDE CHANGE:'))
         lines.extend('  • ' + reason for reason in plan['blockers'])

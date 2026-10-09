@@ -12,6 +12,31 @@ import re
 MAX_SETTINGS = 16384
 SAFE_VALUE = re.compile(r'[a-zA-Z0-9._+ -]{1,70}\Z')
 
+# ReadOne is the v2 API; Read is retained for older portal implementations.
+# Both query exactly one public appearance preference, never all settings.
+PORTAL_COMMANDS = tuple(
+    ('gdbus', 'call', '--session', '--dest', 'org.freedesktop.portal.Desktop',
+     '--object-path', '/org/freedesktop/portal/desktop', '--method',
+     'org.freedesktop.portal.Settings.' + method,
+     'org.freedesktop.appearance', 'color-scheme')
+    for method in ('ReadOne', 'Read')
+)
+PORTAL_LABELS = {0: 'No preference', 1: 'Dark preferred', 2: 'Light preferred'}
+
+
+def portal_preference(runner):
+    """Call from a worker with a bounded runner; return only sanitized status."""
+    for command in PORTAL_COMMANDS:
+        output = runner(command)
+        if output is None:
+            continue
+        # GVariant tuple with one variant (ReadOne), or nested variant (Read).
+        match = re.fullmatch(r'\(\s*(<{1,2})uint32\s+(\d{1,10})(>{1,2})\s*,\s*\)\s*', output)
+        if not match or len(match[1]) != len(match[3]) or int(match[2]) > 4294967295:
+            return 'Unknown (unexpected portal reply)'
+        return PORTAL_LABELS.get(int(match[2]), 'No preference (unknown portal value)')
+    return 'Unavailable (desktop portal or gdbus not responding)'
+
 
 def config_root(home=None):
     if home is not None:

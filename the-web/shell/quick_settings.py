@@ -10,7 +10,7 @@ import shutil
 import subprocess
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from gtk_compat import appearance_snapshot
+from gtk_compat import appearance_snapshot, portal_preference
 from theme_sync_plan import plan_theme, render_plan
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QMessageBox
 
@@ -100,6 +100,7 @@ def quick_snapshot(runner=read_command, power_supply=Path('/sys/class/power_supp
         'Brightness': bright,
     }
     snapshot.update(appearance_snapshot())
+    snapshot['App color preference'] = portal_preference(runner)
     return snapshot
 
 
@@ -134,6 +135,7 @@ class QuickSettingsPanel(QWidget):
         super().__init__(parent)
         self._appearance_reader = appearance_reader
         self._appearance_writer = appearance_writer
+        self._portal_preference = 'Not checked yet'
         self.setWindowTitle('Spider OS · Quick Settings')
         self.setObjectName('spiderQuickSettings')
         layout = QVBoxLayout(self)
@@ -142,7 +144,7 @@ class QuickSettingsPanel(QWidget):
         layout.addWidget(title)
         self.status = {}
         for key in ('Network', 'Wi-Fi radio', 'Bluetooth', 'Microphone', 'Power', 'Brightness',
-                    'KDE colors', 'GTK 3', 'GTK 4'):
+                    'KDE colors', 'GTK 3', 'GTK 4', 'App color preference'):
             label = QLabel(key + ': Checking…')
             label.setWordWrap(True)
             label.setTextFormat(Qt.PlainText)
@@ -204,7 +206,7 @@ class QuickSettingsPanel(QWidget):
         # apps may have their own choices, and Plasma must own its own palette.
         desired = self.appearance_selector.currentData()
         try:
-            report = render_plan(plan_theme(desired))
+            report = render_plan(plan_theme(desired, portal=self._portal_preference))
         except (OSError, ValueError) as error:
             report = 'Cannot preview KDE/GTK appearance: ' + str(error)
         QMessageBox.information(self, 'Spider OS | KDE and GTK appearance', report)
@@ -219,6 +221,7 @@ class QuickSettingsPanel(QWidget):
         self.worker.start()
 
     def show_snapshot(self, snapshot):
+        self._portal_preference = snapshot.get('App color preference', 'Not checked yet')
         for key, label in self.status.items():
             label.setText(key + ': ' + str(snapshot.get(key, 'Unknown'))[:160])
 

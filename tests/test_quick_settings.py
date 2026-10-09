@@ -31,6 +31,8 @@ class QuickSettingsTests(unittest.TestCase):
                      'microphone':'Volume: 0.82 [MUTED]\n'}
             def fake_read(args):
                 calls.append(args)
+                if args[0] == 'gdbus':
+                    return '(<uint32 1>,)'
                 return answers[next(k for k,v in quick.STATUS_COMMANDS.items() if v==args)]
             info=quick.quick_snapshot(runner=fake_read,power_supply=power)
             self.assertEqual(info['Network'],'connected')
@@ -39,8 +41,9 @@ class QuickSettingsTests(unittest.TestCase):
             self.assertEqual(info['Brightness'],'63%')
             self.assertEqual(info['Microphone'],'Muted · 82%')
             self.assertEqual(info['Power'],'78% (Charging)')
-            self.assertEqual(len(calls),5)
-            self.assertTrue(all(args in quick.STATUS_COMMANDS.values() for args in calls))
+            self.assertEqual(info['App color preference'], 'Dark preferred')
+            self.assertEqual(len(calls),6)
+            self.assertTrue(all(args in quick.STATUS_COMMANDS.values() for args in calls[:5]))
 
     def test_missing_tools_and_battery_are_nonfatal(self):
         with tempfile.TemporaryDirectory() as tmp:
