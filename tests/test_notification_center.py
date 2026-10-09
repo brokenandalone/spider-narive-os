@@ -36,7 +36,7 @@ class TaskbarAlertTests(unittest.TestCase):
             center=NotificationCenter(path=state)
             center.add_notification('Webbie','Reply ready')
             center.external_path.write_text(json.dumps({'app':'Mail','title':'Inbox',
-                'message':'New message','time':'1'})+'\\n')
+                'message':'New message','time':'1'})+'\n')
             center.refresh()
             self.assertEqual(center.history.count(),2)
             center.dnd.setChecked(True)
@@ -69,9 +69,9 @@ class TaskbarAlertTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             state=Path(tmp)/'notifications.json'
             center=NotificationCenter(path=state)
-            content='not json\\n'+json.dumps({
+            content='not json\n'+json.dumps({
                 'app':'Mail','title':'Still here','message':'Visible',
-                'time':'2'})+'\\n'
+                'time':'2'})+'\n'
             center.external_path.write_text(content)
             center.refresh()
             self.assertEqual(center.history.count(),1)
