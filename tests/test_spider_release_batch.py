@@ -76,6 +76,18 @@ class BatchReleaseTests(unittest.TestCase):
         self.assertEqual(self.target.read_text(), 'VALUE = 1\n')
         self.assertEqual(target2.read_text(), 'VALUE = 100\n')
 
+    def test_failure_after_committed_replace_still_rolls_back(self):
+        self.target.write_text('VALUE = 1\n')
+        original_copy = batch.atomic_copy
+        def fail_after_copy(*args, **kwargs):
+            original_copy(*args, **kwargs)
+            raise OSError('simulated exception after replace')
+        with patch.object(batch, 'atomic_copy', side_effect=fail_after_copy):
+            with self.assertRaisesRegex(OSError, 'after replace'):
+                batch.apply([self.entry], self.backup_root,
+                            self.source_root, (), self.true_baseline)
+        self.assertEqual(self.target.read_text(), 'VALUE = 1\n')
+
     def test_known_previous_version_is_backed_up_and_restorable(self):
         self.target.write_text('VALUE = 1\n')
         receipt = batch.apply([self.entry], self.backup_root, self.source_root, (), self.true_baseline)
