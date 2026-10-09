@@ -233,9 +233,17 @@ def apply(items, backup_root, project_root=PROJECT_ROOT,
         print('Only new application sources and launchers were written; no manuscripts, boot or services were restarted.')
         return backup
     except Exception:
-        # Roll back only successful writes from this transaction.
-        subset = [entry for entry in records if Path(entry['target']) in applied]
-        _restore(subset, backup, {str(i.target): i for i in items}, allow_missing=False)
+        # A failure may occur after os.replace committed the current file but
+        # before atomic_copy returned. Inspect all recorded destinations and
+        # restore ONLY those whose hashes match the release's expected bytes.
+        # Leave pre-existing, untouched files alone; stop on unfamiliar edits.
+        touched = []
+        for record in records:
+            target = Path(record['target'])
+            if target.is_file() and safe_path(target) and sha256(target) == record['expected']:
+                touched.append(record)
+        if touched:
+            _restore(touched, backup, {str(i.target): i for i in items})
         raise
 
 
