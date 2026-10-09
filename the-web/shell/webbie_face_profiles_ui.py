@@ -70,7 +70,7 @@ class FaceProfileControls(QWidget):
 
     def refresh_status(self):
         parts = [f'{name}: {count} sample(s)' for name, count in self.profiles.status().items()]
-        self.status.setText('Optional familiar faces | ' + ' | '.join(parts) +
+        self.status.setText((self.profiles.load_error or 'Optional familiar faces') + ' | ' + ' | '.join(parts) +
             ((' | Possible match: ' + self.last_match) if self.last_match else
              ' | Both profiles can stay unconfigured.'))
 
@@ -78,7 +78,7 @@ class FaceProfileControls(QWidget):
         if not self.allowed_callback() or not self.device_callback():
             self.status.setText('Turn the webcam on while Webbie is awake to enroll a face.')
             return
-        if self.worker is not None and self.worker.isRunning():
+        if self.worker is not None:
             self.status.setText('Finish the current camera recognition task first.')
             return
         name = self.person.currentText()
@@ -128,7 +128,7 @@ class FaceProfileControls(QWidget):
     def inspect_frame(self, jpeg):
         if not self.allowed_callback() or not self.profiles.any_enrolled():
             return
-        if self.worker is not None and self.worker.isRunning():
+        if self.worker is not None:
             return
         self.worker = FaceWork('match', frame=jpeg, parent=self)
         self.worker.matched.connect(self.on_matched)
