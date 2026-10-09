@@ -37,6 +37,37 @@ python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py wake
 python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py status
 ```
 
+## Quiet visual sleep, without stopping background work
+
+Owner decision: **Webbie's face stays on screen and looks asleep.** Her
+installed microphone/Whisper transcription can remain running, but the agent
+will ignore ordinary speech while the quiet sleep flag is set. The only
+voice exception is an explicit wake phrase. No conversational reply, no
+follow-up listening window, and no routine spoken check-ins are triggered by
+background speech. Scheduled background service loops remain running.
+
+Exact spoken controls proposed in the agent-only source upgrade:
+- `Goodnight, Webbie` / `Hey Webbie, go to sleep` enters indefinite quiet sleep.
+- `Hey Webbie, wake up` / `Webbie, wake up` returns to conversation.
+- Webbie's local menu and Webbie tab also provide sleep and wake actions.
+
+The floating face **remains present** in the lower-left, dimmed with closed
+eyelids and a subdued `Zzz`. It remains fully click-through and still
+disappears temporarily during fullscreen video. No timer wakes Webbie at 8 AM:
+only an explicit wake action does. The older optional `sleep-tonight`
+command remains for backward compatibility, but it is **not** the default.
+
+**Deployment boundary:** The portrait-only selective add-on installs visual
+behavior, not a modified resident voice agent. A second, reviewed agent update
+must be installed and tested before voice sleep can be called operational on
+the owner's PC. Do not replace the existing customized voice agent blindly.
+
+**Voice security:** Speech recognition alone does not prove who is talking.
+Before treating any spoken wake request as identity-authorized, qualify the
+Cory/Shayna-only speaker verification separately. A television or unrecognized
+voice uttering an exact wake phrase cannot currently be guaranteed to be
+rejected. This quiet sleep mode does not add that missing authentication.
+
 ## Optional OneDrive, no forced login or startup delay
 
 Webbie's existing AI/service always starts **locally**. Signing in to Microsoft
