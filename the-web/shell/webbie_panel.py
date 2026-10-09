@@ -326,6 +326,8 @@ class WebbiePanel(QWidget):
         if not self.camera_allowed or self.face_sleeping:
             return
         if self.camera_worker and self.camera_worker.isRunning():
+            if self.vision_bridge is not None:
+                self.vision_bridge.reply('I am already looking. Please ask again in a moment.')
             return
         device = self.camera_selector.currentData()
         if not device:
