@@ -80,6 +80,35 @@ systemctl --user enable --now webbie-onedrive.timer
 
 No Microsoft login is initiated at install time.
 
+## Selective installation on the already working desktop
+
+The complete The Web desktop **does not need reinstalling** for this add-on.
+From a checkout or extracted source archive of this PR:
+
+```bash
+bash the-web/package/install-webbie-extras.sh --check
+sudo bash the-web/package/install-webbie-extras.sh
+```
+
+This installs the overlay launcher, two portrait files if missing, optional
+OneDrive adapter and timer. It preserves your current Plasma/The Web shell,
+customized Webbie panel, the installed AI agent and private files. GUI buttons
+inside The Web's Webbie tab are additionally available when the combined
+desktop batch is installed; the standalone menu launchers and Konsole actions
+work without that batch. Signing out/in loads the auto-start overlay; it may
+also be started manually in the existing **X11** session. No reboot required.
+
+KDE application menu entries:
+- **Webbie: Connect OneDrive**
+- **Webbie: Sleep Face Tonight**
+- **Webbie: Wake Face**
+
+If `rclone` is missing, OneDrive connection cannot begin until you choose
+to install it. The AI keeps running locally regardless. The cloud
+workspace is a selected-file sync area, not a replacement for her models
+or direct synchronization of private memory. Microsoft OAuth is never
+requested during boot or installation.
+
 ## Acceptance checks on the installed PC
 
 - Test Webbie overlay on both selected X11 sessions.
