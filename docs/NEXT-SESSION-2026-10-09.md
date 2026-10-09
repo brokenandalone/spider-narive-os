@@ -56,6 +56,11 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
    screen capture, network/cloud image upload or automatic wake-up capture.
    **Not installed or enabled on the PC.**
 
+## Latest owner preference
+
+- On October 9 the owner requested **Student** as Webbie's form of address in School/Study, alongside **Writer** in Author Bay.
+- The `upgrades/webbie-author-context` source branch / PR #22 now contains both `study` and `school` mappings, updated default config, brain prompt, and regression tests. This is **source-only** until a separately reviewed agent-specific installation. Keep the older Studio=Justin and Kali Bay=Spider forms of address.
+
 ## Tomorrow: safe sequence (only after user is at their PC)
 
 1. Verify session via `echo "$XDG_SESSION_TYPE"`. Floating face is currently
