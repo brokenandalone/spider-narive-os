@@ -2,15 +2,17 @@
 """Native Author library, chapter editor, autosave, snapshots and canon notebook."""
 import sys
 from pathlib import Path
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDialog,
     QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .store import AuthorStore
+    from .web_features import AuthorToolkit
 else:
     from store import AuthorStore
+    from web_features import AuthorToolkit
 
 
 class AuthorWindow(QMainWindow):
@@ -28,15 +30,21 @@ class AuthorWindow(QMainWindow):
         bar = QHBoxLayout(); layout.addLayout(bar)
         for label, action in [('New book', self.new_book), ('New chapter', self.new_chapter),
                 ('Import text', self.import_text), ('Import library', self.import_bundle), ('Save', self.flush),
-                ('Restore snapshot', self.restore), ('Backup library', self.backup)]:
+                ('Restore snapshot', self.restore), ('Backup library', self.backup), ('Focus', self.toggle_focus)]:
             button = QPushButton(label); button.clicked.connect(action); bar.addWidget(button)
-        split = QSplitter(); layout.addWidget(split)
+            if label == 'Focus': self.focus_button = button
+        split = QSplitter(); self.split = split; layout.addWidget(split)
         self.books = QListWidget(); split.addWidget(self.books)
         self.chapters = QListWidget(); split.addWidget(self.chapters)
         tabs = QTabWidget(); split.addWidget(tabs)
         self.editor = QTextEdit(); self.editor.setAcceptRichText(False)
         self.canon = QTextEdit(); self.canon.setAcceptRichText(False)
         tabs.addTab(self.editor, 'Chapter'); tabs.addTab(self.canon, 'Canon notes')
+        self.toolkit = AuthorToolkit(self.store, self.current_chapter, self.flush, self.editor)
+        self.toolkit.jumpRequested.connect(self.jump_to_search_result)
+        self.toolkit.reviewRequested.connect(self.author_review_requested)
+        self.toolkit.editRequested.connect(self.apply_revised_passage)
+        tabs.addTab(self.toolkit, 'Writing Studio')
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
         self.books.currentItemChanged.connect(self.select_book)
@@ -64,6 +72,7 @@ class AuthorWindow(QMainWindow):
                 self.store.save(self.chapter_id, self.editor.toPlainText())
             if self.book_id is not None:
                 self.store.save_canon(self.book_id, self.canon.toPlainText())
+            self.toolkit.save_current()
             self.status.setText('Saved locally. ' + str(len(self.editor.toPlainText().split())) + ' words.')
             return True
         return self.action(save)
@@ -81,6 +90,7 @@ class AuthorWindow(QMainWindow):
         self.canon.setEnabled(item is not None)
         self.canon.setPlainText(self.store.canon(self.book_id) if item else '')
         self.load_chapters()
+        self.toolkit.set_book(self.book_id)
 
     def load_chapters(self):
         self.chapters.blockSignals(True); self.chapters.clear()
@@ -140,6 +150,101 @@ class AuthorWindow(QMainWindow):
             content = self.action(lambda: self.store.restore(self.chapter_id, versions[labels.index(label)]['id']))
             if content is not False:
                 self.editor.setPlainText(content)
+
+    def toggle_focus(self):
+        focus = self.books.isVisible()
+        self.books.setVisible(not focus)
+        self.chapters.setVisible(not focus)
+        self.focus_button.setText('Exit focus' if focus else 'Focus')
+        self.status.setText('Focus writing mode' if focus else 'Writing desk')
+
+    def author_review_requested(self, text):
+        # Hosting desktop attaches the Webbie review hook. Standalone Author
+        # deliberately never sends writing to an AI or an external service.
+        callback = getattr(self, 'show_webbie_review', None)
+        if callback is None:
+            self.status.setText('Open Author through The Web to review selected text with Webbie.')
+        else:
+            callback(text)
+
+    def apply_revised_passage(self):
+        """Review a pasted Webbie suggestion against exactly selected source.
+
+        No autonomous AI edit. Save is transactional and snapshots prior text.
+        """
+        if self.chapter_id is None or not self.flush():
+            return
+        cursor = self.editor.textCursor()
+        old = cursor.selectedText().replace('\u2029', '\n')
+        if not old.strip():
+            QMessageBox.information(self, 'Reviewed rewrite',
+                                    'Highlight the exact original passage you want to replace.')
+            return
+        proposed, ok = QInputDialog.getMultiLineText(
+            self, 'Reviewed rewrite', 'Paste Webbie’s proposed replacement text:', old
+        )
+        if not ok or proposed == old:
+            return
+        original = self.store.chapter(self.chapter_id)['content']
+        start, end = cursor.selectionStart(), cursor.selectionEnd()
+        if self.editor.toPlainText() != original:
+            QMessageBox.warning(self, 'Revision changed',
+                                'The manuscript has changed. Save and select the passage again.')
+            return
+        if original[start:end] != old:
+            QMessageBox.warning(self, 'Revision conflict',
+                                'Selection no longer matches the saved text. No edits were made.')
+            return
+        confirmation = QMessageBox.question(
+            self, 'Approve manuscript revision',
+            'Replace the selected passage? The previous chapter will remain in revision history.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if confirmation != QMessageBox.Yes:
+            return
+        updated = original[:start] + proposed + original[end:]
+        if self.action(lambda: self.store.save(self.chapter_id, updated)) is False:
+            return
+        self.editor.setPlainText(updated)
+        self.status.setText('Approved revision saved. Prior version preserved in snapshots.')
+
+    def current_chapter(self):
+        if self.chapter_id is None:
+            return None
+        return self.store.chapter(self.chapter_id)
+
+    def webbie_context(self):
+        # Titles only; manuscript, chapter text and private notes stay local.
+        book = next((r for r in self.store.books() if r['id'] == self.book_id), None)
+        selected = self.current_chapter()
+        parts = [book['title'] if book else 'No book selected']
+        if selected is not None:
+            parts.append('Chapter: ' + selected['title'])
+        return ' | '.join(parts)
+
+    def jump_to_search_result(self, hit):
+        if not self.flush():
+            return
+        for index in range(self.books.count()):
+            if self.books.item(index).data(Qt.UserRole) == hit['book_id']:
+                self.books.setCurrentRow(index)
+                break
+        kind = hit['kind']
+        if kind == 'chapter':
+            for index in range(self.chapters.count()):
+                if self.chapters.item(index).data(Qt.UserRole) == hit['item_id']:
+                    self.chapters.setCurrentRow(index)
+                    break
+        elif kind == 'story':
+            for index in range(self.toolkit.story_list.count()):
+                if self.toolkit.story_list.item(index).data(Qt.UserRole) == hit['item_id']:
+                    self.toolkit.story_list.setCurrentRow(index)
+                    break
+        elif kind == 'reference':
+            for index in range(self.toolkit.reference_list.count()):
+                if self.toolkit.reference_list.item(index).data(Qt.UserRole) == hit['item_id']:
+                    self.toolkit.reference_list.setCurrentRow(index)
+                    break
 
     def backup(self):
         if not self.flush():
