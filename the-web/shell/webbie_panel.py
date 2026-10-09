@@ -7,7 +7,7 @@ import socket
 import stat
 
 from PyQt5.QtCore import Qt, QRectF, QThread, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QPainter, QPainterPath, QPixmap
+from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
 from PyQt5.QtWidgets import (QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
                             QLineEdit, QPushButton, QTextEdit, QVBoxLayout, QWidget)
 
@@ -73,6 +73,7 @@ class SpeakingPortrait(QLabel):
         self.closed = QPixmap(str(directory / 'webbie-face-v1.png'))
         self.opened = QPixmap(str(directory / 'webbie-face-speaking-v1.png'))
         self.mouth_opacity = 0
+        self.sleeping = False
         if self.closed.isNull():
             self.setText('WEBBIE')
 
@@ -81,10 +82,44 @@ class SpeakingPortrait(QLabel):
             super().paintEvent(event); return
         painter = QPainter(self); painter.setRenderHint(QPainter.SmoothPixmapTransform)
         painter.drawPixmap(self.rect(), self.closed)
-        if self.mouth_opacity and not self.opened.isNull():
+        if not self.sleeping and self.mouth_opacity and not self.opened.isNull():
             clip = QPainterPath(); clip.addEllipse(QRectF(self.width() * .445, self.height() * .467, self.width() * .151, self.height() * .096))
             painter.setClipPath(clip); painter.setOpacity(self.mouth_opacity)
+
             painter.drawPixmap(self.rect(), self.opened)
+        if self.sleeping:
+            # Keep her actual face visible. Dim the light, close the eyelids,
+            # and make the sleep state unmistakable without replacing her art.
+            size = min(self.width(), self.height())
+            painter.setClipping(False)
+            painter.setOpacity(1.0)
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            painter.fillRect(self.rect(), QColor(19, 11, 47, 67))
+            pen = QPen(QColor(70, 44, 103, 238), max(2.0, size * .024))
+            pen.setCapStyle(Qt.RoundCap)
+            painter.setPen(pen)
+            for left in (.315, .555):
+                eye = QPainterPath()
+                eye.moveTo(self.width() * left, self.height() * .420)
+                eye.cubicTo(self.width() * (left + .032), self.height() * .464,
+                            self.width() * (left + .104), self.height() * .466,
+                            self.width() * (left + .145), self.height() * .420)
+                painter.drawPath(eye)
+            # A tiny moon and gentle 'Zzz' remain readable even if portrait
+            # artwork uses a different crop or face position.
+            painter.setPen(QColor(223, 210, 255, 245))
+            painter.setFont(QFont('Sans Serif', max(12, round(size * .105)), QFont.Bold))
+            painter.drawText(QRectF(size * .67, size * .02, size * .30, size * .23),
+                             Qt.AlignCenter, 'Zzz')
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(27, 18, 52, 210))
+            painter.drawRoundedRect(QRectF(size * .17, size * .815,
+                                           size * .66, size * .146), 10, 10)
+            painter.setPen(QColor(228, 208, 255))
+            painter.setFont(QFont('Sans Serif', max(10, round(size * .073)), QFont.Bold))
+            painter.drawText(QRectF(size * .17, size * .815,
+                                    size * .66, size * .146),
+                             Qt.AlignCenter, 'SLEEPING')
 
 
 class WebbiePanel(QWidget):
@@ -100,6 +135,7 @@ class WebbiePanel(QWidget):
         ''')
         self.runtime = runtime_directory(); self.worker = None; self.pending = False; self.phase = 0; self.mouth_frame = 0
         self.workspace_label = 'The Web'; self.workspace_mode = 'Normal'; self.workspace_summary = ''
+        self.face_sleeping = False
         layout = QVBoxLayout(self)
         header = QHBoxLayout(); layout.addLayout(header)
         self.face = SpeakingPortrait(root)
@@ -131,12 +167,20 @@ class WebbiePanel(QWidget):
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_state); self.timer.start(120)
         self.refresh_state()
 
+    def set_face_sleeping(self, sleeping):
+        self.face_sleeping = bool(sleeping)
+        self.face.sleeping = self.face_sleeping
+        self.face.update()
+        self.refresh_state()
+
     def refresh_state(self):
         state, label = observed_state(self.runtime, self.pending)
+        if self.face_sleeping:
+            label = 'Portrait sleeping · Webbie service remains available'
         self.state_label.setText(label); self.face.setAccessibleDescription(label)
         self.phase += 0.2
         self.glow.setBlurRadius(22 + 10 * math.sin(self.phase) if state in {'thinking', 'speaking'} else 10)
-        if state == 'speaking':
+        if state == 'speaking' and not self.face_sleeping:
             cadence = (0, .45, 1, .65, 0, .35, .8, .2)
             self.face.mouth_opacity = cadence[self.mouth_frame % len(cadence)]; self.mouth_frame += 1
         else:
