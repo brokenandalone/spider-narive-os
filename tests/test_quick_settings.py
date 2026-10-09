@@ -27,7 +27,8 @@ class QuickSettingsTests(unittest.TestCase):
             calls=[]
             answers={'connection':'connected\n','wifi':'enabled\n',
                      'bluetooth':'Controller local\n\tPowered: yes\n',
-                     'brightness':'backlight,sysfs,63,100,63%\n'}
+                     'brightness':'backlight,sysfs,63,100,63%\n',
+                     'microphone':'Volume: 0.82 [MUTED]\n'}
             def fake_read(args):
                 calls.append(args)
                 return answers[next(k for k,v in quick.STATUS_COMMANDS.items() if v==args)]
@@ -36,8 +37,9 @@ class QuickSettingsTests(unittest.TestCase):
             self.assertEqual(info['Wi-Fi radio'],'enabled')
             self.assertEqual(info['Bluetooth'],'On')
             self.assertEqual(info['Brightness'],'63%')
+            self.assertEqual(info['Microphone'],'Muted · 82%')
             self.assertEqual(info['Power'],'78% (Charging)')
-            self.assertEqual(len(calls),4)
+            self.assertEqual(len(calls),5)
             self.assertTrue(all(args in quick.STATUS_COMMANDS.values() for args in calls))
 
     def test_missing_tools_and_battery_are_nonfatal(self):
@@ -46,6 +48,7 @@ class QuickSettingsTests(unittest.TestCase):
                 power_supply=Path(tmp)/'not-present')
             self.assertIn('unavailable',info['Network'].lower())
             self.assertEqual(info['Brightness'],'Unavailable')
+            self.assertIn('Unknown',info['Microphone'])
             self.assertEqual(info['Power'],'Unknown')
 
     def test_settings_launch_uses_exact_program_without_shell(self):
@@ -57,7 +60,7 @@ class QuickSettingsTests(unittest.TestCase):
 
     def test_qt_panel_displays_snapshot_without_changing_device_state(self):
         data={'Network':'connected','Wi-Fi radio':'enabled','Bluetooth':'On',
-              'Power':'No battery','Brightness':'Unavailable'}
+              'Microphone':'Muted · 82%', 'Power':'No battery','Brightness':'Unavailable'}
         with patch.object(quick,'quick_snapshot',return_value=data):
             with patch.object(quick,'open_kde_settings') as launch:
                 panel=quick.QuickSettingsPanel()
@@ -65,6 +68,7 @@ class QuickSettingsTests(unittest.TestCase):
                 APP.processEvents()
                 self.assertIn('connected',panel.status['Network'].text())
                 self.assertIn('No battery',panel.status['Power'].text())
+                self.assertIn('Muted',panel.status['Microphone'].text())
                 launch.assert_not_called()
                 panel.close()
 
