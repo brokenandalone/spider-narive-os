@@ -1,0 +1,107 @@
+"""Non-destructive source tests for the owner-requested single batch installer."""
+import importlib.util
+import os
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+spec = importlib.util.spec_from_file_location('spider_release_batch', ROOT / 'system/release_batch.py')
+batch = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = batch
+spec.loader.exec_module(batch)
+
+
+class BatchReleaseTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.base = Path(self.dir.name)
+        self.source_root = self.base / 'sources'
+        self.target_root = self.base / 'installed'
+        self.backup_root = self.base / 'backups'
+        self.source = self.source_root / 'example.py'
+        self.target = self.target_root / 'example.py'
+        self.source.parent.mkdir(parents=True)
+        self.target.parent.mkdir(parents=True)
+        self.source.write_text('VALUE = 2\n', encoding='utf-8')
+        self.entry = batch.Item(self.source, self.target, uid=os.geteuid(), gid=os.getegid(),
+                                mode=0o644, reference='example.py')
+        self.false_baseline = lambda *args: False
+        self.true_baseline = lambda *args: True
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_unknown_local_customization_blocks_entire_transaction(self):
+        self.target.write_text('MY CUSTOM WEBBIE = 1\n')
+        checks = batch.inspect([self.entry], self.source_root, (), self.false_baseline)
+        self.assertEqual(checks[0][1], 'BLOCKED')
+        with self.assertRaisesRegex(RuntimeError, 'No files were changed'):
+            batch.apply([self.entry], self.backup_root, self.source_root, (), self.false_baseline)
+        self.assertEqual(self.target.read_text(), 'MY CUSTOM WEBBIE = 1\n')
+        self.assertFalse(self.backup_root.exists())
+
+    def test_new_module_installs_and_rolls_back_with_one_manifest(self):
+        receipt = batch.apply([self.entry], self.backup_root, self.source_root, (), self.false_baseline)
+        self.assertIsNotNone(receipt)
+        self.assertEqual(self.target.read_text(), 'VALUE = 2\n')
+        self.assertEqual((receipt / 'manifest.json').stat().st_mode & 0o777, 0o600)
+        batch.rollback([self.entry], receipt, self.backup_root, dry_run=True)
+        self.assertTrue(self.target.exists())
+        batch.rollback([self.entry], receipt, self.backup_root, dry_run=False)
+        self.assertFalse(self.target.exists())
+
+    def test_known_previous_version_is_backed_up_and_restorable(self):
+        self.target.write_text('VALUE = 1\n')
+        receipt = batch.apply([self.entry], self.backup_root, self.source_root, (), self.true_baseline)
+        self.assertEqual(self.target.read_text(), 'VALUE = 2\n')
+        batch.rollback([self.entry], receipt, self.backup_root, dry_run=False)
+        self.assertEqual(self.target.read_text(), 'VALUE = 1\n')
+
+    def test_modified_installed_file_cannot_be_rolled_back_blindly(self):
+        receipt = batch.apply([self.entry], self.backup_root, self.source_root, (), self.false_baseline)
+        self.target.write_text('UNRECOGNIZED = 5\n')
+        with self.assertRaisesRegex(RuntimeError, 'customized after upgrade'):
+            batch.rollback([self.entry], receipt, self.backup_root, dry_run=False)
+        self.assertEqual(self.target.read_text(), 'UNRECOGNIZED = 5\n')
+
+    def test_target_symlink_blocks_preflight(self):
+        outside = self.base / 'private'
+        outside.write_text('PRIVATE')
+        self.target.symlink_to(outside)
+        checks = batch.inspect([self.entry], self.source_root, (), self.false_baseline)
+        self.assertEqual(checks[0][1], 'BLOCKED')
+        self.assertEqual(outside.read_text(), 'PRIVATE')
+
+    def test_bad_python_source_blocks_without_installation(self):
+        self.source.write_text('class Broken(:\n')
+        checks = batch.inspect([self.entry], self.source_root, (), self.false_baseline)
+        self.assertEqual(checks[0][1], 'BLOCKED')
+        self.assertFalse(self.target.exists())
+
+    def test_user_ui_release_catalog_is_unique_and_scoped(self):
+        items = batch.prepare_items(root=ROOT, install=self.base / 'install',
+                                    units=self.base / 'unit',
+                                    home=self.base / 'user', uid=os.geteuid(),
+                                    gid=os.getegid())
+        self.assertEqual(len(items), len({str(i.target) for i in items}))
+        targets = '\n'.join(str(i.target) for i in items)
+        self.assertIn('webbie-onedrive.timer', targets)
+        self.assertIn('webbie-floating-face.desktop', targets)
+        self.assertNotIn('library.sqlite3', targets)
+        self.assertNotIn('grub.cfg', targets)
+        self.assertNotIn('rclone.conf', targets)
+        self.assertNotIn('kali-vg', targets)
+
+    def test_cli_accepts_single_check_flag(self):
+        with patch.object(batch, 'user_info', return_value=(self.base / 'user', 1000, 1000)):
+            with patch.object(batch, 'prepare_items', return_value=[self.entry]):
+                with patch.object(batch, 'inspect', return_value=[(self.entry, 'ADD', 'new')]):
+                    self.assertEqual(batch.main(['--check']), 0)
+                    self.assertEqual(batch.main(['check']), 0)
+
+
+if __name__ == '__main__':
+    unittest.main()
