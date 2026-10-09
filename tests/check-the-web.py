@@ -49,10 +49,15 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     fake=InstalledApp('ardour.desktop',Path('/tmp/Ardour.desktop'),'Ardour','Record','ardour','studio')
     window.installed_apps=[fake];window.start_menu.populate()
     window.start_menu.search.setText('ardour');assert window.start_menu.results.count()==1
-    with patch.object(main,'launch_command',return_value=['gio','launch',str(fake.path)]),patch.object(main.subprocess,'Popen') as process:
+    with patch.object(main,'launch_command',return_value=['gio','launch',str(fake.path)]),patch.object(main.subprocess,'Popen') as process, patch.object(main,'wm_command') as wm:
+        # Exercise real desktop code paths: launching Firefox-like XDG apps must
+        # never turn on KDE Show Desktop and hide the newly opened window.
+        window.desktop_mode=True
         window.open_installed(fake.desktop_id)
+        window.desktop_mode=False
         assert process.call_args.args[0]==['gio','launch',str(fake.path)]
         assert window.current_workspace=='studio'
+        wm.assert_not_called()
     window.open_workspace('deep-forage')
     wallpaper_id=window.wallpaper_catalog.defaults['deep-forage']
     window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))

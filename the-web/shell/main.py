@@ -240,7 +240,8 @@ class TheWeb(QMainWindow):
                 body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1); layout.addWidget(surface, 1)
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
-        if self.desktop_mode: wm_command('-k', 'on')
+        # Workspace navigation must never activate KDE Show Desktop, which hides
+        # normal application windows, including Firefox and the file manager.
         self.raise_(); self.activateWindow()
 
     def open_installed(self, ident):
@@ -306,7 +307,8 @@ class TheWeb(QMainWindow):
         self.set_workspace(workspace)
         try:
             subprocess.Popen([str(x) for x in command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-            if self.desktop_mode: wm_command('-k', 'off')
+            # KWin already stacks normal application windows above the desktop.
+            # Never race the application with a separate Show Desktop toggle.
             self.status.setText(message)
         except OSError as error: self.status.setText(str(error))
 
