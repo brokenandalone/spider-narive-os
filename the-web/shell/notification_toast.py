@@ -29,8 +29,15 @@ class NotificationToast(QWidget):
         self.setWindowTitle('The Web Notification')
         self.setStyleSheet('QWidget{background:#241632;color:#f6eaff;border:1px solid #8147b7;border-radius:9px;} QLabel{border:0;}')
         layout=QVBoxLayout(self)
-        self.title=QLabel();layout.addWidget(self.title)
-        self.message=QLabel();self.message.setWordWrap(True);layout.addWidget(self.message)
+        self.title=QLabel()
+        self.title.setTextFormat(Qt.PlainText)
+        layout.addWidget(self.title)
+        self.message=QLabel()
+        # Notification content is supplied by other processes. Display as
+        # literal text, never interpret HTML, links or rich-text markup.
+        self.message.setTextFormat(Qt.PlainText)
+        self.message.setWordWrap(True)
+        layout.addWidget(self.message)
         dismiss=QPushButton('Dismiss');dismiss.clicked.connect(self.hide);layout.addWidget(dismiss)
         self.setFixedWidth(330)
         self.poller=QTimer(self);self.poller.timeout.connect(self.refresh)
