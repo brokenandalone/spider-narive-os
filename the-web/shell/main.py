@@ -188,7 +188,7 @@ class TheWeb(QMainWindow):
         self.installed_apps = discover_apps(desktops='TheWeb:KDE')
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(STYLE)
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-        self.build_ui(); self.setup_webbie_assistant(); self.webbie_overlay = WebbieOverlay(SPIDER_ROOT); self.face_button.setText('Wake Webbie face' if self.webbie_overlay.face_sleeping else 'Sleep Webbie face'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
+        self.build_ui(); self.setup_webbie_assistant(); self.webbie_overlay = WebbieOverlay(SPIDER_ROOT); self.webbie_assistant.set_face_sleeping(self.webbie_overlay.face_sleeping); self.face_button.setText('Wake Webbie face' if self.webbie_overlay.face_sleeping else 'Sleep Webbie face'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
@@ -270,6 +270,7 @@ class TheWeb(QMainWindow):
 
     def toggle_webbie_face(self):
         self.webbie_overlay.sleep(not self.webbie_overlay.face_sleeping)
+        self.webbie_assistant.set_face_sleeping(self.webbie_overlay.face_sleeping)
         self.face_button.setText('Wake Webbie face' if self.webbie_overlay.face_sleeping else 'Sleep Webbie face')
 
     def show_author_review(self, passage):
