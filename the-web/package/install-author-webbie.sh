@@ -145,8 +145,22 @@ for relative in "${managed[@]}"; do
     mv -f -- "$staging" "$installed"
     echo "Installed: $relative"
 done
+# Write the rollback record only after all managed code copies succeeded.
+# Names are a fixed, audited list; never include user document paths.
+manifest="$backup/rollback-manifest.tsv"
+for relative in "${managed[@]}"; do
+    if [[ -f "$backup/$relative" ]]; then
+        action=existing
+    else
+        action=new
+    fi
+    sha="$(sha256sum -- "$root/$relative" | cut -d' ' -f1)"
+    printf '%s\t%s\t%s\n' "$relative" "$action" "$sha" >> "$manifest"
+done
+chmod 0600 "$manifest"
 echo
 echo "Author/Webbie code upgraded. Safe backup: $backup"
+echo "To inspect recovery: sudo bash $source_root/the-web/package/rollback-author-webbie.sh --check $backup"
 echo 'The active desktop stays running. Save your work and log out later to load the upgraded UI.'
 echo 'Webcam vision uses locally installed Ollama gemma3:4b. The microphone configuration is unchanged.'
 echo 'Private manuscripts, Webbie voice service, photos, documents and original DOCX files were untouched.'
