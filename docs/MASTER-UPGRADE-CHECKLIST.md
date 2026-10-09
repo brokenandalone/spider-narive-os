@@ -126,7 +126,7 @@
 ## 4. Author — private manuscripts, library and canon
 
 - [x] Prepared a private import with 20 editable library entries, Broken City front matter + chapters 1–16, and 23 original DOCX documents; ZIP extracted on owner PC.
-- [x] Confirm private Author library import **at database level**: 20 books, 39 chapters, 20 imported fingerprints, Oct 9 audit. No repeat import needed.
+- [x] **Author Bay library import complete and owner-confirmed:** content is imported, opens in Author Bay, and Oct 9 database audit found 20 books, 39 chapters and 20 imported fingerprints. **Never repeat import, recreate library, or overwrite current chapters.** Backup verification and original DOCX preservation remain separate tasks.
 - [ ] Open a representative book, confirm all expected content including companion materials and canon, and test safe edits/version history without overwriting existing chapters.
 - [ ] Preserve original formatted DOCX manuscripts under an Author originals directory, non-destructively, and confirm a real independent backup.
 - [ ] Verify autosave, snapshots, chapter version history, import/export, offline persistence, safe closure and recovery after abrupt restart.
