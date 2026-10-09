@@ -65,6 +65,34 @@ class OwnerAuditTests(unittest.TestCase):
             self.assertEqual(command.call_args_list[1].args[0],
                              ['podman', 'inspect', '--format', '{{.State.Status}}', 'kali-bay'])
 
+    def test_extracted_nested_docx_are_counted_separately(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            originals = root / 'Downloads/Spider-Author-Import/Originals'
+            (originals / 'companion').mkdir(parents=True)
+            (originals / 'chapter.docx').write_bytes(b'PK')
+            (originals / 'companion' / 'canon.docx').write_bytes(b'PK')
+            (originals / 'companion' / 'note.txt').write_text('private')
+            self.assertEqual(audit.count_originals(originals), 1)
+            self.assertEqual(audit.count_originals(originals, recursive=True), 2)
+            result = audit.audit(root, root / 'installed', root / 'media', root / 'sys', False)
+            self.assertEqual(result['content']['originalDocxCount'], None)
+            self.assertEqual(result['content']['extractedOriginalDocxCount'], 2)
+            self.assertNotIn('canon.docx', json.dumps(result))
+            self.assertNotIn('chapter.docx', json.dumps(result))
+
+    def test_bios_mode_does_not_assume_missing_efi_is_a_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(audit.boot_mode(root), 'unknown')
+            (root / 'sys/firmware').mkdir(parents=True)
+            self.assertEqual(audit.boot_mode(root), 'Legacy BIOS')
+            result = audit.audit(root / 'home', root / 'installed',
+                                 root / 'media', root, False)
+            self.assertIn('normal for legacy BIOS', result['boot']['efiLoaderNote'])
+            (root / 'sys/firmware/efi').mkdir()
+            self.assertEqual(audit.boot_mode(root), 'UEFI')
+
     def test_read_only_boot_branding_detection(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
