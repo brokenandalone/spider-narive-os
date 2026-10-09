@@ -43,6 +43,20 @@ class ExternalTrayTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 status_tray.split_item(value)
 
+    def test_tray_metadata_renders_names_and_menu_capabilities(self):
+        detail={'id':'org.example.App/StatusNotifierItem','service':'org.example.App',
+                'title':'My Background App','status':'Active',
+                'icon_name':'application-icon','menu':True}
+        with patch('tray_panel.get_status_items',return_value=[detail['id']]), \
+             patch('tray_panel.get_item_details',return_value=detail):
+            panel=TrayPanel()
+            panel.worker.wait(3000)
+            APP.processEvents()
+            self.assertEqual(panel.list.count(),1)
+            self.assertIn('My Background App',panel.list.item(0).text())
+            self.assertEqual(panel.items[0]['icon_name'],'application-icon')
+            panel.close()
+
     def test_tray_panel_lists_background_apps(self):
         with patch('tray_panel.get_status_items',return_value=[]):
             panel=TrayPanel()
