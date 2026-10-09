@@ -6,6 +6,10 @@ imports web-account data nor sends manuscripts to an external service.
 import difflib
 from pathlib import Path
 from PyQt5.QtCore import Qt, pyqtSignal
+if __package__:
+    from .speech import LocalReader
+else:
+    from speech import LocalReader
 from PyQt5.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QTabWidget, QTextEdit,
@@ -15,6 +19,7 @@ from PyQt5.QtWidgets import (
 
 class AuthorToolkit(QWidget):
     jumpRequested = pyqtSignal(dict)
+    reviewRequested = pyqtSignal(str)
 
     def __init__(self, store, current_chapter, save_editor=None):
         super().__init__()
@@ -23,6 +28,8 @@ class AuthorToolkit(QWidget):
         self.save_editor = save_editor
         self.book_id = self.story_id = self.reference_id = None
         self.story_dirty = self.reference_dirty = False
+        self.reader = LocalReader(self)
+        self.reader.changed.connect(self.read_status)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel('BROKEN WORLD  /  Writing Desk'))
         tabs = QTabWidget(); layout.addWidget(tabs)
@@ -75,6 +82,17 @@ class AuthorToolkit(QWidget):
         tabs.addTab(references, 'Companion Library')
         tools = QWidget(); t = QVBoxLayout(tools)
         t.addWidget(QLabel('Exports and revision comparisons stay on your computer.'))
+        self.read_button = QPushButton('Read active chapter aloud (local voice)')
+        self.read_button.clicked.connect(self.read_aloud)
+        t.addWidget(self.read_button)
+        self.stop_button = QPushButton('Stop reading')
+        self.stop_button.clicked.connect(self.reader.stop)
+        t.addWidget(self.stop_button)
+        self.read_label = QLabel('Read aloud runs locally and can be stopped.')
+        t.addWidget(self.read_label)
+        selected = QPushButton('Review selected passage with Webbie (preview first)')
+        selected.clicked.connect(self.review_selection)
+        t.addWidget(selected)
         self.stats = QLabel('No project selected'); t.addWidget(self.stats)
         export = QPushButton('Export current book to DOCX'); export.clicked.connect(self.export_docx)
         t.addWidget(export)
@@ -222,6 +240,37 @@ class AuthorToolkit(QWidget):
         new = chapter['content'].splitlines(keepends=True)
         diff = difflib.unified_diff(old, new, fromfile='Earlier version', tofile='Current version')
         self.compare_result.setPlainText(''.join(diff) or 'No text changes.')
+
+    def read_status(self, message):
+        self.read_label.setText(message)
+
+    def read_aloud(self):
+        if self.save_editor is not None and not self.save_editor(): return
+        chapter = self.current_chapter()
+        if chapter is None: return
+        try:
+            self.reader.start(chapter['content'])
+        except (OSError, RuntimeError, ValueError) as exc:
+            QMessageBox.warning(self, 'Read aloud', str(exc))
+
+    def review_selection(self):
+        # The user must explicitly click this button and then press Send
+        # in Webbie's sidebar. Never automatically transmit chapter text.
+        editor = getattr(self.parent(), 'editor', None)
+        chapter = self.current_chapter()
+        title = chapter['title'] if chapter is not None else 'Untitled'
+        selection = editor.textCursor().selectedText().replace('\u2029', '\n') if editor else ''
+        selection = selection.strip()
+        if not selection:
+            QMessageBox.information(self, 'Webbie review', 'Highlight a passage in the chapter first.')
+            return
+        if len(selection) > 4000:
+            QMessageBox.warning(self, 'Webbie review', 'Select at most 4,000 characters at a time.')
+            return
+        self.reviewRequested.emit(
+            'Writer requests a continuity and prose review for "' + title +
+            '". Suggest improvements but do not edit the manuscript.\n\n' + selection
+        )
 
     def export_docx(self):
         if self.book_id is None: return
