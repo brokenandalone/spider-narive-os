@@ -32,6 +32,7 @@ sys.path.insert(0, str(SPIDER_ROOT / 'the-web/overlay'))
 from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 from media_panel import MediaPanel
 from volume_panel import VolumePanel
+from quick_settings import QuickSettingsPanel
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
 from tray_panel import TrayPanel
@@ -134,6 +135,7 @@ class Taskbar(QWidget):
         layout.addWidget(button('The Web', shell.show_desktop))
         webbie = button('Webbie', shell.open_webbie); webbie.setIcon(QIcon(str(SPIDER_ROOT / 'branding/webbie/webbie-face-v1.png'))); layout.addWidget(webbie)
         self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
+        layout.addWidget(button('Quick', shell.toggle_quick_settings))
         layout.addWidget(button('Volume', shell.toggle_volume_panel))
         layout.addWidget(button('Alerts', shell.toggle_notifications))
         layout.addWidget(button('Tray', shell.toggle_tray))
@@ -524,6 +526,20 @@ class TheWeb(QMainWindow):
             panel.refresh()
             panel.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
             panel.resize(470, 360)
+            panel.show()
+            panel.raise_()
+
+    def toggle_quick_settings(self):
+        panel=getattr(self, 'quick_settings_panel', None)
+        if panel is None:
+            self.quick_settings_panel=QuickSettingsPanel(self)
+            panel=self.quick_settings_panel
+        if panel.isVisible():
+            panel.hide()
+        else:
+            panel.refresh()
+            panel.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
+            panel.resize(410,320)
             panel.show()
             panel.raise_()
 
