@@ -109,6 +109,34 @@ def kali_snapshot():
     } else 'status unavailable'
 
 
+def boot_branding_snapshot(system):
+    """Inspect likely visible branding without attempting to edit or verify boot."""
+    system = Path(system)
+    grub_dropin = system / 'etc/default/grub.d/99-spider-os.cfg'
+    plymouth_active = system / 'usr/share/plymouth/themes/default.plymouth'
+    sddm = system / 'etc/sddm.conf.d/spider-os.conf'
+    configured = 'not found'
+    if grub_dropin.is_file():
+        try:
+            configured = 'Spider OS' if 'Spider OS' in grub_dropin.read_text(errors='replace')[:16384] else 'unknown branding'
+        except OSError:
+            configured = 'unavailable'
+    theme = 'not found'
+    if plymouth_active.is_symlink():
+        try:
+            link = os.readlink(plymouth_active)
+            theme = 'Spider OS link' if 'spider-os' in link.lower() else 'other theme link'
+        except OSError:
+            theme = 'unavailable'
+    elif plymouth_active.is_file():
+        theme = 'file present; theme selection unknown'
+    return {'grubSpiderBranding': configured,
+            'plymouthSpiderTheme': file_state(system / 'usr/share/plymouth/themes/spider-os/spider-os.plymouth'),
+            'activePlymouthLink': theme,
+            'spiderLoginTheme': file_state(sddm),
+            'note': 'Configured branding does not prove the visible startup screen; no boot changes made.'}
+
+
 def receipt_state(installed):
     path = Path(installed) / 'the-web/install-receipt.json'
     if file_state(path) != 'present':
@@ -171,7 +199,7 @@ def audit(home=None, installed='/usr/local/lib/spider-os', media='/opt/spider-me
         'boot': {
             'grubConfiguration': file_state(system / 'boot/grub/grub.cfg'),
             'spiderRootEfiLoader': file_state(system / 'boot/efi/EFI/SpiderRoot/grubx64.efi'),
-            'note': 'Inventory only: does not verify boot integrity or change GRUB, encryption or initramfs.',
+            **boot_branding_snapshot(system),
         },
         'limitations': [
             'An installed component may still have runtime bugs.',
