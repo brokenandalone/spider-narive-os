@@ -25,6 +25,8 @@ managed=(
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py
   the-web/shell/webbie_camera.py
+  the-web/shell/webbie_faces.py
+  the-web/shell/webbie_face_profiles_ui.py
 )
 if [[ $mode == --apply && $EUID -ne 0 ]]; then
     echo 'Use sudo bash ... --apply from your normal Spider OS user.' >&2
