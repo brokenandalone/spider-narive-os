@@ -33,6 +33,7 @@ from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 from media_panel import MediaPanel
 from volume_panel import VolumePanel
 from notification_center import NotificationCenter
+from tray_panel import TrayPanel
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
 STYLE = '''
@@ -134,6 +135,7 @@ class Taskbar(QWidget):
         self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
         layout.addWidget(button('Volume', shell.toggle_volume_panel))
         layout.addWidget(button('Alerts', shell.toggle_notifications))
+        layout.addWidget(button('Tray', shell.toggle_tray))
         layout.addWidget(button('Audio', shell.open_audio))
         layout.addWidget(button('Lock', shell.lock_session))
         self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
@@ -482,6 +484,19 @@ class TheWeb(QMainWindow):
     def open_author(self): self.open_workspace('author')
     def open_study(self): self.open_workspace('study')
     def open_webbie(self): self.toggle_webbie_assistant()
+
+    def toggle_tray(self):
+        panel=getattr(self,'tray_panel',None)
+        if panel is None:
+            panel=TrayPanel(self)
+            self.tray_panel=panel
+        if panel.isVisible(): panel.hide()
+        else:
+            panel.refresh()
+            panel.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
+            panel.resize(350,300)
+            panel.show()
+            panel.raise_()
 
     def toggle_notifications(self):
         panel = getattr(self, 'notification_center', None)
