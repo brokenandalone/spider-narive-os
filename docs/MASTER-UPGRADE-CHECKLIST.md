@@ -254,6 +254,17 @@
 - [ ] Test Author database content/import/history/exports and file restore, Studio recording/app tools, Media playback/radio/DJ, Kali Bay/Purple and Guardian/Vault backups.
 - [ ] Retain current backups until tests and a sample rollback both pass, then mark each subsystem **verified on installed PC** separately.
 
+## Mandatory post-install walkthrough and owner training
+
+**Owner requirement added October 9, 2026:** when the upgrades are **actually installed and accepted** on the Dell, give a complete, sequential how-to and setup/control tutorial for **every new feature**. This comes after the guarded one-batch installation and real-machine acceptance, not after source CI. See [installation policy](INSTALL-RELEASE-POLICY.md#required-post-install-owner-walkthrough).
+
+- [ ] Create the release-specific **installed-feature inventory** from the exact manifest and real desktop acceptance results. Identify what works, what is deferred and what requires optional login or consent.
+- [ ] Walk through normal desktop use first: Start, open/close/minimize/maximize windows, tabs, taskbar, notifications/tray, Quick Settings, volume/microphone, KDE/GTK appearance and accessibility, file/folder shortcuts, lock/logout, backups and rollback.
+- [ ] Walk through Webbie completely: wake/sleep, voice and text, workspaces/names, animated face, permissions for room camera and any future screen sharing, optional owner/Shayna profiles, background jobs and privacy. Do **not** assert speaker or face authentication before it is truly implemented and tested.
+- [ ] Walk through Author Bay, Study/School, Studio, Forage/Deep Forage, Kali Bay, Media Center/AI DJ, Recovery, System and any newly deployed tools with concrete tasks and exact verified UI labels.
+- [ ] For **each** feature provide first-time setup, navigation, daily operations, customization, how to turn it off/reset, safety/privacy choices and troubleshooting or recovery. Guide owner-performed consent, passwords and OneDrive authentication only when the owner chooses them.
+- [ ] Save and share a **POST-INSTALL-FEATURE-GUIDE.md** based on the final installed build, then mark each item demonstrated or deferred with the owner before considering the installation handoff complete.
+
 ## Key GitHub references
 
 - Current desktop: https://github.com/brokenandalone/spider-narive-os/pull/11
