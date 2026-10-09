@@ -31,6 +31,7 @@ from webbie_panel import WebbiePanel
 sys.path.insert(0, str(SPIDER_ROOT / 'the-web/overlay'))
 from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 from media_panel import MediaPanel
+from volume_panel import VolumePanel
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
 STYLE = '''
@@ -131,6 +132,7 @@ class Taskbar(QWidget):
         webbie = button('Webbie', shell.open_webbie); webbie.setIcon(QIcon(str(SPIDER_ROOT / 'branding/webbie/webbie-face-v1.png'))); layout.addWidget(webbie)
         self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
         layout.addWidget(button('Lock', shell.lock_session))
+        layout.addWidget(button('Volume', shell.toggle_volume_panel))
         layout.addWidget(button('Audio', shell.open_audio))
         self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(2000)
@@ -478,6 +480,19 @@ class TheWeb(QMainWindow):
     def open_author(self): self.open_workspace('author')
     def open_study(self): self.open_workspace('study')
     def open_webbie(self): self.toggle_webbie_assistant()
+
+    def toggle_volume_panel(self):
+        panel = getattr(self, 'quick_volume', None)
+        if panel is None:
+            self.quick_volume = VolumePanel(self)
+            panel = self.quick_volume
+        if panel.isVisible():
+            panel.hide()
+        else:
+            panel.refresh()
+            panel.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
+            panel.show()
+            panel.raise_()
 
     def open_audio(self):
         self.open_workspace('system')
