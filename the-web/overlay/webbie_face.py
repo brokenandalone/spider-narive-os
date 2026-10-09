@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 from PyQt5.QtCore import Qt, QRectF, QTimer
-from PyQt5.QtGui import QColor, QPainter, QPainterPath, QPixmap
+from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
 from PyQt5.QtWidgets import QApplication, QWidget
 
 ROOT = Path('/usr/local/lib/spider-os')
@@ -145,6 +145,7 @@ class WebbieOverlay(QWidget):
         self.full_screen_check = full_screen_check
         self.runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'spider-os'
         self.phase = 0
+        self.sleeping = False
         self.allowed = False
         self.move_corner()
         self.timer = QTimer(self)
@@ -167,8 +168,10 @@ class WebbieOverlay(QWidget):
 
     def refresh(self):
         self.move_corner()
-        # Refuse to cover fullscreen content; sleep never stops the resident AI.
-        visible = not asleep(self.sleep_path) and self.full_screen_check() is False
+        # Sleep keeps her face visible; fullscreen hides it. Voice only
+        # accepts an explicit wake phrase, and background work continues.
+        self.sleeping = asleep(self.sleep_path)
+        visible = self.full_screen_check() is False
         if not visible:
             self.allowed = False
             self.hide()
@@ -195,13 +198,32 @@ class WebbieOverlay(QWidget):
         circle.addEllipse(QRectF(7, 7, SIZE - 14, SIZE - 14))
         painter.setClipPath(circle)
         painter.drawPixmap(self.rect(), self.closed)
-        if (self.runtime / 'webbie-speaking').is_file() and not self.speaking.isNull():
+        if not self.sleeping and (self.runtime / 'webbie-speaking').is_file() and not self.speaking.isNull():
             # Blend mouth only; do not flash a second full portrait.
             mouth = QPainterPath()
             mouth.addEllipse(QRectF(SIZE * .445, SIZE * .467, SIZE * .151, SIZE * .096))
             painter.setClipPath(mouth)
             painter.setOpacity(.53 * SPEECH_FRAMES[self.phase % len(SPEECH_FRAMES)])
             painter.drawPixmap(self.rect(), self.speaking)
+        if self.sleeping:
+            # Keep her face in view, with clearly closed eyes and subdued glow.
+            painter.setClipping(False)
+            painter.setOpacity(.93)
+            painter.fillRect(self.rect(), QColor(22, 12, 48, 76))
+            pen = QPen(QColor(91, 55, 132, 228), 4)
+            pen.setCapStyle(Qt.RoundCap)
+            painter.setPen(pen)
+            for left in (.31, .56):
+                eyelid = QPainterPath()
+                eyelid.moveTo(SIZE * left, SIZE * .425)
+                eyelid.cubicTo(SIZE * (left + .035), SIZE * .468,
+                               SIZE * (left + .105), SIZE * .468,
+                               SIZE * (left + .15), SIZE * .425)
+                painter.drawPath(eyelid)
+            painter.setPen(QColor(230, 210, 255, 235))
+            painter.setFont(QFont('Sans Serif', 18, QFont.Bold))
+            painter.drawText(self.rect().adjusted(112, 0, -4, -132),
+                             Qt.AlignCenter, 'Zzz')
 
 
 def main(argv=None):
