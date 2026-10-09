@@ -151,11 +151,18 @@ def connect():
     print('OneDrive configuration saved. Workspace folder:', FOLDER)
     print('Cloud access is verified by an actual background copy, not config alone.')
     print('Background sync is optional and never blocks Webbie.')
-    # Triggering a timer asynchronously never makes sign-in wait for the cloud.
+    # Only after explicit Microsoft sign-in: enable a user-level repeating
+    # timer without awaiting network or making Webbie depend on it.
     if shutil.which('systemctl'):
-        subprocess.Popen(['systemctl', '--user', 'start', '--no-block',
-                          'webbie-onedrive.service'], stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL)
+        try:
+            subprocess.Popen(['systemctl', '--user', 'enable', '--now',
+                              'webbie-onedrive.timer'],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL,
+                             stdin=subprocess.DEVNULL,
+                             start_new_session=True)
+        except OSError:
+            print('OneDrive configured; background timer can be enabled later.')
     return 0
 
 

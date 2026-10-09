@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / 'the-web/shell'))
 from PyQt5.QtCore import QTimer, QEventLoop
 from PyQt5.QtWidgets import QApplication
 from webbie_panel import WebbiePanel, observed_state, request_reply
+from webbie_overlay import WebbieOverlay
 from desktop import close_window
 
 APP = QApplication.instance() or QApplication([])
@@ -35,6 +36,51 @@ class PortraitTests(unittest.TestCase):
             self.assertEqual(panel.face.mouth_opacity, 0)
             self.assertEqual(observed_state(panel.runtime)[0], 'offline')
             panel.close()
+
+    def test_sleeping_avatar_stays_visible_and_obviously_asleep(self):
+        # Real face image remains visible and click-through; close-eye
+        # treatment and the SLEEPING label render in sleeping mode.
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.dict(os.environ, {'XDG_CONFIG_HOME': folder}), patch('webbie_overlay.fullscreen_active', return_value=False):
+                avatar = WebbieOverlay(ROOT)
+                APP.processEvents()
+                avatar.sleep(True)
+                APP.processEvents()
+                self.assertTrue(avatar.isVisible(), 'sleep should not hide Webbie')
+                self.assertTrue(avatar.face_sleeping)
+                self.assertTrue(avatar.portrait.sleeping)
+                self.assertEqual(avatar.portrait.mouth_opacity, 0)
+                self.assertNotEqual(avatar.portrait.grab().toImage().pixelColor(80, 80), avatar.portrait.closed.toImage().pixelColor(80, 80))
+                avatar.stop()
+                reopened = WebbieOverlay(ROOT)
+                self.assertTrue(reopened.face_sleeping, 'sleep persists through desktop restart')
+                self.assertTrue(reopened.isVisible())
+                reopened.sleep(False)
+                self.assertFalse(reopened.portrait.sleeping)
+                reopened.stop()
+
+    def test_fullscreen_hides_asleep_avatar_only_during_playback(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.dict(os.environ, {'XDG_CONFIG_HOME': folder}), patch('webbie_overlay.fullscreen_active', return_value=False):
+                avatar = WebbieOverlay(ROOT)
+                avatar.sleep(True)
+                self.assertTrue(avatar.isVisible())
+                with patch('webbie_overlay.fullscreen_active', return_value=True):
+                    avatar.refresh()
+                    self.assertFalse(avatar.isVisible())
+                avatar.refresh()
+                self.assertTrue(avatar.isVisible())
+                avatar.stop()
+
+    def test_shared_panel_follows_same_sleep_visual_without_blocking_chat(self):
+        panel = WebbiePanel(ROOT)
+        panel.timer.stop()
+        panel.set_face_sleeping(True)
+        self.assertTrue(panel.face.sleeping)
+        self.assertIn('Portrait sleeping', panel.state_label.text())
+        panel.set_face_sleeping(False)
+        self.assertFalse(panel.face.sleeping)
+        panel.close()
 
     def test_slow_reply_keeps_event_loop_and_safe_close(self):
         release = threading.Event(); ticks = []

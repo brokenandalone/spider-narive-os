@@ -38,6 +38,7 @@ from brain import respond
 from tts import speak
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
+from vision_query import visual_question, ask_vision
 
 
 CONFIG_FILE = (
@@ -509,16 +510,19 @@ def handle_command(command, voice=False):
         last_input="voice" if voice else "text",
     )
 
-    built_in = handle_builtin(command)
-
-    if built_in:
-        reply = built_in
-
+    # Speech-triggered camera questions work only with consent granted in
+    # The Web GUI. They cannot enable the webcam or bypass quiet sleep.
+    if voice and visual_question(command):
+        reply = ask_vision(command)
     else:
-        reply = respond(
-            command,
-            context_name=current_name(),
-        )
+        built_in = handle_builtin(command)
+        if built_in:
+            reply = built_in
+        else:
+            reply = respond(
+                command,
+                context_name=current_name(),
+            )
 
     if voice:
         say(reply)
