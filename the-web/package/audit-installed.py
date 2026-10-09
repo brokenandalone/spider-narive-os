@@ -71,14 +71,29 @@ def readonly_counts(database, tables):
         return {'status': 'unavailable (locked, corrupt or unsupported)', 'counts': {}}
 
 
-def count_originals(directory):
-    """Count only regular DOCX, do not read content or return private filenames."""
+def count_originals(directory, recursive=False):
+    """Count regular DOCX only, not names or text. A bounded optional tree scan."""
+    folder = Path(directory)
+    if not folder.is_dir() or folder.is_symlink():
+        return None
     try:
-        return sum(1 for entry in Path(directory).iterdir()
-                   if entry.is_file() and not entry.is_symlink()
-                   and entry.suffix.lower() == '.docx')
+        candidates = folder.rglob('*.docx') if recursive else folder.iterdir()
+        count = 0
+        for number, entry in enumerate(candidates):
+            if number >= 4000: return None  # Incomplete count is not trustworthy.
+            if entry.is_file() and not entry.is_symlink() and entry.suffix.lower() == '.docx':
+                count += 1
+        return count
     except OSError:
         return None
+
+
+def boot_mode(system):
+    """Identify firmware mode before interpreting absence of an EFI loader."""
+    efi = Path(system) / 'sys/firmware/efi'
+    if efi.is_dir(): return 'UEFI'
+    if (Path(system) / 'sys/firmware').is_dir(): return 'Legacy BIOS'
+    return 'unknown'
 
 
 def services_snapshot():
@@ -182,6 +197,7 @@ def audit(home=None, installed='/usr/local/lib/spider-os', media='/opt/spider-me
             'authorDatabase': readonly_counts(author / 'library.sqlite3',
                                                ('books', 'chapters', 'snapshots', 'imported_sources')),
             'originalDocxCount': count_originals(original),
+            'extractedOriginalDocxCount': count_originals(extraction.parent / 'Originals', recursive=True),
             'extractedBrokenWorldBundle': file_state(extraction),
             'schoolDatabase': readonly_counts(home / '.local/share/spider-os/study/study.db',
                                               ('courses', 'assignments')),
@@ -197,14 +213,20 @@ def audit(home=None, installed='/usr/local/lib/spider-os', media='/opt/spider-me
             'webbieAgent': file_state(installed / 'webbie/agent/webbie.py'),
         },
         'boot': {
+            'firmwareMode': boot_mode(system),
             'grubConfiguration': file_state(system / 'boot/grub/grub.cfg'),
             'spiderRootEfiLoader': file_state(system / 'boot/efi/EFI/SpiderRoot/grubx64.efi'),
+            'efiLoaderNote': ('A missing EFI loader is normal for legacy BIOS boot.'
+                              if boot_mode(system) == 'Legacy BIOS' else
+                              'File presence alone does not prove the EFI loader is in use; '
+                              'an unmounted EFI partition may appear empty.'),
             **boot_branding_snapshot(system),
         },
         'limitations': [
             'An installed component may still have runtime bugs.',
             'SQLite uses an immutable read-only view; counts can lag uncheckpointed writes.',
             'Only known workspace paths are checked; missing paths do not imply lost files.',
+            'DOCX counts distinguish installed Author originals from the extracted import package.',
             'No private text, titles, original filenames or audio are read into the report.',
         ],
     }
