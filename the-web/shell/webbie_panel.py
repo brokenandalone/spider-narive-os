@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
                             QLineEdit, QPushButton, QTextEdit, QVBoxLayout, QWidget, QComboBox)
 from webbie_camera import camera_devices, capture_jpeg, describe_frame
 from webbie_face_profiles_ui import FaceProfileControls
+from webbie_vision_bridge import VisionBridge
 
 
 def runtime_directory():
@@ -165,6 +166,7 @@ class WebbiePanel(QWidget):
         self.workspace_label = 'The Web'; self.workspace_mode = 'Normal'; self.workspace_summary = ''
         self.face_sleeping = False
         self.camera_worker = None
+        self.vision_bridge = None
         self.camera_allowed = False
         self.camera_continuous = False
         self.camera_summary = ''
@@ -212,6 +214,9 @@ class WebbiePanel(QWidget):
         self.camera_state = QLabel('CAMERA OFF  |  Audio remains on its existing webcam mic')
         self.camera_state.setWordWrap(True)
         layout.addWidget(self.camera_state)
+        self.camera_voice_tip = QLabel('With camera on: Hey Webbie, what do you see?')
+        self.camera_voice_tip.setWordWrap(True)
+        layout.addWidget(self.camera_voice_tip)
         self.camera_preview = QLabel('Camera preview appears here after Look now.')
         self.camera_preview.setMinimumHeight(110)
         self.camera_preview.setMaximumHeight(160)
@@ -263,6 +268,16 @@ class WebbiePanel(QWidget):
         if not self.camera_selector.currentData():
             self.camera_state.setText('CAMERA OFF  |  No webcam detected.')
             return
+        # A listener exists ONLY during explicit owner permission. A spoken
+        # LOOK request can take one frame, but can never enable the camera.
+        try:
+            listener = VisionBridge(parent=self)
+            listener.lookRequested.connect(self.look_now)
+            listener.activate()
+        except (OSError, RuntimeError, ValueError) as error:
+            self.camera_state.setText('CAMERA OFF  |  Voice vision unavailable: ' + str(error))
+            return
+        self.vision_bridge = listener
         self.camera_allowed = True
         self.camera_selector.setEnabled(False)
         self.camera_toggle.setText('Turn camera off')
@@ -275,6 +290,10 @@ class WebbiePanel(QWidget):
         self.camera_continuous = False
         self.camera_allowed = False
         self.camera_timer.stop()
+        if self.vision_bridge is not None:
+            self.vision_bridge.deactivate()
+            self.vision_bridge.deleteLater()
+            self.vision_bridge = None
         if self.camera_worker is not None:
             self.camera_worker.requestInterruption()
         self.camera_summary = ''
@@ -335,6 +354,8 @@ class WebbiePanel(QWidget):
             return
         self.camera_summary = description[:3000]
         self.camera_observation.setPlainText(self.camera_summary)
+        if self.vision_bridge is not None:
+            self.vision_bridge.reply(self.camera_summary)
         self.camera_state.setText(
             'CAMERA ACTIVE  |  Watching locally' if self.camera_continuous
             else 'CAMERA ON  |  Latest snapshot ready'
@@ -342,6 +363,8 @@ class WebbiePanel(QWidget):
 
     def camera_failed(self, message):
         if self.camera_allowed:
+            if self.vision_bridge is not None:
+                self.vision_bridge.reply('I could not see the room: ' + str(message)[:300])
             self.camera_state.setText('CAMERA ERROR  |  ' + message)
             self.camera_continuous = False
             self.camera_timer.stop()
