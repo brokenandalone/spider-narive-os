@@ -41,6 +41,7 @@ APP_FILES = (
     'author/main.py', 'author/store.py', 'author/web_features.py',
     'author/speech.py', 'author/publishing.py',
     'the-web/shell/main.py', 'the-web/shell/volume_panel.py',
+    'the-web/shell/notification_center.py',
     'the-web/shell/webbie_panel.py',
     'the-web/shell/webbie_camera.py', 'the-web/shell/webbie_faces.py',
     'the-web/shell/webbie_face_profiles_ui.py',
