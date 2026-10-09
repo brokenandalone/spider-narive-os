@@ -93,8 +93,15 @@ class AuthorWebsitePortTests(unittest.TestCase):
         self.assertIn('Address: Writer', panel.context.text())
         self.assertIn('Address the user as Writer', panel.prepare_request('Review chapter'))
         panel.set_workspace_context('School', mode='School Tutor', summary='SOC-112')
-        self.assertNotIn('Address: Writer', panel.context.text())
+        self.assertIn('Address: Student', panel.context.text())
+        self.assertIn('Preferred address: Student', panel.prepare_request('Help me study'))
         self.assertNotIn('Address the user as Writer', panel.prepare_request('Help me study'))
+        panel.set_workspace_context('Studio', mode='Studio Producer')
+        self.assertIn('Address: Justin', panel.context.text())
+        panel.set_workspace_context('Kali Bay', mode='Security Workspace')
+        self.assertIn('Address: Spider', panel.context.text())
+        panel.set_workspace_context('The Web', mode='Normal')
+        self.assertIn('Address: Cory', panel.context.text())
         panel.close()
 
     def test_global_webbie_modes_cover_all_web_workspaces(self):
