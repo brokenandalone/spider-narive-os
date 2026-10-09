@@ -19,7 +19,7 @@
 - [x] Installed Spider Media Center repaired `app.asar` on Oct 8 at 20:07, saving `app.asar.before-playback-20261008-200747-1055870`. GUI playback remains unverified.
 - [x] Developed source-level Author library, chapter snapshots/import, School dashboard/APA export, Studio installed-tool discovery, Webbie action gateway, Forage indexing, Guardian/Vault tools and AI DJ HTTP reliability. Not all have user-PC feature acceptance.
 - [x] Built System and Recovery nonblocking diagnostics in PR #16; all source checks passed. **Not yet installed on owner's PC.**
-- [x] Prepared private `Spider-Author-Private-Content-Import.zip`; owner extracted it. Actual SQLite import and retention of the original DOCX files remain unconfirmed.
+- [x] Prepared/extracted private `Spider-Author-Private-Content-Import.zip`. Oct 9 owner-PC audit confirmed Author SQLite readable with **20 books, 39 chapters and 20 imported source fingerprints**; remaining check is chapter/content verification and preservation of original DOCX files.
 - [x] PR #17 source-built Webbie's ethereal violet woman portrait, speech-gated lip animation, responsive typed chat and safe window Close controls. Not yet confirmed installed; lip motion is approximate, not phoneme-synchronized.
 
 - [x] User confirmed all personal files remained present after the power outage. This is not a validated independent backup or a storage-health report.
@@ -29,8 +29,9 @@
 ## 1. Boot, disk and irreplaceable data — urgent
 
 - [ ] Collect a read-only post-outage boot/SMART/journal and drive-health inventory; document the exact cause if detectable. Do not run destructive filesystem repair blindly.
-- [ ] Confirm encryption unlock, SpiderRoot EFI/GRUB, actual running Ubuntu base/kernel, and clean reboot, without editing the working boot chain before backup.
-- [ ] Verify *existing* Author DB, extracted Broken World manuscripts, Studio projects, school work, Webbie models/memory, and Media Center settings survived the outage.
+- [ ] Confirm encryption unlock, actual firmware mode (Legacy BIOS vs UEFI), GRUB/SpiderRoot configuration, running Ubuntu base/kernel, and clean reboot; Oct 9 inventory found grub.cfg present and SpiderRoot EFI path absent, which **does not prove a fault**, especially under Legacy BIOS. Make no boot changes before backup.
+- [x] Owner confirmed files remain after outage; read-only Oct 9 inventory found Author DB, extracted bundle, Studio project directory, Study DB (1 course, 0 assignments), Webbie agent, Media Center archive, and active Webbie/Ollama/AI DJ/PipeWire/WirePlumber services.
+- [ ] Verify individual Author chapter contents, Studio and school project files, Webbie models/memory and Media Center settings before marking all personal-data recovery fully checked.
 - [ ] Make versioned local backups of the boot configuration and irreplaceable projects. Test restoring one harmless sample file from the backup.
 - [ ] Enable/qualify Spider Guardian health/backup UI; verify failures are visible rather than silently ignored.
 - [ ] Consider UPS battery-backup support/clean shutdown alerts for another outage (optional hardware improvement, separate from boot repair).
@@ -77,7 +78,8 @@
 ## 4. Author — private manuscripts, library and canon
 
 - [x] Prepared a private import with 20 editable library entries, Broken City front matter + chapters 1–16, and 23 original DOCX documents; ZIP extracted on owner PC.
-- [ ] Confirm private Author import into its real SQLite library, without running two concurrent editors. Verify chapter count, companion materials, canon bible/evidence ledger and that existing entries aren't overwritten.
+- [x] Confirm private Author library import **at database level**: 20 books, 39 chapters, 20 imported fingerprints, Oct 9 audit. No repeat import needed.
+- [ ] Open a representative book, confirm all expected content including companion materials and canon, and test safe edits/version history without overwriting existing chapters.
 - [ ] Preserve original formatted DOCX manuscripts under an Author originals directory, non-destructively, and confirm a real independent backup.
 - [ ] Verify autosave, snapshots, chapter version history, import/export, offline persistence, safe closure and recovery after abrupt restart.
 - [ ] Finish manuscript library, novel/companion navigation, character/timeline/lore/reveal-ledger tools, and Broken World canon/continuity checking requiring user approval before edits.

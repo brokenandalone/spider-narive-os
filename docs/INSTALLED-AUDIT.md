@@ -5,7 +5,10 @@ Konsole in The Web. It does not upgrade, rebuild, reinstall or restart anything.
 
 The scanner asks only whether expected components are present, whether user
 services are running, what state the existing Kali container is in, and how
-many entries the two known SQLite libraries contain. It scans no arbitrary
+many entries the two known SQLite libraries contain. It counts original DOCX
+files separately in the installed Author folder and in the extracted import
+package, without copying or printing their names. It identifies BIOS versus
+UEFI boot mode before interpreting whether the SpiderRoot EFI path is present. It scans no arbitrary
 user folders, prints no private book titles, lyrics, manuscript text, model
 prompts, usernames, hostnames, or account credentials.
 
