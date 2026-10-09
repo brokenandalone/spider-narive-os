@@ -2,7 +2,7 @@
 Type=Application
 Name=Webbie: Connect OneDrive
 Comment=Optional Microsoft sign-in for Webbie; local AI keeps working without it
-Exec=konsole -e /usr/bin/python3 /usr/local/lib/spider-os/system/onedrive.py connect
+Exec=konsole --hold -e /usr/bin/python3 /usr/local/lib/spider-os/system/onedrive.py connect
 Icon=/usr/local/lib/spider-os/branding/webbie/webbie-face-v1.png
 Terminal=false
 Categories=Network;Utility;
