@@ -28,6 +28,10 @@ released alongside the desktop work.
 2. [x] Implement the selectable The Web X11 desktop session, its own Start,
    taskbar, clock and desktop surface. KDE infrastructure/secure locker remain;
    Plasma remains selectable and returns on shell failure. Installed login QA pending.
+   Owner-PC installation confirmed on 8 October at 20:14 local time; a second
+   run at 20:15 also succeeded. Original-shell backup:
+   `/usr/local/lib/spider-os/upgrade-backups/the-web-20261008-201419`.
+   The later `the-web-20261008-201541` backup contains the already upgraded shell.
 3. [x] Implement one persistent tab per workspace. Seven native Qt workspaces
    embed; unsaved editors/notes and running research block closure. External
    applications retain native windows, switched from the taskbar. Qt integration passes.
@@ -53,6 +57,7 @@ released alongside the desktop work.
 8. [x] Package Spider-branded secure lock-screen artwork using KDE's existing
    locker and authentication. Appearance setter backs up the previous config.
    Real automatic lock, password failure and unlock verification remain pending.
+   The owner installer confirms the artwork configuration was applied successfully.
 9. [x] Add the desktop-loading splash; retain the existing Spider Plymouth theme
    and boot configuration. Active installed boot-theme verification remains pending.
 10. [x] Package and connect all recovered wallpaper collections: 59 artwork files,
@@ -61,7 +66,7 @@ released alongside the desktop work.
     Final placement audit corrected two Study tags and included original
     workspace backgrounds in the installer package; existing installed images
     are never overwritten.
-11. [ ] Install this release candidate and verify real SDDM login, KWin focus,
+11. [ ] Verify the installed release candidate: real SDDM login, KWin focus,
     window switching, lock/unlock, logout, multiple monitors, movies and splash
     transitions on the owner PC. Source/Qt checks cannot establish those results.
     A read-only installed-system preflight is now available at
