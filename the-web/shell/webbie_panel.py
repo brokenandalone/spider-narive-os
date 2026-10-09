@@ -105,7 +105,7 @@ def cloud_state_label():
         if remote.is_symlink(): return 'OneDrive: configuration requires review.'
         parser.read(remote)
         if parser.get('webbie_onedrive', 'type', fallback='') == 'onedrive':
-            return 'OneDrive: connected. Background folder sync is available.'
+            return 'OneDrive: configured. Background sync will verify cloud access.'
     except (OSError, ValueError, TypeError, configparser.Error):
         pass
     return 'OneDrive: not connected. Webbie stays local.'
@@ -208,7 +208,7 @@ class WebbiePanel(QWidget):
             self.append_message('Status', 'Konsole is needed for Microsoft sign-in.')
             return
         try:
-            subprocess.Popen([console, '-e', sys.executable, str(script), 'connect'],
+            subprocess.Popen([console, '--hold', '-e', sys.executable, str(script), 'connect'],
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, start_new_session=True)
             self.append_message('Status', 'OneDrive sign-in is open in Konsole. Webbie stays available.')
