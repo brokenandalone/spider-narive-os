@@ -8,6 +8,7 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
 - Dell / Spider OS boots again following the power outage. All personal data
   reported present. Root cause of the temporary boot failure is unknown.
 - The Web and KDE Plasma desktop exist and work. Only a few desktop bugs remain.
+- Owner explicitly confirmed Plasma X11 on October 9, 2026. The X11 click-through Webbie overlay is the target; verify actual mouse pass-through and fullscreen hiding after installation.
 - Author SQLite audit: **20 books, 39 chapters, 20 imported source fingerprints**.
   Original DOCX backup placement and chapter-content QA still need review.
 - Webbie, Ollama, AI DJ, PipeWire and WirePlumber: active in Oct 9 read-only
@@ -63,9 +64,7 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
 
 ## Tomorrow: safe sequence (only after user is at their PC)
 
-1. Verify session via `echo "$XDG_SESSION_TYPE"`. Floating face is currently
-   X11-only. Plasma Wayland must not be described as supported or magically
-   click-through.
+1. Owner confirmed X11. Optionally recheck via `echo "$XDG_SESSION_TYPE"` before installation. The click-through overlay still needs actual mouse/fullscreen testing.
 2. Confirm recent independent backup of Author and originals. Do not reimport
    the verified 20-book database. Verify source revision and add-on prerequisites.
 3. If installing only PR #21, fetch the **exact pinned revision** above and
@@ -96,7 +95,7 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
   needs explicit permission boundaries and never enables silently.
 - For future room awareness, should Webbie see only on request, or remain
   active for an explicitly approved session with a permanent visual indicator?
-- Is the installed Plasma session X11 or Wayland? Confirm from Konsole.
+- Resolved: Plasma X11 confirmed by owner.
 
 ## Never overwrite
 
