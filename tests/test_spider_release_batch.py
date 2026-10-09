@@ -134,6 +134,21 @@ class BatchReleaseTests(unittest.TestCase):
         self.assertNotIn('rclone.conf', targets)
         self.assertNotIn('kali-vg', targets)
 
+    def test_one_unknown_component_blocks_every_other_component(self):
+        source2 = self.source_root / 'webbie.py'
+        target2 = self.target_root / 'webbie.py'
+        source2.write_text('VALUE = 2\n')
+        target2.write_text('CUSTOM = 10\n')
+        unsafe = batch.Item(source2, target2, uid=os.geteuid(), gid=os.getegid(),
+                            reference='webbie.py')
+        with self.assertRaisesRegex(RuntimeError, 'No files were changed'):
+            batch.apply([self.entry, unsafe], self.backup_root, self.source_root, (),
+                        self.false_baseline)
+        self.assertFalse(self.target.exists(),
+                         'A safe component must not install when another is customized')
+        self.assertEqual(target2.read_text(), 'CUSTOM = 10\n')
+        self.assertFalse(self.backup_root.exists())
+
     def test_realistic_multi_component_layout_roundtrip(self):
         """Author, desktop, Webbie agent, portrait, and OneDrive change together."""
         components = (
