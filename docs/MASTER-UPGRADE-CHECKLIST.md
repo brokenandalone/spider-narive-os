@@ -89,6 +89,7 @@
 - [x] Existing The Web interface uses a purple dark palette.
 - [ ] Finish a persistent dark/light appearance setting for The Web, Qt/KDE apps, GTK apps, file dialogs and menus; qualify contrast/readability rather than claiming a global dark mode from shell colors alone.
 - [x] Source-built a taskbar Audio entry, output volume +/- and mute/unmute, percentage/mute display and bounded WirePlumber calls. Volume increases are capped at 100%.
+- [x] **Source-built a taskbar Volume quick panel** with a 0–100% bounded output slider, mute toggle, nonblocking worker and explicit unavailable-audio messaging. Added to the unified installation manifest and tested in PR #26 GitHub Actions run `37953819308`. No Dell deployment or hardware acceptance yet.
 - [ ] Verify actual speaker/headphone volume and mute on the owner PC; add a slider, output/input device switching, microphone mute, app mixer and reliable media/volume keys.
 - [ ] Add a notification service, visible popups, notification history, dismiss/clear and Do Not Disturb. The current session stops plasmashell; do not assume Plasma's notification UI still exists.
 - [ ] Add a native system tray/status-notifier host with running/background app icons and their menus; preserve compatibility with existing apps.
