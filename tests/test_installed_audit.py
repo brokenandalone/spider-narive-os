@@ -65,6 +65,23 @@ class OwnerAuditTests(unittest.TestCase):
             self.assertEqual(command.call_args_list[1].args[0],
                              ['podman', 'inspect', '--format', '{{.State.Status}}', 'kali-bay'])
 
+    def test_read_only_boot_branding_detection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            grub = root / 'etc/default/grub.d/99-spider-os.cfg'
+            grub.parent.mkdir(parents=True)
+            grub.write_text('GRUB_DISTRIBUTOR="Spider OS"\\n')
+            theme = root / 'usr/share/plymouth/themes'
+            (theme / 'spider-os').mkdir(parents=True)
+            (theme / 'spider-os/spider-os.plymouth').write_text('Spider OS')
+            (theme / 'default.plymouth').symlink_to('spider-os/spider-os.plymouth')
+            original = sorted(str(p) for p in root.rglob('*'))
+            report = audit.boot_branding_snapshot(root)
+            self.assertEqual(report['grubSpiderBranding'], 'Spider OS')
+            self.assertEqual(report['plymouthSpiderTheme'], 'present')
+            self.assertEqual(report['activePlymouthLink'], 'Spider OS link')
+            self.assertEqual(original, sorted(str(p) for p in root.rglob('*')))
+
     def test_report_contains_only_known_fields(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
