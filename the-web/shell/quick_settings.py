@@ -85,7 +85,7 @@ def quick_snapshot(runner=read_command, power_supply=Path('/sys/class/power_supp
             bright = str(min(int(match.group(1)), 100)) + '%'
     mic = 'Unknown (WirePlumber source not reported)'
     if microphone:
-        match = re.search(r'Volume:\\s*([0-9]+(?:\\.[0-9]+)?)', microphone)
+        match = re.search(r'Volume:\s*([0-9]+(?:\.[0-9]+)?)', microphone)
         if match:
             mic_level = max(0,min(100,round(float(match.group(1))*100)))
             mic = ('Muted' if '[MUTED]' in microphone else 'Available') + f' · {mic_level}%'
