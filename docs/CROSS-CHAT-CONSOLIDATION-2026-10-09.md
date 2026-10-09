@@ -32,14 +32,15 @@ Reconciled 2026-10-09 from accessible user/assistant history, current GitHub bra
 - PRs #18/#19 audits already merged into #17's branch; #14/#15 Firefox and workspace links merged in source line.
 - Do not merge each stacked PR into `main` or install conflicting panels one by one. Consolidate in one integration branch, maintain PR traceability and final green CI.
 
-## Current integration work and blockers
-- Branch staged from PR #25, with Author/camera/face files borrowed from PR #23 and optional local vision source from PR #24.
-- Reconcile latest #23 improvements including its rollback and readiness checks, plus authoritative Author data and custom resident agent protection.
-- Choose exactly one floating overlay when The Web runs; avoid two click-through face windows and two incompatible state formats. Keep best X11 XFixes input pass-through and fullscreen guard.
-- Merge shared panel #23 (Author/global dock/webcam) with #21 (OneDrive UI/optional sync), #22 (names/model) and #25 (night mode). Combine voice visual queries with the existing listener gate. Never override custom voice on Dell without file-baseline preflight.
-- Preserve any latest #23 changes if other conversation touched GitHub: always re-check remote head.
-- Source tests passing separately is insufficient; run all component and integration tests against one commit and test installer/rollback on disposable fixtures.
-- No single unified installer is released as of this consolidation. The PR #23 `install-author-webbie.sh` is a tested **component installer**, not the promised one-entry-point Spider OS batch.
+## Current integrated source and remaining release blockers
+
+- Draft [PR #26](https://github.com/brokenandalone/spider-narive-os/pull/26) now integrates Author website tooling, opt-in camera/room watch, optional face cues, spoken local vision, all five owner-selected context names, OneDrive-on-demand and the indefinite visibly sleeping X11 Webbie face.
+- The Web's desktop starts one locked, mouse-pass-through external portrait. The shared Webbie panel uses the same sleep flag and one combined Author/camera/cloud interface; the agent keeps its voice listener and background loops while ignoring ordinary speech when asleep.
+- GitHub source/Qt regressions passed on integration SHA `5cbd4a9a8941e2e714acc17ae62d3a35d8c51db2` (Actions run `37947832794`). The owner PC has **not** been modified and its installed customized voice/mic agent remains authoritative.
+- The source now contains `system/release_batch.py`, a **single** guarded release/rollback path. Its tests cover unknown-file protection, atomic code installation, backup manifest restoration and symlink rejection. The older per-component installers remain historical compatibility code; do not run them for the unified release.
+- PRs #17/#20/#21/#22/#23/#24/#25 remain draft or unmerged on their existing branches. They were **reconciled in code** for PR #26, not blindly merged into the main branch.
+- Before deployment: verify the final frozen PR #26 commit CI; run the one non-mutating preflight on the Dell; separately secure real Author SQLite + originals backups and verify local customizations. The X11 face, cloud OAuth, camera hardware/model, service restart and safe rollback still need owner-PC acceptance. Stop rather than overwrite unrecognized files.
+- Speaker authentication restricted to Cory/Shayna, genuine screen awareness, robust user controls/notifications, Media Center radio/visualizer/TV/casting and upstream OS/ISO migration remain subsequent checklist items, not declared installed.
 
 ## Longer checklist work still open
 1. Preservation: backups of Author DB and formatted original DOCX; restoration test; disk/boot read-only inspection.
