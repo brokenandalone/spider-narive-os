@@ -28,8 +28,12 @@ def append_history(path,title,message,app):
             old=[line for line in path.read_text().splitlines()[-MAX_ITEMS:] if line]
     except (OSError,UnicodeError):
         pass
+    # A unique local event identifier prevents repeated identical app alerts
+    # arriving within the same second from disappearing as duplicate toasts.
+    import uuid
     entry=json.dumps({'title':clean(title,80),'message':clean(message,300),
-                      'app':clean(app,80),'time':datetime.now().isoformat(timespec='seconds')})
+                      'app':clean(app,80),'time':datetime.now().isoformat(timespec='seconds'),
+                      'id':uuid.uuid4().hex})
     import tempfile
     fd,tmp=tempfile.mkstemp(dir=path.parent,prefix='.tray-journal-')
     try:
