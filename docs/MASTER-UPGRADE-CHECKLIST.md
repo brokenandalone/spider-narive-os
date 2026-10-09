@@ -86,6 +86,14 @@
 - [ ] Provide morning NA/AA meeting lookup and contextual reminders, only after reliable source/location handling. Keep user-defined voice preferences.
 - [ ] Add dedicated Webbie DJ persona while preserving normal assistant behavior and preventing media audio from triggering commands.
 
+- [x] Source-built Webbie workspace naming so Author Bay calls the owner **Writer**; owner-defined names take priority. This is **not** a claim that the installed Webbie agent has been replaced.
+- [x] Source-built **Student** form of address in School/Study (internal workspace ID `study`), keeping Author/Writer, Studio/Justin, Kali Bay/Spider and user-configured overrides. **Not installed on the owner PC.**
+- [x] Source-built local Ollama model selection from Webbie's existing `config/default.json`, while retaining the current default and loopback Ollama URL. No model is downloaded or switched on the PC without approval.
+- [ ] Install/qualify any future agent-only changes separately from the safe floating-face and OneDrive add-on. Preserve the installed voice patches and services.
+- [ ] Build explicitly opt-in camera awareness of the room with visible recording/active indicator; no silent start, hidden webcam access, or unsolicited cloud upload.
+- [ ] Build separately approved screen awareness with visible sharing state, limited capture, and privacy controls. Neither camera nor screen capture is currently installed as an enabled Webbie feature.
+- [ ] Confirm whether night sleep should hide only Webbie's face or also pause voice listening before making microphone-service changes.
+
 ## 4. Author — private manuscripts, library and canon
 
 - [x] Prepared a private import with 20 editable library entries, Broken City front matter + chapters 1–16, and 23 original DOCX documents; ZIP extracted on owner PC.

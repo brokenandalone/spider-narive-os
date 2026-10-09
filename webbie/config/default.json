@@ -12,7 +12,10 @@
   "context_names": {
     "default": "Cory",
     "studio": "Justin",
-    "kali-bay": "Spider"
+    "author": "Writer",
+    "kali-bay": "Spider",
+    "study": "Student",
+    "school": "Student"
   },
   "voice": {
     "online": "en-AU-NatashaNeural",

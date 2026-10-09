@@ -1,12 +1,27 @@
 #!/usr/bin/env python3
 
 import json
+from pathlib import Path
+import re
 import urllib.error
 import urllib.request
 
 
 DEFAULT_MODEL = "qwen3:1.7b"
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+CONFIG_FILE = Path(__file__).resolve().parents[1] / 'config/default.json'
+
+
+def preferred_model(path=CONFIG_FILE):
+    """Use the owner's local Ollama model choice; do not pull new models."""
+    try:
+        config = json.loads(Path(path).read_text(encoding='utf-8'))
+        name = config.get('ollama', {}).get('model')
+        if isinstance(name, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,99}', name):
+            return name
+    except (OSError, UnicodeError, ValueError, AttributeError, TypeError):
+        pass
+    return DEFAULT_MODEL
 
 
 SYSTEM_PROMPT = """
@@ -20,6 +35,8 @@ Use the name:
 - Cory normally.
 - Justin inside Studio.
 - Spider inside Kali Bay.
+- Writer inside Author Bay.
+- Student inside School/Study.
 
 Be concise when responding by voice.
 Be more detailed when responding in the graphical interface.
@@ -32,7 +49,7 @@ Never claim an action succeeded unless Spider OS actually performed it.
 """.strip()
 
 
-def ask_ollama(message, context_name="Cory", model=DEFAULT_MODEL):
+def ask_ollama(message, context_name="Cory", model=None):
     prompt = (
         SYSTEM_PROMPT
         + "\n\nCurrent user name: "
@@ -40,7 +57,7 @@ def ask_ollama(message, context_name="Cory", model=DEFAULT_MODEL):
     )
 
     payload = {
-        "model": model,
+        "model": preferred_model() if model is None else model,
         "stream": False,
         "messages": [
             {
