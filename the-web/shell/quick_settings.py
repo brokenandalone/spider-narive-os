@@ -17,6 +17,7 @@ STATUS_COMMANDS = {
     'wifi': ('nmcli', '-t', '-f', 'WIFI', 'general'),
     'bluetooth': ('bluetoothctl', 'show'),
     'brightness': ('brightnessctl', '-m'),
+    'microphone': ('wpctl', 'get-volume', '@DEFAULT_AUDIO_SOURCE@'),
 }
 
 
@@ -69,6 +70,7 @@ def quick_snapshot(runner=read_command, power_supply=Path('/sys/class/power_supp
     wifi = runner(STATUS_COMMANDS['wifi'])
     bluetooth = runner(STATUS_COMMANDS['bluetooth'])
     brightness = runner(STATUS_COMMANDS['brightness'])
+    microphone = runner(STATUS_COMMANDS['microphone'])
     state = (connection or '').strip().splitlines()[:1]
     wifi_state = (wifi or '').strip().splitlines()[:1]
     if bluetooth:
@@ -81,10 +83,17 @@ def quick_snapshot(runner=read_command, power_supply=Path('/sys/class/power_supp
         match = re.search(r'\b(\d{1,3})%', brightness)
         if match:
             bright = str(min(int(match.group(1)), 100)) + '%'
+    mic = 'Unknown (WirePlumber source not reported)'
+    if microphone:
+        match = re.search(r'Volume:\\s*([0-9]+(?:\\.[0-9]+)?)', microphone)
+        if match:
+            mic_level = max(0,min(100,round(float(match.group(1))*100)))
+            mic = ('Muted' if '[MUTED]' in microphone else 'Available') + f' · {mic_level}%'
     return {
         'Network': state[0][:70] if state else 'NetworkManager status unavailable',
         'Wi-Fi radio': wifi_state[0][:70] if wifi_state else 'Unknown',
         'Bluetooth': blue,
+        'Microphone': mic,
         'Power': battery_summary(power_supply),
         'Brightness': bright,
     }
@@ -126,7 +135,7 @@ class QuickSettingsPanel(QWidget):
         title.setStyleSheet('font-weight:bold;font-size:17px;')
         layout.addWidget(title)
         self.status = {}
-        for key in ('Network', 'Wi-Fi radio', 'Bluetooth', 'Power', 'Brightness'):
+        for key in ('Network', 'Wi-Fi radio', 'Bluetooth', 'Microphone', 'Power', 'Brightness'):
             label = QLabel(key + ': Checking…')
             label.setWordWrap(True)
             label.setTextFormat(Qt.PlainText)
