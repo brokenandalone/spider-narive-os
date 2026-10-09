@@ -33,6 +33,8 @@ class VolumeTests(unittest.TestCase):
     def test_missing_wireplumber_disables_controls(self):
         with patch.object(volume_panel.shutil,'which',return_value=None):
             panel=volume_panel.VolumePanel()
+            self.assertTrue(panel.worker.wait(3000))
+            APP.processEvents()
             self.assertFalse(panel.slider.isEnabled())
             self.assertFalse(panel.mute.isEnabled())
             self.assertIn('unavailable',panel.status.text().lower())
@@ -41,8 +43,33 @@ class VolumeTests(unittest.TestCase):
     def test_volume_and_mute_render(self):
         with patch.object(volume_panel,'volume_state',return_value=(36,True)):
             panel=volume_panel.VolumePanel()
+            self.assertTrue(panel.worker.wait(3000))
+            APP.processEvents()
             self.assertEqual(panel.slider.value(),36)
             self.assertIn('Muted',panel.status.text())
+            panel.close()
+
+    def test_refresh_starts_worker_without_blocking_qt_gui(self):
+        import threading
+        started=threading.Event()
+        proceed=threading.Event()
+        def delayed_read():
+            started.set()
+            if not proceed.wait(2):
+                return (None,False)
+            return (44,False)
+        with patch.object(volume_panel,'volume_state',side_effect=delayed_read):
+            panel=volume_panel.VolumePanel()
+            self.assertTrue(started.wait(2))
+            self.assertFalse(panel.mute.isEnabled())
+            # GUI is still responsive while the audio query is running.
+            APP.processEvents()
+            self.assertTrue(panel.worker.isRunning())
+            proceed.set()
+            self.assertTrue(panel.worker.wait(3000))
+            APP.processEvents()
+            self.assertEqual(panel.slider.value(),44)
+            self.assertTrue(panel.mute.isEnabled())
             panel.close()
 
 if __name__ == '__main__':
