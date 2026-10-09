@@ -65,7 +65,7 @@ async def serve(path):
                    summary:'s',body:'s',actions:'as',hints:'a{sv}',expire_timeout:'i')->'u':
             return model.notify(app_name,summary,body)
         @method()
-        def CloseNotification(self,id:'u')->None:
+        def CloseNotification(self,id:'u'):
             self.NotificationClosed(id,3)
         @signal()
         def NotificationClosed(self,id:'u',reason:'u')->'uu':return [id,reason]
