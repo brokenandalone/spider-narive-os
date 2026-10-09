@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Start KDE session infrastructure, then replace only its visible desktop shell.
+set -Eeuo pipefail
+root=/usr/local/lib/spider-os
+if [[ "${1:-}" == --check ]]; then
+    for command in startplasma-x11 python3 dbus-send wmctrl systemctl; do
+        command -v "$command" >/dev/null || { echo "Missing desktop dependency: $command" >&2; exit 1; }
+    done
+    python3 -c 'from PyQt5.QtWidgets import QApplication'
+    test -s "$root/the-web/shell/main.py"
+    echo 'The Web desktop dependencies are available.'
+    exit 0
+fi
+if [[ -z "${DISPLAY:-}" || "${XDG_SESSION_TYPE:-x11}" != x11 ]]; then
+    echo 'Choose The Web (X11) from the login screen. This launcher needs an X11 display.' >&2
+    exit 1
+fi
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    exec dbus-run-session -- "$0" "$@"
+fi
+# A single graphical session per user is required by KDE's user services.
+if dbus-send --session --print-reply --reply-timeout=1000 --dest=org.kde.KWin /KWin org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1; then
+    echo 'A KDE window manager is already running for this user. Log out before choosing The Web.' >&2
+    exit 1
+fi
+export SPIDER_THE_WEB_SESSION=1
+export DESKTOP_SESSION=the-web
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}/spider-os"
+mkdir -p "$state_home"
+exec >>"$state_home/desktop-session.log" 2>&1
+startplasma-x11 &
+plasma_pid=$!
+web_pid=''
+cleanup() {
+    if [[ -n "$web_pid" ]]; then kill "$web_pid" 2>/dev/null || true; fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+ready=false
+for ((attempt=0; attempt<90; attempt++)); do
+    kill -0 "$plasma_pid" 2>/dev/null || break
+    if dbus-send --session --print-reply --reply-timeout=1000 --dest=org.freedesktop.ScreenSaver /ScreenSaver org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1 \
+       && dbus-send --session --print-reply --reply-timeout=1000 --dest=org.kde.KWin /KWin org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1; then
+        ready=true; break
+    fi
+    sleep 0.5
+done
+if [[ "$ready" != true ]]; then
+    echo 'KDE session/secure locker did not become ready. Keeping the Plasma fallback.'
+    wait "$plasma_pid" || true; exit 1
+fi
+# No settings, shell packages, masks or Plasma layouts are overwritten.
+# KWin, the secure locker, portals, audio, policy agent and session manager remain.
+if ! systemctl --user stop plasma-plasmashell.service; then
+    echo 'Could not stop the visible Plasma shell; keeping Plasma.'
+    wait "$plasma_pid" || true; exit 1
+fi
+set +e
+python3 "$root/the-web/shell/main.py" --desktop-session &
+web_pid=$!
+wait "$web_pid"
+result=$?
+web_pid=''
+set -e
+if [[ "$result" -ne 0 ]]; then
+    echo "The Web exited with $result. Restoring Plasma for this session."
+    systemctl --user start plasma-plasmashell.service || true
+else
+    dbus-send --session --type=method_call --dest=org.kde.Shutdown /Shutdown org.kde.Shutdown.logout || \
+        systemctl --user start plasma-plasmashell.service || true
+fi
+wait "$plasma_pid" || true
+exit "$result"

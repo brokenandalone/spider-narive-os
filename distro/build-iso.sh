@@ -326,6 +326,10 @@ GRUB_DISTRIBUTOR="Spider OS"
 GRUB_BACKGROUND="/usr/share/backgrounds/spider-os-wallpaper.png"
 SPIDER_GRUB
 
+# The Web is a selectable desktop session; existing Plasma sessions remain.
+install -Dm755 "${ROOT}/the-web/session/the-web-session" "${ROOTFS}/usr/local/bin/the-web-session"
+install -Dm644 "${ROOT}/distro/config/sessions/the-web.desktop" "${ROOTFS}/usr/share/xsessions/the-web.desktop"
+
 echo "Installing Spider OS visual branding..."
 
 install -Dm644 \
@@ -405,9 +409,7 @@ install -Dm644 \
   "${SPIDER_REPO_ROOT}/distro/config/autostart/the-web.desktop" \
   "${ROOTFS}/etc/xdg/autostart/the-web.desktop"
 
-install -Dm644 \
-  "${SPIDER_REPO_ROOT}/distro/config/autostart/the-web.desktop" \
-  "${ROOTFS}/usr/share/applications/the-web.desktop"
+# The Web is listed in the desktop session chooser, not Lost and Found.
 
 install -Dm644 \
   "${SPIDER_REPO_ROOT}/distro/config/autostart/the-web.desktop" \
@@ -577,6 +579,9 @@ install -Dm644 \
 install -Dm644 \
     "${ROOT}/branding/splash/spider-os-splash.png" \
     "${LIVE_ROOTFS}/usr/share/spider-os/branding/spider-os-splash.png"
+
+install -Dm755 "${ROOT}/the-web/session/the-web-session" "${LIVE_ROOTFS}/usr/local/bin/the-web-session"
+install -Dm644 "${ROOT}/distro/config/sessions/the-web.desktop" "${LIVE_ROOTFS}/usr/share/xsessions/the-web.desktop"
 
 # Live desktop branding and The Web startup.
 install -Dm755 \

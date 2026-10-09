@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=The Web (X11)
+Comment=Spider OS desktop with native workspace tabs
+Exec=/usr/local/bin/the-web-session
+TryExec=/usr/local/bin/the-web-session
+DesktopNames=KDE;TheWeb;
+X-KDE-PluginInfo-Version=1.0

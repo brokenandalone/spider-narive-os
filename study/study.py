@@ -56,9 +56,14 @@ sys.path.insert(
     str(SCRIPT_ROOT),
 )
 
-from store import StudyStore
-from dashboard import overview
-from paper_dialog import PaperDialog
+if __package__:
+    from .store import StudyStore
+    from .dashboard import overview
+    from .paper_dialog import PaperDialog
+else:
+    from store import StudyStore
+    from dashboard import overview
+    from paper_dialog import PaperDialog
 
 
 WALLPAPER = (
@@ -1199,7 +1204,10 @@ class StudyWindow(QMainWindow):
             if not overwrite:
                 return
         try:
-            from apa import create_paper
+            if __package__:
+                from .apa import create_paper
+            else:
+                from apa import create_paper
             create_paper(path, **values, overwrite=overwrite)
         except ImportError:
             QMessageBox.warning(self, 'APA paper', 'APA export needs python3-docx. Install the School dependency and retry.')
@@ -1249,12 +1257,13 @@ class StudyWindow(QMainWindow):
         self,
         event,
     ):
-        self.save_notes(
-            quiet=True
-        )
-
+        try:
+            self.save_notes(quiet=True)
+        except Exception as error:
+            QMessageBox.warning(self, "Notes not saved", str(error))
+            event.ignore()
+            return
         self.store.close()
-
         event.accept()
 
 

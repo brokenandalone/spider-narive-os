@@ -22,7 +22,13 @@ for file in \
     usr/lib/systemd/system/spider-os.service \
     usr/lib/systemd/user/webbie.service \
     etc/xdg/autostart/the-web.desktop \
-    usr/share/applications/the-web.desktop \
+    usr/share/xsessions/the-web.desktop \
+    usr/local/bin/the-web-session \
+    usr/local/lib/spider-os/the-web/shell/desktop.py \
+    usr/local/lib/spider-os/the-web/shell/workspaces.py \
+    usr/local/lib/spider-os/the-web/shell/app_catalog.py \
+    usr/local/lib/spider-os/the-web/shell/wallpapers.py \
+    usr/local/lib/spider-os/branding/wallpapers/collection.json \
     etc/skel/.config/autostart/the-web.desktop \
     usr/share/backgrounds/spider-os-wallpaper.png
 do
@@ -46,6 +52,24 @@ do
 done
 
 test -x "${spider_target_root}/usr/bin/ollama"
+test -x "${spider_target_root}/usr/local/bin/the-web-session"
+if [[ -e "${spider_target_root}/usr/share/applications/the-web.desktop" ]]; then
+    echo 'The Web still has the old application-menu entry' >&2
+    exit 1
+fi
+grep -q '^Exec=/usr/local/bin/the-web-session$' "${spider_target_root}/usr/share/xsessions/the-web.desktop"
+python3 - "${spider_target_root}/usr/local/lib/spider-os" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+root = Path(sys.argv[1]).resolve()
+catalog = json.loads((root / 'branding/wallpapers/collection.json').read_text())
+for entry in catalog['wallpapers']:
+    image = (root / entry['file']).resolve()
+    if not image.is_relative_to(root) or not image.is_file():
+        raise SystemExit('Missing or unsafe packaged wallpaper')
+    if hashlib.sha256(image.read_bytes()).hexdigest() != entry['sha256']:
+        raise SystemExit('Packaged wallpaper checksum mismatch')
+PY
 test -x "${spider_target_root}/usr/local/bin/whisper-cli"
 test -x "${spider_target_root}/opt/spider-webbie/bin/edge-tts"
 test -L "${spider_target_root}/etc/systemd/system/multi-user.target.wants/ollama.service"

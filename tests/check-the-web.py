@@ -1,124 +1,75 @@
-"""Exercise the installed shell and every background with bounded diagnostics."""
-import faulthandler
+"""Offscreen native desktop integration: real tabs, state, edits and safe close."""
+import os
 from pathlib import Path
 import sys
-
-faulthandler.enable()
-faulthandler.dump_traceback_later(30, repeat=True)
-root = Path(sys.argv[1]).resolve()
-sys.path.insert(0, str(root / 'the-web' / 'shell'))
-print('SPIDER_QT: import', flush=True)
-from PyQt5.QtWidgets import QApplication
-import main
-
-# Also supports testing the identical payload in a checkout.
-main.SPIDER_ROOT = root
-main.WALLPAPER = root / 'branding' / 'wallpapers' / 'spider-os-wallpaper.png'
-print('SPIDER_QT: application', flush=True)
-app = QApplication([])
-# Regression: the actual visible central widget must render the image.
-from PyQt5.QtGui import QColor, QPixmap
-surface = main.WallpaperWidget()
-surface.resize(120, 80)
-red = QPixmap(20, 20); red.fill(QColor(255, 0, 0))
-blue = QPixmap(20, 20); blue.fill(QColor(0, 0, 255))
-surface.set_background(red)
-red_pixel = surface.grab().toImage().pixelColor(4, 4)
-surface.set_background(blue)
-blue_pixel = surface.grab().toImage().pixelColor(4, 4)
-assert red_pixel.red() > red_pixel.blue(), red_pixel.name()
-assert blue_pixel.blue() > blue_pixel.red(), blue_pixel.name()
-surface.close()
-print('SPIDER_QT: construct The Web', flush=True)
-window = main.TheWeb()
-assert isinstance(window.centralWidget(), main.WallpaperWidget)
-assert window.background_picker.count() == 11
-for index in range(11):
-    name = window.background_picker.itemData(index)
-    print(f'SPIDER_QT: background {name}', flush=True)
-    image = main.WALLPAPER if name == 'default' else root / 'branding' / 'workspaces' / f'{main.WORKSPACE_IMAGES.get(name, name)}.png'
-    assert image.is_file(), f'Missing background: {image}'
-    window.background_picker.setCurrentIndex(index)
-    assert window.wallpaper is not None and not window.wallpaper.isNull(), name
-    app.processEvents()
-# Native Studio should construct even if optional apps and system services are absent.
-import importlib.util
-spec = importlib.util.spec_from_file_location('studio_ui', root / 'studio/main.py')
-studio = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(studio)
-from unittest.mock import patch
 import tempfile
-with patch.object(main, 'media_command', side_effect=main.AppUnavailable('media missing')):
-    window.open_media()
-    assert window.status.text() == 'media missing'
-with patch.object(main.subprocess, 'Popen') as process:
-    window.open_studio()
-    assert process.call_args.args[0] == ['python3', str(root / 'studio/main.py')]
-with tempfile.TemporaryDirectory() as folder:
-    with patch.object(main, 'AUTHOR_HOME', Path(folder) / 'Author'), \
-         patch.object(main, 'author_command', return_value=['kate', '--start', 'Spider-Author']), \
-         patch.object(main.subprocess, 'Popen') as process:
-        window.open_author()
-        assert window.background_picker.currentData() == 'author'
-        assert process.call_args.kwargs['cwd'] == Path(folder) / 'Author'
-    with patch.object(studio, 'STUDIO_HOME', Path(folder) / 'Studio'):
-        studio_window = studio.SpiderStudio()
-        assert not (Path(folder) / 'Studio/Author').exists()
-        assert studio_window.windowTitle() == 'Spider Studio | Spider OS'
-        with patch.object(studio.shutil, 'which', return_value=None):
-            studio_window.launch_music()
-            assert 'No supported DAW' in studio_window.status.text()
-        assert studio_window.tool_tabs.count() == 4
-        with patch.object(studio, 'resolve_tool', return_value=['/test/ardour']), \
-             patch.object(studio.subprocess, 'Popen') as launch:
-            studio_window.refresh_tools()
-            assert all(button.isEnabled() for _, button in studio_window.tool_buttons)
-            studio_window.launch_tool(studio.TOOLS['Recording & mixing'][0])
-            launch.assert_called_once_with(['/test/ardour'])
-            assert studio_window.status.text() == 'Opened Ardour.'
-        with patch.object(studio, 'resolve_tool', return_value=None):
-            studio_window.refresh_tools()
-            assert not any(button.isEnabled() for _, button in studio_window.tool_buttons)
-        studio_window.close()
-        app.processEvents()
-print('SPIDER_QT: Author library and autosave', flush=True)
-spec = importlib.util.spec_from_file_location('author_ui', root / 'author/main.py')
-author = importlib.util.module_from_spec(spec); spec.loader.exec_module(author)
-with tempfile.TemporaryDirectory() as folder:
-    author_window = author.AuthorWindow(folder)
-    book = author_window.store.create_book('Smoke book')
-    chapter = author_window.store.create_chapter(book, 'One', 'Original')
-    author_window.load_books(); author_window.books.setCurrentRow(0)
-    author_window.chapters.setCurrentRow(0)
-    assert author_window.editor.toPlainText() == 'Original'
-    author_window.editor.setPlainText('Autosaved text')
-    author_window.canon.setPlainText('Canon rule')
-    author_window.autosave()
-    assert author_window.store.chapter(chapter)['content'] == 'Autosaved text'
-    assert author_window.store.canon(book) == 'Canon rule'
-    from unittest.mock import patch as author_patch
-    with author_patch.object(author_window.store, 'save', side_effect=OSError('disk full')), \
-         author_patch.object(author.QMessageBox, 'warning'):
-        author_window.editor.setPlainText('Unsaved text')
-        assert author_window.flush() is False
-        assert author_window.editor.toPlainText() == 'Unsaved text'
-    author_window.close()
-    reopened = author.AuthorWindow(folder)
-    assert reopened.store.chapter(chapter)['content'] == 'Unsaved text'
-    reopened.close()
-print('SPIDER_QT: Forage source-link rendering', flush=True)
-spec = importlib.util.spec_from_file_location('forage_ui', root / 'forage/forage.py')
-forage = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(forage)
-search_window = forage.ForageWindow()
-search_window.show_results('local', 'river', [{'path': '/tmp/example.md', 'url': 'file:///tmp/example.md',
-    'title': '<script>', 'snippet': 'river text', 'stale': True}])
-assert 'file:///tmp/example.md' in search_window.results.toHtml()
-assert 'Source changed since indexing' in search_window.results.toPlainText()
-assert '<script>' in search_window.results.toPlainText()
-search_window.close()
-print('SPIDER_QT: close', flush=True)
-window.close()
-app.processEvents()
-faulthandler.cancel_dump_traceback_later()
-print('SPIDER_QT: PASSED', flush=True)
+from unittest.mock import patch
+root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root / 'the-web/shell'))
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtGui import QColor,QPixmap
+from PyQt5.QtCore import Qt
+import main
+main.SPIDER_ROOT = root
+from app_catalog import InstalledApp
+
+app=QApplication([])
+with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_value=Path(folder)), patch.dict(os.environ,{'XDG_CONFIG_HOME':folder}), patch.object(main.TheWeb,'refresh_status'):
+    surface=main.WallpaperWidget();surface.resize(120,80)
+    for color in ['red','blue']:
+        pixmap=QPixmap(20,20);pixmap.fill(QColor(color));surface.set_background(pixmap)
+        pixel=surface.grab().toImage().pixelColor(4,4)
+        assert (pixel.red()>pixel.blue()) == (color=='red')
+    surface.close()
+    window=main.TheWeb(restore=False);window.show()
+    for name in main.WORKSPACES:
+        window.open_workspace(name)
+        assert not window.wallpaper.isNull(),name
+    assert window.tabs.count()==15
+    author=window.workspace_widgets['author'].native
+    window.open_author();window.open_author();assert window.workspace_widgets['author'].native is author
+    assert window.tabs.count()==15
+    for name in ['author','study','studio','forage','deep-forage','webbie','kali-bay']:
+        assert window.workspace_widgets[name].native is not None,name
+    book=author.store.create_book('Desktop test');chapter=author.store.create_chapter(book,'One','Original')
+    author.load_books();author.books.setCurrentRow(0);author.chapters.setCurrentRow(0)
+    author.editor.setPlainText('Edited inside the workspace tab');assert author.flush()
+    author_index=window.tabs.indexOf(window.workspace_widgets['author'])
+    with patch.object(author,'flush',return_value=False):
+        window.close_tab(author_index);assert 'author' in window.workspace_widgets
+        assert not window.close()
+    worker=window.workspace_widgets['forage'].native
+    with patch.object(worker,'worker') as busy:
+        busy.isRunning.return_value=True
+        window.close_tab(window.tabs.indexOf(window.workspace_widgets['forage']))
+        assert 'forage' in window.workspace_widgets
+    school=window.workspace_widgets['study'].native
+    with patch.object(school,'save_notes',side_effect=OSError('disk full')):
+        window.close_tab(window.tabs.indexOf(window.workspace_widgets['study']));assert 'study' in window.workspace_widgets
+    fake=InstalledApp('ardour.desktop',Path('/tmp/Ardour.desktop'),'Ardour','Record','ardour','studio')
+    window.installed_apps=[fake];window.start_menu.populate()
+    window.start_menu.search.setText('ardour');assert window.start_menu.results.count()==1
+    with patch.object(main,'launch_command',return_value=['gio','launch',str(fake.path)]),patch.object(main.subprocess,'Popen') as process, patch.object(main,'wm_command') as wm:
+        # Exercise real desktop code paths: launching Firefox-like XDG apps must
+        # never turn on KDE Show Desktop and hide the newly opened window.
+        window.desktop_mode=True
+        window.open_installed(fake.desktop_id)
+        window.desktop_mode=False
+        assert process.call_args.args[0]==['gio','launch',str(fake.path)]
+        assert window.current_workspace=='studio'
+        wm.assert_not_called()
+    # Workspace Files opens the user's real project directory through the
+    # desktop file manager without any data copy or destructive operation.
+    with patch.object(main, 'file_open_command', return_value=['xdg-open', '/home/test/Documents/Spider Studio']), patch.object(main.subprocess, 'Popen') as folder_open:
+        window.open_workspace_folder('/home/test/Documents/Spider Studio', 'studio')
+        assert folder_open.call_args.args[0] == ['xdg-open', '/home/test/Documents/Spider Studio']
+        assert window.current_workspace == 'studio'
+    window.open_workspace('deep-forage')
+    wallpaper_id=window.wallpaper_catalog.defaults['deep-forage']
+    window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))
+    window.open_author();assert window.close()
+    reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
+    assert reopened.workspace_widgets['author'].native.store.chapter(chapter)['content']=='Edited inside the workspace tab'
+    assert reopened.wallpaper_catalog.selected_id('deep-forage')==wallpaper_id
+    assert reopened.close();app.processEvents()
+print('DESKTOP INTEGRATION PASSED: 15 tabs, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')

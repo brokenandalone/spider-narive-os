@@ -1,0 +1,482 @@
+{
+  "version": 1,
+  "wallpapers": [
+    {
+      "id": "ede4237a3b6ea730",
+      "label": "Art Lab",
+      "workspace": "art-lab",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/art-lab-ede4237a.jpg",
+      "sha256": "ede4237a3b6ea73043ee457cc39c6432235d812904db275a29b60c2c72d907ce"
+    },
+    {
+      "id": "7db16b7b0d2885d2",
+      "label": "Author Alt",
+      "workspace": "author",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/author-alt-7db16b7b.png",
+      "sha256": "7db16b7b0d2885d24008a5858c82d2d62501c2d73187e3923f62d63666cc6b90"
+    },
+    {
+      "id": "f5ce7c61ab0a74fb",
+      "label": "Author",
+      "workspace": "author",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/author-f5ce7c61.png",
+      "sha256": "f5ce7c61ab0a74fbf2da6f63517d7518ad47881329e89c67c34643f88ecad32f"
+    },
+    {
+      "id": "7253d6de102bf4e7",
+      "label": "Branding Legacy",
+      "workspace": "default",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/branding-legacy-7253d6de.png",
+      "sha256": "7253d6de102bf4e74468ebe50e9bdb63eaa14b851a97896b1b4fb1e77932902d"
+    },
+    {
+      "id": "2c318fe83d7f8518",
+      "label": "Concept Grid",
+      "workspace": "default",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/concept-grid-2c318fe8.png",
+      "sha256": "2c318fe83d7f851821d06c2936cc47c651381cc2bdb46597bab7ac8d7059650d"
+    },
+    {
+      "id": "d32ee89c293279da",
+      "label": "Dev Bay Alt 2",
+      "workspace": "dev-bay",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/dev-bay-alt-2-d32ee89c.png",
+      "sha256": "d32ee89c293279da4986fb57713dc4ff2832b2a8a330fdd54d8cf07c6c223147"
+    },
+    {
+      "id": "0d1e0bdf51c6f94d",
+      "label": "Dev Bay Alt 3",
+      "workspace": "dev-bay",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/dev-bay-alt-3-0d1e0bdf.png",
+      "sha256": "0d1e0bdf51c6f94da2eaa7600fe15415336da250826e5e44ca4b5e54aa03a793"
+    },
+    {
+      "id": "7c01ef4d236e891c",
+      "label": "Dev Bay Alt",
+      "workspace": "dev-bay",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/dev-bay-alt-7c01ef4d.png",
+      "sha256": "7c01ef4d236e891ca46913f46438b4be9efeef9c83c7f01bcd2af36e5e16fb43"
+    },
+    {
+      "id": "502ae795be5e78e7",
+      "label": "Dev Bay",
+      "workspace": "dev-bay",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/dev-bay-502ae795.jpg",
+      "sha256": "502ae795be5e78e70b9ceeb11c3abdce5729f2dc02cd2224052f9d046b3fb671"
+    },
+    {
+      "id": "808362ac31c91dc1",
+      "label": "Emblem Purple Grunge",
+      "workspace": "default",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/emblem-purple-grunge-808362ac.png",
+      "sha256": "808362ac31c91dc1a32f4e3b5de24ca8107601e096693af9d959ede6b670cc05"
+    },
+    {
+      "id": "540e97b18f817880",
+      "label": "Forage",
+      "workspace": "forage",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/forage-540e97b1.jpg",
+      "sha256": "540e97b18f817880fa914a68428e3fec8a3a12ab5b5e1d4faeef3df373035802"
+    },
+    {
+      "id": "6f34e9d90161727a",
+      "label": "Home Legacy",
+      "workspace": "default",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/home-legacy-6f34e9d9.png",
+      "sha256": "6f34e9d90161727ad829fb1118bba2ff3b5312d3a566b7043ba3047392931669"
+    },
+    {
+      "id": "7b76db38415c00e3",
+      "label": "Home",
+      "workspace": "default",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/home-7b76db38.jpg",
+      "sha256": "7b76db38415c00e34bd0e1a4fb1a21fa74f06bd61f0c42c4727906c5c9e35b05"
+    },
+    {
+      "id": "7fb71c4fc09c660d",
+      "label": "Kali Bay",
+      "workspace": "kali-bay",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/kali-bay-7fb71c4f.jpg",
+      "sha256": "7fb71c4fc09c660d438482566a2140bd0716fbde4b6d4c8c973fcfa0585c2ba8"
+    },
+    {
+      "id": "6ec0d674f041c70f",
+      "label": "Media Center",
+      "workspace": "media",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/media-center-6ec0d674.jpg",
+      "sha256": "6ec0d674f041c70ff863757de6f8f14f1e869268832d58c01d95e3d0f946e755"
+    },
+    {
+      "id": "0b50a317c68b722d",
+      "label": "Recovery Alt",
+      "workspace": "recovery",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/recovery-alt-0b50a317.png",
+      "sha256": "0b50a317c68b722d16174d40eced5bc503724ebc4c776c85d2aac52d7fc0fe7b"
+    },
+    {
+      "id": "fc468f54e06f32da",
+      "label": "Recovery",
+      "workspace": "recovery",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/recovery-fc468f54.png",
+      "sha256": "fc468f54e06f32daf5e21397707da2dad18cf61ccb3e5ace56cb39fe1bd772cc"
+    },
+    {
+      "id": "10e3ab2e66eb3b64",
+      "label": "Studio",
+      "workspace": "studio",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/studio-10e3ab2e.jpg",
+      "sha256": "10e3ab2e66eb3b644623c4440250c44a59cfb5682783ceda8398f7ccd64f3721"
+    },
+    {
+      "id": "3596d94ab9b0a448",
+      "label": "Study Alt",
+      "workspace": "study",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/study-alt-3596d94a.png",
+      "sha256": "3596d94ab9b0a4485bc48ef5454bb2d6ff82604eb1694c6643b0fca83c492490"
+    },
+    {
+      "id": "89520f2feae0ee61",
+      "label": "Study",
+      "workspace": "study",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/study-89520f2f.jpg",
+      "sha256": "89520f2feae0ee613951cc953a8b3d12cf4a8afbfb29641b2eaa7ece17ced556"
+    },
+    {
+      "id": "576c2812f8d60d2b",
+      "label": "System",
+      "workspace": "system",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/system-576c2812.jpg",
+      "sha256": "576c2812f8d60d2bd804a7b687a939814314c30b120f71ba17f81cdbf0287d1a"
+    },
+    {
+      "id": "fa454b8dade902eb",
+      "label": "Author landscape",
+      "workspace": "author",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/author-landscape-fa454b8d.jpeg",
+      "sha256": "fa454b8dade902eb5a2ecdd2864af0548c3f46b6fb212f6797f0d15e595d99ed"
+    },
+    {
+      "id": "288313beada99d1e",
+      "label": "Recovery dawn",
+      "workspace": "recovery",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/recovery-dawn-288313be.jpeg",
+      "sha256": "288313beada99d1efb7f3190c72a8e571adceb1f65389c3074d098c61e31a654"
+    },
+    {
+      "id": "22bad69498148f4d",
+      "label": "Recovery web sanctuary",
+      "workspace": "recovery",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/recovery-web-sanctuary-22bad694.jpeg",
+      "sha256": "22bad69498148f4d1cfcda574e05e57961a1817a1787d895c60572bec23f723f"
+    },
+    {
+      "id": "8fb7df596ba47bab",
+      "label": "Kali Bay landscape",
+      "workspace": "kali-bay",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/kali-bay-landscape-8fb7df59.jpeg",
+      "sha256": "8fb7df596ba47bab0fbec3d1343eaf48b42f7e24c35347f3f2d75e65cae7f212"
+    },
+    {
+      "id": "ecd9b156df031eab",
+      "label": "Dev Bay landscape",
+      "workspace": "dev-bay",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/dev-bay-landscape-ecd9b156.jpeg",
+      "sha256": "ecd9b156df031eabf65afbd15f0b8447a7bff4fffaffdfc9c896b0bb724104dd"
+    },
+    {
+      "id": "d18db9cfce85ff92",
+      "label": "Neon Purple Dripping Spider Emblem",
+      "workspace": "default",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/neon-purple-dripping-spider-emblem-d18db9cf.png",
+      "sha256": "d18db9cfce85ff92b314259a3139243e38a77027b4124a6530d63a7989c5e518"
+    },
+    {
+      "id": "c882e8d5a66effa6",
+      "label": "Neon Purple Grunge Spider Emblem",
+      "workspace": "default",
+      "group": "Purple collection",
+      "file": "branding/wallpapers/collection/neon-purple-grunge-spider-emblem-c882e8d5.png",
+      "sha256": "c882e8d5a66effa6354799db9fdc36ed3ca59e2b4cd2db7fc2da253d6e6311cf"
+    },
+    {
+      "id": "7f41cfb9d42506fa",
+      "label": "Author early landscape",
+      "workspace": "author",
+      "group": "Earlier designs",
+      "file": "branding/wallpapers/collection/author-early-landscape-7f41cfb9.jpeg",
+      "sha256": "7f41cfb9d42506faadd069d74f000a1bb1848888b6f699f62923207495463a0a"
+    },
+    {
+      "id": "bfbae5e6fb0f4070",
+      "label": "Dev Bay early landscape",
+      "workspace": "dev-bay",
+      "group": "Earlier designs",
+      "file": "branding/wallpapers/collection/dev-bay-early-landscape-bfbae5e6.jpeg",
+      "sha256": "bfbae5e6fb0f4070ad9f12018d4795d0e2528d6ae142aa7145885d9540f988f8"
+    },
+    {
+      "id": "666a8c325bb0e54c",
+      "label": "Recovery early landscape",
+      "workspace": "recovery",
+      "group": "Earlier designs",
+      "file": "branding/wallpapers/collection/recovery-early-landscape-666a8c32.jpeg",
+      "sha256": "666a8c325bb0e54c09d6a143066756694b4cf912ee37378e9881a067c29e393a"
+    },
+    {
+      "id": "e2b6901b1d2541de",
+      "label": "Dev Bay Crimson Spider Forge",
+      "workspace": "dev-bay",
+      "group": "Earlier designs",
+      "file": "branding/wallpapers/collection/dev-bay-crimson-spider-forge-e2b6901b.png",
+      "sha256": "e2b6901b1d2541de3ce4e685bb679ff92f4d04faa7878ae8a7d412cd39dc0fb3"
+    },
+    {
+      "id": "bd71c95d32a6eb8d",
+      "label": "Gothic Author S Weblit Sanctuary",
+      "workspace": "author",
+      "group": "Earlier designs",
+      "file": "branding/wallpapers/collection/gothic-author-s-weblit-sanctuary-bd71c95d.png",
+      "sha256": "bd71c95d32a6eb8dbeb074948ffd36091cda7c620a58f061e2cae313ae538c05"
+    },
+    {
+      "id": "2353464df408ea41",
+      "label": "Recovery At The Spider Gate",
+      "workspace": "recovery",
+      "group": "Earlier designs",
+      "file": "branding/wallpapers/collection/recovery-at-the-spider-gate-2353464d.png",
+      "sha256": "2353464df408ea41444efc99a50fe9f7c0f7b8a52dac99c968cdf805f02cec2f"
+    },
+    {
+      "id": "173e186b9fd3b152",
+      "label": "Home",
+      "workspace": "default",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/home-173e186b.png",
+      "sha256": "173e186b9fd3b152a8585693e465343c58ce8f25ce555c71381d18cf09355383"
+    },
+    {
+      "id": "ba5318df899f6849",
+      "label": "Study",
+      "workspace": "study",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/study-ba5318df.png",
+      "sha256": "ba5318df899f68496d924a00989d5dadcacfe3d9b5646892710121a7a4906e01"
+    },
+    {
+      "id": "1104e710646fd494",
+      "label": "Author",
+      "workspace": "author",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/author-1104e710.png",
+      "sha256": "1104e710646fd494297f5bb211f6158ad05249c92e42d8a83f2c87d956dedf0b"
+    },
+    {
+      "id": "052f481b6d93c97a",
+      "label": "Studio",
+      "workspace": "studio",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/studio-052f481b.png",
+      "sha256": "052f481b6d93c97a91aaf9a794331a6646ba9f951fcec4b5c400c151ddc97d59"
+    },
+    {
+      "id": "71310bd2636f66e9",
+      "label": "Media",
+      "workspace": "media",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/media-71310bd2.png",
+      "sha256": "71310bd2636f66e96868e7645e96cc8986e397c96f41c9c422abb9a3a6a1ef52"
+    },
+    {
+      "id": "525756fc7763cb1e",
+      "label": "Forage",
+      "workspace": "forage",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/forage-525756fc.png",
+      "sha256": "525756fc7763cb1e666ab58e410579abf92aa7070f114941afc7b1d80241de77"
+    },
+    {
+      "id": "e60839a468a32107",
+      "label": "Dev Bay",
+      "workspace": "dev-bay",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/dev-bay-e60839a4.png",
+      "sha256": "e60839a468a32107e6a9e425686b43b855ab5a6a5c8de5c86087a8801943959b"
+    },
+    {
+      "id": "7d27a058432abcfa",
+      "label": "Art Lab",
+      "workspace": "art-lab",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/art-lab-7d27a058.png",
+      "sha256": "7d27a058432abcfa452152164b9cc83a91a4ced321e482d32bebb2640f0efa13"
+    },
+    {
+      "id": "43745033594411ac",
+      "label": "Kali Bay",
+      "workspace": "kali-bay",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/kali-bay-43745033.png",
+      "sha256": "43745033594411ac3a0a25f5e0be028636923b951acdee80773c49acb2535cb6"
+    },
+    {
+      "id": "f0c22b5af34bf1d9",
+      "label": "System",
+      "workspace": "system",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/system-f0c22b5a.png",
+      "sha256": "f0c22b5af34bf1d9cd4b177f591856c455765de52a5479bbd69da2dd2d6ab55b"
+    },
+    {
+      "id": "91cbd8d2e414cc56",
+      "label": "Recovery",
+      "workspace": "recovery",
+      "group": "Original workspace designs",
+      "file": "branding/wallpapers/collection/recovery-91cbd8d2.png",
+      "sha256": "91cbd8d2e414cc56f8a941ad9aeafcc235d2dd62c891b69ea5fd9ddb91842405"
+    },
+    {
+      "id": "f07f13a4f75bbdc2",
+      "label": "Webbie \u00b7 New workspace artwork",
+      "workspace": "webbie",
+      "group": "New workspace collection",
+      "file": "branding/wallpapers/collection/webbie-new-workspace-artwork-f07f13a4.png",
+      "sha256": "f07f13a4f75bbdc2c0d49a7a057a395e94b70a1623cd857f3fe1b491a3814133"
+    },
+    {
+      "id": "28b037617b934092",
+      "label": "Forage \u00b7 New workspace artwork",
+      "workspace": "forage",
+      "group": "New workspace collection",
+      "file": "branding/wallpapers/collection/forage-new-workspace-artwork-28b03761.png",
+      "sha256": "28b037617b93409298aa01e040eb753dabb705051916c3106286f379aad5dd4c"
+    },
+    {
+      "id": "bf7b2bb89fca4e5f",
+      "label": "Deep Forage \u00b7 New workspace artwork",
+      "workspace": "deep-forage",
+      "group": "New workspace collection",
+      "file": "branding/wallpapers/collection/deep-forage-new-workspace-artwork-bf7b2bb8.png",
+      "sha256": "bf7b2bb89fca4e5fd306448013f885240ff4d889a79d22d6bc84f82e74d94086"
+    },
+    {
+      "id": "b12b4c7974b1729d",
+      "label": "Communocations \u00b7 New workspace artwork",
+      "workspace": "communications",
+      "group": "New workspace collection",
+      "file": "branding/wallpapers/collection/communocations-new-workspace-artwork-b12b4c79.png",
+      "sha256": "b12b4c7974b1729d9c76651daa437204d4cc5e318b9c0ee582083d0b15e1b1da"
+    },
+    {
+      "id": "93f4db791c8ef346",
+      "label": "Recovery \u00b7 New workspace artwork",
+      "workspace": "recovery",
+      "group": "New workspace collection",
+      "file": "branding/wallpapers/collection/recovery-new-workspace-artwork-93f4db79.png",
+      "sha256": "93f4db791c8ef346d42140cc0e7d2005b89400a267f9d54791d267a30c1be672"
+    },
+    {
+      "id": "0a838240af875e89",
+      "label": "Author Workspace \u00b7 New workspace artwork",
+      "workspace": "author",
+      "group": "New workspace collection",
+      "file": "branding/wallpapers/collection/author-workspace-new-workspace-artwork-0a838240.png",
+      "sha256": "0a838240af875e8974e6033ca246a1186c5c0d81e36980c74be9d61d9df9296b"
+    },
+    {
+      "id": "ad7a217aa18adf39",
+      "label": "Dev Bay \u00b7 New workspace artwork",
+      "workspace": "dev-bay",
+      "group": "New workspace collection",
+      "file": "branding/wallpapers/collection/dev-bay-new-workspace-artwork-ad7a217a.png",
+      "sha256": "ad7a217aa18adf396f13438fd02cfcc1d5b43c01aa2b836aeb29a0a5ffa8a9d4"
+    },
+    {
+      "id": "cac8ad6b850a0e8f",
+      "label": "Communocations \u00b7 Matching collection",
+      "workspace": "communications",
+      "group": "New workspace alternates",
+      "file": "branding/wallpapers/collection/communocations-matching-collection-cac8ad6b.png",
+      "sha256": "cac8ad6b850a0e8fa3d12d0fedfb7275cd29c8c434acbbd982b44dc1384ee3b8"
+    },
+    {
+      "id": "f30b0a5cd01f7c2c",
+      "label": "Deep Forage \u00b7 Matching collection",
+      "workspace": "deep-forage",
+      "group": "New workspace alternates",
+      "file": "branding/wallpapers/collection/deep-forage-matching-collection-f30b0a5c.png",
+      "sha256": "f30b0a5cd01f7c2c45bb2d348453cfe38808fb074b52c950bc631dfb35a5bd73"
+    },
+    {
+      "id": "08020aa8ba12aa0d",
+      "label": "Forage \u00b7 Matching collection",
+      "workspace": "forage",
+      "group": "New workspace alternates",
+      "file": "branding/wallpapers/collection/forage-matching-collection-08020aa8.png",
+      "sha256": "08020aa8ba12aa0da56b44ef8809dbf33819fc3a00c5100d101e9bde5d5037f3"
+    },
+    {
+      "id": "d4b1a37b6544c43e",
+      "label": "Webbie \u00b7 Matching collection",
+      "workspace": "webbie",
+      "group": "New workspace alternates",
+      "file": "branding/wallpapers/collection/webbie-matching-collection-d4b1a37b.png",
+      "sha256": "d4b1a37b6544c43e80d005f2d2a67441e7690c7223943295d2bb4413a1844060"
+    },
+    {
+      "id": "913aebca0e7e69b8",
+      "label": "Purple Spider OS night study-1",
+      "workspace": "study",
+      "group": "Additional designs",
+      "file": "branding/wallpapers/collection/purple-spider-os-night-study-1-913aebca.png",
+      "sha256": "913aebca0e7e69b8e7036f7b5871a9b04afa9060d54d6e6fdc5b225103858718"
+    },
+    {
+      "id": "1685054669abb329",
+      "label": "Violet spider over a lavender dawn-3",
+      "workspace": "recovery",
+      "group": "Additional designs",
+      "file": "branding/wallpapers/collection/violet-spider-over-a-lavender-dawn-3-16850546.png",
+      "sha256": "1685054669abb329e48471dd27618b9e03ae0f4d54d31316351cc0fa86f27f96"
+    },
+    {
+      "id": "e799fd2563dbabed",
+      "label": "Distressed crimson Spider OS wallpaper",
+      "workspace": "default",
+      "group": "Additional designs",
+      "file": "branding/wallpapers/collection/distressed-crimson-spider-os-wallpaper-e799fd25.png",
+      "sha256": "e799fd2563dbabedbb4359bf399799b8cf86a6043b8f1a3f6f0865d1289643f9"
+    }
+  ],
+  "new_workspace_defaults": {
+    "webbie": "f07f13a4f75bbdc2",
+    "deep-forage": "bf7b2bb89fca4e5f",
+    "communications": "b12b4c7974b1729d"
+  }
+}
