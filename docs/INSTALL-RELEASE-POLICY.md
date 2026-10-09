@@ -15,11 +15,14 @@ When the owner explicitly asks to install:
 
 **There is no daily install quota or scheduled daily installation.** A user-requested session is the batching boundary. Multiple separately requested installation sessions, including on the same day, are allowed.
 
-## Current integration status (not ready to install)
-Branch: `integration/webbie-author-camera-sleep-20261009`.
-Initial commit: `1fd759bab3aa95054664323fea4a3a9ab6cd98c9`.
-Stage contains PR #25 quiet sleep + inherited #21 OneDrive and face and #22 names, plus selected Author/camera support from #23 and independent local vision files from #24. The Webbie agent, shared panel and shell imports are NOT yet reconciled. This staging branch has NOT been demonstrated to pass integration CI. **Do not install it.**
-PR #23 was updated by another chat during staging (observed `83d692b4c3115a2f4edeed2730a77774c2b49364`), after the initial staging source was selected. Reconcile latest source before declaring finished.
+## Current integration status (source validated; not installed)
+
+- One integration branch: `integration/webbie-author-camera-sleep-20261009`, with draft PR #26.
+- Reconciled the latest Author/camera modules from PR #23 with the PR #21 OneDrive and X11 portrait, PR #22 workspace names and model selection, and PR #25 quiet sleep. Existing user voice settings, models, manuscripts and boot code are preserved in this source-only work.
+- The Web launches the **single external X11 portrait** guarded by a per-user lock. Its Webbie panel shares the same sleep state; microphone voice commands use the existing listener gate, and consent-bound visual queries use the explicit GUI camera permission.
+- Added `system/release_batch.py` with a strict source/host preflight, one backup manifest, atomic file staging and rollback; source regression tests pass. This is not a full ISO or OS reinstall.
+- GitHub Actions run `37947832794` passed the integrated source checks on SHA `5cbd4a9a8941e2e714acc17ae62d3a35d8c51db2`. Later documentation-only commits also need their current CI check before promoting any release.
+- **Still blocked from owner-PC installation:** verify a frozen final SHA; run the real Dell --check and reconcile unknown customized files; confirm a restorable Author DB and originals backup; test GUI/voice/camera/OneDrive and selective rollback on the installed host. Never run old PR installers to bypass a blocked preflight.
 
 ## Unified release source (still awaiting owner-PC preflight)
 
