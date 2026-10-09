@@ -30,9 +30,10 @@ class AuthorWindow(QMainWindow):
         bar = QHBoxLayout(); layout.addLayout(bar)
         for label, action in [('New book', self.new_book), ('New chapter', self.new_chapter),
                 ('Import text', self.import_text), ('Import library', self.import_bundle), ('Save', self.flush),
-                ('Restore snapshot', self.restore), ('Backup library', self.backup)]:
+                ('Restore snapshot', self.restore), ('Backup library', self.backup), ('Focus', self.toggle_focus)]:
             button = QPushButton(label); button.clicked.connect(action); bar.addWidget(button)
-        split = QSplitter(); layout.addWidget(split)
+            if label == 'Focus': self.focus_button = button
+        split = QSplitter(); self.split = split; layout.addWidget(split)
         self.books = QListWidget(); split.addWidget(self.books)
         self.chapters = QListWidget(); split.addWidget(self.chapters)
         tabs = QTabWidget(); split.addWidget(tabs)
@@ -41,6 +42,7 @@ class AuthorWindow(QMainWindow):
         tabs.addTab(self.editor, 'Chapter'); tabs.addTab(self.canon, 'Canon notes')
         self.toolkit = AuthorToolkit(self.store, self.current_chapter, self.flush, self.editor)
         self.toolkit.jumpRequested.connect(self.jump_to_search_result)
+        self.toolkit.reviewRequested.connect(self.author_review_requested)
         tabs.addTab(self.toolkit, 'Writing Studio')
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
@@ -147,6 +149,22 @@ class AuthorWindow(QMainWindow):
             content = self.action(lambda: self.store.restore(self.chapter_id, versions[labels.index(label)]['id']))
             if content is not False:
                 self.editor.setPlainText(content)
+
+    def toggle_focus(self):
+        focus = self.books.isVisible()
+        self.books.setVisible(not focus)
+        self.chapters.setVisible(not focus)
+        self.focus_button.setText('Exit focus' if focus else 'Focus')
+        self.status.setText('Focus writing mode' if focus else 'Writing desk')
+
+    def author_review_requested(self, text):
+        # Hosting desktop attaches the Webbie review hook. Standalone Author
+        # deliberately never sends writing to an AI or an external service.
+        callback = getattr(self, 'show_webbie_review', None)
+        if callback is None:
+            self.status.setText('Open Author through The Web to review selected text with Webbie.')
+        else:
+            callback(text)
 
     def current_chapter(self):
         if self.chapter_id is None:
