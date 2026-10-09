@@ -150,13 +150,18 @@ class WebbiePanel(QWidget):
         self.workspace_label = str(label)[:90]
         self.workspace_mode = str(mode)[:70]
         self.workspace_summary = str(summary)[:600]
+        self.preferred_address = 'Writer' if self.workspace_mode == 'Author Editor' else ''
         description = f'Workspace: {self.workspace_label}  |  {self.workspace_mode}'
+        if self.preferred_address:
+            description += '  |  Address: Writer'
         if self.workspace_summary:
             description += '\nSelected: ' + self.workspace_summary
         self.context.setText(description)
 
     def prepare_request(self, text):
         fields = [f'Workspace: {self.workspace_label}', f'Mode: {self.workspace_mode}']
+        if self.workspace_mode == 'Author Editor':
+            fields.append('Writer mode: Address the user as Writer naturally in this bay; do not use this form of address in other bays.')
         if self.workspace_summary:
             fields.append('Selected title: ' + self.workspace_summary)
         return '[Spider OS workspace context; advisory only]\n' + '\n'.join(fields) + '\n[User request]\n' + text
