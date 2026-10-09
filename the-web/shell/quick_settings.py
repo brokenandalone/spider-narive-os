@@ -10,7 +10,7 @@ import shutil
 import subprocess
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox
 
 STATUS_COMMANDS = {
     'connection': ('nmcli', '-t', '-f', 'STATE', 'general'),
@@ -126,8 +126,10 @@ class QuickSettingsWorker(QThread):
 
 class QuickSettingsPanel(QWidget):
     """Fast-access status, while KDE retains all privileged device controls."""
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, appearance_reader=None, appearance_writer=None):
         super().__init__(parent)
+        self._appearance_reader = appearance_reader
+        self._appearance_writer = appearance_writer
         self.setWindowTitle('Spider OS · Quick Settings')
         self.setObjectName('spiderQuickSettings')
         layout = QVBoxLayout(self)
@@ -141,6 +143,21 @@ class QuickSettingsPanel(QWidget):
             label.setTextFormat(Qt.PlainText)
             layout.addWidget(label)
             self.status[key] = label
+        appearance_row = QHBoxLayout()
+        appearance_row.addWidget(QLabel('The Web appearance'))
+        self.appearance_selector = QComboBox()
+        self.appearance_selector.setAccessibleName('The Web appearance')
+        self.appearance_selector.addItem('Dark violet (default)', 'dark')
+        self.appearance_selector.addItem('Light violet', 'light')
+        saved = appearance_reader() if callable(appearance_reader) else 'dark'
+        if saved not in ('dark', 'light'):
+            saved = 'dark'
+        self._appearance_value = saved
+        self.appearance_selector.setCurrentIndex(self.appearance_selector.findData(saved))
+        self.appearance_selector.setEnabled(callable(appearance_writer))
+        self.appearance_selector.currentIndexChanged.connect(self.choose_appearance)
+        appearance_row.addWidget(self.appearance_selector)
+        layout.addLayout(appearance_row)
         controls = QHBoxLayout()
         self.refresh_button = QPushButton('Refresh')
         self.refresh_button.clicked.connect(self.refresh)
@@ -155,6 +172,22 @@ class QuickSettingsPanel(QWidget):
         layout.addWidget(self.help)
         self.worker = None
         self.refresh()
+
+    def choose_appearance(self, index):
+        candidate = self.appearance_selector.itemData(index)
+        if candidate not in ('dark', 'light') or not callable(self._appearance_writer):
+            return
+        try:
+            self._appearance_writer(candidate)
+        except (OSError, ValueError, RuntimeError) as error:
+            self.help.setText('Appearance not changed: ' + str(error))
+            self.appearance_selector.blockSignals(True)
+            self.appearance_selector.setCurrentIndex(
+                self.appearance_selector.findData(self._appearance_value))
+            self.appearance_selector.blockSignals(False)
+        else:
+            self._appearance_value = candidate
+            self.help.setText('The Web appearance saved. KDE, GTK and other apps remain unchanged.')
 
     def refresh(self):
         if self.worker and self.worker.isRunning():
