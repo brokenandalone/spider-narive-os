@@ -42,6 +42,12 @@
 - [ ] Verify those capabilities on the Dell: optional `dbus-next`, NetworkManager/brightness tool detection, real app notifications, audio responsiveness and Webbie mic status. Build full device toggles only with permission checks and no connectivity surprises.
 - [ ] Qualify hardware media keys, input/output audio selection, native notification actions and tray menus, USB/eject, power/suspend and multi-monitor support; present them as future items, not completed controls.
 
+### Window-management source build (installed-PC acceptance pending)
+
+- [x] Built `the-web/shell/window_overview.py` and wired **Start → Windows** to a searchable nonblocking X11 window list. Activate, Minimize, Maximize/Restore and Close are available without terminal commands; close uses normal window-manager requests so applications can present save prompts.
+- [x] Added regression coverage for window-search filtering, invalid window IDs, safe normal Close and non-destructive handling of failed Minimize. Included the module in the one guarded release manifest. **Source CI on the newest combined revision must pass before promotion.**
+- [ ] Verify real-window listing, window activation/restore/minimize and unsaved-document prompts on the Dell. Consider a global shortcut/overview later with KWin session-specific permissions; don't claim the Qt shortcut is globally effective across unrelated apps.
+
 ## Confirmed accomplishments and source builds
 
 - [x] Installed native Spider OS boots; owner recovered it after Oct 9 power outage. Cause of failed boot and health of disk still unknown.
