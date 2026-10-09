@@ -100,7 +100,10 @@ class VoiceVisionBridgeTests(unittest.TestCase):
             with patch.dict(os.environ, {'XDG_RUNTIME_DIR': folder}), patch('webbie_panel.camera_devices', return_value=['/dev/video0']):
                 panel = WebbiePanel(ROOT)
                 panel.timer.stop()
-                panel.toggle_camera()
+                panel.camera_allowed = True
+                panel.vision_bridge = VisionBridge(folder, panel)
+                panel.vision_bridge.lookRequested.connect(panel.look_now)
+                panel.vision_bridge.activate()
                 self.assertTrue(panel.camera_allowed)
                 # Do not open physical camera; mimic a worker already running.
                 class Busy:
