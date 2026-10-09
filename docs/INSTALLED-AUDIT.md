@@ -16,9 +16,8 @@ run apt, start Kali, install packages, change a database or make backups.
 
 ```bash
 cd ~/spider-narive-os
-git fetch origin upgrades/installed-system-audit
-git show FETCH_HEAD:the-web/package/audit-installed.py > /tmp/spider-audit-installed.py
-python3 /tmp/spider-audit-installed.py
+git fetch origin upgrades/webbie-face-window-controls
+git show FETCH_HEAD:the-web/package/audit-installed.py | python3 -
 ```
 
 No `sudo`. The report prints presence/absence and safe counts directly into
@@ -29,7 +28,7 @@ is intentionally **not saved by default**.
 For a completely offline, file-only check without contacting systemd/Podman:
 
 ```bash
-python3 /tmp/spider-audit-installed.py --files-only
+git show FETCH_HEAD:the-web/package/audit-installed.py | python3 - --files-only
 ```
 
 Author's database is opened with SQLite immutable, read-only URI mode. This
