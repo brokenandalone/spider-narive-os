@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Webbie: Sleep Face Tonight
+Comment=Hide Webbie's translucent floating face until 8 AM; voice AI stays active
+Exec=/usr/bin/python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py sleep-tonight
+Icon=/usr/local/lib/spider-os/branding/webbie/webbie-face-v1.png
+Terminal=false
+Categories=Utility;

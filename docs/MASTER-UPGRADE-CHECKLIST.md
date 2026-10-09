@@ -25,6 +25,17 @@
 - [x] User confirmed all personal files remained present after the power outage. This is not a validated independent backup or a storage-health report.
 - [x] Source-built a read-only, privacy-limited installed-system audit for Author/Study record counts, Spider startup-branding hints, Kali state, desktop/Media files and user services (PR #18, merged into combined PR #17). **Not run on the owner PC yet.**
 - [x] The combined PR #17 source batch includes Webbie face/chat, window Close/Minimize/Maximize, audio/mute, Media MPRIS client, System/Recovery health panels and build receipts. Not installed on the owner PC; install in one selective batch with backup after source qualification.
+- [x] Owner's post-audit response on Oct 9 confirmed **System/Recovery dashboards (#5) and media playback controls (#4) working** in the currently used Plasma desktop. This is user-observed UI functionality, not proof of full streaming, recovery or backup testing.
+- [x] Oct 9 post-outage inventory: Webbie/Ollama/AI DJ/PipeWire/WirePlumber **active**; Kali Bay container **exited**, not missing; Author DB readable with 20 books, 39 chapters, 20 fingerprints; school DB 1 course, 0 assignments.
+- [x] PR #21 source-built floating click-through Webbie face, fullscreen auto-hide, explicit night sleep and optional sign-in OneDrive folder sync. Dedicated add-on installer exists; PC installation, mouse-pass-through, fullscreen, OAuth and cloud transfer all **still unchecked**.
+
+## New: floating Webbie and deferred OneDrive sign-in
+
+- [x] Source-built a separate, translucent **click-through** Webbie face in the lower-left of Plasma X11 and The Web X11, with KWin fullscreen hide, speaking-marker mouth animation, night sleep until 8 AM, and default user autostart. **Installed-PC verification pending.**
+- [x] Source-built optional Microsoft OneDrive connection via explicit user-invoked rclone OAuth, with Webbie local operation independent from all cloud tasks and a separate timed background folder sync. **Owner sign-in, cloud transfer and feature verification pending.**
+- [ ] Verify visible click-through on buttons, actual fullscreen video hiding, night sleep and voice continuity on the owner PC; support Plasma Wayland only after compositor-specific qualification.
+- [ ] Verify user-selected OneDrive remote/authentication and a harmless selected-folder upload. Do not auto-upload private Webbie history, memory, manuscripts or other user files.
+- [ ] Decide whether to offer secure memory sync or full OneDrive search only after explicit user permission and encryption design; selected-folder sync is not yet Webbie cloud memory.
 
 ## 1. Boot, disk and irreplaceable data — urgent
 

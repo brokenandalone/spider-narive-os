@@ -6,11 +6,12 @@ from pathlib import Path
 import re
 import subprocess
 
-BUILD_VERSION = '2026.10.09-batch-2'
+BUILD_VERSION = '2026.10.09-webbie-floating-cloud-rc'
 TRACKED = tuple('the-web/shell/' + name for name in (
     'main.py', 'desktop.py', 'app_catalog.py', 'wallpapers.py', 'workspace_files.py',
     'workspaces.py', 'system_panel.py', 'system_status.py', 'webbie_panel.py',
     'media_panel.py', 'media_transport.py', 'audio_controls.py', 'build_info.py')) + (
+    'the-web/overlay/webbie_face.py', 'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png', 'branding/webbie/webbie-face-speaking-v1.png',
     'branding/wallpapers/collection.json', 'the-web/session/the-web-session')
 
