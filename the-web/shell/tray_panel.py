@@ -1,6 +1,7 @@
 """StatusNotifier applications panel for The Web's existing taskbar."""
 from PyQt5.QtCore import QThread,pyqtSignal,Qt
-from PyQt5.QtWidgets import QWidget,QVBoxLayout,QLabel,QListWidget,QPushButton,QMenu
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QWidget,QVBoxLayout,QLabel,QListWidget,QListWidgetItem,QPushButton,QMenu
 from status_tray import get_status_items,activate_item,split_item,get_item_details,secondary_activate_item
 
 class TrayWorker(QThread):
@@ -59,8 +60,17 @@ class TrayPanel(QWidget):
             self.list.clear()
             for item in result:
                 if not isinstance(item,dict):continue
-                self.list.addItem(str(item.get('title',item.get('service','App')))[:90]
-                    +' · '+str(item.get('status','Unknown'))[:28])
+                label=str(item.get('title',item.get('service','App')))[:90]
+                label+=' · '+str(item.get('status','Unknown'))[:28]
+                row=QListWidgetItem(label)
+                # Resolve a themed icon name only. App-supplied file paths
+                # or pixmaps must not be opened by the tray.
+                icon_name=item.get('icon_name','')
+                if (isinstance(icon_name,str) and icon_name and
+                        '/' not in icon_name and len(icon_name)<=120):
+                    icon=QIcon.fromTheme(icon_name)
+                    if not icon.isNull():row.setIcon(icon)
+                self.list.addItem(row)
             self.status.setText(f'{len(result)} background apps found.' if result else
                  'No registered StatusNotifier apps found. A watcher service may be unavailable.')
         else:
