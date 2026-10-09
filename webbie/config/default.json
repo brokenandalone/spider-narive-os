@@ -13,7 +13,9 @@
     "default": "Cory",
     "studio": "Justin",
     "author": "Writer",
-    "kali-bay": "Spider"
+    "kali-bay": "Spider",
+    "study": "Student",
+    "school": "Student"
   },
   "voice": {
     "online": "en-AU-NatashaNeural",
