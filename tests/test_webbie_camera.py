@@ -38,15 +38,16 @@ class CameraSecurityTests(unittest.TestCase):
             self.assertTrue(panel.camera_allowed)
             self.assertFalse(panel.camera_timer.isActive())
             with patch.object(panel, 'look_now') as look:
-                # UI performs no capture until expressly requested.
+                # UI performs no capture until explicitly requested.
                 self.assertEqual(look.call_count, 0)
-            panel.toggle_camera_awareness()
+                panel.toggle_camera_awareness()
+                self.assertEqual(look.call_count, 1)
             self.assertTrue(panel.camera_continuous)
             self.assertTrue(panel.camera_timer.isActive())
             panel.camera_described('A table with notebooks and a lamp.')
             self.assertIn('notebooks', panel.camera_observation.toPlainText())
             self.assertIn('notebooks', panel.camera_summary)
-            self.assertIn('notebooks', panel.camera_state.text()) if False else None
+            self.assertIn('CAMERA ACTIVE', panel.camera_state.text())
             panel.set_face_sleeping(True)
             self.assertFalse(panel.camera_allowed)
             self.assertFalse(panel.camera_timer.isActive())
