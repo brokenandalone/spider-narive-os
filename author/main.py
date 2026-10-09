@@ -2,15 +2,17 @@
 """Native Author library, chapter editor, autosave, snapshots and canon notebook."""
 import sys
 from pathlib import Path
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDialog,
     QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .store import AuthorStore
+    from .web_features import AuthorToolkit
 else:
     from store import AuthorStore
+    from web_features import AuthorToolkit
 
 
 class AuthorWindow(QMainWindow):
@@ -37,6 +39,9 @@ class AuthorWindow(QMainWindow):
         self.editor = QTextEdit(); self.editor.setAcceptRichText(False)
         self.canon = QTextEdit(); self.canon.setAcceptRichText(False)
         tabs.addTab(self.editor, 'Chapter'); tabs.addTab(self.canon, 'Canon notes')
+        self.toolkit = AuthorToolkit(self.store, self.current_chapter)
+        self.toolkit.jumpRequested.connect(self.jump_to_search_result)
+        tabs.addTab(self.toolkit, 'Writing Studio')
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
         self.books.currentItemChanged.connect(self.select_book)
@@ -64,6 +69,7 @@ class AuthorWindow(QMainWindow):
                 self.store.save(self.chapter_id, self.editor.toPlainText())
             if self.book_id is not None:
                 self.store.save_canon(self.book_id, self.canon.toPlainText())
+            self.toolkit.save_current()
             self.status.setText('Saved locally. ' + str(len(self.editor.toPlainText().split())) + ' words.')
             return True
         return self.action(save)
@@ -81,6 +87,7 @@ class AuthorWindow(QMainWindow):
         self.canon.setEnabled(item is not None)
         self.canon.setPlainText(self.store.canon(self.book_id) if item else '')
         self.load_chapters()
+        self.toolkit.set_book(self.book_id)
 
     def load_chapters(self):
         self.chapters.blockSignals(True); self.chapters.clear()
@@ -140,6 +147,44 @@ class AuthorWindow(QMainWindow):
             content = self.action(lambda: self.store.restore(self.chapter_id, versions[labels.index(label)]['id']))
             if content is not False:
                 self.editor.setPlainText(content)
+
+    def current_chapter(self):
+        if self.chapter_id is None:
+            return None
+        return self.store.chapter(self.chapter_id)
+
+    def webbie_context(self):
+        # Titles only; manuscript, chapter text and private notes stay local.
+        book = next((r for r in self.store.books() if r['id'] == self.book_id), None)
+        selected = self.current_chapter()
+        parts = [book['title'] if book else 'No book selected']
+        if selected is not None:
+            parts.append('Chapter: ' + selected['title'])
+        return ' | '.join(parts)
+
+    def jump_to_search_result(self, hit):
+        if not self.flush():
+            return
+        for index in range(self.books.count()):
+            if self.books.item(index).data(Qt.UserRole) == hit['book_id']:
+                self.books.setCurrentRow(index)
+                break
+        kind = hit['kind']
+        if kind == 'chapter':
+            for index in range(self.chapters.count()):
+                if self.chapters.item(index).data(Qt.UserRole) == hit['item_id']:
+                    self.chapters.setCurrentRow(index)
+                    break
+        elif kind == 'story':
+            for index in range(self.toolkit.story_list.count()):
+                if self.toolkit.story_list.item(index).data(Qt.UserRole) == hit['item_id']:
+                    self.toolkit.story_list.setCurrentRow(index)
+                    break
+        elif kind == 'reference':
+            for index in range(self.toolkit.reference_list.count()):
+                if self.toolkit.reference_list.item(index).data(Qt.UserRole) == hit['item_id']:
+                    self.toolkit.reference_list.setCurrentRow(index)
+                    break
 
     def backup(self):
         if not self.flush():
