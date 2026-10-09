@@ -141,9 +141,9 @@ class WebbiePanel(QWidget):
         # These are explicit user actions. Neither OneDrive nor the overlay is
         # a dependency of the resident voice agent or its normal replies.
         extras = QHBoxLayout(); layout.addLayout(extras)
-        sleep_btn = QPushButton('Sleep face tonight')
-        sleep_btn.setToolTip('Hide the screen portrait until 8 AM. Webbie continues running.')
-        sleep_btn.clicked.connect(lambda: self.face_mode('sleep-tonight'))
+        sleep_btn = QPushButton('Put Webbie to sleep')
+        sleep_btn.setToolTip('Webbie remains visible with closed eyes, ignores conversation, and keeps background jobs running.')
+        sleep_btn.clicked.connect(lambda: self.face_mode('sleep'))
         extras.addWidget(sleep_btn)
         wake_btn = QPushButton('Wake face')
         wake_btn.clicked.connect(lambda: self.face_mode('wake'))
@@ -194,7 +194,7 @@ class WebbiePanel(QWidget):
                              stderr=subprocess.DEVNULL,
                              start_new_session=True)
             self.append_message('Status',
-                'Webbie face will wake at 8 AM.' if mode == 'sleep-tonight' else 'Webbie face waking.')
+                'Webbie is sleeping until you wake her.' if mode == 'sleep' else 'Webbie waking.')
         except OSError as error:
             self.append_message('Status', 'Could not change face display: ' + str(error))
 

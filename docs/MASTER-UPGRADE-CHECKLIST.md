@@ -92,7 +92,10 @@
 - [ ] Install/qualify any future agent-only changes separately from the safe floating-face and OneDrive add-on. Preserve the installed voice patches and services.
 - [ ] Build explicitly opt-in camera awareness of the room with visible recording/active indicator; no silent start, hidden webcam access, or unsolicited cloud upload.
 - [ ] Build separately approved screen awareness with visible sharing state, limited capture, and privacy controls. Neither camera nor screen capture is currently installed as an enabled Webbie feature.
-- [ ] Confirm whether night sleep should hide only Webbie's face or also pause voice listening before making microphone-service changes.
+- [x] **Owner decision Oct 9:** Webbie's lower-left face must **remain visible and look asleep**, while ordinary voice input is ignored. Microphone/transcription may remain active solely for an explicit wake phrase. No background jobs or services should stop.
+- [x] Source-built shared quiet-sleep state for the X11 portrait and agent: closed-eyes dimmed appearance, explicit voice sleep/wake phrases, ignore ordinary recognized speech and proactive spoken check-ins, preserve background loops. Agent and desktop installation **pending**.
+- [ ] Qualify Cory/Shayna-only speaker verification for wake commands; an exact phrase from TV/strangers cannot yet be guaranteed rejected.
+- [ ] Test actual sleeping face, mouse pass-through, fullscreen video, voice wake/sleep and uninterrupted scheduled background work on the installed X11 PC.
 
 ## 4. Author — private manuscripts, library and canon
 
