@@ -62,6 +62,28 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
 - On October 9 the owner requested **Student** as Webbie's form of address in School/Study, alongside **Writer** in Author Bay.
 - The `upgrades/webbie-author-context` source branch / PR #22 now contains both `study` and `school` mappings, updated default config, brain prompt, and regression tests. This is **source-only** until a separately reviewed agent-specific installation. Keep the older Studio=Justin and Kali Bay=Spider forms of address.
 
+## Latest night-sleep decision (October 9)
+
+The owner clarified that Webbie should **stay visible with closed eyes, dimmed,
+and obviously asleep** in the lower left of the screen. Audio transcription may
+continue, but **ordinary heard speech must be ignored** until an explicit wake
+phrase. Webbie's background tasks, model service, AI DJ, timers and ordinary
+housekeeping should continue. This is NOT hardware microphone mute.
+
+- Source PR #25: https://github.com/brokenandalone/spider-narive-os/pull/25
+- Built on PR #22, with quiet shared state for the floating portrait and agent
+  voice gate. "Goodnight Webbie" / "Hey Webbie go to sleep" enter indefinite
+  quiet mode; "Hey Webbie wake up" exits. Manual GUI sleep/wake remains possible.
+- Face does NOT disappear while sleeping; it still hides temporarily for a
+  fullscreen movie. No automatic 8 AM wake.
+- PR #21's **older** selective add-on build still has the former hide-until-8AM
+  behavior. **Do not recommend that pinned PR #21 artifact as completing the
+  new sleep requirement.** A compatible updated selective rollout must be
+  reviewed; Webbie's installed customized agent is not to be overwritten.
+- Wake-phrase voice identity authorization remains a separate unverified
+  Cory/Shayna-only requirement. A recognized command is not secure proof of
+  the speaker.
+
 ## Tomorrow: safe sequence (only after user is at their PC)
 
 1. **Session confirmed:** `XDG_SESSION_TYPE=x11`, `DESKTOP_SESSION=the-web`. No more login-session checks required for X11 eligibility. Test actual click-through and fullscreen hiding after installing the add-on.
@@ -87,9 +109,7 @@ This is the source-of-truth recovery point for the ongoing owner-PC upgrade.
 
 ## Decisions to ask the owner (do not presume an answer)
 
-- When Webbie is **asleep for the night**, should that hide only her portrait,
-  or pause the microphone/listening service too? The existing overlay only
-  hides the face and does **not** stop the voice agent.
+- **Resolved:** keep the portrait visible with sleep expression, ignore ordinary heard speech except an explicit wake command, keep all background services running. This is a soft voice gate, not a microphone mute.
 - Should OneDrive access remain restricted to the **Webbie share folder**, or
   should Webbie eventually read more user-approved areas? Broader access
   needs explicit permission boundaries and never enables silently.
