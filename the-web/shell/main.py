@@ -33,6 +33,7 @@ from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 from media_panel import MediaPanel
 from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
+from appearance import LIGHT_STYLE, appearance_file, load_theme, save_theme
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
 from tray_panel import TrayPanel
@@ -62,9 +63,14 @@ class WallpaperWidget(QWidget):
     def __init__(self):
         super().__init__()
         self._background = QPixmap()
+        self.appearance = 'dark'
 
     def set_background(self, pixmap):
         self._background = pixmap
+        self.update()
+
+    def set_appearance(self, mode):
+        self.appearance = mode
         self.update()
 
     def paintEvent(self, event):
@@ -74,8 +80,13 @@ class WallpaperWidget(QWidget):
             x = (image.width() - self.width()) // 2; y = (image.height() - self.height()) // 2
             painter.drawPixmap(0, 0, image, x, y, self.width(), self.height())
         else:
-            painter.fillRect(self.rect(), QColor(8, 6, 11))
-        painter.fillRect(self.rect(), QColor(8, 6, 11, 95))
+            painter.fillRect(self.rect(), QColor(8, 6, 11) if self.appearance == 'dark' else QColor(250, 245, 255))
+        # The actual image file is never changed. Light mode needs a brighter
+        # tint so dark labels remain visible over the same purple wallpaper.
+        if self.appearance == 'light':
+            painter.fillRect(self.rect(), QColor(253, 250, 255, 192))
+        else:
+            painter.fillRect(self.rect(), QColor(8, 6, 11, 95))
 
 
 def button(label, callback):
@@ -197,10 +208,14 @@ class TheWeb(QMainWindow):
         self.desktop_mode = desktop_mode; self.current_workspace = 'default'; self.workspace_widgets = {}; self.app_lists = {}
         self.wallpaper_catalog = WallpaperCatalog(SPIDER_ROOT); self.wallpaper = None
         self.state_path = self.wallpaper_catalog.config.parent / 'desktop.json'
+        self.appearance_path = appearance_file()
+        self.appearance = load_theme(self.appearance_path)
         self.installed_apps = discover_apps(desktops='TheWeb:KDE')
-        self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(STYLE)
+        self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(self._appearance_style())
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-        self.build_ui(); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
+        self.build_ui(); self.background_surface.set_appearance(self.appearance); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
+        self.start_menu.setStyleSheet(self._appearance_style())
+        self.taskbar.setStyleSheet(self._appearance_style())
         self.launch_webbie_floating_face()
         self.notifications_process = self.start_notification_bridge()
         self.notification_toast = NotificationToast(self) if self.desktop_mode else None
@@ -217,7 +232,9 @@ class TheWeb(QMainWindow):
         outer = QVBoxLayout(root); outer.setContentsMargins(20, 16, 20, 12)
         header = QHBoxLayout(); outer.addLayout(header)
         logo = QLabel(); logo.setPixmap(QPixmap(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png')).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)); header.addWidget(logo)
-        title = QLabel('THE WEB'); title.setStyleSheet('font-size:26px; font-weight:bold; color:#e9d5ff; letter-spacing:2px;'); header.addWidget(title)
+        self.brand_title = QLabel('THE WEB')
+        self.brand_title.setStyleSheet(self._brand_style())
+        header.addWidget(self.brand_title)
         header.addWidget(QLabel('YOUR LIFE. ONE WEB.'), 1)
         header.addWidget(button('Ask Webbie', self.toggle_webbie_assistant))
         self.face_button = button('Put Webbie to sleep', self.toggle_webbie_face)
@@ -529,10 +546,36 @@ class TheWeb(QMainWindow):
             panel.show()
             panel.raise_()
 
+    def _appearance_style(self):
+        return LIGHT_STYLE if self.appearance == 'light' else STYLE
+
+    def _brand_style(self):
+        color = '#4c1674' if self.appearance == 'light' else '#e9d5ff'
+        return 'font-size:26px; font-weight:bold; color:' + color + '; letter-spacing:2px;'
+
+    def choose_appearance(self, theme):
+        # This preference deliberately changes The Web, not KDE/GTK themes.
+        # Never modify the preferred purple wallpapers or other applications.
+        if theme not in ('dark', 'light'):
+            raise ValueError('Invalid Spider OS appearance')
+        if theme == self.appearance:
+            return
+        save_theme(theme, self.appearance_path)
+        self.appearance = theme
+        stylesheet = self._appearance_style()
+        self.setStyleSheet(stylesheet)
+        self.brand_title.setStyleSheet(self._brand_style())
+        self.background_surface.set_appearance(theme)
+        self.start_menu.setStyleSheet(stylesheet)
+        self.taskbar.setStyleSheet(stylesheet)
+        self.status.setText('The Web appearance: ' + theme + '. KDE/GTK applications unchanged.')
+
     def toggle_quick_settings(self):
         panel=getattr(self, 'quick_settings_panel', None)
         if panel is None:
-            self.quick_settings_panel=QuickSettingsPanel(self)
+            self.quick_settings_panel=QuickSettingsPanel(
+                self, appearance_reader=lambda: self.appearance,
+                appearance_writer=self.choose_appearance)
             panel=self.quick_settings_panel
         if panel.isVisible():
             panel.hide()
