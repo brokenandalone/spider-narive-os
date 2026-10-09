@@ -35,4 +35,18 @@ Source: 71 Python regressions, feature-script validation, shell syntax checks, S
 
 A real SDDM login, KWin focus/window switching, multi-monitor behavior, automatic lock, authentication/unlock and logout require verification on the installed machine. Offscreen Qt checks do not establish those results. This build is a release candidate until that installed-session verification is complete. X11 is supported; no Wayland session is provided.
 
+From a terminal opened in The Web, run without sudo:
+
+```bash
+python3 the-web/package/verify-installed.py
+```
+
+The read-only preflight checks installed session files, original and collection
+wallpapers, workspace assignments, system PyQt, session endpoints, services and
+local AI health. It compares Media Center's installed archive to the supplied
+playback build. A different archive may be a newer build; the report does not
+declare it broken. Manual login, unlock, saved editing and playback checks remain
+explicitly pending. Add `--json` for a structured report. No services are restarted
+and no settings, logs, models or manuscripts are changed or printed.
+
 To return to the previous desktop, log out and select **Plasma**. Source backups are retained under `/usr/local/lib/spider-os/upgrade-backups/`; the prior lock-screen config is `~/.config/kscreenlockerrc.before-the-web` when one existed.

@@ -61,6 +61,13 @@ released alongside the desktop work.
 11. [ ] Install this release candidate and verify real SDDM login, KWin focus,
     window switching, lock/unlock, logout, multiple monitors, movies and splash
     transitions on the owner PC. Source/Qt checks cannot establish those results.
+    A read-only installed-system preflight is now available at
+    `the-web/package/verify-installed.py`; it checks wallpaper integrity and
+    placement, session files, services and the tested Media Center archive.
+    The ISO payload gate now expects the desktop session instead of the removed
+    application-menu entry. Manual acceptance still needs owner-PC results.
+    The updated suite passes 75 regressions. A staged new-desktop ISO payload
+    fixture passes; reintroducing the old app entry is correctly rejected.
 
 ### Proposed application placement
 
