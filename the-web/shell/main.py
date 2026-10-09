@@ -33,6 +33,7 @@ from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 from media_panel import MediaPanel
 from volume_panel import VolumePanel
 from notification_center import NotificationCenter
+from notification_toast import NotificationToast
 from tray_panel import TrayPanel
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
@@ -200,6 +201,7 @@ class TheWeb(QMainWindow):
         self.build_ui(); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self.launch_webbie_floating_face()
         self.notifications_process = self.start_notification_bridge()
+        self.notification_toast = NotificationToast(self) if self.desktop_mode else None
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
@@ -604,6 +606,7 @@ class TheWeb(QMainWindow):
         bridge=getattr(self,'notifications_process',None)
         if bridge is not None and bridge.poll() is None:
             bridge.terminate()
+        if self.notification_toast is not None: self.notification_toast.close()
         self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
 
 
