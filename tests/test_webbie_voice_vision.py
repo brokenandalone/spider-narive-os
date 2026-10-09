@@ -93,6 +93,56 @@ class VoiceVisionBridgeTests(unittest.TestCase):
             self.assertFalse(client.is_alive())
             self.assertIn('turned off', result['text'].lower())
 
+    def test_busy_camera_answers_without_hanging_speech(self):
+        from unittest.mock import patch
+        from webbie_panel import WebbiePanel
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.dict(os.environ, {'XDG_RUNTIME_DIR': folder}), patch('webbie_panel.camera_devices', return_value=['/dev/video0']):
+                panel = WebbiePanel(ROOT)
+                panel.timer.stop()
+                panel.toggle_camera()
+                self.assertTrue(panel.camera_allowed)
+                # Do not open physical camera; mimic a worker already running.
+                class Busy:
+                    def isRunning(self): return True
+                    def requestInterruption(self): pass
+                panel.camera_worker = Busy()
+                result = {}
+                client = threading.Thread(target=lambda: result.update(
+                    text=voice.ask_vision('what can you see', runtime=folder, timeout=4)))
+                client.start()
+                deadline = time.monotonic() + 4
+                while client.is_alive() and time.monotonic() < deadline:
+                    APP.processEvents()
+                    time.sleep(.005)
+                client.join(.1)
+                self.assertFalse(client.is_alive())
+                self.assertIn('already looking', result['text'])
+                panel.camera_worker = None
+                panel.stop_camera()
+                panel.close()
+
+    def test_voice_response_handles_unicode_at_byte_limit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            bridge = VisionBridge(folder)
+            bridge.activate()
+            bridge.lookRequested.connect(
+                lambda: QTimer.singleShot(1, lambda: bridge.reply('💜' * 1200))
+            )
+            result = {}
+            client = threading.Thread(target=lambda: result.update(
+                text=voice.ask_vision('look around', runtime=folder, timeout=4)))
+            client.start()
+            deadline = time.monotonic() + 5
+            while client.is_alive() and time.monotonic() < deadline:
+                APP.processEvents()
+                time.sleep(.005)
+            client.join(.1)
+            self.assertFalse(client.is_alive())
+            self.assertTrue(result['text'].startswith('💜'))
+            self.assertNotIn('\ufffd', result['text'])
+            bridge.deactivate()
+
     def test_voice_module_import_is_headless_and_does_not_reconfigure_mic(self):
         code = (ROOT / 'webbie/agent/vision_query.py').read_text()
         self.assertNotIn('PyQt5', code)
