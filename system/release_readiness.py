@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import hashlib
+import importlib.util
 
 def read_cmd(command, timeout=4):
     try:
@@ -46,7 +47,13 @@ def inspect(home=None, install=None, env=None, runner=read_cmd):
             'author_code_present':author.is_dir(),
         },
         'dependencies': {name: bool(shutil.which(name)) for name in
-                         ('python3', 'git', 'ffmpeg', 'xprop', 'rclone', 'ollama')},
+                         ('python3', 'git', 'ffmpeg', 'xprop', 'rclone', 'ollama',
+                          'wpctl', 'nmcli', 'bluetoothctl', 'brightnessctl',
+                          'systemsettings')},
+        'optional_desktop_support': {
+            'dbus_next_notifications': importlib.util.find_spec('dbus_next') is not None,
+            'note': 'Missing optional tools disable individual controls, not the resident Webbie voice service.',
+        },
         'ollama_models': runner(['ollama','list']) if shutil.which('ollama') else None,
         'audio_services': {name:runner(['systemctl','--user','is-active',name]) for name in
                            ('webbie.service','ollama.service','ai-dj.service','pipewire.service','wireplumber.service')}
@@ -81,7 +88,8 @@ def main(argv=None):
         print(json.dumps(data,indent=2))
     else:
         print('SPIDER OS | READ-ONLY RELEASE READINESS')
-        for section in ('display','installed_sources','dependencies','audio_services',
+        for section in ('display','installed_sources','dependencies',
+                        'optional_desktop_support','audio_services',
                         'author_originals','disk','one_drive','camera'):
             print(section+': '+json.dumps(data[section]))
         print('Remaining checks:')
