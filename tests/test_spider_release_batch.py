@@ -79,9 +79,13 @@ class BatchReleaseTests(unittest.TestCase):
     def test_failure_after_committed_replace_still_rolls_back(self):
         self.target.write_text('VALUE = 1\n')
         original_copy = batch.atomic_copy
+        calls = 0
         def fail_after_copy(*args, **kwargs):
+            nonlocal calls
+            calls += 1
             original_copy(*args, **kwargs)
-            raise OSError('simulated exception after replace')
+            if calls == 1:
+                raise OSError('simulated exception after replace')
         with patch.object(batch, 'atomic_copy', side_effect=fail_after_copy):
             with self.assertRaisesRegex(OSError, 'after replace'):
                 batch.apply([self.entry], self.backup_root,
