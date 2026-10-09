@@ -21,5 +21,43 @@ Initial commit: `1fd759bab3aa95054664323fea4a3a9ab6cd98c9`.
 Stage contains PR #25 quiet sleep + inherited #21 OneDrive and face and #22 names, plus selected Author/camera support from #23 and independent local vision files from #24. The Webbie agent, shared panel and shell imports are NOT yet reconciled. This staging branch has NOT been demonstrated to pass integration CI. **Do not install it.**
 PR #23 was updated by another chat during staging (observed `83d692b4c3115a2f4edeed2730a77774c2b49364`), after the initial staging source was selected. Reconcile latest source before declaring finished.
 
+## Unified release source (still awaiting owner-PC preflight)
+
+The integration branch now includes `system/release_batch.py`, the intended
+**one-command, one-transaction** release entry point. It has read-only `--check`,
+a guarded `--apply`, and explicit `--rollback-check` / `--rollback` for its
+own manifest-backed batch backup. Its published regression tests exercise
+unknown-customization blocking, additive installs, backup restore, symlink
+protection and CLI parsing. Release CI also performs a non-mutating source
+preflight. None of these tests supplies the Dell's actual hashes or proves
+the installed Webbie voice agent is safe to replace.
+
+**During a future explicitly requested installation session**, work from a
+pinned, full local checkout of the final integration commit and first run:
+
+```bash
+python3 system/release_batch.py --check
+```
+
+If this says `BLOCKED`, do **not** try a different installer, bypass
+safeguards or install individual PRs. Review the existing local files and
+reconcile them into a tailored release first.
+
+When the installed-PC checks and source freeze both pass, the single install
+entry point is:
+
+```bash
+sudo python3 system/release_batch.py --apply
+```
+
+The installer prints a backup directory and rollback receipt. **These are
+documented future commands, not instructions to run before approval.**
+
+There is deliberately no automatic user-service restart during installation.
+An intentional The Web session relogin activates the X11 portrait. OneDrive
+continues local-only until the user manually chooses Connect OneDrive; it
+enables the independent user-level sync timer only after sign-in. Webcam
+access remains off until the user enables it.
+
 ## Single-chat ownership
 The user requested ONE active Spider OS build chat as the source of direction. Other chats should not write to Spider OS branches concurrently. GitHub handoff and master checklist record status. If a competing branch changes, fetch and compare its latest commit before continuing. Do not claim other chats can be automatically stopped or merged by editing this file.
