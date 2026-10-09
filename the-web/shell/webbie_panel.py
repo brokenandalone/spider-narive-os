@@ -1,5 +1,6 @@
 """Webbie portrait and asynchronous chat; preserve the installed voice agent."""
 from html import escape
+import importlib.util
 import configparser
 import json
 import math
@@ -14,7 +15,7 @@ import stat
 from PyQt5.QtCore import Qt, QRectF, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QPainter, QPainterPath, QPixmap
 from PyQt5.QtWidgets import (QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
-                            QLineEdit, QPushButton, QTextEdit, QVBoxLayout, QWidget)
+                            QLineEdit, QMessageBox, QPushButton, QTextEdit, QVBoxLayout, QWidget)
 
 
 def runtime_directory():
@@ -68,6 +69,31 @@ class ReplyWorker(QThread):
             self.reply.emit(request_reply(self.text, self.socket_path))
         except (OSError, ValueError) as error:
             self.failed.emit('Unable to reach Webbie: ' + str(error))
+
+
+class CameraWorker(QThread):
+    captured = pyqtSignal()
+    reply = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, source, model, parent):
+        super().__init__(parent)
+        self.source, self.model = Path(source), model
+
+    def run(self):
+        # Importing local_camera never opens the camera. Capture happens only
+        # after the owner clicks Look Once and confirms the permission prompt.
+        try:
+            spec = importlib.util.spec_from_file_location('webbie_local_camera', self.source)
+            if spec is None or spec.loader is None:
+                raise RuntimeError('Local camera bridge was not found.')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            frame = module.capture_one()
+            self.captured.emit()  # Camera is closed before local vision inference.
+            self.reply.emit(module.describe(frame, self.model))
+        except Exception as error:
+            self.failed.emit('Local camera/vision unavailable: ' + str(error))
 
 
 class SpeakingPortrait(QLabel):
@@ -160,6 +186,20 @@ class WebbiePanel(QWidget):
         self.cloud_timer = QTimer(self); self.cloud_timer.timeout.connect(
             lambda: self.cloud_label.setText(cloud_state_label()))
         self.cloud_timer.start(10000)
+        camera_row = QHBoxLayout(); layout.addLayout(camera_row)
+        self.vision_model = QLineEdit()
+        self.vision_model.setPlaceholderText('Installed vision model, e.g. gemma3:4b')
+        self.vision_model.setAccessibleName('Local Ollama vision model for camera')
+        camera_row.addWidget(self.vision_model, 1)
+        self.camera_button = QPushButton('Look at room once')
+        self.camera_button.setToolTip('Only after confirmation: capture one camera frame, '
+                                      'analyze locally, discard the frame. Never auto-monitor.')
+        self.camera_button.clicked.connect(self.look_once)
+        camera_row.addWidget(self.camera_button)
+        self.camera_status = QLabel('CAMERA OFF · opt-in only')
+        self.camera_status.setObjectName('cameraStatus')
+        layout.addWidget(self.camera_status)
+        self.camera_worker = None
         self.chat = QTextEdit(); self.chat.setReadOnly(True); layout.addWidget(self.chat, 1)
         self.chat.setPlainText('Ask Webbie below.')
         row = QHBoxLayout(); layout.addLayout(row)
@@ -181,6 +221,38 @@ class WebbiePanel(QWidget):
         else:
             self.face.mouth_opacity = 0; self.mouth_frame = 0
         self.face.update()
+
+    def look_once(self):
+        if self.camera_worker and self.camera_worker.isRunning():
+            return
+        source = self.root / 'webbie/vision/local_camera.py'
+        if not source.is_file():
+            self.append_message('Status', 'Local camera support is not installed yet.')
+            return
+        model = self.vision_model.text().strip()
+        if not model:
+            self.append_message('Status', 'Choose an already-installed vision-capable Ollama model.')
+            return
+        accepted = QMessageBox.question(
+            self, 'Webbie camera permission',
+            'Capture ONE webcam image, then analyze it with local Ollama? '
+            'The image is not saved or sent to OneDrive.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if accepted != QMessageBox.Yes:
+            return
+        self.camera_status.setText('CAMERA ACTIVE · capturing one frame')
+        self.camera_button.setEnabled(False)
+        self.camera_worker = CameraWorker(source, model, self)
+        self.camera_worker.captured.connect(lambda: self.camera_status.setText(
+            'CAMERA OFF · analyzing the local snapshot'))
+        self.camera_worker.reply.connect(lambda result: self.append_message('Webbie vision', result))
+        self.camera_worker.failed.connect(lambda message: self.append_message('Status', message))
+        self.camera_worker.finished.connect(self.camera_finished)
+        self.camera_worker.start()
+
+    def camera_finished(self):
+        self.camera_status.setText('CAMERA OFF · opt-in only')
+        self.camera_button.setEnabled(True)
 
     def face_mode(self, mode):
         script = self.root / 'the-web/overlay/webbie_face.py'
@@ -259,7 +331,8 @@ class WebbiePanel(QWidget):
 
     def closeEvent(self, event):
         # The workspace/tab owner uses the same worker guard before deletion.
-        if self.worker and self.worker.isRunning():
+        if (self.worker and self.worker.isRunning()) or (
+                self.camera_worker and self.camera_worker.isRunning()):
             event.ignore()
         else:
             event.accept()

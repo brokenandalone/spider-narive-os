@@ -90,7 +90,8 @@
 - [x] Source-built **Student** form of address in School/Study (internal workspace ID `study`), keeping Author/Writer, Studio/Justin, Kali Bay/Spider and user-configured overrides. **Not installed on the owner PC.**
 - [x] Source-built local Ollama model selection from Webbie's existing `config/default.json`, while retaining the current default and loopback Ollama URL. No model is downloaded or switched on the PC without approval.
 - [ ] Install/qualify any future agent-only changes separately from the safe floating-face and OneDrive add-on. Preserve the installed voice patches and services.
-- [ ] Build explicitly opt-in camera awareness of the room with visible recording/active indicator; no silent start, hidden webcam access, or unsolicited cloud upload.
+- [x] Source-built an **explicitly approved single-frame webcam bridge** using ffmpeg and local-only Ollama vision, including camera-on indicator, no saved images, bounded timeouts, and no automatic startup. No owner-PC installation or camera test yet.
+- [ ] Extend to persistent, user-visible room awareness **only** after choosing session lifetime, hardware, voice authorization, stop control and privacy settings. Camera must never activate silently.
 - [ ] Build separately approved screen awareness with visible sharing state, limited capture, and privacy controls. Neither camera nor screen capture is currently installed as an enabled Webbie feature.
 - [ ] Confirm whether night sleep should hide only Webbie's face or also pause voice listening before making microphone-service changes.
 
