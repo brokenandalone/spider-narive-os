@@ -14,6 +14,7 @@ STATE_PATH = Path.home() / '.config/spider-os/webbie-face.json'
 SLEEP_COMMANDS = frozenset({
     'hey webbie go to sleep', 'hey webbie goodnight', 'hey webbie good night',
     'webbie go to sleep', 'webbie goodnight', 'webbie good night',
+    'goodnight webbie', 'good night webbie',
     'hey web go to sleep', 'hey web goodnight',
 })
 WAKE_COMMANDS = frozenset({
