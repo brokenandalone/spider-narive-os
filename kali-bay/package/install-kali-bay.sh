@@ -7,7 +7,7 @@ SOURCE_ROOT="$(cd -- "$(dirname -- "$0")/../.." && pwd)"
 DEST="/usr/local/lib/spider-os"
 BIN="/usr/local/bin"
 APPS="/usr/share/applications"
-ACTION="$(printf '%s' "$1")"
+ACTION="$(printf '%s' "$@")"
 
 usage() {
     printf 'Usage: bash kali-bay/package/install-kali-bay.sh --check | --apply\n'
