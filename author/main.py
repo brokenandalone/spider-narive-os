@@ -43,6 +43,7 @@ class AuthorWindow(QMainWindow):
         self.toolkit = AuthorToolkit(self.store, self.current_chapter, self.flush, self.editor)
         self.toolkit.jumpRequested.connect(self.jump_to_search_result)
         self.toolkit.reviewRequested.connect(self.author_review_requested)
+        self.toolkit.editRequested.connect(self.apply_revised_passage)
         tabs.addTab(self.toolkit, 'Writing Studio')
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
@@ -165,6 +166,47 @@ class AuthorWindow(QMainWindow):
             self.status.setText('Open Author through The Web to review selected text with Webbie.')
         else:
             callback(text)
+
+    def apply_revised_passage(self):
+        """Review a pasted Webbie suggestion against exactly selected source.
+
+        No autonomous AI edit. Save is transactional and snapshots prior text.
+        """
+        if self.chapter_id is None or not self.flush():
+            return
+        cursor = self.editor.textCursor()
+        old = cursor.selectedText().replace('\u2029', '\n')
+        if not old.strip():
+            QMessageBox.information(self, 'Reviewed rewrite',
+                                    'Highlight the exact original passage you want to replace.')
+            return
+        proposed, ok = QInputDialog.getMultiLineText(
+            self, 'Reviewed rewrite', 'Paste Webbie’s proposed replacement text:', old
+        )
+        if not ok or proposed == old:
+            return
+        original = self.store.chapter(self.chapter_id)['content']
+        start, end = cursor.selectionStart(), cursor.selectionEnd()
+        if self.editor.toPlainText() != original:
+            QMessageBox.warning(self, 'Revision changed',
+                                'The manuscript has changed. Save and select the passage again.')
+            return
+        if original[start:end] != old:
+            QMessageBox.warning(self, 'Revision conflict',
+                                'Selection no longer matches the saved text. No edits were made.')
+            return
+        confirmation = QMessageBox.question(
+            self, 'Approve manuscript revision',
+            'Replace the selected passage? The previous chapter will remain in revision history.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if confirmation != QMessageBox.Yes:
+            return
+        updated = original[:start] + proposed + original[end:]
+        if self.action(lambda: self.store.save(self.chapter_id, updated)) is False:
+            return
+        self.editor.setPlainText(updated)
+        self.status.setText('Approved revision saved. Prior version preserved in snapshots.')
 
     def current_chapter(self):
         if self.chapter_id is None:
