@@ -18,6 +18,12 @@ the installed-PC acceptance items below remain open.
 
 ## Revised build order
 
+See [the reprioritized checklist](UPGRADE-PRIORITIES.md) for the current execution
+order and additional upgrades. Latest owner confirmation: the reconciled
+desktop installer succeeded at 21:15, preserving Studio tool tabs and the Author
+launcher; backup `the-web-20261008-211515`. Media installation remains confirmed;
+real playback and session acceptance remain pending.
+
 Build The Web desktop foundation first. Keep the tested Author, School, Studio,
 and playback repairs; integrate them into that foundation rather than rebuilding
 workspace navigation independently. Playback repair is independent and can be

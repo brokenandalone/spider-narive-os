@@ -16,6 +16,23 @@ user="${SUDO_USER:-}"
 if [[ -z "$user" || "$user" == root ]]; then echo 'Run sudo from your normal desktop account.' >&2; exit 1; fi
 user_home="$(getent passwd "$user" | cut -d: -f6)"
 root=/usr/local/lib/spider-os
+# Reject incomplete packages before installing dependencies or changing files.
+for relative in the-web/shell/main.py the-web/shell/system_panel.py the-web/shell/system_status.py the-web/session/the-web-session the-web/session/apply-lock-screen.py the-web/package/patch-native-imports.py the-web/package/reconcile-native.py branding/wallpapers/collection.json distro/config/sessions/the-web.desktop system/apps.py; do
+    test -s "$source_root/$relative" || { echo "Incomplete build: $relative" >&2; exit 1; }
+done
+if [[ -f "$source_root/SHA256SUMS" ]]; then
+    (cd "$source_root" && sha256sum --strict -c SHA256SUMS) || { echo 'Build checksum verification failed.' >&2; exit 1; }
+fi
+if ! command -v startplasma-x11 >/dev/null; then
+    # Ubuntu 25.10/26.04 split the X11 session out of plasma-workspace.
+    candidate="$(apt-cache policy plasma-session-x11 | sed -n 's/^[[:space:]]*Candidate: //p')"
+    if [[ -n "$candidate" && "$candidate" != '(none)' ]]; then
+        apt-get install -y plasma-session-x11 kwin-x11
+    else
+        echo 'Missing KDE X11 session. Install plasma-session-x11 and kwin-x11 using your Ubuntu package sources, then retry.' >&2
+        exit 1
+    fi
+fi
 for command in startplasma-x11 python3 dbus-send systemctl; do
     command -v "$command" >/dev/null || { echo "Missing desktop dependency: $command" >&2; exit 1; }
 done
@@ -56,11 +73,12 @@ for workspace in author studio study; do
     [[ -d "$source_dir" ]] || continue
     while IFS= read -r -d '' candidate; do
         relative="${candidate#"$source_dir/"}"
+        case "$relative" in *.py|bin/*) ;; *) continue ;; esac
         target="$root/$workspace/$relative"
         if [[ ! -e "$target" && ! -L "$target" ]]; then
             install -d "$(dirname "$target")"
             cp -a -- "$candidate" "$target"
-            printf 'Added missing %s source: %s\\n' "$workspace" "$relative"
+            printf 'Added missing %s source: %s\n' "$workspace" "$relative"
         fi
     done < <(find "$source_dir" -type f -print0)
 done

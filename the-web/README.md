@@ -10,6 +10,10 @@ The Web is a selectable **X11 desktop session**, with its own desktop surface, S
 - Fifty-nine archived artwork files, including today's seven workspace designs and their matching alternates. Existing backgrounds remain available and retain their defaults. Choices persist independently per workspace.
 - Spider desktop-loading splash. Spider artwork for KDE's secure lock screen, with a backup of the previous wallpaper configuration. Authentication continues to use KDE; no password is handled by The Web.
 - Selective installed-PC installer and ISO source integration. Existing native workspace files receive only small import-compatibility/save-guard changes. Existing Webbie source, model selection, memory, timers, manuscripts and notes are preserved.
+- System and Recovery inspection tabs show service state, storage, current audio
+  status and available desktop/Media Center backups. Refresh runs in a worker;
+  opening tabs or polling the status bar does not wait for systemctl on the GUI
+  thread. These panels do not restart services or restore backups.
 
 ## Install on the existing Ubuntu Studio machine
 

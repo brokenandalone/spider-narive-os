@@ -26,6 +26,16 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
     assert window.tabs.count()==15
+    for name in ['system', 'recovery']:
+        panel = window.workspace_widgets[name].native
+        assert panel is not None and panel.tables['storage'].rowCount() > 0
+        assert panel.tables['backups'].columnCount() == 3
+        with patch('system_panel.collect', return_value={'services': [], 'audio': 'PipeWire test', 'checkedAt': '12:00:00'}):
+            panel.refresh()
+            assert panel.worker.wait(3000)
+            app.processEvents()
+            assert panel.audio.toPlainText() == 'PipeWire test'
+            assert panel.refresh_button.isEnabled()
     author=window.workspace_widgets['author'].native
     window.open_author();window.open_author();assert window.workspace_widgets['author'].native is author
     assert window.tabs.count()==15

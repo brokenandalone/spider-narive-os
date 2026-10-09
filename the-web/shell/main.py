@@ -24,6 +24,7 @@ from desktop import list_tasks, wm_command, x11_properties
 from wallpapers import WallpaperCatalog
 from workspaces import create_native
 from workspace_files import workspace_folders, file_open_command
+from system_panel import SystemPanel, StatusWorker
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
 STYLE = '''
@@ -246,9 +247,13 @@ class TheWeb(QMainWindow):
                 native.setParent(page); native.setWindowFlags(Qt.Widget)
                 area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native); layout.addWidget(area, 1); native.show()
             else:
-                surface = QWidget(); surface.setObjectName('root'); body = QVBoxLayout(surface)
-                heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
-                body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1); layout.addWidget(surface, 1)
+                if name in {'system', 'recovery'}:
+                    surface = SystemPanel(SPIDER_ROOT, recovery=name == 'recovery'); page.native = surface
+                else:
+                    surface = QWidget(); surface.setObjectName('root'); body = QVBoxLayout(surface)
+                    heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
+                    body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1)
+                layout.addWidget(surface, 1)
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
         # Workspace navigation must never activate KDE Show Desktop, which hides
@@ -273,7 +278,7 @@ class TheWeb(QMainWindow):
         native = getattr(page, 'native', None)
         worker = getattr(native, 'worker', None)
         if worker and worker.isRunning():
-            self.status.setText('Research is still running. Keep this workspace open until it finishes.'); return False
+            self.status.setText('A workspace task is still running. Keep this tab open until it finishes.'); return False
         if hasattr(native, 'save_notes'):
             try: native.save_notes(quiet=True)
             except Exception as error:
@@ -358,14 +363,16 @@ class TheWeb(QMainWindow):
             self.close()
 
     def refresh_status(self):
-        states = []
-        for label, unit, user in [('Webbie', 'webbie.service', True), ('Local AI', 'ollama.service', False), ('AI DJ', 'spider-ai-dj.service', True)]:
-            try:
-                command = ['systemctl'] + (['--user'] if user else []) + ['is-active', '--quiet', unit]
-                active = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1).returncode == 0
-            except (OSError, subprocess.TimeoutExpired): active = False
-            states.append(label + ': ' + ('ONLINE' if active else 'OFFLINE'))
-        self.service_status.setText('  ·  '.join(states))
+        previous = getattr(self, 'status_worker', None)
+        if previous and previous.isRunning(): return
+        if previous: previous.deleteLater()
+        self.status_worker = StatusWorker(SPIDER_ROOT, self, services_only=True)
+        self.status_worker.result.connect(self.render_service_status)
+        self.status_worker.failed.connect(lambda: self.service_status.setText('Service status unavailable.'))
+        self.status_worker.start()
+
+    def render_service_status(self, rows):
+        self.service_status.setText('  ·  '.join(name + ': ' + state.upper() for name, unit, state, substate, startup in rows[:3]))
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -378,7 +385,7 @@ class TheWeb(QMainWindow):
         # Save all editors before closing any of their stores.
         for page in self.workspace_widgets.values():
             native = getattr(page, 'native', None); worker = getattr(native, 'worker', None)
-            if worker and worker.isRunning(): self.status.setText('Research is still running.'); event.ignore(); return
+            if worker and worker.isRunning(): self.status.setText('A workspace task is still running.'); event.ignore(); return
             if hasattr(native, 'flush') and not native.flush(): event.ignore(); return
             if hasattr(native, 'save_notes'):
                 try: native.save_notes(quiet=True)
@@ -386,6 +393,9 @@ class TheWeb(QMainWindow):
         self.save_state()
         for page in self.workspace_widgets.values():
             if not self.can_close(page): event.ignore(); return
+        worker = getattr(self, 'status_worker', None)
+        if worker and worker.isRunning(): worker.wait(3000)
+        if worker and worker.isRunning(): event.ignore(); return
         self.timer.stop(); self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
 
 
