@@ -128,6 +128,12 @@
 
 ## 3. Webbie — voice reliability, permissions and speaking face
 
+**Next-phase priority confirmed October 9:** after the current combined upgrades and installed-feature walkthrough, focus on contextual awareness and more natural interaction, then native Studio song generation without a required Suno subscription. Full scope and acceptance gates: [Webbie next phase](WEBBIE-NEXT-PHASE.md).
+
+- [ ] Build a permission-aware context service for active workspace/app, selected task, conversation and fresh room/screen observations, with source, expiry and uncertainty.
+- [ ] Add correctable local project memory, natural follow-up/turn-taking, interruption, functional capability awareness and controlled proactive suggestions.
+- [ ] Improve expressive Australian speech, accurate lip timing and state-aware facial behavior after the conversation foundation is reliable.
+
 - [ ] Repair/verify wake phrase through continuous hands-free multi-turn conversation, explicit end phrase, timeout, interruption handling, TTS playback/mic recovery and self-speech echo rejection.
 - [ ] Enforce **only Cory and Shayna** as authorized voice users by default. Ignore TV/movie voices, strangers and Webbie's own speech unless deliberately added by owner.
 - [x] Source-built an ethereal violet woman face and a stationary portrait with blended mouth movement during the real speaking marker.
@@ -196,6 +202,9 @@
 - [ ] Add backup of Kali container configuration and reproducible restore/checks without affecting Spider host packages.
 
 ## 8. Studio — recording, songwriting and production
+
+- [ ] **Next-phase owner priority:** integrate local lyrics-to-song and instrumental generation into native Studio, controlled by Webbie, to remove the need for a Suno subscription. Evaluate official ACE-Step/YuE-family backends against actual GPU/VRAM/RAM, licenses and listening tests before selection; no promise of quality parity or free hardware/cloud compute.
+- [ ] Add Broken Sorrow sound preset, generation queue/cancel, previews, saved takes and WAV export; qualify section editing, extensions, stems and DAW handoff as follow-ups. See [scope and acceptance](WEBBIE-NEXT-PHASE.md).
 
 - [x] Source-built Studio tools tabs and application discovery; owner's custom Studio layout preserved.
 - [ ] Verify all installed production apps launch from Studio; repair launchers still falling through to Dolphin.
