@@ -21,11 +21,12 @@ class AuthorToolkit(QWidget):
     jumpRequested = pyqtSignal(dict)
     reviewRequested = pyqtSignal(str)
 
-    def __init__(self, store, current_chapter, save_editor=None):
+    def __init__(self, store, current_chapter, save_editor=None, editor=None):
         super().__init__()
         self.store = store
         self.current_chapter = current_chapter
         self.save_editor = save_editor
+        self.editor = editor
         self.book_id = self.story_id = self.reference_id = None
         self.story_dirty = self.reference_dirty = False
         self.reader = LocalReader(self)
@@ -256,7 +257,7 @@ class AuthorToolkit(QWidget):
     def review_selection(self):
         # The user must explicitly click this button and then press Send
         # in Webbie's sidebar. Never automatically transmit chapter text.
-        editor = getattr(self.parent(), 'editor', None)
+        editor = self.editor
         chapter = self.current_chapter()
         title = chapter['title'] if chapter is not None else 'Untitled'
         selection = editor.textCursor().selectedText().replace('\u2029', '\n') if editor else ''
