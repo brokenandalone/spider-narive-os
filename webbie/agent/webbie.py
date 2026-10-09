@@ -37,6 +37,7 @@ sys.path.insert(
 from brain import respond
 from tts import speak
 from workspace_names import context_name
+from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
 
 
 CONFIG_FILE = (
@@ -619,6 +620,22 @@ def voice_listener():
         if not phrase:
             return
 
+        # Stay operational at night without answering TV, casual speech or
+        # wake words alone. Only an exact, deliberate wake phrase reopens chat.
+        sleeping = quiet_asleep()
+        mode = spoken_mode(phrase, sleeping=sleeping)
+        if sleeping:
+            awaiting_command_until = 0
+            if mode == 'wake':
+                set_quiet_mode('wake')
+                say("I'm awake.")
+            return
+        if mode == 'sleep':
+            awaiting_command_until = 0
+            say("Goodnight. I'll keep everything running quietly.")
+            set_quiet_mode('sleep')
+            return
+
         now = time.time()
 
         if (
@@ -756,10 +773,11 @@ def proactive_loop():
         else:
             greeting = "Good evening"
 
-        say(
-            f"{greeting}, {current_name()}. "
-            "Webbie is online."
-        )
+        if not quiet_asleep():
+            say(
+                f"{greeting}, {current_name()}. "
+                "Webbie is online."
+            )
 
     minutes = max(
         15,
@@ -787,7 +805,8 @@ def proactive_loop():
             + minutes * 60
         )
 
-        if not session_is_active():
+        if not session_is_active() or quiet_asleep():
+            # Postpone conversation, not the background service loop.
             continue
 
         say(
