@@ -23,6 +23,7 @@ from app_catalog import WORKSPACES, discover_apps, launch_command
 from desktop import list_tasks, wm_command, x11_properties
 from wallpapers import WallpaperCatalog
 from workspaces import create_native
+from workspace_files import workspace_folders, file_open_command
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
 STYLE = '''
@@ -201,6 +202,16 @@ class TheWeb(QMainWindow):
         apps.itemActivated.connect(lambda item: self.open_installed(item.data(Qt.UserRole)))
         self.app_lists[workspace] = apps; self.populate_app_list(workspace)
         layout.addWidget(button('Refresh installed apps', self.refresh_apps))
+        folders = workspace_folders(workspace)
+        if folders:
+            layout.addWidget(QLabel('Workspace files'))
+            locations = QComboBox()
+            for title, location in folders:
+                locations.addItem(title, str(location))
+            layout.addWidget(locations)
+            open_files = button('Open files in Dolphin', lambda checked=False, picker=locations: self.open_workspace_folder(picker.currentData(), workspace))
+            open_files.setToolTip('Opens existing local files; never moves, replaces or uploads documents.')
+            layout.addWidget(open_files)
         if workspace == 'media': layout.addWidget(button('Open Spider Media Center', self.launch_media))
         if workspace == 'system': layout.addWidget(button('System settings', self.open_settings))
         if workspace == 'dev-bay': layout.addWidget(button('Terminal', self.open_terminal))
@@ -243,6 +254,13 @@ class TheWeb(QMainWindow):
         # Workspace navigation must never activate KDE Show Desktop, which hides
         # normal application windows, including Firefox and the file manager.
         self.raise_(); self.activateWindow()
+
+    def open_workspace_folder(self, path, workspace):
+        try:
+            command = file_open_command(path)
+            self.launch(command, workspace, 'Opened local workspace files.')
+        except (FileNotFoundError, RuntimeError, OSError) as error:
+            self.status.setText(str(error))
 
     def open_installed(self, ident):
         app = next((a for a in self.installed_apps if a.desktop_id == ident), None)

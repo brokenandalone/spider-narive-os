@@ -58,6 +58,12 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         assert process.call_args.args[0]==['gio','launch',str(fake.path)]
         assert window.current_workspace=='studio'
         wm.assert_not_called()
+    # Workspace Files opens the user's real project directory through the
+    # desktop file manager without any data copy or destructive operation.
+    with patch.object(main, 'file_open_command', return_value=['xdg-open', '/home/test/Documents/Spider Studio']), patch.object(main.subprocess, 'Popen') as folder_open:
+        window.open_workspace_folder('/home/test/Documents/Spider Studio', 'studio')
+        assert folder_open.call_args.args[0] == ['xdg-open', '/home/test/Documents/Spider Studio']
+        assert window.current_workspace == 'studio'
     window.open_workspace('deep-forage')
     wallpaper_id=window.wallpaper_catalog.defaults['deep-forage']
     window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))
