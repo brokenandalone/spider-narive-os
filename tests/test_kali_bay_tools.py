@@ -105,6 +105,37 @@ esac
         self.assertIn('"tool-check", tool_id', source)
         self.assertIn('"tool", tool_id', source)
 
+    def test_qt_workspace_has_both_security_tabs(self):
+        # An isolated child process keeps Qt's global singleton out of
+        # unrelated source-check tests and needs no real Kali installation.
+        import sys
+        script = """
+import importlib.util
+from pathlib import Path
+from PyQt5.QtWidgets import QApplication
+source = Path(__import__('sys').argv[1])
+spec = importlib.util.spec_from_file_location('kali_bay_under_test', source)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+app = QApplication([])
+window = module.KaliBayWindow()
+assert window.security_tabs.count() == 2
+assert window.security_tabs.tabText(0) == 'OFFENSIVE'
+assert window.security_tabs.tabText(1) == 'PURPLE DEFENSE'
+assert 'DIRECT SECURITY TOOL LAUNCHERS' in [
+    widget.text()
+    for widget in window.findChildren(module.QLabel)
+]
+window.close()
+"""
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(UI)],
+            cwd=ROOT, env=env, capture_output=True,
+            text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
