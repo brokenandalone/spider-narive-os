@@ -32,6 +32,7 @@ sys.path.insert(0, str(SPIDER_ROOT / 'the-web/overlay'))
 from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 from media_panel import MediaPanel
 from volume_panel import VolumePanel
+from notification_center import NotificationCenter
 
 WALLPAPER = SPIDER_ROOT / 'branding/wallpapers/spider-os-wallpaper.png'
 STYLE = '''
@@ -131,9 +132,10 @@ class Taskbar(QWidget):
         layout.addWidget(button('The Web', shell.show_desktop))
         webbie = button('Webbie', shell.open_webbie); webbie.setIcon(QIcon(str(SPIDER_ROOT / 'branding/webbie/webbie-face-v1.png'))); layout.addWidget(webbie)
         self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
-        layout.addWidget(button('Lock', shell.lock_session))
         layout.addWidget(button('Volume', shell.toggle_volume_panel))
+        layout.addWidget(button('Alerts', shell.toggle_notifications))
         layout.addWidget(button('Audio', shell.open_audio))
+        layout.addWidget(button('Lock', shell.lock_session))
         self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(2000)
         self.last_tasks = None; self.refresh()
@@ -480,6 +482,20 @@ class TheWeb(QMainWindow):
     def open_author(self): self.open_workspace('author')
     def open_study(self): self.open_workspace('study')
     def open_webbie(self): self.toggle_webbie_assistant()
+
+    def toggle_notifications(self):
+        panel = getattr(self, 'notification_center', None)
+        if panel is None:
+            panel = NotificationCenter(self)
+            self.notification_center = panel
+        if panel.isVisible():
+            panel.hide()
+        else:
+            panel.refresh()
+            panel.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
+            panel.resize(470, 360)
+            panel.show()
+            panel.raise_()
 
     def toggle_volume_panel(self):
         panel = getattr(self, 'quick_volume', None)
