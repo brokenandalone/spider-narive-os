@@ -116,6 +116,25 @@ class CloudTests(unittest.TestCase):
             self.assertNotIn('--delete', args)
             self.assertEqual(keywords['timeout'], 145)
 
+    def test_symlinked_workspace_is_rejected_before_cloud_transfer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, remote, folder = self.make_configs(root)
+            private = root / 'private'
+            private.mkdir()
+            (private / 'private-note.txt').write_text('KEEP PRIVATE')
+            folder.symlink_to(private, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, 'symbolic-link'):
+                cloud.enable(config, remote, folder)
+            folder.unlink()
+            cloud.enable(config, remote, folder)
+            folder.rmdir()
+            folder.symlink_to(private, target_is_directory=True)
+            with patch.object(cloud.shutil, 'which', return_value='/usr/bin/rclone'):
+                with patch.object(cloud.subprocess, 'run') as runner:
+                    self.assertEqual(cloud.sync_folder(config, remote, folder), 'unsafe workspace')
+                    runner.assert_not_called()
+
     def test_no_connection_no_cloud_call(self):
         with tempfile.TemporaryDirectory() as temporary:
             config, remote, folder = self.make_configs(Path(temporary))
