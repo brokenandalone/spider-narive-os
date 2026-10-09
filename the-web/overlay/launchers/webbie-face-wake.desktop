@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Webbie: Wake Face
+Comment=Show Webbie's click-through overlay again outside fullscreen video
+Exec=/usr/bin/python3 /usr/local/lib/spider-os/the-web/overlay/webbie_face.py wake
+Icon=/usr/local/lib/spider-os/branding/webbie/webbie-face-v1.png
+Terminal=false
+Categories=Utility;
