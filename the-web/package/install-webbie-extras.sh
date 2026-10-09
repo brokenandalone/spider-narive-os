@@ -17,6 +17,25 @@ for name in ('the-web/overlay/webbie_face.py', 'system/onedrive.py'):
     ast.parse((root / name).read_text(), filename=name)
 print('PASS: Webbie add-on source syntax and package files present.')
 PY
+  echo "Desktop session: ${XDG_SESSION_TYPE:-unknown}"
+  if [[ "${XDG_SESSION_TYPE:-}" != x11 ]]; then
+    echo "NOTE: The floating portrait needs an X11 desktop session. OneDrive setup works independently."
+  fi
+  if ! command -v xprop >/dev/null; then
+    echo "NOTE: xprop is missing; the floating portrait will stay hidden until x11-utils is available."
+  fi
+  if ! /usr/bin/python3 -c "from PyQt5.QtWidgets import QApplication" >/dev/null 2>&1; then
+    echo "NOTE: system PyQt5 is unavailable; the portrait requires python3-pyqt5."
+  fi
+  /usr/bin/python3 - <<'PY'
+import ctypes.util
+for name in ('X11', 'Xfixes'):
+    if not ctypes.util.find_library(name):
+        print('NOTE: missing lib%s; portrait hides rather than intercept mouse clicks.' % name)
+PY
+  if ! command -v rclone >/dev/null; then
+    echo "NOTE: rclone is not installed. OneDrive sign-in stays optional and unavailable until then."
+  fi
   exit 0
 fi
 if [[ "$EUID" -ne 0 || -z "${SUDO_USER:-}" || "${SUDO_USER:-}" == root ]]; then
