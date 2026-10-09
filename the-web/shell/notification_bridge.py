@@ -52,7 +52,7 @@ class NotificationModel:
 async def serve(path):
     from dbus_next.aio import MessageBus
     from dbus_next.service import ServiceInterface, method, signal
-    from dbus_next import BusType, RequestNameReply, Variant
+    from dbus_next import BusType, RequestNameReply, NameFlag
     model=NotificationModel(path)
     class Notifications(ServiceInterface):
         def __init__(self):super().__init__('org.freedesktop.Notifications')
@@ -72,7 +72,7 @@ async def serve(path):
         @signal()
         def ActionInvoked(self,id:'u',action_key:'s')->'us':return [id,action_key]
     bus=await MessageBus(bus_type=BusType.SESSION).connect()
-    reply=await bus.request_name('org.freedesktop.Notifications',flags=0)
+    reply=await bus.request_name('org.freedesktop.Notifications',flags=NameFlag.DO_NOT_QUEUE)
     if reply not in (RequestNameReply.PRIMARY_OWNER,RequestNameReply.ALREADY_OWNER):
         print('Existing notifications provider retained; The Web bridge not taking over.')
         bus.disconnect()
