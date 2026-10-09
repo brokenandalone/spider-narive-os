@@ -54,7 +54,14 @@ class FaceProfiles:
         )) / 'spider-os'
         self.path = Path(path) if path is not None else root / 'webbie-face-profiles.json'
         self.samples = {name: [] for name in PROFILES}
-        self.load()
+        self.load_error = None
+        try:
+            self.load()
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            # An absent, unreadable or malformed optional face database must
+            # never block Webbie's ordinary vision or microphone.
+            self.samples = {name: [] for name in PROFILES}
+            self.load_error = 'Face profiles unavailable. No profiles are required.'
 
     def load(self):
         try:
