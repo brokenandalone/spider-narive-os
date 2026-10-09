@@ -16,10 +16,11 @@ from PyQt5.QtWidgets import (
 class AuthorToolkit(QWidget):
     jumpRequested = pyqtSignal(dict)
 
-    def __init__(self, store, current_chapter):
+    def __init__(self, store, current_chapter, save_editor=None):
         super().__init__()
         self.store = store
         self.current_chapter = current_chapter
+        self.save_editor = save_editor
         self.book_id = self.story_id = self.reference_id = None
         self.story_dirty = self.reference_dirty = False
         layout = QVBoxLayout(self)
@@ -211,6 +212,7 @@ class AuthorToolkit(QWidget):
 
     def compare(self):
         self.compare_result.clear()
+        if self.save_editor is not None and not self.save_editor(): return
         chapter = self.current_chapter()
         if chapter is None: return
         snapshots = self.store.snapshots(chapter['id'])
@@ -223,6 +225,7 @@ class AuthorToolkit(QWidget):
 
     def export_docx(self):
         if self.book_id is None: return
+        if self.save_editor is not None and not self.save_editor(): return
         try:
             self.save_current()
             book = next(b for b in self.store.books() if b['id'] == self.book_id)
@@ -238,5 +241,6 @@ class AuthorToolkit(QWidget):
                 document.add_heading(chapter['title'], level=1)
                 for paragraph in chapter['content'].split('\n'):
                     document.add_paragraph(paragraph)
-            document.save(destination)
+            with open(destination, 'xb') as output:
+                document.save(output)
         except Exception as exc: QMessageBox.warning(self, 'Export', str(exc))
