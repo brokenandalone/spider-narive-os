@@ -41,6 +41,7 @@ APP_FILES = (
     'author/main.py', 'author/store.py', 'author/web_features.py',
     'author/speech.py', 'author/publishing.py',
     'the-web/shell/main.py', 'the-web/shell/volume_panel.py',
+    'the-web/shell/quick_settings.py',
     'the-web/shell/notification_center.py',
     'the-web/shell/notification_bridge.py', 'the-web/shell/notification_toast.py',
     'the-web/shell/status_tray.py',
