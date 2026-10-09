@@ -32,7 +32,8 @@ def visual_question(command):
 
 
 def _safe_runtime(runtime=None):
-    home = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+    candidate = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+    home = candidate if candidate.is_dir() else Path.home() / '.cache' / 'spider-os' / 'private-run'
     folder = Path(runtime) if runtime is not None else home / 'spider-os'
     if folder.is_symlink():
         raise ValueError('Unsafe runtime directory.')
