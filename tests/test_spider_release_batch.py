@@ -53,6 +53,29 @@ class BatchReleaseTests(unittest.TestCase):
         batch.rollback([self.entry], receipt, self.backup_root, dry_run=False)
         self.assertFalse(self.target.exists())
 
+    def test_partial_copy_failure_restores_first_file_and_leaves_second_untouched(self):
+        self.target.write_text('VALUE = 1\\n')
+        source2 = self.source_root / 'second.py'
+        target2 = self.target_root / 'second.py'
+        source2.write_text('VALUE = 200\\n')
+        target2.write_text('VALUE = 100\\n')
+        second = batch.Item(source2, target2, uid=os.geteuid(), gid=os.getegid(),
+                            reference='second.py')
+        original_copy = batch.atomic_copy
+        count = 0
+        def copy_with_failure(*args, **kwargs):
+            nonlocal count
+            count += 1
+            if count == 2:
+                raise OSError('simulated failed second file write')
+            return original_copy(*args, **kwargs)
+        with patch.object(batch, 'atomic_copy', side_effect=copy_with_failure):
+            with self.assertRaisesRegex(OSError, 'simulated'):
+                batch.apply([self.entry, second], self.backup_root,
+                            self.source_root, (), self.true_baseline)
+        self.assertEqual(self.target.read_text(), 'VALUE = 1\\n')
+        self.assertEqual(target2.read_text(), 'VALUE = 100\\n')
+
     def test_known_previous_version_is_backed_up_and_restorable(self):
         self.target.write_text('VALUE = 1\n')
         receipt = batch.apply([self.entry], self.backup_root, self.source_root, (), self.true_baseline)
