@@ -199,6 +199,7 @@ class TheWeb(QMainWindow):
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.build_ui(); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self.launch_webbie_floating_face()
+        self.notifications_process = self.start_notification_bridge()
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
@@ -277,6 +278,18 @@ class TheWeb(QMainWindow):
             self.webbie_dock.show()
             self.webbie_dock.raise_()
             self.webbie_assistant.entry.setFocus()
+
+    def start_notification_bridge(self):
+        if not self.desktop_mode:
+            return None
+        script=SPIDER_ROOT/'the-web/shell/notification_bridge.py'
+        if not script.is_file(): return None
+        try:
+            return subprocess.Popen([sys.executable,str(script)],
+                stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL)
+        except OSError:
+            return None
 
     def launch_webbie_floating_face(self):
         # At most one instance. The overlay uses a per-user X11 file lock.
@@ -587,7 +600,11 @@ class TheWeb(QMainWindow):
         worker = getattr(self, 'status_worker', None)
         if worker and worker.isRunning(): worker.wait(3000)
         if worker and worker.isRunning(): event.ignore(); return
-        self.timer.stop(); self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
+        self.timer.stop()
+        bridge=getattr(self,'notifications_process',None)
+        if bridge is not None and bridge.poll() is None:
+            bridge.terminate()
+        self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
 
 
 def main():
