@@ -28,7 +28,14 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_ACCESSIBILITY: '0'
         run: timeout --kill-after=5 120 dbus-run-session -- python3 -u tests/check-the-web.py .
-      - name: Non-mutating Webbie extras installer preflight
+      - name: Single bundled Spider OS release preflight and rollback syntax
+        run: |
+          python3 -m py_compile system/release_batch.py
+          python3 system/release_batch.py --check
+          bash -n the-web/package/install-author-webbie.sh
+          bash -n the-web/package/rollback-author-webbie.sh
+          bash -n the-web/package/check-webbie-vision-readiness.sh
+      - name: Legacy optional Webbie extras preflight
         run: |
           bash -n the-web/package/install-webbie-extras.sh
           bash the-web/package/install-webbie-extras.sh --check
