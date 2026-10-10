@@ -89,7 +89,7 @@ class VoiceConvertWorker(QThread):
 
 
 class SeparationWorker(QThread):
-    result = pyqtSignal(str, str)
+    result = pyqtSignal(str, object, str)
 
     def __init__(self, source):
         super().__init__(QApplication.instance())
@@ -104,9 +104,10 @@ class SeparationWorker(QThread):
     def run(self):
         try:
             directory, stems = separate(self.source, stop=self.stop)
-            self.result.emit(str(directory), f"Extracted {len(stems)} WAV candidates. Listen, then assign vocal and backing separately.")
+            self.result.emit(str(directory), [str(path) for path in stems],
+                             f"Extracted {len(stems)} WAV candidates. Listen to each before assigning its role.")
         except Exception as error:
-            self.result.emit("", str(error) if isinstance(error, SeparationError)
+            self.result.emit("", [], str(error) if isinstance(error, SeparationError)
                              else "Stem separation failed. Check the installed RVC/PyMSS engine.")
 
 
@@ -194,6 +195,8 @@ class StudioAIPanel(QWidget):
         self.last_training_set = None
         self.mix_worker = None
         self.separation_worker = None
+        self.separation_directory = None
+        self.separation_files = set()
         self.finish_after_conversion = False
         self.capture_proc = None
         self.capture_file = None
@@ -385,6 +388,22 @@ class StudioAIPanel(QWidget):
         self.separate_button.clicked.connect(self.start_separation)
         separation_buttons.addWidget(self.separate_button)
         layout.addLayout(separation_buttons)
+        stem_review_notice = QLabel("Review the extracted WAV files. Listen before marking which one is the "
+                                    "singing vocal and which is instrumental. Names alone are not proof.")
+        stem_review_notice.setWordWrap(True)
+        layout.addWidget(stem_review_notice)
+        self.stem_candidates = QListWidget()
+        self.stem_candidates.setMaximumHeight(135)
+        layout.addWidget(self.stem_candidates)
+        stem_review_actions = QHBoxLayout()
+        for label, handler in (("Listen to stem", self.listen_stem),
+                               ("Use as singing vocal", self.assign_vocal_stem),
+                               ("Use as instrumental", self.assign_instrumental_stem),
+                               ("Open stems folder", self.open_separated_folder)):
+            action = QPushButton(label)
+            action.clicked.connect(handler)
+            stem_review_actions.addWidget(action)
+        layout.addLayout(stem_review_actions)
         mix_heading = QLabel("Final song: combine My Voice with instrumental backing")
         mix_heading.setStyleSheet("font-size:18px; color:#c4b5fd;")
         layout.addWidget(mix_heading)
@@ -505,6 +524,9 @@ class StudioAIPanel(QWidget):
         except (OSError, MixError) as error:
             self.status.setText(str(error))
             return
+        self.separation_directory = None
+        self.separation_files.clear()
+        self.stem_candidates.clear()
         self.separation_worker = SeparationWorker(source)
         self.separation_worker.result.connect(self.separation_done)
         self.separation_worker.finished.connect(self.separation_finished)
@@ -512,10 +534,75 @@ class StudioAIPanel(QWidget):
         self.status.setText("Extracting stems locally. Existing files are unchanged…")
         self.separation_worker.start()
 
-    def separation_done(self, directory, message):
+    def separation_done(self, directory, candidates, message):
         self.status.setText(message + ((" Folder: " + directory) if directory else ""))
-        if directory:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(directory))
+        self.stem_candidates.clear()
+        self.separation_files.clear()
+        self.separation_directory = None
+        if not directory:
+            return
+        folder = Path(directory).expanduser()
+        if folder.is_symlink() or not folder.is_dir():
+            self.status.setText('Separated audio folder is missing or not safe to inspect.')
+            return
+        self.separation_directory = folder.resolve()
+        for candidate in candidates:
+            try:
+                path = valid_wav(candidate, 'separated track')
+                if self.separation_directory not in path.parents:
+                    continue
+                self.separation_files.add(path)
+                item = QListWidgetItem(path.name)
+                item.setData(Qt.UserRole, str(path))
+                self.stem_candidates.addItem(item)
+            except (OSError, MixError):
+                continue
+        if not self.separation_files:
+            self.status.setText('No valid WAV stems were found. Inspect the private separator job log.')
+
+    def selected_stem(self):
+        item = self.stem_candidates.currentItem()
+        if item is None:
+            self.status.setText('Select a separated WAV track to review first.')
+            return None
+        try:
+            path = valid_wav(item.data(Qt.UserRole), 'separated track')
+            if path not in self.separation_files or self.separation_directory not in path.parents:
+                raise MixError('Selected file is not one of this job\'s WAV stems.')
+            return path
+        except (OSError, MixError) as error:
+            self.status.setText(str(error))
+            return None
+
+    def listen_stem(self):
+        path = self.selected_stem()
+        if path and not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
+            self.status.setText('No audio player opened. Audition the stem with your installed DAW.')
+
+    def assign_vocal_stem(self):
+        path = self.selected_stem()
+        if path is None:
+            return
+        if self.mix_backing.text().strip() == str(path):
+            self.status.setText('This is already assigned as backing. Select a different vocal WAV.')
+            return
+        self.rvc_vocal.setText(str(path))
+        self.mix_vocal.clear()
+        self.status.setText('Singing vocal selected for RVC. Review it before converting; this is not a trained model.')
+
+    def assign_instrumental_stem(self):
+        path = self.selected_stem()
+        if path is None:
+            return
+        if self.rvc_vocal.text().strip() == str(path):
+            self.status.setText('This is already assigned as vocal. Select a different backing WAV.')
+            return
+        self.mix_backing.setText(str(path))
+        self.status.setText('Instrumental backing selected. Your original audio stays unchanged.')
+
+    def open_separated_folder(self):
+        if self.separation_directory and self.separation_directory.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.separation_directory)))
 
     def separation_finished(self):
         worker, self.separation_worker = self.separation_worker, None
