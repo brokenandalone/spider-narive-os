@@ -1,0 +1,26 @@
+name: Validate Native Nova BCN DJ
+on:
+  pull_request:
+    paths:
+      - 'media/ai-dj/**'
+      - 'tests/test_nova_bcn.py'
+      - '.github/workflows/validate-nova.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'media/ai-dj/**'
+      - 'tests/test_nova_bcn.py'
+      - '.github/workflows/validate-nova.yml'
+jobs:
+  nova:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native Nova service
+        run: python3 -m py_compile media/ai-dj/nova_host.py media/ai-dj/service.py
+      - name: Test native Nova radio host
+        run: python3 -m unittest discover -s tests -p 'test_nova_bcn.py' -v
+      - name: Ensure there is one native DJ service
+        run: |
+          test -f media/ai-dj/spider-ai-dj.service
+          test ! -e media/ai-dj/portable-dj.service

@@ -1,0 +1,274 @@
+"""Explicit, least-privilege Kali Bay actions for Webbie.
+
+Only a literal user command may reach this module. Nothing produced by the
+language model, workspace metadata, webcam or terminal output is executable.
+The existing Kali Bay manager owns all approved tool launches.
+"""
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+from pathlib import Path
+
+INSTALLED_MANAGER = Path("/usr/local/lib/spider-os/kali-bay/bin/kali-bay")
+SOURCE_MANAGER = Path(__file__).resolve().parents[2] / "kali-bay/bin/kali-bay"
+
+# IDs are hardcoded to the audited "kali-bay tool" command's allowlist.
+APPROVED_TOOLS = {
+    "wireshark": ("wireshark", "Wireshark"),
+    "burp": ("burpsuite", "Burp Suite"),
+    "burp suite": ("burpsuite", "Burp Suite"),
+    "burpsuite": ("burpsuite", "Burp Suite"),
+    "zap": ("zaproxy", "OWASP ZAP"),
+    "owasp zap": ("zaproxy", "OWASP ZAP"),
+    "zaproxy": ("zaproxy", "OWASP ZAP"),
+    "ghidra": ("ghidra", "Ghidra"),
+    "clamtk": ("clamtk", "ClamTK"),
+    "nmap": ("nmap", "Nmap workbench"),
+    "metasploit": ("msfconsole", "Metasploit workbench"),
+    "msfconsole": ("msfconsole", "Metasploit workbench"),
+    "suricata": ("suricata", "Suricata workbench"),
+    "yara": ("yara", "YARA workbench"),
+    "lynis": ("lynis", "Lynis workbench"),
+}
+ID_TO_NAME = {tool_id: name for tool_id, name in APPROVED_TOOLS.values()}
+
+# Deliberately no general-purpose subprocess, shell, package manager,
+# "run scan", attack, or dynamic target arguments.
+_ACTION = re.compile(
+    r"(?:(?:can|could|would) you\s+)?(?:please\s+)?"
+    r"(open|launch|start|show|switch to)\s+(?:the\s+)?"
+    r"(?:(?:kali|kali bay)\s+)?(.+)",
+    re.IGNORECASE,
+)
+_STATUS = re.compile(
+    r"(?:check|show|tell me|what is|what's)\s+"
+    r"(?:the\s+)?(?:kali|kali bay)\s+(?:status|health)",
+    re.IGNORECASE,
+)
+_TOOLS = re.compile(
+    r"(?:list|show|what are|which are|what)\s+"
+    r"(?:the\s+)?(?:available\s+)?(?:kali|kali bay)\s+tools",
+    re.IGNORECASE,
+)
+
+
+def literal_user_text(message: str) -> str:
+    """Ignore advisory metadata and untrusted camera context in panel packets."""
+    raw = str(message or "")
+    header = "[Spider OS workspace context; advisory only]"
+    marker = "[User request]\n"
+    if raw.startswith(header):
+        # An attacker-controlled workspace title could contain a fake
+        # [User request] delimiter. Prefer the last delimiter *before*
+        # appended untrusted camera/proximity observations.
+        raw = raw.split("\n[Untrusted ", 1)[0]
+        if marker not in raw:
+            return ""
+        raw = raw.rsplit(marker, 1)[1]
+    # A spoken/typed command is single line; don't parse follow-on metadata.
+    raw = raw.splitlines()[0].strip() if raw else ""
+    raw = re.sub(r"^(?:hey\s+)?webbie[,\s]+", "", raw, flags=re.IGNORECASE)
+    return raw.strip(" \t.!?").strip()[:240]
+
+
+def parse_request(message: str):
+    """Return an explicit allowlisted intent, or None for ordinary conversation."""
+    phrase = literal_user_text(message)
+    if not phrase or len(phrase) > 180:
+        return None
+    direct = phrase.casefold().strip()
+    if direct in ("open kali terminal", "open kali linux terminal",
+                  "launch kali terminal", "open kali shell"):
+        return ("shell", None)
+    if direct in ("open kali package manager", "open kali apt",
+                  "open kali packages"):
+        return ("packages", None)
+    if direct in ("show installed kali packages", "check kali package inventory",
+                  "show kali package inventory"):
+        return ("inventory", None)
+    if direct in (
+        "list installed kali applications", "list installed kali apps",
+        "which kali applications are installed", "which kali apps are installed",
+    ):
+        return ("apps", None)
+    search = re.fullmatch(
+        r"(?:find|search for) kali (?:app|application) (.{1,60})",
+        phrase, flags=re.IGNORECASE,
+    )
+    if search:
+        term = search.group(1).strip()
+        if re.fullmatch(r"[A-Za-z0-9 ._+-]{1,60}", term):
+            return ("search_apps", term)
+    if _STATUS.fullmatch(phrase):
+        return ("status", None)
+    if _TOOLS.fullmatch(phrase):
+        return ("list", None)
+    match = _ACTION.fullmatch(phrase)
+    if not match:
+        return None
+    target = match.group(2).casefold().strip()
+    if target in ("purple", "purple defense", "kali purple"):
+        return ("section", "purple")
+    if target in ("offensive", "offensive security", "offensive tools"):
+        return ("section", "offensive")
+    if target in APPROVED_TOOLS:
+        return ("tool", APPROVED_TOOLS[target])
+    return None
+
+
+def _manager():
+    # Never fall back to PATH or an arbitrary executable supplied in text.
+    if INSTALLED_MANAGER.is_file() and os.access(INSTALLED_MANAGER, os.X_OK):
+        return INSTALLED_MANAGER
+    if SOURCE_MANAGER.is_file() and os.access(SOURCE_MANAGER, os.X_OK):
+        return SOURCE_MANAGER
+    return None
+
+
+def _excerpt(text: str, limit: int = 280) -> str:
+    # Do not echo ANSI/control escapes or unlimited third-party output.
+    value = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", str(text or ""))
+    value = "".join(c for c in value if c.isprintable() or c == "\n")
+    return value.strip()[:limit]
+
+
+def handle_kali_request(message: str, manager=None):
+    """Return response for one user action, None when not a Kali action.
+
+    The caller supplies the *literal human request*, never an LLM reply.
+    No action creates or restarts a container. No scan is launched.
+    """
+    intent = parse_request(message)
+    if intent is None:
+        return None
+    operation, value = intent
+    if operation == "list":
+        return (
+            "I can check Kali Bay status and open Wireshark, Burp Suite, "
+            "OWASP ZAP, Ghidra, ClamTK, or the Nmap, Metasploit, "
+            "Suricata, YARA and Lynis workbenches. I won't run a "
+            "scan, attack or privileged command on your behalf. "
+            "You can also ask me to open the full Kali terminal or the "
+            "interactive Kali package manager, or list and search your "
+            "installed Kali applications."
+        )
+    command = Path(manager) if manager is not None else _manager()
+    if command is None or not command.is_file() or not os.access(command, os.X_OK):
+        return (
+            "The Kali Bay manager isn't available here. "
+            "I haven't started or changed anything."
+        )
+    if operation in ("apps", "search_apps"):
+        # Fixed read-only query against real Kali package .desktop inventory.
+        # Application metadata is untrusted and never executable input.
+        import json
+        try:
+            found = subprocess.run(
+                [str(command), "apps-json"], capture_output=True,
+                text=True, timeout=24, check=False,
+            )
+            if found.returncode:
+                return (
+                    "I couldn't read installed Kali applications. "
+                    "Check that Kali Bay is running. Nothing was launched."
+                )
+            data = json.loads(found.stdout)
+            apps = data.get("applications", [])
+            if not isinstance(apps, list):
+                raise ValueError("Unexpected catalog")
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return "Kali's installed application catalog is unavailable."
+        total = len(apps)
+        if operation == "search_apps":
+            wanted = value.casefold()
+            apps = [
+                app for app in apps if isinstance(app, dict)
+                and wanted in str(app.get("name", "")).casefold()
+            ]
+        visible = [
+            _excerpt(app.get("name", ""), 70)
+            for app in apps[:8]
+            if isinstance(app, dict) and app.get("name")
+        ]
+        if operation == "search_apps" and not visible:
+            return f"No installed Kali application matched {_excerpt(value, 50)}."
+        if not visible:
+            return "No Kali desktop applications were reported by the running container."
+        summary = ", ".join(visible)
+        if operation == "apps":
+            return (
+                f"Kali reports {total} visible desktop applications. "
+                f"Examples: {summary}. Open Kali Bay's applications menu "
+                "to browse and launch them."
+            )
+        return (
+            f"Installed Kali applications matching {_excerpt(value, 50)}: "
+            f"{summary}. Select the one you want in Kali Bay's applications menu."
+        )
+    if operation == "status":
+        try:
+            result = subprocess.run(
+                [str(command), "status"], capture_output=True,
+                text=True, timeout=10, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return "Kali Bay did not respond to a read-only status check."
+        if result.returncode:
+            return "Kali Bay status check failed: " + _excerpt(
+                result.stderr or result.stdout
+            )
+        status = result.stdout.strip()
+        states = {
+            "ready": "Kali Bay's complete toolset is reported ready.",
+            "container": "The Kali Bay container exists; full readiness is not confirmed.",
+            "missing": "No Kali Bay container was found.",
+        }
+        return states.get(status, "Kali Bay reported an unrecognized status.")
+
+    if operation in ("shell", "packages", "inventory"):
+        # Explicit owner-selected interactive terminal/workbench only. It
+        # cannot execute arbitrary commands generated by the language model.
+        args = [str(command), {
+            "shell": "terminal",
+            "packages": "packages",
+            "inventory": "inventory",
+        }[operation]]
+        description = {
+            "shell": "Kali Linux terminal",
+            "packages": "Kali package manager shell",
+            "inventory": "read-only Kali package inventory",
+        }[operation]
+    elif operation == "tool":
+        tool_id, title = value
+        try:
+            check = subprocess.run(
+                [str(command), "tool-check", tool_id],
+                capture_output=True, text=True, timeout=12, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return f"I couldn't verify {title}. No tool was launched."
+        if check.returncode:
+            reason = _excerpt(check.stderr or check.stdout)
+            return (
+                f"{title} isn't available in the running Kali Bay container. "
+                + (reason or "No action was taken.")
+            )
+        args = [str(command), "tool", tool_id]
+        description = title
+    else:
+        # Section selection only opens the existing UI, not a tool/scan.
+        args = [str(command), value]
+        description = "Purple Defense" if value == "purple" else "Offensive Security"
+    try:
+        subprocess.Popen(
+            args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True,
+        )
+    except OSError:
+        return f"I couldn't open {description}. Nothing was started."
+    return (
+        f"Requested {description} in Kali Bay. "
+        "I haven't launched a scan or changed security settings."
+    )

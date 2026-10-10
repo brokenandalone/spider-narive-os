@@ -1,5 +1,5 @@
 [Unit]
-Description=Spider Media Player AI DJ Service
+Description=BCN Radio Nova AI DJ for Spider OS
 After=network-online.target ollama.service
 Wants=network-online.target
 

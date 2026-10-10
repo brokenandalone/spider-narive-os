@@ -35,6 +35,9 @@ from PyQt5.QtWidgets import (
 )
 
 
+if QApplication.instance() is None:
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+
 SCRIPT_ROOT = (
     Path(__file__)
     .resolve()
@@ -57,10 +60,12 @@ sys.path.insert(
 )
 
 if __package__:
+    from .school_portal import SchoolPortal
     from .store import StudyStore
     from .dashboard import overview
     from .paper_dialog import PaperDialog
 else:
+    from school_portal import SchoolPortal
     from store import StudyStore
     from dashboard import overview
     from paper_dialog import PaperDialog
@@ -596,10 +601,13 @@ class StudyWindow(QMainWindow):
             ]
         )
 
-        outer.addWidget(
-            splitter,
-            1,
-        )
+        self.school_tabs = QTabWidget()
+        self.school_tabs.addTab(splitter, 'Courses & coursework')
+        self.school_portal = SchoolPortal(lambda: self.store.course_folder(self.current_course_id))
+        self.school_tabs.addTab(self.school_portal, 'My SNHU')
+        self.school_tabs.currentChanged.connect(
+            lambda index: self.school_portal.open() if index == 1 else None)
+        outer.addWidget(self.school_tabs, 1)
 
         footer = QLabel(
             "SCHOOL · SPIDER OS · YOUR LIFE. ONE WEB."
@@ -1178,7 +1186,8 @@ class StudyWindow(QMainWindow):
         self.dashboard.setText(text)
 
     def open_snhu(self):
-        self.launch(['xdg-open', 'https://my.snhu.edu/'])
+        self.school_tabs.setCurrentIndex(1)
+        self.school_portal.open()
 
     def open_apa_guide(self):
         self.launch(['xdg-open', 'https://apastyle.apa.org/instructional-aids/student-paper-setup-guide.pdf'])

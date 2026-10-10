@@ -47,3 +47,6 @@ python3-docx
 
 # The Web X11 taskbar/window switching
 wmctrl
+
+# Embedded school workspace browser
+python3-pyqt5.qtwebengine
