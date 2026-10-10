@@ -25,15 +25,7 @@ security daemons.
 
 ## Required dependency and integration
 
-**PR #13** (`upgrades/kali-bay-security-tool-launchers`) provides the safe
-`kali-bay tool-check <id>`, `kali-bay tool <id>`, `kali-bay offensive` and
-`kali-bay purple` commands. This PR is based on the current Webbie/desktop
-integration branch **PR #26**, whose Kali manager is older. Do **not** install
-the Webbie bridge alone onto an unqualified older Kali manager and assume
-tool launch works. The user previously installed the PR #13 Kali-only files
-on October 8; revalidate those files and confirm both versions are present
-before the coordinated install. Do not silently overwrite the working Kali
-scripts with PR #26's older version.
+The combined development branch now includes the approved Kali manager from PR #13, the Kali-style Desktop Hub from PR #40, and Webbie's fixed-allowlist bridge from PR #39. These source versions are consistent. The user's installed Kali files, Webbie customization and rootless Distrobox state still require backup-first inspection and local testing before deployment.
 
 The user's real installed Webbie may contain local customizations that are
 not identical to either branch. Compare and back up `webbie.py`, the Kali
