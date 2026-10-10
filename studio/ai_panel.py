@@ -504,8 +504,9 @@ class StudioAIPanel(QWidget):
     def remember_my_voice_model(self):
         answer = QMessageBox.question(
             self, 'Remember owner-trained voice model',
-            'Confirm the selected .pth and optional .index are your own locally trained voice model, '
-            'or are recordings and model files you are authorized to use. Only their file locations '
+            'Confirm the selected .pth and optional .index were trained from your own '
+            'Justin Therapy voice recordings. Guest singers need separate, permission-based '
+            'profiles. Only the owner-model file locations '
             'are stored privately; model weights are never loaded merely by remembering the selection. '
             'The voice identity and sound quality have NOT been verified.',
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
