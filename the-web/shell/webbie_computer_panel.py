@@ -14,7 +14,8 @@ from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QHBoxLayout,
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'webbie/actions'))
-from desktop_control import DesktopOperator, app_catalog, KEYS
+from desktop_control import app_catalog, KEYS
+from window_safety import ConfinedDesktopOperator
 from task_grants import TaskGrant
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
@@ -69,7 +70,7 @@ class WebbieComputerDialog(QDialog):
         self.resize(510, 610)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
         self.grant = TaskGrant(approve_sensitive=self.approve_sensitive)
-        self.operator = DesktopOperator(
+        self.operator = ConfinedDesktopOperator(
             permission=self.grant.authorize,
             discover=lambda: self.apps,
             runner=run, launcher=launcher)
@@ -115,6 +116,9 @@ class WebbieComputerDialog(QDialog):
 
         self.windows = QComboBox(); self.windows.setObjectName('webbieWindowSelector')
         layout.addWidget(self.windows)
+        self.bind_button = QPushButton('Authorize selected window')
+        self.bind_button.clicked.connect(self.bind_window)
+        layout.addWidget(self.bind_button)
         window_row = QHBoxLayout(); layout.addLayout(window_row)
         self.focus_button = QPushButton('Focus window')
         self.focus_button.clicked.connect(self.focus_window); window_row.addWidget(self.focus_button)
@@ -217,7 +221,7 @@ class WebbieComputerDialog(QDialog):
             (f"AUTHORIZED | {data['remaining_seconds']} sec left | "
              f"{data['remaining_actions']} actions | {data['task']}")
             if active else 'OFF | Webbie cannot operate applications')
-        for control in (self.open_button, self.refresh_button, self.focus_button,
+        for control in (self.open_button, self.refresh_button, self.bind_button, self.focus_button,
                         self.inspect_button, self.close_button, self.click_button,
                         self.key_button, self.type_button):
             control.setEnabled(active)
@@ -267,6 +271,20 @@ class WebbieComputerDialog(QDialog):
     def selected_window(self):
         return self.windows.currentData()
 
+    def bind_window(self):
+        target = self.selected_window()
+        if not target:
+            self.status('Choose an open window first.'); return
+        chosen = self.windows.currentText()
+        choice = QMessageBox.question(
+            self, 'Authorize this program window?',
+            f'Allow Webbie to operate this exact window?\n\n{chosen[:200]}\n\n'
+            'The currently selected application is not automatically proof of '
+            'the window owner. Verify its title and contents yourself.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if choice == QMessageBox.Yes:
+            self.action(self.operator.bind_window, target)
+
     def focus_window(self):
         if self.selected_window():
             self.action(self.operator.focus, self.selected_window())
@@ -290,8 +308,9 @@ class WebbieComputerDialog(QDialog):
 
     def inspect_window(self):
         target = self.selected_window()
-        if not target or not self.grant.status()['active']:
-            return
+        if (not target or target != self.operator.target_window or
+                not self.grant.status()['active']):
+            self.status('Authorize the exact window before inspecting it.'); return
         if self.screen_worker and self.screen_worker.isRunning():
             self.status('Current window inspection is still running.')
             return
