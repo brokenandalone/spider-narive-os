@@ -62,6 +62,10 @@ class NativeReconciliationTests(unittest.TestCase):
             self.assertEqual(dest.read_text(), previous)
 
 
+    def test_git_blob_fingerprint_matches_git_format(self):
+        self.assertEqual(helper.git_blob_sha('hello\n'),
+                         'ce013625030ba8dba906f756967f9e9ca394464a')
+
     def test_known_study_baselines_are_recorded(self):
         self.assertIn('456f0279b397f7776b8ba9c6d970d493a9a8ccaf',
                       helper.STUDY_KNOWN_BLOBS['Study workspace'])
