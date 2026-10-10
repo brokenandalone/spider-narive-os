@@ -135,6 +135,41 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertIn('trained', panel.status.text())
             panel.close()
 
+    def test_voice_training_setup_stays_read_only_and_launcher_requires_consent(self):
+        from PyQt5.QtWidgets import QMessageBox
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            script = Path(folder) / 'voice-engine.sh'
+            panel.training_script = script
+            panel.check_training_engine()
+            self.assertIn('not been installed', panel.engine_status.text())
+            with patch('studio.ai_panel.QProcess') as process:
+                panel.launch_trainer()
+                process.assert_not_called()
+            script.write_text('#!/bin/bash\nexit 0\n')
+            with patch('studio.ai_panel.subprocess.run') as audit:
+                audit.return_value.stdout = 'RVC checkout: present; models need review'
+                panel.check_training_engine()
+                audit.assert_called_once()
+                self.assertEqual(audit.call_args.args[0], ['bash', str(script), '--check'])
+                self.assertIn('models need review', panel.engine_status.text())
+            with patch('studio.ai_panel.QMessageBox.question', return_value=QMessageBox.No), \
+                 patch('studio.ai_panel.QProcess') as process:
+                panel.launch_trainer()
+                process.assert_not_called()
+            with patch('studio.ai_panel.QMessageBox.question', return_value=QMessageBox.Yes), \
+                 patch('studio.ai_panel.QProcess') as process:
+                panel.launch_trainer()
+                process.assert_called_once()
+                runner = process.return_value
+                runner.setArguments.assert_called_once_with([str(script), '--launch-local'])
+                runner.setProgram.assert_called_once_with('bash')
+                runner.start.assert_called_once()
+                self.assertFalse(panel.training_launch_button.isEnabled())
+                panel.trainer_finished(0, 0)
+                self.assertTrue(panel.training_launch_button.isEnabled())
+            panel.close()
+
     def test_training_readiness_reports_usable_and_rejected_clips(self):
         with tempfile.TemporaryDirectory() as folder:
             panel = StudioAIPanel(folder)
