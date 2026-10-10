@@ -24,7 +24,7 @@ class StudyBatchReleaseTests(unittest.TestCase):
             "webbie/agent/webbie.py",
         ):
             self.assertIn(required, references)
-        self.assertEqual(len(references), len(set(references)))
+        self.assertEqual(len(items), len({str(item.target) for item in items}))
         for item in items:
             self.assertTrue(item.source.is_file(), str(item.source))
         forbidden = ("assignments.db", "writing-style.txt", "rclone.conf", "oauth")
