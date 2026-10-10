@@ -19,6 +19,7 @@ from task_grants import TaskGrant
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from screen_capture import capture_window, describe_window
+from webbie_operator_bridge import OperatorBridge
 
 
 def parse_open_request(message, apps):
@@ -73,6 +74,8 @@ class WebbieComputerDialog(QDialog):
             discover=lambda: self.apps,
             runner=run, launcher=launcher)
         self.screen_worker = None
+        self.bridge = OperatorBridge(grant=self.grant, parent=self)
+        self.bridge.openRequested.connect(self.handle_voice_open)
 
         layout = QVBoxLayout(self)
         notice = QLabel(
@@ -179,12 +182,20 @@ class WebbieComputerDialog(QDialog):
         consume_stop()
         self.grant.activate(task, app.desktop_id, seconds=300)
         self.operator.begin_new_task()
+        try:
+            self.bridge.activate()
+        except (OSError, RuntimeError, ValueError, PermissionError) as error:
+            self.operator.stop()
+            self.grant.stop()
+            self.status('Desktop voice bridge unavailable: ' + str(error))
+            return
         self.status(f'Authorized: {app.name}. No changes made yet.')
         self.refresh_status()
 
     def stop(self):
         self.operator.stop()
         self.grant.stop()
+        self.bridge.deactivate()
         self.status('STOPPED. No additional Webbie computer actions are authorized.')
         self.refresh_status()
 
@@ -210,8 +221,10 @@ class WebbieComputerDialog(QDialog):
                         self.inspect_button, self.close_button, self.click_button,
                         self.key_button, self.type_button):
             control.setEnabled(active)
-        if not active and not self.operator.cancelled.is_set():
-            self.operator.stop()
+        if not active:
+            self.bridge.deactivate()
+            if not self.operator.cancelled.is_set():
+                self.operator.stop()
 
     def action(self, method, *args):
         try:
@@ -222,6 +235,20 @@ class WebbieComputerDialog(QDialog):
         self.status(str(outcome))
         self.refresh_status()
         return outcome
+
+    def handle_voice_open(self, app_id):
+        # A socket request cannot create/extend approval; the selected app ID
+        # and current GUI grant are rechecked before even attempting a launch.
+        result = None
+        app = self.selected_app()
+        if (app is not None and app.desktop_id == app_id
+                and self.grant.status()['active']):
+            result = self.action(self.operator.open_app, app.name)
+        peer = self.bridge.pending
+        if peer is not None:
+            self.bridge.finish(
+                peer, f'Launch requested for {app.name}.' if result else
+                'App launch denied or unsuccessful. Check the desktop panel.')
 
     def open_app(self):
         app = self.selected_app()
