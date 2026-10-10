@@ -102,3 +102,9 @@ Study's Homework Assistant now has a separate read-only rubric-feedback panel an
 "Ask Webbie to review rubric" submits the owner-selected instructions, current draft, optional course readings, and approved writing-style sample to the already configured local Webbie/Ollama model. Webbie is prompted to cite specific mismatches and recommend changes without fabricating bibliographic details or claiming an official grade. Its answer goes into the feedback panel and **never replaces the edited draft**. The separate Revise action still requires user approval; earlier local draft versions continue to be snapshotted before replacement.
 
 New source tests check explicit word requirements, unresolved source markers, missing directions/draft, selective context use and preserving the draft during model review. This is source validation only. Real SNHU assignments, model quality, school OneDrive authorization, and installation on the PC still require acceptance; no document has been submitted to SNHU.
+
+## Local homework autosave and exit recovery (source staged)
+
+Study's Webbie Homework editor now autosaves changed, nonempty drafts into the selected course's private Assignments/Drafts directory every three minutes. It creates a new snapshot rather than overwriting a previous version; unchanged text does not create duplicate snapshots. A normal editor close also preserves any new text. If the final save fails, the editor refuses to close and displays a warning so the owner can recover their writing. Manual Save and Restore remain available.
+
+Autosave is a local safety net only: it never sends coursework to Microsoft or Webbie's personal OneDrive. It is separate from the explicit APA export and separately confirmed university cloud upload. Source regression tests cover no-change, changed versions, close recovery and simulated disk failure. PC acceptance is still required; no new application files have been deployed to the owner's Spider OS.
