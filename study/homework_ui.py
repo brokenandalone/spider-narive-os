@@ -4,7 +4,7 @@ All requested material is displayed before it is sent to a local Ollama model.
 The user controls sample storage, revision, APA export, and later cloud uploads.
 """
 from pathlib import Path
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
     QCheckBox, QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QFileDialog, QPushButton, QTextEdit, QVBoxLayout,
@@ -54,6 +54,7 @@ class HomeworkDialog(QDialog):
         self.last_exported_path = None
         self.review_source_draft = None
         self.review_is_stale = False
+        self.last_saved_text = ""
         outer = QVBoxLayout(self)
         intro = QLabel("Webbie drafts and revises at your request using local AI. "
                        "You choose what course material and writing samples she sees. "
@@ -135,6 +136,7 @@ class HomeworkDialog(QDialog):
         self.draft = QTextEdit()
         self.draft.setAcceptRichText(False)
         self.draft.textChanged.connect(self.invalidate_export)
+        self.draft.textChanged.connect(self.note_draft_changed)
         self.draft.setPlaceholderText("Webbie's editable draft appears here. No automatic submission.")
         outer.addWidget(self.draft, 1)
         review_heading = QLabel("Rubric feedback and source checks (not an official grade)")
@@ -166,6 +168,29 @@ class HomeworkDialog(QDialog):
         self.status = QLabel("Ready. Nothing is sent to Webbie until you request a draft.")
         self.status.setWordWrap(True)
         outer.addWidget(self.status)
+        # A local file is created only after the draft changes. Never sync it
+        # to personal or university cloud accounts.
+        self.autosave_timer = QTimer(self)
+        self.autosave_timer.setInterval(180000)
+        self.autosave_timer.timeout.connect(self.autosave_draft)
+        self.autosave_timer.start()
+
+    def note_draft_changed(self):
+        # Saving is deferred so typing stays responsive.
+        if self.draft.toPlainText() != self.last_saved_text:
+            self.status.setText("Draft has unsaved local edits. Autosave runs every 3 minutes.")
+
+    def autosave_draft(self):
+        current = self.draft.toPlainText()
+        if not current.strip() or current == self.last_saved_text:
+            return
+        try:
+            path = save_snapshot(self.course_folder, self.assignment.text(), current)
+        except (OSError, ValueError) as error:
+            self.status.setText("Autosave failed; existing drafts are safe. " + str(error))
+            return
+        self.last_saved_text = current
+        self.status.setText("Draft autosaved locally: " + str(path))
 
     def invalidate_export(self):
         # A Word export is only eligible while the editable draft matches it.
@@ -182,6 +207,7 @@ class HomeworkDialog(QDialog):
         try:
             path = save_snapshot(self.course_folder, self.assignment.text(),
                                  self.draft.toPlainText())
+            self.last_saved_text = self.draft.toPlainText()
             self.status.setText("New local draft saved: " + str(path))
         except (ValueError, OSError) as error:
             QMessageBox.warning(self, "Save draft", str(error))
@@ -456,4 +482,17 @@ class HomeworkDialog(QDialog):
             self.status.setText("Webbie is finishing this request. You can close after her response.")
             event.ignore()
             return
+        current = self.draft.toPlainText()
+        if current.strip() and current != self.last_saved_text:
+            try:
+                save_snapshot(self.course_folder, self.assignment.text(), current)
+                self.last_saved_text = current
+            except (OSError, ValueError) as error:
+                QMessageBox.warning(
+                    self, "Homework not saved",
+                    "Local draft backup failed. The editor will stay open "
+                    "so you can copy your work or free disk space.\n" + str(error))
+                event.ignore()
+                return
+        self.autosave_timer.stop()
         super().closeEvent(event)
