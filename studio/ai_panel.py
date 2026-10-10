@@ -8,7 +8,7 @@ import threading
 
 from PyQt5.QtCore import QThread, QUrl, pyqtSignal
 from PyQt5.QtGui import QDesktopServices
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QFileDialog, QFormLayout,
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QVBoxLayout, QWidget)
 from PyQt5.QtCore import Qt
@@ -16,9 +16,11 @@ from PyQt5.QtCore import Qt
 if __package__:
     from .music_backend import LocalMusicClient, SongRequest, MusicError
     from .tools import TOOLS, resolve_tool
+    from .arrangement import VOICE_OPTIONS
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
+    from arrangement import VOICE_OPTIONS
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -81,6 +83,39 @@ class StudioAIPanel(QWidget):
                             ('', self.instrumental), ('Length', self.duration), ('Takes', self.takes), ('Tempo', self.bpm)):
             form.addRow(name, field)
         layout.addLayout(form)
+
+        band_heading = QLabel('Band arrangement')
+        band_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
+        layout.addWidget(band_heading)
+        notice = QLabel('Singer labels guide original vocal roles, not cloned real voices. '
+                        'Guitar parts are mixed in the generated WAV, not independent stems. '
+                        'Use [Singer 1], [Singer 2], etc. in lyrics to request handoffs.')
+        notice.setWordWrap(True)
+        layout.addWidget(notice)
+        band = QFormLayout()
+        self.voice_boxes = []
+        for number, default in ((1, 'Justin Therapy (original baritone)'),
+                                (2, 'None'), (3, 'None')):
+            combo = QComboBox()
+            combo.addItems(VOICE_OPTIONS)
+            combo.setCurrentText(default)
+            self.voice_boxes.append(combo)
+            band.addRow(f'Singer {number}', combo)
+        self.voice_notes = QPlainTextEdit()
+        self.voice_notes.setPlaceholderText('Optional vocal roles, harmonies or who sings each section. Give Jason/J-Cold an original vocal description here.')
+        self.voice_notes.setMaximumHeight(65)
+        band.addRow('Singer directions', self.voice_notes)
+        self.guitar_one = QLineEdit('Downtuned seven-string rhythm guitar, tight muted riffs and heavy chord accents')
+        self.guitar_two = QLineEdit('Distinct melodic lead guitar, soaring harmony lines and expressive solo fills')
+        self.two_guitarists = QCheckBox('Include second guitarist')
+        self.two_guitarists.setChecked(True)
+        self.two_guitarists.toggled.connect(self.guitar_two.setEnabled)
+        band.addRow('Guitarist 1', self.guitar_one)
+        band.addRow('', self.two_guitarists)
+        band.addRow('Guitarist 2', self.guitar_two)
+        self.other_instruments = QLineEdit('Bass guitar, live acoustic drums, atmospheric piano')
+        band.addRow('Rest of band', self.other_instruments)
+        layout.addLayout(band)
         buttons = QHBoxLayout()
         self.preset = QPushButton('Broken Sorrow preset')
         self.preset.clicked.connect(lambda: self.style.setPlainText(BROKEN_SORROW))
@@ -105,9 +140,15 @@ class StudioAIPanel(QWidget):
         try:
             client = LocalMusicClient(os.environ.get('SPIDER_MUSIC_URL', 'http://127.0.0.1:8001'),
                                       os.environ.get('ACESTEP_API_KEY'))
-            request = None if check_only else SongRequest(self.title.text(), self.style.toPlainText(),
-                self.lyrics.toPlainText(), self.instrumental.isChecked(), self.duration.value(),
-                self.takes.value(), self.bpm.value())
+            singers = tuple(box.currentText() for box in self.voice_boxes
+                            if box.currentText() != 'None')
+            request = None if check_only else SongRequest(
+                self.title.text(), self.style.toPlainText(), self.lyrics.toPlainText(),
+                self.instrumental.isChecked(), self.duration.value(), self.takes.value(), self.bpm.value(),
+                vocal_lineup=singers, vocal_notes=self.voice_notes.toPlainText(),
+                guitar_one=self.guitar_one.text(),
+                guitar_two=self.guitar_two.text() if self.two_guitarists.isChecked() else '',
+                other_instruments=self.other_instruments.text())
             if request:
                 request.payload()
         except ValueError as error:
