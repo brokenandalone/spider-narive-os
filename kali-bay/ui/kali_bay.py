@@ -3,9 +3,11 @@
 import os
 import subprocess
 import sys
+import socket
+import stat
 from pathlib import Path
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
     QFont,
@@ -17,6 +19,8 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QDockWidget,
+    QPlainTextEdit,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -201,6 +205,45 @@ class WallpaperSurface(QWidget):
         painter.end()
 
 
+class KaliWebbieReplyWorker(QThread):
+    """Send typed Kali Bay questions to the EXISTING Webbie resident socket."""
+
+    received = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, message, sock_path, parent=None):
+        super().__init__(parent)
+        self.message = message
+        self.sock_path = Path(sock_path)
+
+    def run(self):
+        try:
+            entry = self.sock_path.stat()
+            if not stat.S_ISSOCK(entry.st_mode) or entry.st_uid != os.getuid():
+                self.failed.emit("Webbie's private session socket is unavailable.")
+                return
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                client.settimeout(110)
+                client.connect(str(self.sock_path))
+                client.sendall(self.message.encode("utf-8"))
+                output = []
+                size = 0
+                while True:
+                    part = client.recv(16384)
+                    if not part:
+                        break
+                    size += len(part)
+                    if size > 262144:
+                        raise ValueError("Webbie response was too large.")
+                    output.append(part)
+            answer = b"".join(output).decode("utf-8", errors="replace").strip()
+            if not answer:
+                raise ValueError("Webbie did not send a reply.")
+            self.received.emit(answer)
+        except (OSError, ValueError) as error:
+            self.failed.emit("Webbie connection: " + str(error))
+
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -222,6 +265,7 @@ class KaliBayWindow(QMainWindow):
         )
 
         self.build_ui()
+        self.build_webbie_dock()
         self.load_wallpaper()
         self.refresh_status()
         if "--purple" in sys.argv[1:]:
@@ -530,6 +574,21 @@ class KaliBayWindow(QMainWindow):
             self.filter_desktop_tools
         )
         left.addWidget(self.desktop_category)
+        self.installed_desktop_apps = []
+        load_apps = QPushButton("LOAD ALL INSTALLED KALI APPS")
+        load_apps.setObjectName("kaliLoadInstalledApps")
+        load_apps.setToolTip(
+            "Read Kali's actual installed system .desktop menu. "
+            "Does not install software, run scans or start the container."
+        )
+        load_apps.clicked.connect(self.load_installed_desktop_apps)
+        left.addWidget(load_apps)
+        self.desktop_apps_status = QLabel(
+            "Ten featured tools. Load the installed Kali application catalog."
+        )
+        self.desktop_apps_status.setObjectName("kaliInstalledAppsStatus")
+        self.desktop_apps_status.setWordWrap(True)
+        left.addWidget(self.desktop_apps_status)
         self.desktop_list = QListWidget()
         self.desktop_list.setObjectName("kaliDesktopToolList")
         self.desktop_list.setStyleSheet(
@@ -538,9 +597,7 @@ class KaliBayWindow(QMainWindow):
             "QListWidget::item {padding:9px;}"
             "QListWidget::item:selected {background:#5b21b6;}"
         )
-        self.desktop_list.itemDoubleClicked.connect(
-            lambda item: self.open_tool(item.data(Qt.UserRole))
-        )
+        self.desktop_list.itemDoubleClicked.connect(self.open_desktop_item)
         left.addWidget(self.desktop_list, 1)
         launch = QPushButton("OPEN SELECTED TOOL")
         launch.setObjectName("kaliDesktopLaunchTool")
@@ -564,6 +621,8 @@ class KaliBayWindow(QMainWindow):
         about.setWordWrap(True)
         right.addWidget(about)
         for caption, operation in (
+            ("START EXISTING KALI", self.start_existing_kali),
+            ("KALI HEALTH CHECK", self.open_kali_health),
             ("KALI TERMINAL", self.open_terminal),
             ("KALI PACKAGE MANAGER", self.open_packages),
             ("INSTALLED KALI PACKAGES", self.open_inventory),
@@ -585,7 +644,11 @@ class KaliBayWindow(QMainWindow):
         notice.setStyleSheet("color:#c4aedb;")
         right.addWidget(notice)
         right.addStretch(1)
-        layout.addWidget(actions, 3)
+        actions_scroll = QScrollArea()
+        actions_scroll.setObjectName("kaliDesktopActionsScroll")
+        actions_scroll.setWidgetResizable(True)
+        actions_scroll.setWidget(actions)
+        layout.addWidget(actions_scroll, 3)
         self.filter_desktop_tools()
         return page
 
@@ -601,15 +664,160 @@ class KaliBayWindow(QMainWindow):
             item = QListWidgetItem(f"{group}  /  {label}")
             item.setData(Qt.UserRole, tool_id)
             self.desktop_list.addItem(item)
+        for app in self.installed_desktop_apps:
+            group = app["category"]
+            label = app["name"]
+            if category != "All categories" and group != category:
+                continue
+            if query and query not in (
+                group + " " + label + " " + app["description"]
+            ).casefold():
+                continue
+            item = QListWidgetItem(f"{group}  /  {label}")
+            item.setToolTip(app["description"])
+            item.setData(Qt.UserRole, ("app", app["id"]))
+            self.desktop_list.addItem(item)
         if self.desktop_list.count():
             self.desktop_list.setCurrentRow(0)
 
     def open_selected_desktop_tool(self):
         item = self.desktop_list.currentItem()
         if item is None:
-            QMessageBox.information(self, "Kali Bay", "Select a tool first.")
+            QMessageBox.information(self, "Kali Bay", "Select an application first.")
             return
-        self.open_tool(item.data(Qt.UserRole))
+        self.open_desktop_item(item)
+
+    def open_desktop_item(self, item):
+        value = item.data(Qt.UserRole)
+        if isinstance(value, (tuple, list)) and len(value) == 2:
+            if value[0] == "app":
+                self.open_installed_kali_app(value[1])
+            return
+        # Static featured tools retain the fixed legacy approved manager IDs.
+        self.open_tool(value)
+
+    def load_installed_desktop_apps(self):
+        """Inventory only. Never initialize/start Kali or run app Exec lines."""
+        try:
+            import json
+            result = subprocess.run(
+                [str(MANAGER), "apps-json"],
+                capture_output=True, text=True, timeout=24, check=False,
+            )
+            if result.returncode:
+                raise ValueError(
+                    (result.stderr or result.stdout).strip()[:220]
+                    or "Kali isn't running or desktop apps are unavailable."
+                )
+            apps = json.loads(result.stdout).get("applications", [])
+            if not isinstance(apps, list):
+                raise ValueError("Unexpected Kali application inventory.")
+            import re
+            id_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\.desktop$")
+            cleaned = []
+            for app in apps[:1500]:
+                if not isinstance(app, dict):
+                    continue
+                app_id = app.get("id")
+                name = app.get("name")
+                group = app.get("category", "Other")
+                if not isinstance(app_id, str) or not id_pattern.fullmatch(app_id):
+                    continue
+                if not isinstance(name, str) or not name.strip():
+                    continue
+                if not isinstance(group, str):
+                    group = "Other"
+                description = app.get("description", "")
+                if not isinstance(description, str):
+                    description = ""
+                cleaned.append({
+                    "id": app_id,
+                    "name": name[:95],
+                    "category": (group.strip() or "Other")[:55],
+                    "description": description[:200],
+                })
+            self.installed_desktop_apps = cleaned
+            selected = self.desktop_category.currentText()
+            all_groups = sorted(
+                {item[0] for item in DESKTOP_TOOL_MENU}
+                | {item["category"] for item in cleaned}
+            )
+            self.desktop_category.blockSignals(True)
+            self.desktop_category.clear()
+            self.desktop_category.addItems(["All categories"] + all_groups)
+            index = self.desktop_category.findText(selected)
+            self.desktop_category.setCurrentIndex(max(index, 0))
+            self.desktop_category.blockSignals(False)
+            self.desktop_apps_status.setText(
+                f"{len(cleaned)} installed Kali applications loaded. "
+                "Select one and click Open. No programs were started."
+            )
+            self.filter_desktop_tools()
+        except (OSError, subprocess.TimeoutExpired, ValueError) as error:
+            self.desktop_apps_status.setText("Application discovery unavailable.")
+            QMessageBox.information(
+                self, "Kali Bay", f"Could not list Kali applications: {error}"
+            )
+
+    def open_installed_kali_app(self, app_id):
+        # Only manually selected inventory entries reach app-open.
+        if app_id not in {app["id"] for app in self.installed_desktop_apps}:
+            return
+        try:
+            preflight = subprocess.run(
+                [str(MANAGER), "app-check", app_id],
+                text=True, capture_output=True, check=False, timeout=12,
+            )
+            if preflight.returncode:
+                QMessageBox.information(
+                    self, "Kali Bay",
+                    (preflight.stderr or preflight.stdout).strip()[:280]
+                    or "Kali application is not available."
+                )
+                return
+            subprocess.Popen(
+                [str(MANAGER), "app-open", app_id], start_new_session=True,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            QMessageBox.warning(
+                self, "Kali Bay", f"Could not launch Kali app: {error}"
+            )
+
+    def start_existing_kali(self):
+        reply = QMessageBox.question(
+            self, "Start Kali Bay",
+            "Start your existing Kali Linux container? No packages are "
+            "installed and no new container is created. You can run the "
+            "health check afterward.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            result = subprocess.run(
+                [str(MANAGER), "start"],
+                text=True, capture_output=True, check=False, timeout=40,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            QMessageBox.warning(self, "Kali Bay", "Kali start did not finish.")
+            return
+        if result.returncode:
+            QMessageBox.warning(
+                self, "Kali Bay",
+                (result.stderr or result.stdout).strip()[:350]
+                or "Kali could not start."
+            )
+            return
+        QMessageBox.information(
+            self, "Kali Bay",
+            (result.stdout or "The existing Kali container has started.").strip()[:350]
+        )
+        self.refresh_status()
+
+    def open_kali_health(self):
+        # Read-only diagnostic terminal for the existing container.
+        self.launch_terminal_command([MANAGER, "doctor"])
 
     def open_packages(self):
         # Explicit interactive shell in the existing Kali Distrobox.
@@ -641,27 +849,115 @@ class KaliBayWindow(QMainWindow):
             QMessageBox.warning(self, "Kali Bay", str(error))
 
     def open_webbie_security(self):
-        # The Web owns one persistent Webbie panel; never start a duplicate
-        # resident voice agent or bypass the main shell's consent checks.
-        parent = self.parentWidget()
-        while parent is not None:
-            if hasattr(parent, "open_kali_assistant"):
-                parent.open_kali_assistant()
-                return
-            if hasattr(parent, "toggle_webbie_assistant"):
-                parent.update_webbie_context()
-                dock = getattr(parent, "webbie_dock", None)
-                if dock is not None and dock.isVisible():
-                    dock.raise_()
-                else:
-                    parent.toggle_webbie_assistant()
-                return
-            parent = parent.parentWidget()
-        QMessageBox.information(
-            self, "Webbie",
-            "Open Kali Bay inside The Web and use Ask Webbie. "
-            "The standalone Kali window does not start a second Webbie."
+        # This is a lightweight second UI for the SAME resident Webbie socket,
+        # not a duplicate listener, model, portrait or privileged service.
+        self.webbie_dock.show()
+        self.webbie_dock.raise_()
+        self.webbie_chat_entry.setFocus()
+
+    def build_webbie_dock(self):
+        """One optional inline chat UI for the already-running Webbie agent.
+
+        Not another LLM instance, voice listener, webcam or authentication
+        service. The same strict Kali action bridge handles explicit messages.
+        """
+        self.webbie_worker = None
+        self.webbie_dock = QDockWidget("WEBBIE | KALI BAY", self)
+        self.webbie_dock.setObjectName("kaliWebbieAssistantDock")
+        self.webbie_dock.setAllowedAreas(
+            Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea
         )
+        panel = QWidget()
+        panel.setObjectName("kaliWebbieChatPanel")
+        panel.setStyleSheet(
+            "QWidget#kaliWebbieChatPanel {background:#170e27;color:#f3e8ff;}"
+            "QPlainTextEdit, QLineEdit {background:#0c0718;color:#f3e8ff;"
+            "border:1px solid #6842a0;border-radius:7px;padding:6px;}"
+        )
+        layout = QVBoxLayout(panel)
+        title = QLabel("WEBBIE · SECURITY ASSISTANT")
+        title.setStyleSheet("font-weight:bold;color:#c4b5fd;")
+        layout.addWidget(title)
+        hint = QLabel(
+            "This chat uses the existing resident Webbie. "
+            "No separate AI or camera is started. "
+            "Dynamic Kali applications are still opened by you."
+        )
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.webbie_chat_log = QPlainTextEdit()
+        self.webbie_chat_log.setObjectName("kaliWebbieConversation")
+        self.webbie_chat_log.setReadOnly(True)
+        layout.addWidget(self.webbie_chat_log, 1)
+        self.webbie_chat_entry = QLineEdit()
+        self.webbie_chat_entry.setObjectName("kaliWebbieEntry")
+        self.webbie_chat_entry.setPlaceholderText(
+            "Ask Webbie about Kali or an installed tool…"
+        )
+        self.webbie_chat_entry.returnPressed.connect(self.send_webbie_chat)
+        layout.addWidget(self.webbie_chat_entry)
+        self.webbie_send_button = QPushButton("SEND TO WEBBIE")
+        self.webbie_send_button.setObjectName("kaliWebbieSend")
+        self.webbie_send_button.clicked.connect(self.send_webbie_chat)
+        layout.addWidget(self.webbie_send_button)
+        self.webbie_dock.setWidget(panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.webbie_dock)
+        self.webbie_dock.hide()
+
+    def send_webbie_chat(self):
+        content = self.webbie_chat_entry.text().strip()
+        if not content or (self.webbie_worker and self.webbie_worker.isRunning()):
+            return
+        if len(content.encode("utf-8")) > 8000:
+            self.webbie_chat_log.appendPlainText("System: Shorten your question.")
+            return
+        base = os.environ.get(
+            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
+        )
+        sock = Path(base) / "spider-os" / "webbie.sock"
+        request = (
+            "[Spider OS workspace context; advisory only]\\n"
+            "Workspace: Kali Bay\\n"
+            "Mode: Security Assistant\\n"
+            "Preferred address: Spider; this is not identity verification.\\n"
+            "[User request]\\n" + content
+        )
+        self.webbie_chat_log.appendPlainText("You: " + content)
+        self.webbie_chat_entry.clear()
+        self.webbie_chat_entry.setEnabled(False)
+        self.webbie_send_button.setEnabled(False)
+        self.webbie_chat_log.appendPlainText("Webbie: thinking…")
+        worker = KaliWebbieReplyWorker(request, sock, self)
+        self.webbie_worker = worker
+        worker.received.connect(self.webbie_answer)
+        worker.failed.connect(self.webbie_error)
+        worker.finished.connect(self.webbie_chat_finished)
+        worker.start()
+
+    def webbie_answer(self, answer):
+        self.webbie_chat_log.appendPlainText("Webbie: " + answer)
+
+    def webbie_error(self, message):
+        self.webbie_chat_log.appendPlainText("System: " + message)
+
+    def webbie_chat_finished(self):
+        finished = self.webbie_worker
+        self.webbie_worker = None
+        if finished is not None:
+            finished.deleteLater()
+        self.webbie_chat_entry.setEnabled(True)
+        self.webbie_send_button.setEnabled(True)
+        self.webbie_chat_entry.setFocus()
+
+    def closeEvent(self, event):
+        if self.webbie_worker and self.webbie_worker.isRunning():
+            event.ignore()
+            self.webbie_chat_log.appendPlainText(
+                "System: The current Webbie reply is finishing."
+            )
+            self.webbie_dock.show()
+            return
+        super().closeEvent(event)
 
     def build_category_page(self, categories, description):
         page = QWidget()

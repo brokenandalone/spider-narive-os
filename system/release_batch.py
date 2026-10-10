@@ -61,6 +61,7 @@ APP_FILES = (
     'webbie/agent/night_mode.py', 'webbie/agent/workspace_names.py',
     'webbie/brain/brain.py', 'system/onedrive.py',
     'kali-bay/bin/kali-bay', 'kali-bay/ui/kali_bay.py',
+    'kali-bay/runtime/kali_apps.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
 )

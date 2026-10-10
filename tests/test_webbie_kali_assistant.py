@@ -73,6 +73,37 @@ class KaliIntentTests(unittest.TestCase):
                     spawn.call_args.args[0], [str(manager), "packages"]
                 )
 
+    def test_webbie_can_search_installed_kali_apps_readonly(self):
+        self.assertEqual(
+            assistant.parse_request("list installed Kali apps"), ("apps", None)
+        )
+        self.assertEqual(
+            assistant.parse_request("find Kali app Wireshark"),
+            ("search_apps", "Wireshark"),
+        )
+        self.assertIsNone(assistant.parse_request("find Kali app bash;id"))
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = Path(tmp) / "kali-bay"
+            manager.write_text("#!/bin/sh\\n", encoding="utf-8")
+            manager.chmod(0o700)
+            mock_inventory = subprocess.CompletedProcess(
+                [], 0,
+                '{"applications":[{"name":"Wireshark","id":"wireshark.desktop"},'
+                '{"name":"Ghidra","id":"ghidra.desktop"}]}',
+                "",
+            )
+            with patch.object(assistant.subprocess, "run", return_value=mock_inventory) as run, \
+                    patch.object(assistant.subprocess, "Popen") as spawn:
+                reply = assistant.handle_kali_request(
+                    "find Kali app Wireshark", manager=manager
+                )
+                self.assertIn("Wireshark", reply)
+                self.assertNotIn("Ghidra", reply)
+                self.assertEqual(
+                    run.call_args.args[0], [str(manager), "apps-json"]
+                )
+                spawn.assert_not_called()
+
     def test_no_arbitrary_shell_or_active_scan(self):
         for command in (
             "open wireshark; echo compromised",

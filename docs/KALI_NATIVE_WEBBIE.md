@@ -16,20 +16,48 @@ this native release.
   Konsole. If the Kali container does not exist, the launcher now stops
   and directs the owner to explicit setup rather than silently creating a
   new container.
+- **START EXISTING KALI** is an explicit confirmed owner action that uses
+  rootless `podman start kali-bay` only if that container already exists.
+  No new container, host packages or Kali packages are installed; a running
+  container is not restarted. **KALI HEALTH CHECK** runs the existing
+  read-only `kali-bay doctor` diagnostic.
+- Kali Desktop Hub's quick actions are scrollable so all Kali controls and
+  Webbie remain reachable on smaller screens.
 - **KALI PACKAGE MANAGER** opens a Kali shell and explains apt; it does
   not update, install or remove packages automatically. The owner can
   operate `apt`, `dpkg` and `sudo` inside Kali interactively as Kali
   intends, subject to container and user permissions.
 - **INSTALLED KALI PACKAGES** presents a read-only package inventory by
   querying the existing, running container, without starting it.
-- Existing Kali tools, Offensive and Purple categories, searchable native
-  app launcher and persistent Kali files all remain in place.
+- The Kali Bay Desktop Hub has **LOAD ALL INSTALLED KALI APPS**. It queries
+  the running container's real system application menu using `kali-bay
+  apps-json`, validates installed `*.desktop` identifiers, and merges the
+  installed entries into the searchable/filtered list. The list isn't limited
+  to Spider's ten featured shortcuts.
+- An owner-selected application uses `kali-bay app-check <id>` followed by
+  `kali-bay app-open <id>` via Kali's own `gio launch`. System desktop files
+  are read from `/usr/share/applications` inside Kali, not Spider OS host
+  binaries. No shell command or path is accepted from the app label.
+- **LOAD ALL INSTALLED KALI APPS** only reads the running container and does
+  not start it, install packages or launch applications. If the container
+  is stopped, Kali Bay reports why the catalog is unavailable.
+- Existing Kali tools, Offensive and Purple categories, the ten featured
+  static shortcuts and persistent Kali files all remain in place.
 - Webbie can answer questions about Kali tools and open the interactive
   terminal, Kali package manager or read-only inventory on an **explicit,
   literal user request**. No model-generated, camera-generated or
   workspace-metadata text may supply executable commands.
-- The existing Webbie voice profile and The Web assistant dock are reused;
-  Kali Bay does not spawn a second Webbie.
+- Webbie additionally supports **list installed Kali apps** and
+  **find Kali app Wireshark**, executing only a read-only inventory query.
+  Dynamic apps require manual selection in Kali Bay; Webbie does not
+  execute arbitrary desktop entries from voice or language-model output.
+- The existing Webbie resident agent and voice service are reused.
+  The standalone Kali Bay window now has its own purple **WEBBIE | KALI BAY**
+  text-chat dock, which connects asynchronously to Webbie's existing private
+  per-user Unix socket. No second AI model, microphone listener, camera or
+  privileged daemon is launched. Only explicitly typed messages are sent;
+  the response is displayed without blocking Kali Bay's main GUI. The Web's
+  original Webbie assistant dock remains independent but uses the same agent.
 
 ## What is Kali and what is Spider OS
 - The GUI/window manager and desktop integrations are **Spider OS**.

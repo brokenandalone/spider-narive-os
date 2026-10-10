@@ -208,6 +208,24 @@ update_kali() {
 }
 
 
+start_existing() {
+    require_host_tools
+    container_exists || die "No Kali container exists. Nothing was created."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali Bay before starting."
+    if [[ "${running}" == "true" ]]; then
+        echo "Kali Bay is already running."
+        return 0
+    fi
+    echo "Starting ONLY the existing rootless Kali Bay container."
+    # Explicit owner action only. Does not reinstall packages, create a new
+    # container, change networks or touch host privileges.
+    podman start "${NAME}" >/dev/null || die "Kali Bay container did not start."
+    echo "Kali Bay container started; check doctor before package work."
+}
+
+
 open_terminal() {
     require_host_tools
 
@@ -316,6 +334,49 @@ category_shell() {
 
 # No arbitrary executable names, shell fragments or arguments are accepted.
 # Kali GUI programs run as the existing container user, never as root.
+# The full Kali applications menu is sourced from distro-owned .desktop
+# launchers in the running container, not a list guessed by Spider OS.
+# App IDs are exact basenames. Never accept arbitrary file paths or arguments.
+app_id_valid() {
+    local id="${1:-}"
+    [[ "${#id}" -le 108 && "${id}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._+-]*\.desktop$ ]] \
+        || die "Invalid Kali desktop application identifier."
+}
+app_ready() {
+    require_host_tools
+    container_exists || die "Kali Bay container is missing."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali container."
+    [[ "${running}" == "true" ]] \
+        || die "Kali container is stopped. Open its terminal deliberately."
+}
+apps_json() {
+    app_ready
+    [[ -f "${KALI_ROOT}/runtime/kali_apps.py" ]] \
+        || die "Kali application inventory module is missing."
+    # Read-only: stream the packaged, fixed Python source to the Kali
+    # interpreter. No user-provided expressions, shell or file system edits.
+    podman exec --user 0 --tty=false --interactive "${NAME}" python3 - \
+        < "${KALI_ROOT}/runtime/kali_apps.py"
+}
+app_check() {
+    app_id_valid "${1:-}"
+    app_ready
+    podman exec --user 0 --tty=false "${NAME}" sh -c \
+      'test -f "/usr/share/applications/$1" && command -v gio >/dev/null 2>&1' \
+      sh "$1" || die "This Kali application or the required gio launcher is missing."
+    printf 'ready\n'
+}
+app_open() {
+    local id="${1:-}"
+    app_check "${id}" >/dev/null
+    # gio reads the actual Kali system desktop entry and uses its declared
+    # Exec field as intended. No bash expansion and no arbitrary host command.
+    exec distrobox enter --name "${NAME}" -- \
+        gio launch "/usr/share/applications/${id}"
+}
+
 tool_metadata() {
     TOOL_BINARY=""
     TOOL_MODE=""
@@ -410,6 +471,15 @@ case "${1:-ui}" in
     offensive|purple)
         launch_ui "--$1"
         ;;
+    apps-json)
+        apps_json
+        ;;
+    app-check)
+        app_check "${2:-}"
+        ;;
+    app-open)
+        app_open "${2:-}"
+        ;;
     tool-check)
         tool_check "${2:-}"
         ;;
@@ -427,6 +497,9 @@ case "${1:-ui}" in
 
     terminal|shell|enter)
         open_terminal
+        ;;
+    start)
+        start_existing
         ;;
     packages)
         open_packages
@@ -462,11 +535,15 @@ Usage:
   kali-bay
   kali-bay setup
   kali-bay terminal
+  kali-bay start    # explicit existing container start only
   kali-bay packages  # interactive Kali apt shell
   kali-bay inventory # read-only Kali package inventory
   kali-bay update
   kali-bay status
   kali-bay doctor
+  kali-bay apps-json   # read-only installed Kali desktop applications
+  kali-bay app-check <system.desktop>
+  kali-bay app-open <system.desktop> # only on explicit user click
   kali-bay tool-check <approved-id>
   kali-bay tool <approved-id>
   kali-bay offensive|purple

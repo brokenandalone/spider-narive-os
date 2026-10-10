@@ -88,6 +88,19 @@ def parse_request(message: str):
     if direct in ("show installed kali packages", "check kali package inventory",
                   "show kali package inventory"):
         return ("inventory", None)
+    if direct in (
+        "list installed kali applications", "list installed kali apps",
+        "which kali applications are installed", "which kali apps are installed",
+    ):
+        return ("apps", None)
+    search = re.fullmatch(
+        r"(?:find|search for) kali (?:app|application) (.{1,60})",
+        phrase, flags=re.IGNORECASE,
+    )
+    if search:
+        term = search.group(1).strip()
+        if re.fullmatch(r"[A-Za-z0-9 ._+-]{1,60}", term):
+            return ("search_apps", term)
     if _STATUS.fullmatch(phrase):
         return ("status", None)
     if _TOOLS.fullmatch(phrase):
@@ -138,13 +151,61 @@ def handle_kali_request(message: str, manager=None):
             "Suricata, YARA and Lynis workbenches. I won't run a "
             "scan, attack or privileged command on your behalf. "
             "You can also ask me to open the full Kali terminal or the "
-            "interactive Kali package manager."
+            "interactive Kali package manager, or list and search your "
+            "installed Kali applications."
         )
     command = Path(manager) if manager is not None else _manager()
     if command is None or not command.is_file() or not os.access(command, os.X_OK):
         return (
             "The Kali Bay manager isn't available here. "
             "I haven't started or changed anything."
+        )
+    if operation in ("apps", "search_apps"):
+        # Fixed read-only query against real Kali package .desktop inventory.
+        # Application metadata is untrusted and never executable input.
+        import json
+        try:
+            found = subprocess.run(
+                [str(command), "apps-json"], capture_output=True,
+                text=True, timeout=24, check=False,
+            )
+            if found.returncode:
+                return (
+                    "I couldn't read installed Kali applications. "
+                    "Check that Kali Bay is running. Nothing was launched."
+                )
+            data = json.loads(found.stdout)
+            apps = data.get("applications", [])
+            if not isinstance(apps, list):
+                raise ValueError("Unexpected catalog")
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return "Kali's installed application catalog is unavailable."
+        total = len(apps)
+        if operation == "search_apps":
+            wanted = value.casefold()
+            apps = [
+                app for app in apps if isinstance(app, dict)
+                and wanted in str(app.get("name", "")).casefold()
+            ]
+        visible = [
+            _excerpt(app.get("name", ""), 70)
+            for app in apps[:8]
+            if isinstance(app, dict) and app.get("name")
+        ]
+        if operation == "search_apps" and not visible:
+            return f"No installed Kali application matched {_excerpt(value, 50)}."
+        if not visible:
+            return "No Kali desktop applications were reported by the running container."
+        summary = ", ".join(visible)
+        if operation == "apps":
+            return (
+                f"Kali reports {total} visible desktop applications. "
+                f"Examples: {summary}. Open Kali Bay's applications menu "
+                "to browse and launch them."
+            )
+        return (
+            f"Installed Kali applications matching {_excerpt(value, 50)}: "
+            f"{summary}. Select the one you want in Kali Bay's applications menu."
         )
     if operation == "status":
         try:
