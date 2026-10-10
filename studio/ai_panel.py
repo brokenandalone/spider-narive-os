@@ -454,7 +454,10 @@ class StudioAIPanel(QWidget):
         layout.addWidget(QLabel('Saved takes'))
         self.library = QListWidget(); layout.addWidget(self.library)
         actions = QHBoxLayout()
-        for label, action in (('Play selected take', self.play), ('Export WAV', self.export), ('Edit in Audacity', self.edit_audio), ('Refresh takes', self.refresh)):
+        for label, action in (('Play selected take', self.play),
+                              ('Send take to vocal separator', self.use_take_for_separation),
+                              ('Export WAV', self.export), ('Edit in Audacity', self.edit_audio),
+                              ('Refresh takes', self.refresh)):
             button = QPushButton(label); button.clicked.connect(action); actions.addWidget(button)
         layout.addLayout(actions)
         self.refresh()
@@ -925,6 +928,22 @@ class StudioAIPanel(QWidget):
                     item.setData(Qt.UserRole, str(take)); self.library.addItem(item)
             except (OSError, ValueError, KeyError, TypeError):
                 continue
+
+    def use_take_for_separation(self):
+        source = self.selected()
+        if source is None:
+            self.status.setText('Select a generated song take first.')
+            return
+        try:
+            path = valid_wav(source, 'generated song')
+            if not self.output_root.exists() or self.output_root.resolve() not in path.parents:
+                raise MixError('This audio is not a saved Spider Studio song take.')
+        except (OSError, MixError) as error:
+            self.status.setText(str(error))
+            return
+        self.separation_source.setText(str(path))
+        self.status.setText('Generated WAV selected for separation. Click Separate when ready; '
+                            'first-time model setup may require a download.')
 
     def selected(self):
         item = self.library.currentItem()
