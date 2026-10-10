@@ -87,7 +87,12 @@ class AuthorCommandTests(unittest.TestCase):
                 APP.processEvents()
 
     def test_window_route_only_invokes_requested_action(self):
-        from main import AuthorWindow
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "author_main_under_test", ROOT / "author/main.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        AuthorWindow = module.AuthorWindow
         with tempfile.TemporaryDirectory() as folder:
             win = AuthorWindow(folder)
             try:
