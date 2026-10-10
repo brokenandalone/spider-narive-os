@@ -48,7 +48,7 @@ def ready():
     )
 
 
-def record_chunk(path):
+def record_chunk(path, seconds=None):
     result = subprocess.run(
         [
             "arecord",
@@ -60,7 +60,7 @@ def record_chunk(path):
             "-c",
             "1",
             "-d",
-            str(CHUNK_SECONDS),
+            str(CHUNK_SECONDS if seconds is None else seconds),
             path,
         ],
         stdout=subprocess.DEVNULL,
@@ -174,7 +174,7 @@ def listen_forever(
                 audio_path = temp.name
 
             if not record_chunk(
-                audio_path
+                audio_path, seconds=2 if talking_at_start else None
             ):
                 time.sleep(1)
                 continue
