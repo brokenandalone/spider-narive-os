@@ -16,6 +16,11 @@ from urllib.parse import urlsplit, urljoin
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 import wave
 
+try:
+    from .arrangement import arrangement_text
+except ImportError:
+    from arrangement import arrangement_text
+
 
 class MusicError(RuntimeError):
     pass
@@ -40,6 +45,11 @@ class SongRequest:
     takes: int = 2
     bpm: int = 0
     seed: int = -1
+    vocal_lineup: tuple = ()
+    vocal_notes: str = ''
+    guitar_one: str = ''
+    guitar_two: str = ''
+    other_instruments: str = ''
 
     def payload(self):
         for name, limit in (('title', 200), ('style', 8000), ('lyrics', 20000)):
@@ -58,8 +68,13 @@ class SongRequest:
                 raise ValueError(f'{name} must be an integer between {low} and {high}')
         if type(self.bpm) is not int or (self.bpm != 0 and not 30 <= self.bpm <= 300):
             raise ValueError('Tempo must be 0 (automatic) or 30–300 BPM.')
+        band = arrangement_text(self.vocal_lineup, self.vocal_notes,
+                                self.guitar_one, self.guitar_two, self.other_instruments)
+        prompt = self.style.strip() + ('\n\n' + band if band else '')
+        if len(prompt) > 12000:
+            raise ValueError('Combined arrangement is too long.')
         result = {
-            'prompt': self.style.strip(),
+            'prompt': prompt,
             'lyrics': '[Instrumental]' if self.instrumental else self.lyrics,
             'audio_duration': self.duration, 'batch_size': self.takes,
             'seed': self.seed, 'use_random_seed': self.seed == -1,
