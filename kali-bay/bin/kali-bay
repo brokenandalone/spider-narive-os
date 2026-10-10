@@ -208,6 +208,24 @@ update_kali() {
 }
 
 
+start_existing() {
+    require_host_tools
+    container_exists || die "No Kali container exists. Nothing was created."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali Bay before starting."
+    if [[ "${running}" == "true" ]]; then
+        echo "Kali Bay is already running."
+        return 0
+    fi
+    echo "Starting ONLY the existing rootless Kali Bay container."
+    # Explicit owner action only. Does not reinstall packages, create a new
+    # container, change networks or touch host privileges.
+    podman start "${NAME}" >/dev/null || die "Kali Bay container did not start."
+    echo "Kali Bay container started; check doctor before package work."
+}
+
+
 open_terminal() {
     require_host_tools
 
@@ -480,6 +498,9 @@ case "${1:-ui}" in
     terminal|shell|enter)
         open_terminal
         ;;
+    start)
+        start_existing
+        ;;
     packages)
         open_packages
         ;;
@@ -514,6 +535,7 @@ Usage:
   kali-bay
   kali-bay setup
   kali-bay terminal
+  kali-bay start    # explicit existing container start only
   kali-bay packages  # interactive Kali apt shell
   kali-bay inventory # read-only Kali package inventory
   kali-bay update
