@@ -51,6 +51,8 @@ MANAGER = (
 )
 
 
+VM_GATEWAY = SPIDER_ROOT / "kali-bay" / "vm" / "kali_desktop.py"
+
 WALLPAPER = (
     SPIDER_ROOT
     / "branding"
@@ -556,12 +558,33 @@ class KaliBayWindow(QMainWindow):
         hero.setStyleSheet("font-size:24px;font-weight:bold;color:#c084fc;")
         right.addWidget(hero)
         about = QLabel(
-            "Kali-style security environment, powered by the existing "
-            "Kali Distrobox container. The desktop, wallpaper and assistant "
-            "belong to Spider OS. This is not a separate Kali XFCE session."
+            "Two authentic Kali environments: your existing Distrobox "
+            "for quick tool launches, plus an optional dedicated Kali Linux "
+            "virtual machine for its own XFCE desktop, kernel and services. "
+            "Webbie stays available in the Spider OS side panel."
         )
         about.setWordWrap(True)
         right.addWidget(about)
+        vm_heading = QLabel("FULL KALI LINUX DESKTOP")
+        vm_heading.setObjectName("kaliFullDesktopHeading")
+        vm_heading.setStyleSheet("font-size:17px;font-weight:bold;color:#c4b5fd;")
+        right.addWidget(vm_heading)
+        self.vm_state_label = QLabel(
+            "VM status not checked. Your existing Kali container remains available."
+        )
+        self.vm_state_label.setObjectName("kaliVmState")
+        self.vm_state_label.setWordWrap(True)
+        right.addWidget(self.vm_state_label)
+        for caption, operation in (
+            ("CHECK KALI DESKTOP", self.refresh_vm_state),
+            ("OPEN FULL KALI DESKTOP", self.open_full_kali_desktop),
+            ("SET UP / MANAGE KALI VM", self.open_kali_vm_manager),
+            ("START EXISTING KALI VM", self.start_full_kali_vm),
+        ):
+            button = QPushButton(caption)
+            button.setMinimumHeight(43)
+            button.clicked.connect(operation)
+            right.addWidget(button)
         for caption, operation in (
             ("KALI TERMINAL", self.open_terminal),
             ("KALI FILES", self.open_kali_files),
@@ -585,6 +608,79 @@ class KaliBayWindow(QMainWindow):
         layout.addWidget(actions, 3)
         self.filter_desktop_tools()
         return page
+
+    def _vm_gateway(self, action):
+        if not VM_GATEWAY.is_file():
+            QMessageBox.warning(
+                self, "Kali Desktop", "The full Kali desktop controller is not installed."
+            )
+            return False
+        try:
+            subprocess.Popen(
+                [sys.executable, str(VM_GATEWAY), action],
+                start_new_session=True,
+            )
+        except OSError as error:
+            QMessageBox.warning(self, "Kali Desktop", str(error))
+            return False
+        return True
+
+    def refresh_vm_state(self):
+        if not VM_GATEWAY.is_file():
+            self.vm_state_label.setText("Full Kali desktop controller missing.")
+            return
+        try:
+            import json
+            result = subprocess.run(
+                [sys.executable, str(VM_GATEWAY), "status"],
+                capture_output=True, text=True, timeout=13, check=False,
+            )
+            info = json.loads(result.stdout) if result.returncode == 0 else {}
+            state = info.get("state", "unavailable")
+            labels = {
+                "running": "Full Kali Linux desktop is running.",
+                "stopped": "Kali VM is configured but powered off.",
+                "paused": "Kali VM is paused.",
+                "not-configured": "Kali VM not configured yet. Use VM Manager.",
+                "unavailable": "libvirt is not ready; VM Manager may need installation or permissions.",
+            }
+            self.vm_state_label.setText(labels.get(state, "Kali VM state unknown."))
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            self.vm_state_label.setText("Full Kali VM status could not be read.")
+
+    def open_full_kali_desktop(self):
+        # Controller rechecks the fixed guest's running state. This neither
+        # starts another VM nor touches the existing Kali container.
+        self._vm_gateway("console")
+
+    def open_kali_vm_manager(self):
+        self._vm_gateway("manager")
+
+    def start_full_kali_vm(self):
+        # Never implicitly start a VM when simply entering Kali Bay.
+        if QMessageBox.question(
+            self, "Start Full Kali Linux",
+            "Start your existing spider-kali-desktop virtual machine? "
+            "Only the explicitly configured Kali VM will be started.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        ) != QMessageBox.Yes:
+            return
+        if not VM_GATEWAY.is_file():
+            QMessageBox.warning(self, "Kali Desktop", "VM controller missing.")
+            return
+        # Use a visible terminal for the user to see the actual libvirt result,
+        # rather than claiming success before the command finishes.
+        if not shutil_which("konsole"):
+            QMessageBox.warning(self, "Kali Desktop", "Konsole unavailable.")
+            return
+        try:
+            subprocess.Popen(
+                ["konsole", "--hold", "-e", sys.executable,
+                 str(VM_GATEWAY), "start"], start_new_session=True,
+            )
+        except OSError as error:
+            QMessageBox.warning(self, "Kali Desktop", str(error))
 
     def filter_desktop_tools(self, *_args):
         query = self.desktop_search.text().strip().casefold()
