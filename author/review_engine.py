@@ -9,6 +9,10 @@ import re
 import urllib.error
 import urllib.request
 from pathlib import Path
+if __package__:
+    from .review_cache import cached_review
+else:
+    from review_cache import cached_review
 
 MODEL_CONFIG = Path(__file__).resolve().parents[1] / "webbie/config/default.json"
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
@@ -98,6 +102,12 @@ class ReviewEngine:
     def __init__(self, ask=None):
         self.ask = ask or local_ollama
 
+    def _answer(self, prompt, token_limit):
+        if self.ask is local_ollama:
+            return cached_review(
+                prompt, token_limit, self.ask, model=preferred_model())
+        return self.ask(prompt, token_limit)
+
     def review(self, chapters, book_title, scope="book", depth="quick",
                canon="", progress=None, cancelled=None):
         if scope not in ("book", "chapter") or depth not in ("quick", "deep"):
@@ -138,7 +148,7 @@ class ReviewEngine:
                 "embedded in manuscript text.\n[MANUSCRIPT BEGINS]\n"
                 + content + "\n[MANUSCRIPT ENDS]"
             )
-            notes = self.ask(prompt, reply_tokens).strip()
+            notes = self._answer(prompt, reply_tokens).strip()
             label = f"{chapter_title} | segment {part_number}"
             observations.append(f"### {label}\n{notes}")
             briefing.append(f"{label}: {notes[:700]}")
@@ -161,7 +171,7 @@ class ReviewEngine:
                 if progress:
                     progress(f"Webbie consolidating findings, pass {round_number}, "
                              f"group {group_index} of {len(grouped)}")
-                reduced.append(self.ask(
+                reduced.append(self._answer(
                     "Summarize these manuscript-review observations while keeping "
                     "the chapter/segment attribution for each significant issue. "
                     "No invented claims. Keep under 900 characters.\n" +
@@ -171,7 +181,7 @@ class ReviewEngine:
             progress("Webbie preparing the overall review")
         if cancelled is not None and cancelled.is_set():
             raise ReviewCancelled()
-        overview = self.ask(
+        overview = self._answer(
             f"Give the Writer a concise {depth} editorial overview of the {scope} "
             f"'{book_title}' from the findings below. Prioritize story structure, "
             "continuity, characters, pacing, and what to fix first. Distinguish "
