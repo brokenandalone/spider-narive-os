@@ -1,6 +1,5 @@
 """Nova's BCN on-air persona, used by the ONE native spider-ai-dj service."""
 from collections import deque
-from datetime import datetime
 import random
 import re
 import threading
