@@ -115,6 +115,26 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertFalse(panel.finish_after_conversion)
             panel.close()
 
+    def test_finish_song_chain_rejects_untrained_model(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            backing, singer = root / 'backing.wav', root / 'isolated.wav'
+            for source in (backing, singer):
+                with wave.open(str(source), 'wb') as out:
+                    out.setnchannels(1); out.setsampwidth(2); out.setframerate(8000)
+                    out.writeframes(b'\\0\\0' * 100)
+            panel = StudioAIPanel(folder)
+            panel.mix_backing.setText(str(backing))
+            panel.rvc_vocal.setText(str(singer))
+            panel.rvc_model.setText(str(root / 'not-trained.pth'))
+            with patch.object(panel, 'start_conversion') as conversion:
+                panel.start_song_finish()
+                conversion.assert_not_called()
+                self.assertTrue(panel.finish_song_button.isEnabled())
+                self.assertIn('trained', panel.status.text())
+            panel.close()
+
     def test_finish_song_chain_rejects_missing_instrumental(self):
         with tempfile.TemporaryDirectory() as folder:
             panel = StudioAIPanel(folder)
