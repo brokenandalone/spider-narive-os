@@ -70,6 +70,12 @@ ACE-Step API documentation: https://github.com/ace-step/ACE-Step-1.5/blob/main/d
 ACE-Step installation: https://github.com/ace-step/ACE-Step-1.5
 RVC source and training guide: https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI
 
+## Private, reusable voice-model selection and listening checks
+
+Studio can now **remember one owner-confirmed local RVC model** under the private My Voice directory without copying model weights or loading a PyTorch model merely to store a preference. Optional local `.index` selection is also retained. The owner must explicitly confirm the files are authorized before registration. Stored paths include file size and modification metadata; if either file is missing or has changed since selection, Studio refuses to restore the stale pointer and asks the owner to reselect it. The **Forget saved model selection** control deletes only the private pointer, never model weights, audio recordings, or training datasets.
+
+The restore control only populates fields. **It cannot prove the selected model was trained correctly or sounds like Justin Therapy.** Model files must be trusted and locally created; unsafe third-party `.pth` files can execute code when loaded by a backend. Once a converted vocal and a finished song exist, separate listening controls let the owner audition them with the installed audio player, with each WAV revalidated before launch.
+
 ## Merge and install gates
 
 - [ ] GitHub source tests pass on the exact next release candidate commit (the head can change as new features are committed).
