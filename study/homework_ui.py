@@ -16,6 +16,7 @@ try:
     from .paper_dialog import PaperDialog
     from .apa import create_paper
     from .draft_storage import drafts_folder, save_snapshot, read_snapshot
+    from .assignment_review import draft_checklist, build_review_prompt
 except ImportError:
     from homework import (load_style, save_style, clear_style, sample_from_file,
                           build_prompt, webbie_draft, MAX_CONTEXT, MAX_TASK)
@@ -23,6 +24,7 @@ except ImportError:
     from paper_dialog import PaperDialog
     from apa import create_paper
     from draft_storage import drafts_folder, save_snapshot, read_snapshot
+    from assignment_review import draft_checklist, build_review_prompt
 
 
 class DraftWorker(QThread):
@@ -120,11 +122,28 @@ class HomeworkDialog(QDialog):
             actions.addWidget(button)
             self.generate_buttons.append(button)
         outer.addLayout(actions)
+        review_actions = QHBoxLayout()
+        self.check_button = QPushButton("Check word count and sources")
+        self.check_button.clicked.connect(self.check_draft)
+        review_actions.addWidget(self.check_button)
+        self.review_button = QPushButton("Ask Webbie to review rubric")
+        self.review_button.clicked.connect(self.review_draft)
+        review_actions.addWidget(self.review_button)
+        outer.addLayout(review_actions)
         self.draft = QTextEdit()
         self.draft.setAcceptRichText(False)
         self.draft.textChanged.connect(self.invalidate_export)
         self.draft.setPlaceholderText("Webbie's editable draft appears here. No automatic submission.")
         outer.addWidget(self.draft, 1)
+        review_heading = QLabel("Rubric feedback and source checks (not an official grade)")
+        review_heading.setWordWrap(True)
+        outer.addWidget(review_heading)
+        self.review_notes = QTextEdit()
+        self.review_notes.setReadOnly(True)
+        self.review_notes.setMaximumHeight(170)
+        self.review_notes.setPlaceholderText(
+            "Run an offline draft check or request Webbie's separate rubric feedback.")
+        outer.addWidget(self.review_notes)
         footer = QHBoxLayout()
         save_button = QPushButton("Save local draft")
         save_button.clicked.connect(self.save_local_draft)
@@ -269,13 +288,67 @@ class HomeworkDialog(QDialog):
         self.style.clear()
         self.status.setText("Saved style sample cleared. Webbie can still draft normally.")
 
+    def selected_materials(self):
+        materials = self.materials.toPlainText().strip()
+        if self.include_notes.isChecked() and self.notes.strip():
+            materials += "\n\nSELECTED COURSE NOTES:\n" + self.notes[:10000]
+        return materials
+
+    def check_draft(self):
+        """Deterministic local checks; no network or language-model call."""
+        try:
+            report = draft_checklist(
+                self.directions.toPlainText(), self.draft.toPlainText(),
+                materials=self.selected_materials())
+        except ValueError as error:
+            QMessageBox.warning(self, "Homework review", str(error))
+            return
+        self.review_notes.setPlainText(report)
+        self.status.setText("Local preflight complete. No grade or source verification is implied.")
+
+    def review_draft(self):
+        """Separate Webbie feedback; never replace the user's draft."""
+        if self.worker is not None:
+            self.status.setText("Webbie is already processing a homework request.")
+            return
+        try:
+            checklist = draft_checklist(
+                self.directions.toPlainText(), self.draft.toPlainText(),
+                materials=self.selected_materials())
+            prompt = build_review_prompt(
+                course=self.course.text(), assignment=self.assignment.text(),
+                instructions=self.directions.toPlainText(),
+                draft=self.draft.toPlainText(),
+                materials=self.selected_materials(),
+                sample=self.style.toPlainText())
+        except ValueError as error:
+            QMessageBox.warning(self, "Homework review", str(error))
+            return
+        self.review_notes.setPlainText(checklist + "\n\nWebbie is reviewing the selected rubric...")
+        self.worker = DraftWorker(prompt, self)
+        self.worker.ready.connect(lambda response: self.review_ready(checklist, response))
+        self.worker.failed.connect(self.review_failed)
+        self.worker.finished.connect(self.release_worker)
+        for button in self.generate_buttons:
+            button.setEnabled(False)
+        self.check_button.setEnabled(False)
+        self.review_button.setEnabled(False)
+        self.status.setText("Webbie is reviewing locally. Your draft will not be changed.")
+        self.worker.start()
+
+    def review_ready(self, checklist, response):
+        self.review_notes.setPlainText(checklist + "\n\nWEBBIE'S RUBRIC REVIEW:\n" + response)
+        self.status.setText("Review ready. Feedback is advisory; verify the rubric and references.")
+
+    def review_failed(self, error):
+        self.status.setText("Webbie could not complete rubric review: " + error)
+        # Keep the deterministic checklist available if the local model fails.
+
     def generate(self, mode):
         if self.worker is not None:
             self.status.setText("Webbie is already drafting.")
             return
-        materials = self.materials.toPlainText().strip()
-        if self.include_notes.isChecked() and self.notes.strip():
-            materials += "\n\nSELECTED COURSE NOTES:\n" + self.notes[:10000]
+        materials = self.selected_materials()
         try:
             prompt = build_prompt(
                 course=self.course.text(), assignment=self.assignment.text(),
@@ -292,6 +365,8 @@ class HomeworkDialog(QDialog):
         self.worker.finished.connect(self.release_worker)
         for button in self.generate_buttons:
             button.setEnabled(False)
+        self.check_button.setEnabled(False)
+        self.review_button.setEnabled(False)
         self.status.setText("Webbie is writing locally. Existing work remains editable after completion.")
         self.worker.start()
 
@@ -302,6 +377,8 @@ class HomeworkDialog(QDialog):
             self.worker = None
         for button in self.generate_buttons:
             button.setEnabled(True)
+        self.check_button.setEnabled(True)
+        self.review_button.setEnabled(True)
 
     def draft_ready(self, text):
         if text.strip():
