@@ -10,7 +10,7 @@ from PyQt5.QtCore import QThread, QTimer, QUrl, pyqtSignal
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QVBoxLayout, QWidget)
+    QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QVBoxLayout, QWidget, QMessageBox)
 from PyQt5.QtCore import Qt
 
 if __package__:
@@ -19,12 +19,14 @@ if __package__:
     from .arrangement import VOICE_OPTIONS
     from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from .voice_conversion import convert_vocal, ConversionError
+    from .voice_dataset import prepare_training_set
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
     from arrangement import VOICE_OPTIONS
     from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from voice_conversion import convert_vocal, ConversionError
+    from voice_dataset import prepare_training_set
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -82,12 +84,28 @@ class VoiceConvertWorker(QThread):
                              else 'Voice conversion failed. Check your trained model and local engine.')
 
 
+class DatasetWorker(QThread):
+    result = pyqtSignal(bool, str)
+
+    def __init__(self):
+        super().__init__(QApplication.instance())
+        QApplication.instance().aboutToQuit.connect(self.wait)
+
+    def run(self):
+        try:
+            folder = prepare_training_set(consent=True)
+            self.result.emit(True, str(folder))
+        except (OSError, VoiceSampleError) as error:
+            self.result.emit(False, str(error))
+
+
 class StudioAIPanel(QWidget):
     def __init__(self, output_root=None):
         super().__init__()
         self.output_root = Path(output_root) if output_root else Path.home() / 'Documents/Spider Studio/Music/AI Songs'
         self.worker = None
         self.rvc_worker = None
+        self.dataset_worker = None
         self.capture_proc = None
         self.capture_file = None
         self.capture_timer = QTimer(self)
@@ -178,11 +196,14 @@ class StudioAIPanel(QWidget):
         self.record_button.clicked.connect(self.record_voice)
         self.import_button = QPushButton('Import my vocal sample')
         self.import_button.clicked.connect(self.import_voice)
+        self.dataset_button = QPushButton('Prepare private RVC training dataset')
+        self.dataset_button.clicked.connect(self.prepare_dataset)
         self.voice_status = QLabel('No trained voice model. Recording is opt-in and kept on this computer.')
         self.voice_status.setWordWrap(True)
         voice_buttons.addWidget(self.record_button)
         voice_buttons.addWidget(self.import_button)
         layout.addLayout(voice_buttons)
+        layout.addWidget(self.dataset_button)
         layout.addWidget(self.voice_status)
         QApplication.instance().aboutToQuit.connect(self.cancel_capture)
         self.update_voice_status()
@@ -313,6 +334,34 @@ class StudioAIPanel(QWidget):
             self.status.setText('My Voice sample saved. A trained voice model is still needed for identity-matched singing.')
         except (OSError, VoiceSampleError) as error:
             self.status.setText(str(error))
+
+    def prepare_dataset(self):
+        if self.dataset_worker is not None:
+            return
+        answer = QMessageBox.question(
+            self, 'My Voice recording consent',
+            'I confirm these recordings are my own voice or recordings I have permission to use for model training. '
+            'Prepare private local copies for RVC? This does not train a model or upload audio.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self.dataset_button.setEnabled(False)
+        self.dataset_worker = DatasetWorker()
+        self.dataset_worker.result.connect(self.dataset_result)
+        self.dataset_worker.finished.connect(self.dataset_finished)
+        self.dataset_worker.start()
+        self.voice_status.setText('Checking recording lengths and preparing private training data…')
+
+    def dataset_result(self, success, message):
+        self.voice_status.setText(
+            'RVC training set prepared at ' + message + '. No voice model has been trained yet.'
+            if success else 'Training set not prepared: ' + message)
+
+    def dataset_finished(self):
+        worker, self.dataset_worker = self.dataset_worker, None
+        self.dataset_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
 
     def cancel_capture(self):
         if self.capture_proc is not None:
