@@ -6,6 +6,7 @@ The user personally grants a limited task and can revoke it any time.
 """
 from pathlib import Path
 import sys
+import os
 
 from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QImage
@@ -21,6 +22,7 @@ from task_grants import TaskGrant
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from screen_capture import capture_window, describe_window
+from webbie_camera import DEFAULT_VISION_MODEL as INSTALLED_CAMERA_VISION_MODEL
 from visual_step import propose_step
 from autopilot_policy import AutopilotPolicy
 from webbie_operator_bridge import OperatorBridge
@@ -50,15 +52,16 @@ class ScreenWorker(QThread):
     described = pyqtSignal(str)
     failed = pyqtSignal(str)
 
-    def __init__(self, jpeg, parent=None):
+    def __init__(self, jpeg, model, parent=None):
         super().__init__(parent)
         self.jpeg = jpeg
+        self.model = model
 
     def run(self):
         try:
             self.described.emit(describe_window(
                 self.jpeg, 'Briefly identify the visible application controls. '
-                'Do not repeat personal or secret data.'))
+                'Do not repeat personal or secret data.', model=self.model))
         except (ValueError, RuntimeError, OSError) as error:
             self.failed.emit(str(error))
         finally:
@@ -68,16 +71,17 @@ class ScreenWorker(QThread):
 class StepWorker(QThread):
     proposed = pyqtSignal(object)
     failed = pyqtSignal(str)
-    def __init__(self, jpeg, task, width, height, parent=None):
+    def __init__(self, jpeg, task, width, height, model, parent=None):
         super().__init__(parent)
         self.jpeg = jpeg
+        self.model = model
         self.task = task
         self.width = width
         self.height = height
     def run(self):
         try:
             self.proposed.emit(
-                propose_step(self.jpeg, self.task, self.width, self.height))
+                propose_step(self.jpeg, self.task, self.width, self.height, model=self.model))
         except (ValueError, RuntimeError, OSError) as error:
             self.failed.emit(str(error))
         finally:
@@ -91,6 +95,9 @@ class WebbieComputerDialog(QDialog):
         self.setObjectName('webbieComputerControl')
         self.resize(510, 610)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
+        # Reuse the camera model already deployed on the PC; never pull or switch models.
+        self.vision_model = (os.environ.get('WEBBIE_VISION_MODEL') or
+                             INSTALLED_CAMERA_VISION_MODEL)
         self.grant = TaskGrant(approve_sensitive=self.approve_sensitive)
         self.operator = ConfinedDesktopOperator(
             permission=self.grant.authorize,
@@ -391,7 +398,7 @@ class WebbieComputerDialog(QDialog):
         except (ValueError, RuntimeError, PermissionError, OSError) as error:
             self.status(str(error)); return
         self.status('Local Ollama is describing this one authorized window.')
-        self.screen_worker = ScreenWorker(image, self)
+        self.screen_worker = ScreenWorker(image, self.vision_model, self)
         self.screen_worker.described.connect(
             lambda message: self.status('Local screen observation (untrusted):\n' + message))
         self.screen_worker.failed.connect(self.status)
@@ -470,7 +477,8 @@ class WebbieComputerDialog(QDialog):
             self.refresh_status()
             return
         self.step_worker = StepWorker(
-            jpeg, self.autopilot.task, qimage.width(), qimage.height(), self)
+            jpeg, self.autopilot.task, qimage.width(), qimage.height(),
+            self.vision_model, self)
         self.step_worker.proposed.connect(
             lambda plan, token=revision, target=window:
             self._autopilot_proposed(plan, token, target))
@@ -553,7 +561,8 @@ class WebbieComputerDialog(QDialog):
         self.pending_step = None
         self.pending_step_target = window_id
         self.step_worker = StepWorker(
-            image, grant['task'], qimage.width(), qimage.height(), self)
+            image, grant['task'], qimage.width(), qimage.height(),
+            self.vision_model, self)
         self.step_worker.proposed.connect(self.step_proposed)
         self.step_worker.failed.connect(self.status)
         self.step_worker.start()
