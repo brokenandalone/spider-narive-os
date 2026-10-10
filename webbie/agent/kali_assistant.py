@@ -60,9 +60,13 @@ def literal_user_text(message: str) -> str:
     header = "[Spider OS workspace context; advisory only]"
     marker = "[User request]\n"
     if raw.startswith(header):
+        # An attacker-controlled workspace title could contain a fake
+        # [User request] delimiter. Prefer the last delimiter *before*
+        # appended untrusted camera/proximity observations.
+        raw = raw.split("\n[Untrusted ", 1)[0]
         if marker not in raw:
             return ""
-        raw = raw.split(marker, 1)[1]
+        raw = raw.rsplit(marker, 1)[1]
     # A spoken/typed command is single line; don't parse follow-on metadata.
     raw = raw.splitlines()[0].strip() if raw else ""
     raw = re.sub(r"^(?:hey\s+)?webbie[,\s]+", "", raw, flags=re.IGNORECASE)
