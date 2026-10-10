@@ -94,7 +94,7 @@ def describe_frame(jpeg, prompt='Describe what you can actually see in the room.
             'role': 'user', 'content': instruction,
             'images': [base64.b64encode(jpeg).decode('ascii')]
         }],
-        'options': {'num_predict': 220}
+        'options': {'num_predict': 110}
     }).encode('utf-8')
     request = urllib.request.Request(
         OLLAMA_CHAT, data=payload,
@@ -113,7 +113,17 @@ def describe_frame(jpeg, prompt='Describe what you can actually see in the room.
                 'Install an Ollama vision model, such as gemma3:4b.'
             ) from None
         raise RuntimeError('Local vision engine returned an error.') from None
-    except (urllib.error.URLError, TimeoutError):
+    except TimeoutError:
+        raise RuntimeError(
+            f'Local vision model timed out after {timeout} seconds. '
+            'This computer may need more time for CPU inference.'
+        ) from None
+    except urllib.error.URLError as error:
+        if isinstance(error.reason, TimeoutError) or 'timed out' in str(error.reason).lower():
+            raise RuntimeError(
+                f'Local vision model timed out after {timeout} seconds. '
+                'This computer may need more time for CPU inference.'
+            ) from None
         raise RuntimeError('Local Ollama vision service is unavailable.') from None
     if not isinstance(message, str) or not message.strip():
         raise RuntimeError('No description was returned by the local vision model.')
