@@ -14,9 +14,11 @@ else:
 if __package__:
     from .voice_reader import WebbieReader
     from .review_engine import ReviewEngine, ReviewCancelled
+    from .review_history import ReviewHistory
 else:
     from voice_reader import WebbieReader
     from review_engine import ReviewEngine, ReviewCancelled
+    from review_history import ReviewHistory
 from PyQt5.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QTabWidget, QTextEdit,
@@ -74,6 +76,8 @@ class AuthorToolkit(QWidget):
         self.reader = WebbieReader(self)
         self.reader.changed.connect(self.read_status)
         self.review_worker = None
+        self.review_session = None
+        self.history = ReviewHistory(self.store)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel('BROKEN WORLD  /  Writing Desk'))
         tabs = QTabWidget(); layout.addWidget(tabs)
@@ -147,6 +151,20 @@ class AuthorToolkit(QWidget):
         self.review_result.setReadOnly(True)
         self.review_result.setPlaceholderText('Full review report will appear here.')
         t.addWidget(self.review_result, 1)
+        t.addWidget(QLabel('Saved reviews: open earlier feedback without rerunning Webbie.'))
+        self.saved_reviews = QComboBox()
+        self.saved_reviews.currentIndexChanged.connect(self.open_saved_review)
+        t.addWidget(self.saved_reviews)
+        self.review_freshness = QLabel('No saved review selected.')
+        self.review_freshness.setWordWrap(True)
+        t.addWidget(self.review_freshness)
+        self.review_chapters = QListWidget()
+        self.review_chapters.setMaximumHeight(115)
+        self.review_chapters.itemActivated.connect(self.jump_to_reviewed_chapter)
+        t.addWidget(self.review_chapters)
+        self.export_review_button = QPushButton('Export displayed review as TXT')
+        self.export_review_button.clicked.connect(self.export_review)
+        t.addWidget(self.export_review_button)
         selected = QPushButton('Review selected passage with Webbie (preview first)')
         selected.clicked.connect(self.review_selection)
         t.addWidget(selected)
@@ -216,6 +234,7 @@ class AuthorToolkit(QWidget):
         self.refresh_story()
         self.refresh_references()
         self.refresh_stats()
+        self.refresh_review_history()
 
     def refresh_stats(self):
         if self.book_id is not None:
@@ -372,8 +391,13 @@ class AuthorToolkit(QWidget):
             QMessageBox.information(self, 'Webbie review', 'No manuscript text to review.')
             return
         depth = 'deep' if self.review_depth.currentIndex() else 'quick'
+        canon = self.store.canon(self.book_id)
+        self.review_session = {
+            'book_id': self.book_id, 'scope': scope, 'depth': depth,
+            'manifest': self.history.manifest(self.book_id, chapters, canon),
+        }
         self.review_worker = ReviewWorker(chapters, str(book['title']), scope, depth,
-                                          self.store.canon(self.book_id), self)
+                                          canon, self)
         self.review_worker.progress.connect(self.review_status.setText)
         self.review_worker.ready.connect(self.review_finished_report)
         self.review_worker.failed.connect(self.review_status.setText)
@@ -396,8 +420,97 @@ class AuthorToolkit(QWidget):
         self.review_cancel_button.setEnabled(False)
 
     def review_finished_report(self, report):
-        self.review_result.setPlainText(report)
-        self.review_status.setText('Review complete. No changes were made to your book.')
+        session = self.review_session
+        if session is None:
+            self.review_status.setText('Review finished without an active session.')
+            return
+        # Save the result as a report only. The manuscript and canon are untouched.
+        try:
+            report_id = self.history.save(
+                session['book_id'], session['scope'], session['depth'],
+                report, session['manifest'])
+        except Exception as error:
+            self.review_result.setPlainText(report)
+            self.review_status.setText(
+                'Review complete, but history could not be saved: ' + str(error))
+            return
+        if self.book_id == session['book_id']:
+            self.refresh_review_history(select_id=report_id)
+            self.review_status.setText(
+                'Review complete and saved locally. No manuscript edits made.')
+        else:
+            self.review_status.setText(
+                'Review completed and saved for the previously selected book.')
+        self.review_session = None
+
+    def refresh_review_history(self, select_id=None):
+        self.saved_reviews.blockSignals(True)
+        self.saved_reviews.clear()
+        self.saved_reviews.addItem('Select a saved review…', None)
+        if self.book_id is not None:
+            try:
+                for row in self.history.list(self.book_id):
+                    self.saved_reviews.addItem(
+                        f"#{row['id']}  {row['created']}  "
+                        f"{row['depth']} {row['scope']}", row['id'])
+            except (OSError, ValueError) as error:
+                self.review_freshness.setText('Cannot load reviews: ' + str(error))
+        if select_id is not None:
+            index = self.saved_reviews.findData(select_id)
+            self.saved_reviews.setCurrentIndex(max(index, 0))
+        self.saved_reviews.blockSignals(False)
+        if select_id is not None and self.saved_reviews.currentData() is not None:
+            self.open_saved_review(self.saved_reviews.currentIndex())
+        else:
+            self.review_result.clear()
+            self.review_chapters.clear()
+            self.review_freshness.setText('No saved review selected.')
+
+    def open_saved_review(self, index):
+        report_id = self.saved_reviews.itemData(index) if index >= 0 else None
+        self.review_chapters.clear()
+        if report_id is None or self.book_id is None:
+            self.review_result.clear()
+            self.review_freshness.setText('Select a saved report to inspect it.')
+            return
+        try:
+            row = self.history.get(report_id, self.book_id)
+            fresh = self.history.is_current(row)
+            self.review_freshness.setText(
+                'Reviewed manuscript is unchanged since this report.'
+                if fresh else
+                'OUTDATED REVIEW: The book, chapter or canon changed. '
+                'Findings may no longer apply. Run a new review when wanted.')
+            self.review_result.setPlainText(row['report'])
+            for chapter in self.history.chapters_for_report(row):
+                item = QListWidgetItem(chapter['title'])
+                item.setData(Qt.UserRole, {
+                    'kind': 'chapter', 'book_id': row['book_id'],
+                    'item_id': chapter['id'],
+                })
+                self.review_chapters.addItem(item)
+        except (ValueError, OSError, KeyError) as error:
+            self.review_freshness.setText('Cannot open saved review: ' + str(error))
+
+    def jump_to_reviewed_chapter(self, item):
+        target = item.data(Qt.UserRole)
+        if target is not None:
+            self.jumpRequested.emit(target)
+
+    def export_review(self):
+        report = self.review_result.toPlainText()
+        if not report.strip():
+            QMessageBox.information(self, 'Review export', 'Open a saved review first.')
+            return
+        filename, _ = QFileDialog.getSaveFileName(
+            self, 'Export Webbie review', 'webbie-review.txt', 'Text (*.txt)')
+        if not filename:
+            return
+        try:
+            with open(filename, 'x', encoding='utf-8') as output:
+                output.write(report)
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, 'Review export', str(error))
 
     def shutdown(self):
         # Keep QObject/QThread alive until a pending inference finishes.
