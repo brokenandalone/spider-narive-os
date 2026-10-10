@@ -638,7 +638,11 @@ class KaliBayWindow(QMainWindow):
                 return
             if hasattr(parent, "toggle_webbie_assistant"):
                 parent.update_webbie_context()
-                parent.toggle_webbie_assistant()
+                dock = getattr(parent, "webbie_dock", None)
+                if dock is not None and dock.isVisible():
+                    dock.raise_()
+                else:
+                    parent.toggle_webbie_assistant()
                 return
             parent = parent.parentWidget()
         QMessageBox.information(
