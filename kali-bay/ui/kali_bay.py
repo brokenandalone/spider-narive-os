@@ -530,6 +530,21 @@ class KaliBayWindow(QMainWindow):
             self.filter_desktop_tools
         )
         left.addWidget(self.desktop_category)
+        self.installed_desktop_apps = []
+        load_apps = QPushButton("LOAD ALL INSTALLED KALI APPS")
+        load_apps.setObjectName("kaliLoadInstalledApps")
+        load_apps.setToolTip(
+            "Read Kali's actual installed system .desktop menu. "
+            "Does not install software, run scans or start the container."
+        )
+        load_apps.clicked.connect(self.load_installed_desktop_apps)
+        left.addWidget(load_apps)
+        self.desktop_apps_status = QLabel(
+            "Ten featured tools. Load the installed Kali application catalog."
+        )
+        self.desktop_apps_status.setObjectName("kaliInstalledAppsStatus")
+        self.desktop_apps_status.setWordWrap(True)
+        left.addWidget(self.desktop_apps_status)
         self.desktop_list = QListWidget()
         self.desktop_list.setObjectName("kaliDesktopToolList")
         self.desktop_list.setStyleSheet(
@@ -538,9 +553,7 @@ class KaliBayWindow(QMainWindow):
             "QListWidget::item {padding:9px;}"
             "QListWidget::item:selected {background:#5b21b6;}"
         )
-        self.desktop_list.itemDoubleClicked.connect(
-            lambda item: self.open_tool(item.data(Qt.UserRole))
-        )
+        self.desktop_list.itemDoubleClicked.connect(self.open_desktop_item)
         left.addWidget(self.desktop_list, 1)
         launch = QPushButton("OPEN SELECTED TOOL")
         launch.setObjectName("kaliDesktopLaunchTool")
@@ -601,15 +614,124 @@ class KaliBayWindow(QMainWindow):
             item = QListWidgetItem(f"{group}  /  {label}")
             item.setData(Qt.UserRole, tool_id)
             self.desktop_list.addItem(item)
+        for app in self.installed_desktop_apps:
+            group = app["category"]
+            label = app["name"]
+            if category != "All categories" and group != category:
+                continue
+            if query and query not in (
+                group + " " + label + " " + app["description"]
+            ).casefold():
+                continue
+            item = QListWidgetItem(f"{group}  /  {label}")
+            item.setToolTip(app["description"])
+            item.setData(Qt.UserRole, ("app", app["id"]))
+            self.desktop_list.addItem(item)
         if self.desktop_list.count():
             self.desktop_list.setCurrentRow(0)
 
     def open_selected_desktop_tool(self):
         item = self.desktop_list.currentItem()
         if item is None:
-            QMessageBox.information(self, "Kali Bay", "Select a tool first.")
+            QMessageBox.information(self, "Kali Bay", "Select an application first.")
             return
-        self.open_tool(item.data(Qt.UserRole))
+        self.open_desktop_item(item)
+
+    def open_desktop_item(self, item):
+        value = item.data(Qt.UserRole)
+        if isinstance(value, (tuple, list)) and len(value) == 2:
+            if value[0] == "app":
+                self.open_installed_kali_app(value[1])
+            return
+        # Static featured tools retain the fixed legacy approved manager IDs.
+        self.open_tool(value)
+
+    def load_installed_desktop_apps(self):
+        """Inventory only. Never initialize/start Kali or run app Exec lines."""
+        try:
+            import json
+            result = subprocess.run(
+                [str(MANAGER), "apps-json"],
+                capture_output=True, text=True, timeout=24, check=False,
+            )
+            if result.returncode:
+                raise ValueError(
+                    (result.stderr or result.stdout).strip()[:220]
+                    or "Kali isn't running or desktop apps are unavailable."
+                )
+            apps = json.loads(result.stdout).get("applications", [])
+            if not isinstance(apps, list):
+                raise ValueError("Unexpected Kali application inventory.")
+            import re
+            id_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\\.desktop$")
+            cleaned = []
+            for app in apps[:1500]:
+                if not isinstance(app, dict):
+                    continue
+                app_id = app.get("id")
+                name = app.get("name")
+                group = app.get("category", "Other")
+                if not isinstance(app_id, str) or not id_pattern.fullmatch(app_id):
+                    continue
+                if not isinstance(name, str) or not name.strip():
+                    continue
+                if not isinstance(group, str):
+                    group = "Other"
+                description = app.get("description", "")
+                if not isinstance(description, str):
+                    description = ""
+                cleaned.append({
+                    "id": app_id,
+                    "name": name[:95],
+                    "category": (group.strip() or "Other")[:55],
+                    "description": description[:200],
+                })
+            self.installed_desktop_apps = cleaned
+            selected = self.desktop_category.currentText()
+            all_groups = sorted(
+                {item[0] for item in DESKTOP_TOOL_MENU}
+                | {item["category"] for item in cleaned}
+            )
+            self.desktop_category.blockSignals(True)
+            self.desktop_category.clear()
+            self.desktop_category.addItems(["All categories"] + all_groups)
+            index = self.desktop_category.findText(selected)
+            self.desktop_category.setCurrentIndex(max(index, 0))
+            self.desktop_category.blockSignals(False)
+            self.desktop_apps_status.setText(
+                f"{len(cleaned)} installed Kali applications loaded. "
+                "Select one and click Open. No programs were started."
+            )
+            self.filter_desktop_tools()
+        except (OSError, subprocess.TimeoutExpired, ValueError) as error:
+            self.desktop_apps_status.setText("Application discovery unavailable.")
+            QMessageBox.information(
+                self, "Kali Bay", f"Could not list Kali applications: {error}"
+            )
+
+    def open_installed_kali_app(self, app_id):
+        # Only manually selected inventory entries reach app-open.
+        if app_id not in {app["id"] for app in self.installed_desktop_apps}:
+            return
+        try:
+            preflight = subprocess.run(
+                [str(MANAGER), "app-check", app_id],
+                text=True, capture_output=True, check=False, timeout=12,
+            )
+            if preflight.returncode:
+                QMessageBox.information(
+                    self, "Kali Bay",
+                    (preflight.stderr or preflight.stdout).strip()[:280]
+                    or "Kali application is not available."
+                )
+                return
+            subprocess.Popen(
+                [str(MANAGER), "app-open", app_id], start_new_session=True,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            QMessageBox.warning(
+                self, "Kali Bay", f"Could not launch Kali app: {error}"
+            )
 
     def open_packages(self):
         # Explicit interactive shell in the existing Kali Distrobox.
