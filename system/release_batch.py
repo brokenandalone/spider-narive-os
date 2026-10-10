@@ -62,6 +62,30 @@ APP_FILES = (
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
 )
+# Native Study/Studio modules in the same owner-requested batch transaction.
+# No course databases, personal files, cloud credentials, or model files.
+STUDY_STUDIO_FILES = (
+    'study/study.py', 'study/store.py', 'study/dashboard.py',
+    'study/apa.py', 'study/paper_dialog.py', 'study/school_portal.py',
+    'study/course_materials.py', 'study/school_onedrive.py',
+    'study/school_material_picker.py', 'study/school_upload.py',
+    'study/homework.py', 'study/homework_ui.py',
+    'study/assignment_review.py', 'study/draft_storage.py',
+    'study/bin/webbie-homework',
+    'studio/main.py', 'studio/tools.py', 'studio/music_backend.py',
+    'studio/ai_panel.py',
+)
+
+# Only exact known historical Study source blobs, never personal coursework.
+# An unfamiliar local source still blocks the entire batch before changes.
+KNOWN_STUDY_BLOBS = {
+    'study/study.py': {
+        '456f0279b397f7776b8ba9c6d970d493a9a8ccaf',
+        '422029cbc30b462d87ff52eaa6c608b63f9ce499',
+    },
+    'study/store.py': {'c7fa2cef87f66f187e6253a7059f7a5d335703f0'},
+}
+
 UNITS = ('webbie-onedrive.service', 'webbie-onedrive.timer')
 MENU = ('webbie-face-sleep-tonight.desktop',
         'webbie-face-wake.desktop', 'webbie-onedrive-connect.desktop')
@@ -91,10 +115,10 @@ def prepare_items(root=PROJECT_ROOT, install=INSTALL_ROOT, units=UNIT_ROOT,
         home = Path.home()
     root, install, units, home = map(Path, (root, install, units, home))
     found = []
-    for relative in APP_FILES:
+    for relative in APP_FILES + STUDY_STUDIO_FILES:
         mode = 0o755 if relative in (
             'the-web/shell/main.py', 'the-web/overlay/webbie_face.py',
-            'system/onedrive.py') else 0o644
+            'system/onedrive.py', 'study/bin/webbie-homework') else 0o644
         found.append(Item(root / relative, install / relative, mode=mode,
                           reference=relative))
     for unit in UNITS:
@@ -122,6 +146,12 @@ def safe_path(path):
     return True
 
 
+def git_blob_sha(path):
+    data = Path(path).read_bytes()
+    header = b'blob ' + str(len(data)).encode('ascii') + b'\\0'
+    return hashlib.sha1(header + data).hexdigest()
+
+
 def known_baseline(root, relative, observed_hash, refs=BASELINES):
     # Baselines are pinned git commits, never owner data or untrusted scripts.
     for ref in refs:
@@ -145,7 +175,7 @@ def inspect(items, project_root=PROJECT_ROOT, refs=BASELINES, known_checker=know
         if not safe_path(dest):
             results.append((item, 'BLOCKED', 'symlinked target or parent')); continue
         try:
-            if src.suffix == '.py':
+            if src.suffix == '.py' or item.reference == 'study/bin/webbie-homework':
                 ast.parse(src.read_text(encoding='utf-8'), filename=str(src))
             if src.suffix == '.json':
                 json.loads(src.read_text(encoding='utf-8'))
@@ -157,6 +187,9 @@ def inspect(items, project_root=PROJECT_ROOT, refs=BASELINES, known_checker=know
             results.append((item, 'BLOCKED', 'not a regular installed file')); continue
         if sha256(src) == sha256(dest):
             results.append((item, 'CURRENT', 'identical bytes')); continue
+        if item.reference in KNOWN_STUDY_BLOBS:
+            if git_blob_sha(dest) in KNOWN_STUDY_BLOBS[item.reference]:
+                results.append((item, 'UPGRADE', 'recognized exact older Study source')); continue
         if (item.reference and known_checker(project_root, item.reference,
                                              sha256(dest), refs)):
             results.append((item, 'UPGRADE', 'recognized source baseline')); continue
