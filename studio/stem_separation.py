@@ -13,7 +13,10 @@ import threading
 import time
 import wave
 
-from .song_mix import valid_wav
+try:
+    from .song_mix import valid_wav
+except ImportError:
+    from song_mix import valid_wav
 
 DEFAULT_RVC = Path.home() / ".local/share/spider-os/voice-engine/Retrieval-based-Voice-Conversion-WebUI"
 DEFAULT_OUTPUT = Path.home() / "Documents/Spider Studio/Music/Separated"
