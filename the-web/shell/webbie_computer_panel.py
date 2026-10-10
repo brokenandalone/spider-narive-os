@@ -381,6 +381,12 @@ class WebbieComputerDialog(QDialog):
         if self.selected_window():
             self.action(self.operator.close_window, self.selected_window())
 
+    def _publish_screen_observation(self, message):
+        # A delayed local vision result after STOP must not restore awareness.
+        if (self.grant.status()['active'] and
+                self.operator.target_window == self.selected_window()):
+            self.screenObserved.emit(message)
+
     def inspect_window(self):
         target = self.selected_window()
         if (not target or target != self.operator.target_window or
@@ -410,7 +416,7 @@ class WebbieComputerDialog(QDialog):
         self.screen_worker = ScreenWorker(image, self.vision_model, self)
         self.screen_worker.described.connect(
             lambda message: self.status('Local screen observation (untrusted):\n' + message))
-        self.screen_worker.described.connect(self.screenObserved.emit)
+        self.screen_worker.described.connect(self._publish_screen_observation)
         self.screen_worker.failed.connect(self.status)
         self.screen_worker.start()
 
