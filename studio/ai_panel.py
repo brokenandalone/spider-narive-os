@@ -158,6 +158,7 @@ class StudioAIPanel(QWidget):
         self.dataset_worker = None
         self.mix_worker = None
         self.separation_worker = None
+        self.finish_after_conversion = False
         self.capture_proc = None
         self.capture_file = None
         self.capture_timer = QTimer(self)
@@ -290,6 +291,9 @@ class StudioAIPanel(QWidget):
         self.convert_button = QPushButton('Convert isolated vocal to My Voice')
         self.convert_button.clicked.connect(self.start_conversion)
         layout.addWidget(self.convert_button)
+        self.finish_song_button = QPushButton('Convert My Voice and make final mix')
+        self.finish_song_button.clicked.connect(self.start_song_finish)
+        layout.addWidget(self.finish_song_button)
 
         separator_heading = QLabel("Separate generated-song vocals and backing")
         separator_heading.setStyleSheet("font-size:18px; color:#c4b5fd;")
@@ -371,6 +375,24 @@ class StudioAIPanel(QWidget):
         if path:
             field.setText(path)
 
+    def start_song_finish(self):
+        if self.rvc_worker is not None or self.mix_worker is not None:
+            self.status.setText('An audio job is already running.')
+            return
+        try:
+            backing = valid_wav(self.mix_backing.text().strip(), 'instrumental backing')
+            vocal = valid_wav(self.rvc_vocal.text().strip(), 'isolated original vocal')
+            if backing == vocal:
+                raise MixError('Choose separate instrumental and vocal WAV files.')
+            if not self.rvc_model.text().strip():
+                raise MixError('Choose a trained local My Voice model first.')
+        except (MixError, OSError) as error:
+            self.status.setText(str(error))
+            return
+        self.finish_after_conversion = True
+        self.finish_song_button.setEnabled(False)
+        self.start_conversion()
+
     def start_conversion(self):
         if self.rvc_worker is not None:
             return
@@ -386,6 +408,12 @@ class StudioAIPanel(QWidget):
         self.status.setText(message + ((' Saved: ' + target) if target else ''))
         if target:
             self.mix_vocal.setText(target)
+        if self.finish_after_conversion:
+            self.finish_after_conversion = False
+            if target:
+                self.start_mix()
+            else:
+                self.finish_song_button.setEnabled(True)
 
     def conversion_finished(self):
         worker, self.rvc_worker = self.rvc_worker, None
@@ -444,6 +472,7 @@ class StudioAIPanel(QWidget):
     def mix_finished(self):
         worker, self.mix_worker = self.mix_worker, None
         self.mix_button.setEnabled(True)
+        self.finish_song_button.setEnabled(True)
         if worker is not None:
             worker.deleteLater()
 
