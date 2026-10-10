@@ -24,8 +24,10 @@ jobs:
           bash -n system/bin/spider-vault
           bash -n kali-bay/bin/kali-bay
           bash -n kali-bay/package/install-kali-bay.sh
+          bash -n kali-bay/package/check-full-kali-readiness.sh
+          bash kali-bay/package/check-full-kali-readiness.sh
           bash kali-bay/package/install-kali-bay.sh --check
-          python3 -m py_compile kali-bay/ui/kali_bay.py webbie/agent/kali_assistant.py
+          python3 -m py_compile kali-bay/ui/kali_bay.py webbie/agent/kali_assistant.py kali-bay/vm/kali_desktop.py
           python3 -m py_compile system/guardian.py system/vault.py
       - name: Shell and wallpaper smoke test
         env:
