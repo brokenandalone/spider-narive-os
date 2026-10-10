@@ -196,6 +196,8 @@
 ## 7. Kali Bay and Purple Defense — isolated tools
 
 - [x] Install selective Kali Bay UI/manager upgrade from GitHub PR #13 with original backups.
+- [x] **Source-built (not installed):** deterministic Webbie Kali Bay action bridge for status, approved GUI/workbench launchers and Purple/Offensive tabs, plus an in-workspace “Ask Webbie” entry point. See [Webbie Kali Bay integration](WEBBIE-KALI-BAY-INTEGRATION.md). It depends on PR #13's newer manager; does not run scans, execute arbitrary shell input or elevate privileges.
+- [ ] Reconcile PR #13 Kali manager with the latest Webbie/desktop integration branch, run combined tests, verify voice authorization and PC GUI preflight, then install as one backup-first release.
 - [ ] Safely start the existing Kali container only after checking disk health; run non-mutating diagnostics, verify repaired `systemd`/`udev` package state and installed metapackages. Do **not** rerun `kali-linux-everything` blindly.
 - [ ] Open Offensive Security and Purple Defense tabs and test permitted GUI launchers (Wireshark, Burp, ZAP, Ghidra, ClamTK) in authorized/local test contexts.
 - [ ] Finish Kali Purple defensive tools and SOC workflow integrations if missing; honor rootless container limits and avoid claiming a Distrobox is an independent security VM.
