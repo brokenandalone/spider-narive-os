@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 import wave
 
@@ -58,7 +59,7 @@ def conversion_command(rvc_dir, python_bin, model, src, dest, index=None, pitch=
 
 
 def convert_vocal(model, vocal, *, index=None, pitch=0, rvc_dir=None, output_root=None,
-                  python_bin=None, timeout=1800):
+                  python_bin=None, timeout=1800, stop=None):
     root = Path(rvc_dir) if rvc_dir else DEFAULT_RVC
     interpreter = Path(python_bin) if python_bin else root / ".venv/bin/python"
     destination = Path(output_root) if output_root else DEFAULT_OUTPUT
@@ -71,12 +72,25 @@ def convert_vocal(model, vocal, *, index=None, pitch=0, rvc_dir=None, output_roo
     log = folder / "conversion.log"
     try:
         args = conversion_command(root, interpreter, model, vocal, target, index=index, pitch=pitch)
+        stop = stop if stop is not None else threading.Event()
+        if stop.is_set():
+            raise ConversionError("Conversion was cancelled before model access.")
         with log.open("xb") as stream:
             os.chmod(log, 0o600)
-            result = subprocess.run(args, cwd=root, stdin=subprocess.DEVNULL,
-                                    stdout=stream, stderr=subprocess.STDOUT,
-                                    timeout=timeout, check=False)
-        if result.returncode:
+            proc = subprocess.Popen(args, cwd=root, stdin=subprocess.DEVNULL,
+                                    stdout=stream, stderr=subprocess.STDOUT)
+            deadline = time.monotonic() + timeout
+            while proc.poll() is None:
+                if stop.is_set() or time.monotonic() >= deadline:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait(timeout=5)
+                    raise ConversionError("Voice conversion stopped or timed out. Original vocal preserved.")
+                stop.wait(0.2)
+        if proc.returncode:
             raise ConversionError("Local RVC conversion failed. See the private conversion log.")
         if target.is_symlink() or not target.is_file():
             raise ConversionError("RVC finished without producing a WAV vocal.")
