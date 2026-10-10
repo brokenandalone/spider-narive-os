@@ -176,6 +176,48 @@ class HomeworkUiTests(unittest.TestCase):
             dialog.worker = None
             dialog.close()
 
+    def test_autosave_only_writes_when_draft_changes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(assignment="Module 7 Essay", folder=Path(folder))
+            draft_dir = Path(folder) / "Assignments" / "Drafts"
+            dialog.autosave_draft()
+            self.assertFalse(draft_dir.exists())
+            dialog.draft.setPlainText("My own work in progress.")
+            dialog.autosave_draft()
+            versions = list(draft_dir.glob("*.txt"))
+            self.assertEqual(len(versions), 1)
+            self.assertIn("My own work", versions[0].read_text())
+            dialog.autosave_draft()
+            self.assertEqual(len(list(draft_dir.glob("*.txt"))), 1)
+            dialog.draft.setPlainText("My revised work in progress.")
+            dialog.autosave_draft()
+            self.assertEqual(len(list(draft_dir.glob("*.txt"))), 2)
+            dialog.close()
+            self.assertEqual(len(list(draft_dir.glob("*.txt"))), 2)
+
+    def test_closing_unsaved_homework_saves_a_snapshot(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(assignment="Discussion", folder=Path(folder))
+            dialog.draft.setPlainText("Unfinished discussion, please preserve.")
+            self.assertTrue(dialog.close())
+            versions = list((Path(folder) / "Assignments" / "Drafts").glob("*.txt"))
+            self.assertEqual(len(versions), 1)
+            self.assertIn("Unfinished discussion", versions[0].read_text())
+
+    def test_disk_failure_does_not_close_unsaved_editor(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(folder=Path(folder))
+            dialog.draft.setPlainText("My unsaved paper.")
+            with patch("study.homework_ui.save_snapshot", side_effect=OSError("disk full")), \
+                 patch("study.homework_ui.QMessageBox.warning") as warning:
+                self.assertFalse(dialog.close())
+                warning.assert_called_once()
+            self.assertEqual(dialog.draft.toPlainText(), "My unsaved paper.")
+            dialog.close()
+
     def test_draft_is_editable_before_export(self):
         with tempfile.TemporaryDirectory() as folder:
             with patch("study.homework_ui.load_style", return_value=""):
