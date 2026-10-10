@@ -29,7 +29,8 @@ from webbie_panel import WebbiePanel
 # Only the separate X11 floating overlay draws Webbie on the desktop.
 # The historical panel overlay remains for source compatibility tests.
 sys.path.insert(0, str(SPIDER_ROOT / 'the-web/overlay'))
-from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
+from webbie_face import (asleep as face_asleep, set_sleep as set_face_sleep,
+                         full_screen_display, set_display_mode)
 from media_panel import MediaPanel
 from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
@@ -241,6 +242,10 @@ class TheWeb(QMainWindow):
         header.addWidget(button('Ask Webbie', self.toggle_webbie_assistant))
         self.face_button = button('Put Webbie to sleep', self.toggle_webbie_face)
         header.addWidget(self.face_button)
+        self.face_display_button = button(
+            'Webbie: Compact' if full_screen_display() else 'Webbie: Full Screen',
+            self.toggle_webbie_display)
+        header.addWidget(self.face_display_button)
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
         self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
@@ -337,6 +342,18 @@ class TheWeb(QMainWindow):
             return
         self.webbie_assistant.set_face_sleeping(face_asleep())
         self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep')
+
+    def toggle_webbie_display(self):
+        try:
+            active = set_display_mode('toggle-display')
+        except OSError as error:
+            self.status.setText('Unable to change Webbie face display: ' + str(error))
+            return
+        self.face_display_button.setText(
+            'Webbie: Compact' if active else 'Webbie: Full Screen')
+        self.status.setText(
+            'Webbie full-screen face is click-through.' if active
+            else 'Webbie face returned to compact mode.')
 
     def show_author_review(self, passage):
         self.open_workspace('author')
