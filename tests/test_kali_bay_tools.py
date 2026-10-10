@@ -178,6 +178,12 @@ assert window.security_tabs.count() == 3
 assert window.security_tabs.tabText(0) == 'DESKTOP HUB'
 assert window.security_tabs.tabText(1) == 'OFFENSIVE'
 assert window.security_tabs.tabText(2) == 'PURPLE DEFENSE'
+assert window.webbie_dock.objectName() == 'kaliWebbieAssistantDock'
+assert window.webbie_chat_entry.objectName() == 'kaliWebbieEntry'
+assert window.webbie_worker is None
+window.open_webbie_security()
+assert not window.webbie_dock.isHidden()
+assert window.webbie_worker is None
 assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU)
 from PyQt5.QtWidgets import QPushButton
 buttons = [b.text() for b in window.findChildren(QPushButton)]
