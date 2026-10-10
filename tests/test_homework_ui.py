@@ -160,6 +160,22 @@ class HomeworkUiTests(unittest.TestCase):
             dialog.worker = None
             dialog.close()
 
+    def test_edit_during_review_marks_feedback_as_outdated(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(folder=Path(folder))
+            dialog.directions.setPlainText("Write 250 to 300 words.")
+            dialog.draft.setPlainText("Version one.")
+            with patch("study.homework_ui.DraftWorker"):
+                dialog.review_draft()
+            dialog.draft.setPlainText("Version two with new edits.")
+            self.assertTrue(dialog.review_is_stale)
+            dialog.review_ready("Prior checklist", "Feedback written for version one.")
+            self.assertIn("earlier version", dialog.review_notes.toPlainText())
+            self.assertEqual(dialog.draft.toPlainText(), "Version two with new edits.")
+            dialog.worker = None
+            dialog.close()
+
     def test_draft_is_editable_before_export(self):
         with tempfile.TemporaryDirectory() as folder:
             with patch("study.homework_ui.load_style", return_value=""):
