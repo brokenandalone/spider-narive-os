@@ -1,0 +1,229 @@
+"""Webbie Homework Assistant for Study Bay.
+
+All requested material is displayed before it is sent to a local Ollama model.
+The user controls sample storage, revision, APA export, and later cloud uploads.
+"""
+from pathlib import Path
+from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtWidgets import (
+    QCheckBox, QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
+    QMessageBox, QFileDialog, QPushButton, QTextEdit, QVBoxLayout,
+)
+try:
+    from .homework import (load_style, save_style, clear_style, sample_from_file,
+                           build_prompt, webbie_draft)
+    from .paper_dialog import PaperDialog
+    from .apa import create_paper
+except ImportError:
+    from homework import (load_style, save_style, clear_style, sample_from_file,
+                          build_prompt, webbie_draft)
+    from paper_dialog import PaperDialog
+    from apa import create_paper
+
+
+class DraftWorker(QThread):
+    ready = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, prompt, parent=None):
+        super().__init__(parent)
+        self.prompt = prompt
+
+    def run(self):
+        try:
+            self.ready.emit(webbie_draft(self.prompt))
+        except Exception as error:
+            self.failed.emit(str(error))
+
+
+class HomeworkDialog(QDialog):
+    def __init__(self, parent=None, *, course="", assignment="", notes="", folder=None):
+        super().__init__(parent)
+        self.setWindowTitle("Webbie | Homework Assistant")
+        self.resize(850, 830)
+        self.course_folder = Path(folder) if folder else Path.home() / "Documents"
+        self.notes = str(notes)
+        self.worker = None
+        self.last_mode = "draft"
+        outer = QVBoxLayout(self)
+        intro = QLabel("Webbie drafts and revises at your request using local AI. "
+                       "You choose what course material and writing samples she sees. "
+                       "Review accuracy, citations and school rules before submitting.")
+        intro.setWordWrap(True)
+        outer.addWidget(intro)
+        form = QFormLayout()
+        self.course = QLineEdit(course)
+        self.assignment = QLineEdit(assignment)
+        self.directions = QTextEdit()
+        self.directions.setAcceptRichText(False)
+        self.directions.setMinimumHeight(115)
+        self.directions.setPlaceholderText(
+            "Paste the assignment prompt, rubric, required length, and instructor directions.")
+        self.materials = QTextEdit()
+        self.materials.setAcceptRichText(False)
+        self.materials.setMaximumHeight(95)
+        self.materials.setPlaceholderText(
+            "Optional excerpts or verified source notes that you choose to provide.")
+        self.include_notes = QCheckBox("Include my selected course notes")
+        self.include_notes.setChecked(False)
+        self.style = QTextEdit()
+        self.style.setAcceptRichText(False)
+        self.style.setMaximumHeight(95)
+        self.style.setPlaceholderText("Paste a paragraph from your own previous writing.")
+        self.style.setPlainText(load_style())
+        self.revision = QLineEdit()
+        self.revision.setPlaceholderText("What should Webbie change in the next draft?")
+        for label, widget in [
+            ("Course", self.course), ("Assignment", self.assignment),
+            ("Instructions / rubric", self.directions),
+            ("Optional materials", self.materials),
+            ("Course notes", self.include_notes),
+            ("Your writing style sample", self.style),
+            ("Revision instructions", self.revision),
+        ]:
+            form.addRow(label, widget)
+        outer.addLayout(form)
+        sample_buttons = QHBoxLayout()
+        for label, action in [
+            ("Import my writing", self.import_style),
+            ("Save my style locally", self.save_style),
+            ("Forget my saved style", self.delete_style),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(action)
+            sample_buttons.addWidget(button)
+        outer.addLayout(sample_buttons)
+        actions = QHBoxLayout()
+        self.generate_buttons = []
+        for label, mode in [
+            ("Write draft", "draft"),
+            ("Discussion post", "discussion"),
+            ("Create outline", "outline"),
+            ("Revise draft", "revise"),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(lambda checked=False, kind=mode: self.generate(kind))
+            actions.addWidget(button)
+            self.generate_buttons.append(button)
+        outer.addLayout(actions)
+        self.draft = QTextEdit()
+        self.draft.setAcceptRichText(False)
+        self.draft.setPlaceholderText("Webbie's editable draft appears here. No automatic submission.")
+        outer.addWidget(self.draft, 1)
+        footer = QHBoxLayout()
+        export = QPushButton("Export as APA Word paper")
+        export.clicked.connect(self.export_apa)
+        footer.addWidget(export)
+        close = QPushButton("Close")
+        close.clicked.connect(self.close)
+        footer.addWidget(close)
+        outer.addLayout(footer)
+        self.status = QLabel("Ready. Nothing is sent to Webbie until you request a draft.")
+        self.status.setWordWrap(True)
+        outer.addWidget(self.status)
+
+    def import_style(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select your own writing sample", str(self.course_folder),
+            "Writing samples (*.txt *.md *.docx)")
+        if not path:
+            return
+        try:
+            self.style.setPlainText(sample_from_file(path))
+            self.status.setText("Sample loaded for this session. Save it only if you want Webbie to remember it.")
+        except (OSError, ValueError, ImportError) as error:
+            QMessageBox.warning(self, "Writing sample", str(error))
+
+    def save_style(self):
+        try:
+            save_style(self.style.toPlainText())
+            self.status.setText("Your writing style sample is stored privately on this PC.")
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Writing style", str(error))
+
+    def delete_style(self):
+        clear_style()
+        self.style.clear()
+        self.status.setText("Saved style sample cleared. Webbie can still draft normally.")
+
+    def generate(self, mode):
+        if self.worker is not None:
+            self.status.setText("Webbie is already drafting.")
+            return
+        materials = self.materials.toPlainText().strip()
+        if self.include_notes.isChecked() and self.notes.strip():
+            materials += "\n\nSELECTED COURSE NOTES:\n" + self.notes[:10000]
+        try:
+            prompt = build_prompt(
+                course=self.course.text(), assignment=self.assignment.text(),
+                instructions=self.directions.toPlainText(), materials=materials,
+                sample=self.style.toPlainText(), existing_draft=self.draft.toPlainText(),
+                revision=self.revision.text(), mode=mode)
+        except ValueError as error:
+            QMessageBox.warning(self, "Assignment details", str(error))
+            return
+        self.last_mode = mode
+        self.worker = DraftWorker(prompt, self)
+        self.worker.ready.connect(self.draft_ready)
+        self.worker.failed.connect(self.draft_failed)
+        for button in self.generate_buttons:
+            button.setEnabled(False)
+        self.status.setText("Webbie is writing locally. Existing work remains editable after completion.")
+        self.worker.start()
+
+    def release_worker(self):
+        if self.worker is not None:
+            self.worker.deleteLater()
+            self.worker = None
+        for button in self.generate_buttons:
+            button.setEnabled(True)
+
+    def draft_ready(self, text):
+        if text.strip():
+            self.draft.setPlainText(text)
+            self.status.setText(
+                "Draft ready for review. Check facts, sources and assignment requirements.")
+        else:
+            self.status.setText("Webbie returned no draft.")
+        self.release_worker()
+
+    def draft_failed(self, error):
+        self.status.setText("Webbie could not draft: " + error)
+        self.release_worker()
+
+    def export_apa(self):
+        if not self.draft.toPlainText().strip():
+            QMessageBox.warning(self, "APA export", "Generate or paste an editable draft first.")
+            return
+        form = PaperDialog(self, self.course.text())
+        form.fields["title"].setText(self.assignment.text())
+        form.body.setPlainText(self.draft.toPlainText())
+        if form.exec_() != QDialog.Accepted:
+            return
+        values = form.values()
+        if any(not values[key] for key in
+               ("title", "author", "institution", "course", "instructor", "due")):
+            QMessageBox.warning(self, "APA export", "Complete all title-page fields.")
+            return
+        destination = self.course_folder / "Assignments"
+        destination.mkdir(parents=True, exist_ok=True)
+        file, _ = QFileDialog.getSaveFileName(self, "Save homework draft",
+                                              str(destination / "homework-draft.docx"),
+                                              "Word documents (*.docx)")
+        if not file:
+            return
+        if not file.lower().endswith(".docx"):
+            file += ".docx"
+        try:
+            create_paper(file, **values, overwrite=False)
+        except (OSError, ValueError, ImportError, FileExistsError) as error:
+            QMessageBox.warning(self, "APA export", str(error))
+            return
+        self.status.setText("APA draft saved locally: " + file + ". No cloud upload or school submission.")
+
+    def closeEvent(self, event):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Webbie is finishing this request. You can close after her response.")
+            event.ignore()
+            return
+        super().closeEvent(event)
