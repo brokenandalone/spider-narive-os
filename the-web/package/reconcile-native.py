@@ -7,6 +7,7 @@ The desktop installer backs up original files before invoking this helper.
 from pathlib import Path
 import argparse
 import ast
+import hashlib
 import os
 import tempfile
 
@@ -50,6 +51,25 @@ STUDIO_OLD_ACTIONS = """    def launch(self, command):
 
 """
 
+# Exact Git blob IDs for older Study versions known to be on the upgrade path.
+# These fingerprints prevent overwriting unfamiliar owner-local modifications.
+# Git SHA-1 here identifies known content; it is not used for authentication.
+STUDY_KNOWN_BLOBS = {
+    'Study workspace': {
+        '456f0279b397f7776b8ba9c6d970d493a9a8ccaf',  # original main
+        '422029cbc30b462d87ff52eaa6c608b63f9ce499',  # School PR #8
+    },
+    'Study course store': {
+        'c7fa2cef87f66f187e6253a7059f7a5d335703f0',  # original main
+    },
+}
+
+
+def git_blob_sha(content):
+    data = content.encode('utf-8')
+    header = b'blob ' + str(len(data)).encode('ascii') + b'\0'
+    return hashlib.sha1(header + data).hexdigest()
+
 
 def one_replace(text, old, new):
     if text.count(old) != 1:
@@ -65,8 +85,10 @@ def legacy_studio(upstream):
         "sys.path.insert(0, str(Path(__file__).resolve().parent))\n"
         "if __package__:\n"
         "    from .tools import TOOLS, resolve_tool\n"
+        "    from .ai_panel import StudioAIPanel\n"
         "else:\n"
-        "    from tools import TOOLS, resolve_tool\n", '')
+        "    from tools import TOOLS, resolve_tool\n"
+        "    from ai_panel import StudioAIPanel\n", '')
     style = (
         "            QWidget { background: #0c0a10; color: #eeeaf3; }\n"
         "            QTabBar::tab { background:#21172d; color:#e9d5ff; padding:8px; }\n"
@@ -122,7 +144,7 @@ def atomic_replace(path, content):
         candidate.unlink(missing_ok=True)
 
 
-def reconcile(source, installed, kind):
+def reconcile(source, installed, kind, *, dry_run=False):
     if not installed.is_file() or not source.is_file():
         print(f'{kind}: source or installed entry absent, skipping')
         return 'missing'
@@ -138,7 +160,7 @@ def reconcile(source, installed, kind):
             print('Author launcher: unfamiliar local changes, preserving; manual review required')
             return 'conflict'
         replacement = upstream
-    else:
+    elif kind == 'Studio':
         if 'self.tool_tabs = QTabWidget()' in current:
             print('Studio: tools tabs already present; preserving local version')
             return 'current'
@@ -146,7 +168,17 @@ def reconcile(source, installed, kind):
             print('Studio: unfamiliar local changes, preserving; manual review required')
             return 'conflict'
         replacement = enhanced_studio(upstream)
+    elif kind in STUDY_KNOWN_BLOBS:
+        if git_blob_sha(current) not in STUDY_KNOWN_BLOBS[kind]:
+            print(f'{kind}: unknown local edits, preserving; manual review required')
+            return 'conflict'
+        replacement = upstream
+    else:
+        raise ValueError(f'Unsupported reconciliation type: {kind}')
     ast.parse(replacement)
+    if dry_run:
+        print(f'{kind}: recognized older code, safe to reconcile on apply')
+        return 'would-reconcile'
     atomic_replace(installed, replacement)
     print(f'{kind}: reconciled exactly known local variant')
     return 'reconciled'
@@ -156,13 +188,33 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source_root', type=Path)
     parser.add_argument('installed_root', type=Path)
+    parser.add_argument('--check', action='store_true',
+                        help='Preflight installed code; never change files')
     arguments = parser.parse_args()
     source, root = arguments.source_root, arguments.installed_root
+    checking = arguments.check
     results = [
-        reconcile(source / 'system/apps.py', root / 'system/apps.py', 'Author launcher'),
-        reconcile(source / 'studio/main.py', root / 'studio/main.py', 'Studio'),
+        reconcile(source / 'system/apps.py', root / 'system/apps.py', 'Author launcher', dry_run=checking),
+        reconcile(source / 'studio/main.py', root / 'studio/main.py', 'Studio', dry_run=checking),
     ]
-    return 0 if 'conflict' not in results else 2
+    # The dashboard calls store.all_assignments(): upgrade the dependency first.
+    store_status = reconcile(source / 'study/store.py', root / 'study/store.py', 'Study course store', dry_run=checking)
+    results.append(store_status)
+    if store_status in ('current', 'reconciled', 'would-reconcile', 'missing'):
+        # A missing store is installed from the package before apply reconciliation.
+        # Never accept a known old Study UI while leaving a custom store unchanged.
+        results.append(reconcile(
+            source / 'study/study.py', root / 'study/study.py',
+            'Study workspace', dry_run=checking))
+    else:
+        print('Study workspace: skipped until the course store is reviewed')
+    bad = 'conflict' in results
+    if not checking and store_status == 'missing':
+        bad = True  # Apply expects install-desktop.sh to add missing sources first.
+    print(('NATIVE RECONCILIATION BLOCKED' if bad else
+           'NATIVE RECONCILIATION CHECK PASSED' if checking else
+           'NATIVE RECONCILIATION COMPLETE'))
+    return 2 if bad else 0
 
 
 if __name__ == '__main__':

@@ -410,6 +410,16 @@ def handle_builtin(command):
             "Spider Media Player is not installed yet."
         )
 
+    # Open the assignment editor on an explicit request. Do not create,
+    # submit or upload coursework from a voice command alone.
+    if (("homework" in lower or "essay" in lower or "assignment" in lower)
+            and any(word in lower for word in
+                    ("help", "write", "draft", "open", "start", "work on"))):
+        set_workspace("study")
+        if launch(["python3", workspace_path("study", "bin", "webbie-homework")]):
+            return "Opening your homework assistant. Add the directions and I can draft it in your style."
+        return "The homework assistant is not installed yet."
+
     if (
         "study" in lower
         and any(

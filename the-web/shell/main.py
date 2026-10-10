@@ -691,6 +691,7 @@ class TheWeb(QMainWindow):
 
 
 def main():
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = QApplication(sys.argv); app.setApplicationName('The Web'); app.setQuitOnLastWindowClosed(True)
     splash = QSplashScreen(QPixmap(str(SPIDER_ROOT / 'branding/splash/spider-os-splash.png')).scaled(960, 540, Qt.KeepAspectRatio, Qt.SmoothTransformation))
     splash.show(); splash.showMessage('Opening The Web…', Qt.AlignBottom | Qt.AlignHCenter, QColor('#e9d5ff')); app.processEvents()

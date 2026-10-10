@@ -25,8 +25,10 @@ from apps import AppUnavailable, media_command
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .tools import TOOLS, resolve_tool
+    from .ai_panel import StudioAIPanel
 else:
     from tools import TOOLS, resolve_tool
+    from ai_panel import StudioAIPanel
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 
@@ -131,6 +133,11 @@ class SpiderStudio(QMainWindow):
 
         self.tool_tabs = QTabWidget()
         content.addWidget(self.tool_tabs, 1)
+        self.ai_panel = StudioAIPanel()
+        ai_scroll = QScrollArea()
+        ai_scroll.setWidgetResizable(True)
+        ai_scroll.setWidget(self.ai_panel)
+        self.tool_tabs.addTab(ai_scroll, 'Studio AI')
         self.tool_buttons = []
         for category, tools in TOOLS.items():
             page = QWidget(); grid = QGridLayout(page)

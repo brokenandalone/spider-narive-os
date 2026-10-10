@@ -1,6 +1,6 @@
 # Spider Studio AI: own-voice song generation (owner priority, 2026-10-09)
 
-Status: engineering specification, **not installed functionality**. Developed separately from the currently installed and owner-reconciled release. No downloaded model, training job, camera/microphone activation or paid service is authorized by this document.
+Status: initial local generation source implemented; **not installed functionality**. See [implementation and v6 comparison](STUDIO-AND-SCHOOL-2026-10-10.md) for exact supported behavior and pending acceptance. Developed separately from the currently installed and owner-reconciled release. No downloaded model, training job, camera/microphone activation or paid service is authorized by this document.
 
 ## North star
 
@@ -38,7 +38,7 @@ A **Studio AI** tab with:
 
 ## Suno v6 feature benchmark (confirmed October 9, 2026)
 
-Official release: https://about.suno.com/blog/introducing-v6 (September 9, 2026). Official FAQ: https://help.suno.com/en/articles/13924481 and https://help.suno.com/en/articles/6141377; own-voice workflow https://help.suno.com/en/articles/11362369.
+Official release: https://suno.com/blog/introducing-v6 (September 9, 2026). Official FAQ: https://help.suno.com/en/articles/13924481 and https://help.suno.com/en/articles/6141377; own-voice workflow https://help.suno.com/en/articles/11362369.
 
 Suno **v6 / v6-wild / v6-mini** are distinct quality/creativity/speed choices; the classic creative controls are **Weirdness** (Safe -> Chaos; 50 nominal), **Style Influence** (Loose -> Strong), and **Audio Influence** (appears when a suitable audio reference/upload is selected). v6 also documents a **Variety** slider that adjusts/rephrases style prompts (0 means no changes) and **Max Mode**, costing extra credits to devote more computation to longer songs, covers and vocal/style consistency.
 
@@ -50,7 +50,7 @@ Add **Creative / Experimental / Quick** modes as *Spider Studio modes*, not clai
 
 The Suno v6 FAQ says custom-trained models migrate to v6. Some older Suno Voice help still tells users to choose v5.5, which is inconsistent with the September v6 retirement announcement; do not assert exact v6 Voice-model compatibility without checking the current Create UI or an updated voice-specific support statement.
 
-v6's benchmark also includes natural-language **edit a selected section**, **replace a lyric**, **multi-source mashups**, **sample/isolate/build around a riff**, **image/video/music reference inputs**, and up-to-8-minute renders; Suno Studio 2.0 adds MIDI, built-in synth/effects, automation, and a chat bar. These are long-term feature comparisons, not implemented source behavior.
+v6's benchmark also includes natural-language **edit a selected section**, **replace a lyric**, **multi-source mashups**, **sample/isolate/build around a riff**, **image/video/music reference inputs**; Suno Studio 2.0 adds MIDI, built-in synth/effects, automation, and a chat bar. These are long-term feature comparisons, not implemented source behavior.
 
 ### Voice-first sequence and acceptance test
 
