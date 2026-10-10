@@ -55,6 +55,7 @@ class SongRequest:
     other_instruments: str = ''
     vocal_mode: str = 'ai_lead'
     source_audio: str = ''
+    voice_reference: str = ''
 
     def payload(self):
         for name, limit in (('title', 200), ('style', 8000), ('lyrics', 20000)):
@@ -89,6 +90,8 @@ class SongRequest:
                        '\nCreate complementary musical backing around the supplied source vocal.')
         elif self.source_audio:
             raise ValueError('Source audio is only used in a recording-assisted mode.')
+        if self.voice_reference:
+            check_audio_input(self.voice_reference)
         result = {
             'prompt': prompt,
             'lyrics': '[Instrumental]' if self.instrumental else self.lyrics,
@@ -148,13 +151,12 @@ class LocalMusicClient:
         self.api_key = api_key or ''
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
 
-    def _request(self, path, payload=None, audio=None):
+    def _request(self, path, payload=None, audio=None, reference=None):
         headers = {}
         if self.api_key:
             headers['Authorization'] = 'Bearer ' + self.api_key
         body = None
-        if audio is not None:
-            recording = check_audio_input(str(audio))
+        if audio is not None or reference is not None:
             # A bounded upload can be assembled in memory; HTTP stays strictly loopback.
             boundary = secrets.token_hex(16)
             pieces = []
@@ -163,9 +165,14 @@ class LocalMusicClient:
                            else str(value).lower() if isinstance(value, bool) else str(value)).encode('utf-8')
                 pieces.append(('--' + boundary + '\r\nContent-Disposition: form-data; name="' +
                                key + '"\r\n\r\n').encode() + encoded + b'\r\n')
-            pieces.append(('--' + boundary + '\r\nContent-Disposition: form-data; name="src_audio"; filename="recording' +
-                           recording.suffix.lower() + '"\r\nContent-Type: ' + AUDIO_TYPES[recording.suffix.lower()] +
-                           '\r\n\r\n').encode() + recording.read_bytes() + b'\r\n')
+            for field, source in (('src_audio', audio), ('reference_audio', reference)):
+                if source is None:
+                    continue
+                recording = check_audio_input(str(source))
+                pieces.append(('--' + boundary + '\r\nContent-Disposition: form-data; name="' + field +
+                               '"; filename="recording' + recording.suffix.lower() +
+                               '"\r\nContent-Type: ' + AUDIO_TYPES[recording.suffix.lower()] +
+                               '\r\n\r\n').encode() + recording.read_bytes() + b'\r\n')
             pieces.append(('--' + boundary + '--\r\n').encode())
             body = b''.join(pieces)
             headers['Content-Type'] = 'multipart/form-data; boundary=' + boundary
@@ -174,9 +181,9 @@ class LocalMusicClient:
             headers['Content-Type'] = 'application/json'
         return Request(self.base_url + path, data=body, headers=headers)
 
-    def _json(self, path, payload=None, audio=None):
+    def _json(self, path, payload=None, audio=None, reference=None):
         try:
-            with self.opener.open(self._request(path, payload, audio), timeout=60 if audio is not None else 10) as response:
+            with self.opener.open(self._request(path, payload, audio, reference), timeout=60 if (audio is not None or reference is not None) else 10) as response:
                 raw = response.read(1024 * 1024 + 1)
             if len(raw) > 1024 * 1024:
                 raise MusicError('Oversized response from local music service.')
@@ -273,8 +280,18 @@ class LocalMusicClient:
                 job['source_file'] = target.name
                 write_manifest(manifest, job)
                 local_audio = target
+            ref_audio = None
+            if request.voice_reference:
+                reference = check_audio_input(request.voice_reference)
+                ref_target = folder / ('voice-reference' + reference.suffix.lower())
+                with reference.open('rb') as stream, ref_target.open('xb') as output:
+                    os.chmod(ref_target, 0o600)
+                    shutil.copyfileobj(stream, output)
+                ref_audio = ref_target
+                job['voice_reference_file'] = ref_target.name
+                write_manifest(manifest, job)
             # Never auto-retry submission: a lost response may still have queued a job.
-            submitted = self._json('/release_task', payload, audio=local_audio)
+            submitted = self._json('/release_task', payload, audio=local_audio, reference=ref_audio)
             task_id = submitted.get('task_id') if isinstance(submitted, dict) else None
             if not isinstance(task_id, str) or not task_id or len(task_id) > 200:
                 raise MusicError('The service did not return a valid task ID; do not blindly resubmit.')
