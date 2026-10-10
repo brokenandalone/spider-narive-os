@@ -31,16 +31,7 @@ Kali Qt source file and preserves the existing local backed-up installation.
 
 ## Dependency and compatibility
 
-Stacked on PR #13 (`upgrades/kali-bay-security-tool-launchers`). The recent
-Webbie controls in PR #39 are on a separate stacked desktop/Webbie branch.
-Before a coordinated owner-PC install, reconcile **both** branches and their
-distinct inherited base histories. Do not blindly merge the older desktop's
-Kali UI over the newer locally installed PR #13 Kali implementation.
-
-PR #39 provides Webbie's deterministic, fixed-allowlist tool commands;
-this UI supplies discoverability, searchable menus and a button into that
-same assistant. Neither branch grants Webbie a general shell, root commands,
-or permission to execute arbitrary target-based scans.
+The original hybrid workspace design is PR #40, stacked on PR #13. The consolidated PR #39 branch now includes the current Kali manager, the hybrid UI and Webbie's approved security actions in one source tree. This does **not** establish that the combined features have been deployed on the owner's PC. No arbitrary shell commands, target scans or root privileges are granted.
 
 ## Acceptance steps
 
