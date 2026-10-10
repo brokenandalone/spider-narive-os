@@ -569,7 +569,7 @@ class StudioAIPanel(QWidget):
                 if self.separation_directory not in path.parents:
                     continue
                 self.separation_files.add(path)
-                item = QListWidgetItem(path.name)
+                item = QListWidgetItem(str(path.relative_to(self.separation_directory)))
                 item.setData(Qt.UserRole, str(path))
                 self.stem_candidates.addItem(item)
             except (OSError, MixError):
