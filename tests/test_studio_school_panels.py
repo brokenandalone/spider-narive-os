@@ -89,6 +89,40 @@ class NativeWorkspaceTests(unittest.TestCase):
                 launch.assert_called_once_with(['/usr/bin/audacity', str(take)])
             panel.close()
 
+    def test_finish_song_chain_requires_backing_and_model_then_calls_mixer(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            backing, lead, rendered = (root / name for name in ('instrumental.wav', 'lead.wav', 'converted.wav'))
+            for path in (backing, lead, rendered):
+                with wave.open(str(path), 'wb') as handle:
+                    handle.setnchannels(1); handle.setsampwidth(2); handle.setframerate(8000)
+                    handle.writeframes(b'\\0\\0' * 100)
+            panel = StudioAIPanel(folder)
+            panel.mix_backing.setText(str(backing))
+            panel.rvc_vocal.setText(str(lead))
+            panel.rvc_model.setText(str(root / 'my-voice.pth'))
+            with patch.object(panel, 'start_conversion') as conversion, \\
+                 patch.object(panel, 'start_mix') as mixing:
+                panel.start_song_finish()
+                conversion.assert_called_once()
+                self.assertFalse(panel.finish_song_button.isEnabled())
+                panel.conversion_done(str(rendered), 'converted')
+                mixing.assert_called_once()
+                self.assertEqual(panel.mix_vocal.text(), str(rendered))
+                self.assertFalse(panel.finish_after_conversion)
+            panel.close()
+
+    def test_finish_song_chain_rejects_missing_instrumental(self):
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            panel.rvc_model.setText(str(Path(folder) / 'model.pth'))
+            with patch.object(panel, 'start_conversion') as conversion:
+                panel.start_song_finish()
+                conversion.assert_not_called()
+                self.assertTrue(panel.finish_song_button.isEnabled())
+            panel.close()
+
     def test_voice_mixing_ui_uses_two_distinct_wavs_and_converted_output(self):
         import wave
         with tempfile.TemporaryDirectory() as folder:
