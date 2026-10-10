@@ -90,7 +90,7 @@ class CameraWorker(QThread):
             jpeg = capture_jpeg(self.device)
             if not self.isInterruptionRequested():
                 self.frameReady.emit(jpeg)
-                result = describe_frame(jpeg, timeout=35)
+                result = describe_frame(jpeg, timeout=180)
                 if not self.isInterruptionRequested():
                     self.described.emit(result)
         except (OSError, ValueError, RuntimeError) as error:
