@@ -47,11 +47,20 @@ def capture_jpeg(device, timeout=12):
     valid_camera_path(device)
     command = [
         'ffmpeg', '-hide_banner', '-nostdin', '-loglevel', 'error',
-        '-f', 'video4linux2', '-i', device, '-frames:v', '1',
+        '-f', 'video4linux2',
+        '-input_format', 'mjpeg', '-video_size', '640x480',
+        '-framerate', '15',
+        '-i', device, '-frames:v', '1',
         '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'
     ]
-    result = subprocess.run(command, capture_output=True, timeout=timeout,
-                            check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=timeout,
+                                check=False)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(
+            'Webcam capture timed out at 640x480 MJPEG. Check camera access '
+            'and retry.'
+        ) from None
     if result.returncode != 0:
         raise RuntimeError('Unable to read webcam. Check camera access and try another camera.')
     data = result.stdout
