@@ -144,12 +144,14 @@ class BackendTests(unittest.TestCase):
 
     def test_lineup_roles_are_validated_without_voice_cloning(self):
         for singers in (('Unknown real vocalist',),
-                        ('Original feminine alto', 'Original feminine alto'),
                         ('Original feminine alto',) * 4):
             with self.assertRaises(ValueError):
                 m.SongRequest('Test', 'Rock', 'lyrics', vocal_lineup=singers).payload()
         with self.assertRaises(ValueError):
             m.SongRequest('Test', 'Rock', 'lyrics', guitar_one='a' * 401).payload()
+        duet = m.SongRequest('Test', 'Rock', 'lyrics',
+            vocal_lineup=('Original feminine alto', 'Original feminine alto')).payload()
+        self.assertIn('Singer 2', duet['prompt'])
         default = m.SongRequest('Test', 'Rock', 'lyrics').payload()
         self.assertEqual(default['prompt'], 'Rock')
 
