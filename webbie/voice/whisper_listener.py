@@ -48,7 +48,7 @@ def ready():
     )
 
 
-def record_chunk(path):
+def record_chunk(path, seconds=None):
     result = subprocess.run(
         [
             "arecord",
@@ -60,7 +60,7 @@ def record_chunk(path):
             "-c",
             "1",
             "-d",
-            str(CHUNK_SECONDS),
+            str(CHUNK_SECONDS if seconds is None else seconds),
             path,
         ],
         stdout=subprocess.DEVNULL,
@@ -142,6 +142,7 @@ def transcribe(path):
 def listen_forever(
     on_text,
     should_continue,
+    on_interrupt=None,
 ):
     if not ready():
         raise RuntimeError(
@@ -155,8 +156,10 @@ def listen_forever(
 
     while should_continue():
 
-        # Do not let Webbie hear herself talking.
-        if SPEAKING_MARKER.exists():
+        # When available, the stop-only interrupt route continues listening
+        # during playback. Everything but an explicit stop is discarded.
+        talking_at_start = SPEAKING_MARKER.exists()
+        if talking_at_start and on_interrupt is None:
             time.sleep(0.25)
             continue
 
@@ -171,22 +174,23 @@ def listen_forever(
                 audio_path = temp.name
 
             if not record_chunk(
-                audio_path
+                audio_path, seconds=2 if talking_at_start else None
             ):
                 time.sleep(1)
                 continue
 
-            # If Webbie began speaking during capture,
-            # throw this chunk away.
-            if SPEAKING_MARKER.exists():
-                continue
-
-            phrase = transcribe(
-                audio_path
+            talking_during_capture = (
+                talking_at_start or SPEAKING_MARKER.exists()
             )
-
+            if talking_during_capture and on_interrupt is None:
+                continue
+            phrase = transcribe(audio_path)
             if phrase:
-                on_text(phrase)
+                if talking_during_capture:
+                    # Never treat a TTS echo as a normal assistant command.
+                    on_interrupt(phrase)
+                else:
+                    on_text(phrase)
 
         finally:
             if audio_path:

@@ -207,6 +207,39 @@ class WebbieCaption(QWidget):
                          Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignVCenter, display)
 
 
+def paint_sleeping_eyelids(painter):
+    """Mask open eye artwork before drawing actual closed eyelid shapes.
+
+    The original face is a still image with open eyes. Curved lines alone
+    leave her pupils exposed. These opaque eyelid patches must cover them.
+    Position is calibrated to the 196px Webbie v1 portrait; visual review on
+    the user's actual display is still required.
+    """
+    painter.save()
+    for left in (.31, .56):
+        # Mask original iris and eye highlights, rather than merely drawing
+        # a line over an open eye. Keep the rest of the face visible.
+        mask = QPainterPath()
+        mask.addRoundedRect(QRectF(SIZE * (left - .018), SIZE * .375,
+                                   SIZE * .187, SIZE * .113), 11, 11)
+        painter.fillPath(mask, QColor(72, 49, 99, 252))
+        eyelid = QPainterPath()
+        eyelid.moveTo(SIZE * (left - .002), SIZE * .422)
+        eyelid.cubicTo(SIZE * (left + .035), SIZE * .467,
+                       SIZE * (left + .112), SIZE * .467,
+                       SIZE * (left + .158), SIZE * .422)
+        painter.setPen(QPen(QColor(154, 106, 193, 255), 4))
+        painter.drawPath(eyelid)
+        # Faint crease reads as closed, rather than painted-over eyes.
+        crease = QPainterPath()
+        crease.moveTo(SIZE * (left + .024), SIZE * .397)
+        crease.quadTo(SIZE * (left + .084), SIZE * .381,
+                       SIZE * (left + .137), SIZE * .397)
+        painter.setPen(QPen(QColor(127, 83, 162, 180), 1.5))
+        painter.drawPath(crease)
+    painter.restore()
+
+
 class WebbieOverlay(QWidget):
     def __init__(self, root=ROOT, sleep_path=CONFIG, full_screen_check=fullscreen_active):
         flags = Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
@@ -363,16 +396,7 @@ class WebbieOverlay(QWidget):
             painter.setClipping(False)
             painter.setOpacity(.93)
             painter.fillRect(frame, QColor(22, 12, 48, 76))
-            pen = QPen(QColor(91, 55, 132, 228), 4)
-            pen.setCapStyle(Qt.RoundCap)
-            painter.setPen(pen)
-            for left in (.31, .56):
-                eyelid = QPainterPath()
-                eyelid.moveTo(SIZE * left, SIZE * .425)
-                eyelid.cubicTo(SIZE * (left + .035), SIZE * .468,
-                               SIZE * (left + .105), SIZE * .468,
-                               SIZE * (left + .15), SIZE * .425)
-                painter.drawPath(eyelid)
+            paint_sleeping_eyelids(painter)
             painter.setPen(QColor(230, 210, 255, 235))
             painter.setFont(QFont('Sans Serif', 18, QFont.Bold))
             painter.drawText(frame.adjusted(112, 0, -4, -132),
