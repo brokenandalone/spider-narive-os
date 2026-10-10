@@ -31,6 +31,7 @@ class SchoolMaterialPicker(SchoolOneDriveDialog):
         self.kind = QComboBox()
         self.kind.addItem("Assignment directions or rubric", "instructions")
         self.kind.addItem("Reading, source, or class notes", "materials")
+        self.kind.addItem("My own previous writing, for style only", "style")
         self.layout().addWidget(QLabel("How should Webbie use the selected file?"))
         self.layout().addWidget(self.kind)
         self.use_button = QPushButton("Use selected file in Homework Assistant")
@@ -94,10 +95,9 @@ class SchoolMaterialPicker(SchoolOneDriveDialog):
             name = self._cloud_path.split("/")[-1]
             filename = Path(self._temporary.name) / name
             document = read_course_document(filename)
-            self.selected_material = (
-                self.kind.currentData(),
-                format_selected_source(self._cloud_path, document),
-            )
+            kind = self.kind.currentData()
+            text = document if kind == "style" else format_selected_source(self._cloud_path, document)
+            self.selected_material = (kind, text)
         except (ValueError, OSError, RuntimeError, ImportError,
                 UnicodeError, TimeoutError) as error:
             self.status.setText("Document was not imported: " + str(error))
