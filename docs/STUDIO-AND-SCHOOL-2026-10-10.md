@@ -9,7 +9,7 @@ Source implementation; not installed or PC-accepted yet. This branch extends the
 3. [ ] Verify the PC GPU/VRAM, install/configure the chosen engine, and render a real song in Studio. Compare to Cory's Suno references before claiming usable quality.
 4. [x] Put My SNHU alongside courses, assignments, notes and APA export in Study.
 5. [ ] Test SNHU sign-in, Brightspace navigation and downloads on the PC. School-managed SSO may require the normal-browser fallback; no account has been connected by this source change.
-6. [ ] Reconcile final PC repairs and the complete application inventory into one reversible update. Preserve working Webbie/camera/voice and existing coursework.
+6. [ ] Reconcile final PC repairs and the complete application inventory into one reversible update. Preserve working Webbie/camera/voice and existing coursework. Source reconciliation now supports exact-known prior Study UI and store versions, but still needs installed-PC verification.
 7. [ ] Add owner singing identity, reference audio, supported section editing and production improvements after real engine acceptance.
 8. [ ] Carry forward the Resident AI research checklist: accurate persistent memory, context and preference recall, emotion-aware responses, feedback-based improvements and evaluation of user effects. The supplied Forage report's numbered "Source Material" labels are not verifiable references; verify claims before treating them as established findings. Memory storage is not continuous model training or evidence of human emotion.
 
@@ -52,3 +52,9 @@ Study keeps Courses & coursework and My SNHU in the same native workspace. Brows
 School downloads ask where to save, starting in the currently selected course's Downloads folder. Cancel does not accept the download. Completion is reported only when the browser reports success. Use Courses & coursework to select another course, view deadlines, write notes or make an APA paper without changing workspaces.
 
 The distro package list includes `python3-pyqt5.qtwebengine`; existing installations still need that package and a restarted desktop session. Missing support displays a normal-browser fallback. SNHU account linkage and real SSO acceptance are unverified until Cory signs in on the PC. Automatic Brightspace assignment/deadline sync is not included.
+
+## Study installation reconciliation (source staged, PC not upgraded)
+
+The desktop installer previously copied only *missing* Study sources. Existing `study/study.py` remained old, and an existing `study/store.py` could lack the dashboard's `all_assignments()` method. The native reconciliation helper now recognizes two exact prior Study UI fingerprints (original and School dashboard PR #8) and the original course store fingerprint. It updates only these known source versions after the installer backs up installed files. Unrecognized local edits are reported as conflicts and left unchanged. It upgrades the store before the UI so a known old-store/new-UI mismatch cannot occur.
+
+This is **not** a full installed-app replacement or confirmation of deployment. The final combined installation still requires comparing the PC with source, retaining PC Webbie repairs, testing SNHU SSO and downloads, and verifying rollback. No course databases, passwords or assignments are committed.
