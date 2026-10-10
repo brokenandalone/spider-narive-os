@@ -17,6 +17,10 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QComboBox,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -147,6 +151,21 @@ PURPLE_CATEGORIES = [
 ]
 
 
+# Native Spider OS launcher labels mapped only to the already-audited Kali
+# manager's hardcoded tool IDs. No shell input, targets or scans.
+DESKTOP_TOOL_MENU = (
+    ("Network", "Wireshark", "wireshark"),
+    ("Network", "Nmap workbench", "nmap"),
+    ("Web Security", "Burp Suite", "burpsuite"),
+    ("Web Security", "OWASP ZAP", "zaproxy"),
+    ("Reverse Engineering", "Ghidra", "ghidra"),
+    ("Assessment", "Metasploit workbench", "msfconsole"),
+    ("Detection", "Suricata workbench", "suricata"),
+    ("Detection", "YARA workbench", "yara"),
+    ("Hardening", "Lynis workbench", "lynis"),
+    ("Malware Checks", "ClamTK", "clamtk"),
+)
+
 class WallpaperSurface(QWidget):
     """Paint the workspace artwork on the content surface itself.
 
@@ -206,9 +225,9 @@ class KaliBayWindow(QMainWindow):
         self.load_wallpaper()
         self.refresh_status()
         if "--purple" in sys.argv[1:]:
-            self.security_tabs.setCurrentIndex(1)
+            self.security_tabs.setCurrentIndex(2)
         elif "--offensive" in sys.argv[1:]:
-            self.security_tabs.setCurrentIndex(0)
+            self.security_tabs.setCurrentIndex(1)
 
     def build_ui(self):
         self.setStyleSheet(
@@ -418,6 +437,10 @@ class KaliBayWindow(QMainWindow):
             }
         """)
         self.security_tabs.addTab(
+            self.build_desktop_page(),
+            "DESKTOP HUB",
+        )
+        self.security_tabs.addTab(
             self.build_category_page(
                 OFFENSIVE_CATEGORIES,
                 "Assessment and penetration-testing tools for authorized labs.",
@@ -471,6 +494,161 @@ class KaliBayWindow(QMainWindow):
 
         outer.addWidget(
             footer
+        )
+
+    def build_desktop_page(self):
+        """Kali-style application launcher in the native Spider OS workspace.
+
+        This is not a second Linux desktop, virtual machine, or new container.
+        Actions delegate to the existing checked Kali Bay manager.
+        """
+        page = QWidget()
+        page.setObjectName("kaliHybridDesktop")
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(20)
+
+        menu = QWidget()
+        menu.setObjectName("kaliApplicationsMenu")
+        menu.setMinimumWidth(310)
+        left = QVBoxLayout(menu)
+        title = QLabel("KALI APPLICATIONS")
+        title.setStyleSheet("color:#c4b5fd;font-size:18px;font-weight:bold;")
+        left.addWidget(title)
+        left.addWidget(QLabel("Search the tools already in Kali Bay."))
+        self.desktop_search = QLineEdit()
+        self.desktop_search.setObjectName("kaliDesktopSearch")
+        self.desktop_search.setPlaceholderText("Search tools or categories…")
+        self.desktop_search.textChanged.connect(self.filter_desktop_tools)
+        left.addWidget(self.desktop_search)
+        self.desktop_category = QComboBox()
+        self.desktop_category.setObjectName("kaliDesktopCategories")
+        self.desktop_category.addItems(
+            ["All categories"] + sorted({item[0] for item in DESKTOP_TOOL_MENU})
+        )
+        self.desktop_category.currentIndexChanged.connect(
+            self.filter_desktop_tools
+        )
+        left.addWidget(self.desktop_category)
+        self.desktop_list = QListWidget()
+        self.desktop_list.setObjectName("kaliDesktopToolList")
+        self.desktop_list.setStyleSheet(
+            "QListWidget {background:rgba(12,7,24,215);color:#f3e8ff;"
+            "border:1px solid #7645a6;border-radius:8px;}"
+            "QListWidget::item {padding:9px;}"
+            "QListWidget::item:selected {background:#5b21b6;}"
+        )
+        self.desktop_list.itemDoubleClicked.connect(
+            lambda item: self.open_tool(item.data(Qt.UserRole))
+        )
+        left.addWidget(self.desktop_list, 1)
+        launch = QPushButton("OPEN SELECTED TOOL")
+        launch.setObjectName("kaliDesktopLaunchTool")
+        launch.clicked.connect(self.open_selected_desktop_tool)
+        left.addWidget(launch)
+        layout.addWidget(menu, 2)
+
+        actions = QWidget()
+        actions.setObjectName("kaliDesktopQuickActions")
+        right = QVBoxLayout(actions)
+        right.setSpacing(12)
+        hero = QLabel("KALI × SPIDER")
+        hero.setStyleSheet("font-size:24px;font-weight:bold;color:#c084fc;")
+        right.addWidget(hero)
+        about = QLabel(
+            "Kali-style security environment, powered by the existing "
+            "Kali Distrobox container. The desktop, wallpaper and assistant "
+            "belong to Spider OS. This is not a separate Kali XFCE session."
+        )
+        about.setWordWrap(True)
+        right.addWidget(about)
+        for caption, operation in (
+            ("KALI TERMINAL", self.open_terminal),
+            ("KALI FILES", self.open_kali_files),
+            ("ASK WEBBIE · SECURITY ASSISTANT", self.open_webbie_security),
+            ("OFFENSIVE SECURITY", lambda: self.security_tabs.setCurrentIndex(1)),
+            ("PURPLE DEFENSE", lambda: self.security_tabs.setCurrentIndex(2)),
+        ):
+            button = QPushButton(caption)
+            button.setMinimumHeight(49)
+            button.clicked.connect(operation)
+            right.addWidget(button)
+        notice = QLabel(
+            "Opening a workbench does not launch a scan. Kali files are "
+            "the container's dedicated home folder; they are opened with "
+            "the Spider OS file manager. Only use tools on authorized systems."
+        )
+        notice.setWordWrap(True)
+        notice.setStyleSheet("color:#c4aedb;")
+        right.addWidget(notice)
+        right.addStretch(1)
+        layout.addWidget(actions, 3)
+        self.filter_desktop_tools()
+        return page
+
+    def filter_desktop_tools(self, *_args):
+        query = self.desktop_search.text().strip().casefold()
+        category = self.desktop_category.currentText()
+        self.desktop_list.clear()
+        for group, label, tool_id in DESKTOP_TOOL_MENU:
+            if category != "All categories" and group != category:
+                continue
+            if query and query not in (group + " " + label).casefold():
+                continue
+            item = QListWidgetItem(f"{group}  /  {label}")
+            item.setData(Qt.UserRole, tool_id)
+            self.desktop_list.addItem(item)
+        if self.desktop_list.count():
+            self.desktop_list.setCurrentRow(0)
+
+    def open_selected_desktop_tool(self):
+        item = self.desktop_list.currentItem()
+        if item is None:
+            QMessageBox.information(self, "Kali Bay", "Select a tool first.")
+            return
+        self.open_tool(item.data(Qt.UserRole))
+
+    def open_kali_files(self):
+        # This dedicated Distrobox home is already created by the Kali manager.
+        # Do not browse arbitrary host folders or create/change any files here.
+        path = Path.home() / ".local/share/spider-os/kali-bay/home"
+        if not path.is_dir():
+            QMessageBox.information(
+                self, "Kali Bay", "Kali Bay's home directory is not available yet."
+            )
+            return
+        command = "dolphin" if shutil_which("dolphin") else "xdg-open"
+        if not shutil_which(command):
+            QMessageBox.information(
+                self, "Kali Bay", "No graphical file manager is available."
+            )
+            return
+        try:
+            subprocess.Popen([command, str(path)], start_new_session=True)
+        except OSError as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
+
+    def open_webbie_security(self):
+        # The Web owns one persistent Webbie panel; never start a duplicate
+        # resident voice agent or bypass the main shell's consent checks.
+        parent = self.parentWidget()
+        while parent is not None:
+            if hasattr(parent, "open_kali_assistant"):
+                parent.open_kali_assistant()
+                return
+            if hasattr(parent, "toggle_webbie_assistant"):
+                parent.update_webbie_context()
+                dock = getattr(parent, "webbie_dock", None)
+                if dock is not None and dock.isVisible():
+                    dock.raise_()
+                else:
+                    parent.toggle_webbie_assistant()
+                return
+            parent = parent.parentWidget()
+        QMessageBox.information(
+            self, "Webbie",
+            "Open Kali Bay inside The Web and use Ask Webbie. "
+            "The standalone Kali window does not start a second Webbie."
         )
 
     def build_category_page(self, categories, description):
