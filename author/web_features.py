@@ -15,10 +15,12 @@ if __package__:
     from .voice_reader import WebbieReader
     from .review_engine import ReviewEngine, ReviewCancelled
     from .review_history import ReviewHistory
+    from .narration_bookmarks import NarrationBookmarks, book_fingerprint
 else:
     from voice_reader import WebbieReader
     from review_engine import ReviewEngine, ReviewCancelled
     from review_history import ReviewHistory
+    from narration_bookmarks import NarrationBookmarks, book_fingerprint
 from PyQt5.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QTabWidget, QTextEdit,
@@ -62,6 +64,7 @@ class ReviewWorker(QThread):
 
 class AuthorToolkit(QWidget):
     jumpRequested = pyqtSignal(dict)
+    reviewSegmentRequested = pyqtSignal(dict)
     reviewRequested = pyqtSignal(str)
     editRequested = pyqtSignal()
 
@@ -75,6 +78,11 @@ class AuthorToolkit(QWidget):
         self.story_dirty = self.reference_dirty = False
         self.reader = WebbieReader(self)
         self.reader.changed.connect(self.read_status)
+        self.reader.positionChanged.connect(self.save_narration_position)
+        self.reader.bookCompleted.connect(self.clear_narration_bookmark)
+        self.bookmarks = NarrationBookmarks(self.store)
+        self.narration_source_hash = None
+        self.narration_book_id = None
         self.review_worker = None
         self.review_session = None
         self.history = ReviewHistory(self.store)
@@ -162,6 +170,11 @@ class AuthorToolkit(QWidget):
         self.review_chapters.setMaximumHeight(115)
         self.review_chapters.itemActivated.connect(self.jump_to_reviewed_chapter)
         t.addWidget(self.review_chapters)
+        t.addWidget(QLabel('Review source sections (double-click to highlight):'))
+        self.review_sections = QListWidget()
+        self.review_sections.setMaximumHeight(140)
+        self.review_sections.itemActivated.connect(self.jump_to_review_section)
+        t.addWidget(self.review_sections)
         self.export_review_button = QPushButton('Export displayed review as TXT')
         self.export_review_button.clicked.connect(self.export_review)
         t.addWidget(self.export_review_button)
@@ -178,6 +191,12 @@ class AuthorToolkit(QWidget):
         self.read_book_button = QPushButton('Webbie: Read entire book')
         self.read_book_button.clicked.connect(self.read_book)
         t.addWidget(self.read_book_button)
+        self.resume_book_button = QPushButton('Webbie: Resume bookmarked book')
+        self.resume_book_button.clicked.connect(self.resume_book)
+        t.addWidget(self.resume_book_button)
+        self.bookmark_status = QLabel('No audiobook bookmark.')
+        self.bookmark_status.setWordWrap(True)
+        t.addWidget(self.bookmark_status)
         self.pause_button = QPushButton('Pause narration after current section')
         self.pause_button.clicked.connect(self.reader.pause)
         t.addWidget(self.pause_button)
@@ -235,6 +254,7 @@ class AuthorToolkit(QWidget):
         self.refresh_references()
         self.refresh_stats()
         self.refresh_review_history()
+        self.refresh_bookmark_status()
 
     def refresh_stats(self):
         if self.book_id is not None:
@@ -367,9 +387,77 @@ class AuthorToolkit(QWidget):
         if self.save_editor is not None and not self.save_editor(): return
         try:
             chapters = [dict(c) for c in self.store.chapters(self.book_id)]
-            self.reader.start_book(chapters)
+            self.reader.start_book(chapters, book_id=self.book_id)
+            self.narration_book_id = self.book_id
+            self.narration_source_hash = book_fingerprint(chapters)
         except (OSError, RuntimeError, ValueError) as exc:
             QMessageBox.warning(self, 'Webbie voice', str(exc))
+
+    def resume_book(self):
+        if self.book_id is None or (self.save_editor is not None and
+                                    not self.save_editor()):
+            return
+        try:
+            chapters = [dict(c) for c in self.store.chapters(self.book_id)]
+            bookmark = self.bookmarks.get(self.book_id)
+            if bookmark is None:
+                self.bookmark_status.setText('No saved position for this book.')
+                return
+            if not self.bookmarks.is_current(bookmark, chapters):
+                self.bookmark_status.setText(
+                    'Bookmark outdated: chapters changed. Start from beginning '
+                    'to avoid reading the wrong passage.')
+                return
+            self.reader.start_book(
+                chapters, book_id=self.book_id,
+                resume=(bookmark['chapter_id'], bookmark['section_index']))
+            self.narration_book_id = self.book_id
+            self.narration_source_hash = book_fingerprint(chapters)
+        except (OSError, RuntimeError, ValueError) as exc:
+            QMessageBox.warning(self, 'Webbie voice', str(exc))
+
+    def save_narration_position(self, book_id, chapter_id, section_index):
+        # This callback runs in the Qt GUI thread, never the audio worker.
+        if (book_id != self.narration_book_id or
+                self.narration_source_hash is None):
+            return
+        try:
+            self.bookmarks.save(
+                book_id, self.narration_source_hash, chapter_id, section_index)
+            if self.book_id == book_id:
+                self.refresh_bookmark_status()
+        except (OSError, ValueError) as exc:
+            self.bookmark_status.setText('Bookmark save failed: ' + str(exc))
+
+    def clear_narration_bookmark(self, book_id):
+        # This signal only fires when the *whole* selected book finished.
+        try:
+            self.bookmarks.clear(book_id)
+            if self.book_id == book_id:
+                self.refresh_bookmark_status()
+        except OSError as exc:
+            self.bookmark_status.setText('Bookmark clear failed: ' + str(exc))
+
+    def refresh_bookmark_status(self):
+        if self.book_id is None:
+            self.bookmark_status.setText('Select a book for audiobook bookmarks.')
+            return
+        try:
+            mark = self.bookmarks.get(self.book_id)
+            if mark is None:
+                self.bookmark_status.setText('No saved audiobook position.')
+                return
+            chapters = self.store.chapters(self.book_id)
+            if not self.bookmarks.is_current(mark, chapters):
+                self.bookmark_status.setText(
+                    'Saved reading position is outdated after manuscript edits.')
+                return
+            chapter = next((c for c in chapters if c['id'] == mark['chapter_id']), None)
+            title = chapter['title'] if chapter else 'Unknown chapter'
+            self.bookmark_status.setText(
+                f"Resume available: {title}, spoken section {mark['section_index']}.")
+        except (OSError, ValueError) as exc:
+            self.bookmark_status.setText('Cannot load audiobook bookmark: ' + str(exc))
 
     def start_review(self, scope):
         if self.review_worker is not None and self.review_worker.isRunning():
@@ -394,7 +482,7 @@ class AuthorToolkit(QWidget):
         canon = self.store.canon(self.book_id)
         self.review_session = {
             'book_id': self.book_id, 'scope': scope, 'depth': depth,
-            'manifest': self.history.manifest(self.book_id, chapters, canon),
+            'manifest': self.history.manifest(self.book_id, chapters, canon, depth=depth),
         }
         self.review_worker = ReviewWorker(chapters, str(book['title']), scope, depth,
                                           canon, self)
@@ -464,11 +552,13 @@ class AuthorToolkit(QWidget):
         else:
             self.review_result.clear()
             self.review_chapters.clear()
+            self.review_sections.clear()
             self.review_freshness.setText('No saved review selected.')
 
     def open_saved_review(self, index):
         report_id = self.saved_reviews.itemData(index) if index >= 0 else None
         self.review_chapters.clear()
+        self.review_sections.clear()
         if report_id is None or self.book_id is None:
             self.review_result.clear()
             self.review_freshness.setText('Select a saved report to inspect it.')
@@ -489,6 +579,11 @@ class AuthorToolkit(QWidget):
                     'item_id': chapter['id'],
                 })
                 self.review_chapters.addItem(item)
+            for segment in self.history.sections_for_report(row):
+                item = QListWidgetItem(
+                    f"{segment['chapter_title']} | segment {segment['number']}")
+                item.setData(Qt.UserRole, segment)
+                self.review_sections.addItem(item)
         except (ValueError, OSError, KeyError) as error:
             self.review_freshness.setText('Cannot open saved review: ' + str(error))
 
@@ -496,6 +591,22 @@ class AuthorToolkit(QWidget):
         target = item.data(Qt.UserRole)
         if target is not None:
             self.jumpRequested.emit(target)
+
+    def jump_to_review_section(self, item):
+        section = item.data(Qt.UserRole)
+        if section is None:
+            return
+        self.reviewSegmentRequested.emit(section)
+        # Place the corresponding editorial observation in view too.
+        report = self.review_result
+        marker = (
+            f"### {section['chapter_title']} "
+            f"(chapter #{section['item_id']}) | segment {section['number']}")
+        report.moveCursor(report.textCursor().Start)
+        if not report.find(marker):
+            self.review_freshness.setText(
+                self.review_freshness.text() +
+                ' The older report has no matching segment heading.')
 
     def export_review(self):
         report = self.review_result.toPlainText()
