@@ -33,7 +33,7 @@ class VisionLatencyBudgetTests(unittest.TestCase):
     def test_qwen_selected_for_camera_without_model_download(self):
         source = (ROOT / "the-web/shell/webbie_camera.py").read_text(encoding="utf-8")
         self.assertIn("DEFAULT_VISION_MODEL = 'qwen3-vl:2b-instruct'", source)
-        self.assertIn("'input_format', 'mjpeg'", source)
+        self.assertIn("'-input_format', 'mjpeg'", source)
         self.assertIn("'640x480'", source)
 
 
