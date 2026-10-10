@@ -59,6 +59,15 @@ class MemoryReconciliationTests(unittest.TestCase):
         brain.remember_turn('Recovery', 'Works')
         self.assertEqual(len(brain.load_conversation()), 2)
 
+    def test_preexisting_permissive_history_is_replaced_privately(self):
+        # This uses a disposable file and never reads the owner's history.
+        brain.CONVERSATION_FILE.parent.mkdir(parents=True, exist_ok=True)
+        brain.CONVERSATION_FILE.write_text('[]', encoding='utf-8')
+        brain.CONVERSATION_FILE.chmod(0o666)
+        brain.remember_turn('Example', 'Private reply')
+        self.assertEqual(brain.CONVERSATION_FILE.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(len(brain.load_conversation()), 2)
+
     def test_unavailable_memory_does_not_claim_saved(self):
         with patch.object(brain, 'LONG_TERM_MEMORY_DB', Path(self.temp.name) / 'missing/db'):
             self.assertIn("couldn't access", brain.respond('remember that Indigo is a project'))
