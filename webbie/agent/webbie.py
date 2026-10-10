@@ -35,7 +35,9 @@ sys.path.insert(
 
 
 from brain import respond
-from tts import speak
+from interruptible_speech import InterruptibleSpeech
+from interrupt_intent import is_direct_stop
+from stop_signal import request_stop
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
 from vision_query import visual_question, ask_vision
@@ -87,6 +89,8 @@ STATE_FILE = (
 
 running = True
 speech_lock = threading.Lock()
+voice_turn_lock = threading.Lock()
+speech_playback = InterruptibleSpeech()
 awaiting_command_until = 0.0
 
 
@@ -242,7 +246,7 @@ def say(text):
                 encoding="utf-8",
             )
 
-            speak(text)
+            speech_playback.speak(text)
 
         finally:
             try:
@@ -505,6 +509,15 @@ def handle_command(command, voice=False):
     if not command:
         return ""
 
+    # Stop is a direct, strictly matched intervention, not a generated answer.
+    if is_direct_stop(command):
+        speech_playback.stop()
+        try:
+            request_stop()
+        except (OSError, PermissionError):
+            pass
+        return "Stopped."
+
     write_state(
         last_heard=command,
         last_input="voice" if voice else "text",
@@ -614,6 +627,30 @@ def voice_listener():
         voice_error=None,
     )
 
+    def start_voice_turn(command):
+        # Keep the microphone listener unblocked while speech and inference
+        # run on the reply thread. An overlap is ignored, not queued.
+        if not voice_turn_lock.acquire(blocking=False):
+            return
+        def worker():
+            try:
+                handle_command(command, voice=True)
+            finally:
+                voice_turn_lock.release()
+        threading.Thread(target=worker, name='webbie-voice-turn', daemon=True).start()
+
+    def on_interrupt(phrase):
+        global awaiting_command_until
+        if not is_direct_stop(phrase):
+            return
+        awaiting_command_until = 0
+        speech_playback.stop()
+        try:
+            request_stop()
+        except (OSError, PermissionError):
+            pass
+        write_state(last_reply='Voice interruption requested')
+
     def on_text(phrase):
         global awaiting_command_until
 
@@ -648,10 +685,7 @@ def voice_listener():
         ):
             awaiting_command_until = 0
 
-            handle_command(
-                phrase,
-                voice=True,
-            )
+            start_voice_turn(phrase)
 
             return
 
@@ -665,10 +699,7 @@ def voice_listener():
             return
 
         if command:
-            handle_command(
-                command,
-                voice=True,
-            )
+            start_voice_turn(command)
 
             return
 
@@ -685,6 +716,7 @@ def voice_listener():
         listen_forever(
             on_text=on_text,
             should_continue=lambda: running,
+            on_interrupt=on_interrupt,
         )
 
     except Exception as error:
