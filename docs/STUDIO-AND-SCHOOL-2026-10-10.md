@@ -76,3 +76,13 @@ The owner can paste instructor directions and rubrics, opt in to attaching the c
 Drafts remain editable in Study. An explicit APA export launches the existing student-paper form, requiring the real title-page metadata and user-supplied references. Source material is never fabricated; unsourced factual assertions should be reviewed. The user is responsible for following the course's AI-use policy and checking sources and work before submission.
 
 Source tests cover prompt building, approved writing voice, private sample lifecycle, disabled notes by default, no automatic model call without directions and editable draft UI. **Installation remains pending**. The installer currently preserves Webbie's installed custom voice agent, so the combined release must reconcile voice modifications before this new spoken command reaches the PC. Native model availability, performance, APA export and actual school assignment quality require installed-PC acceptance.
+
+## Explicit OneDrive course documents in Webbie Homework (source staged)
+
+The Homework Assistant now lets the owner select one school OneDrive file using a nonrecursive folder browser. Only that selected file is transferred into a private temporary folder, read as text, and deleted. The text is visible and editable before a Webbie drafting request. The university account remains separate from the Webbie personal OneDrive account. There is no automatic school-drive scanning or Brightspace scraping.
+
+Supported documents: TXT, Markdown, DOCX and text-based PDF using poppler-utils (pdftotext). Image-only PDFs require a separate OCR workflow. Imports are bounded to 8 MB per file and 12,000 extracted characters; assignment/source text limits are shown rather than silently replacing existing text.
+
+The owner assigns the chosen document to an instructor prompt or rubric, a source/reading, or their own prior writing used as an opt-in style sample. A writing sample is not saved persistently until the owner explicitly chooses Save my style. Imported source origins remain visible but do not establish verified bibliographic citations. Course documents are reference data, not trusted system commands.
+
+Local document import works without school OneDrive access. Selecting a cloud document alone does not call the model, write to the cloud, or submit anything to school. Live university sign-in, download behavior, local PDF support and end-to-end model quality still require installed-PC checks. Added offline regression tests cover path safety, extraction, opt-in, document visibility, and failure conditions.
