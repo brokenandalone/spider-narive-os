@@ -253,6 +253,34 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertTrue(panel.finish_song_button.isEnabled())
             panel.close()
 
+    def test_converted_and_final_mix_preview_revalidate_local_wav(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            converted, mixed = root / 'converted.wav', root / 'final.wav'
+            for file in (converted, mixed):
+                with wave.open(str(file), 'wb') as track:
+                    track.setnchannels(1); track.setsampwidth(2); track.setframerate(8000)
+                    track.writeframes(b'\\0\\0' * 120)
+            panel = StudioAIPanel(folder)
+            self.assertFalse(panel.play_converted_button.isEnabled())
+            self.assertFalse(panel.play_final_mix_button.isEnabled())
+            panel.conversion_done(str(converted), 'Converted')
+            panel.mix_done(str(mixed), 'Mixed')
+            self.assertTrue(panel.play_converted_button.isEnabled())
+            self.assertTrue(panel.play_final_mix_button.isEnabled())
+            with patch('studio.ai_panel.QDesktopServices.openUrl', return_value=True) as opener:
+                panel.play_converted_voice()
+                panel.play_final_mix()
+                self.assertEqual([c.args[0].toLocalFile() for c in opener.call_args_list],
+                                 [str(converted), str(mixed)])
+            mixed.unlink()
+            with patch('studio.ai_panel.QDesktopServices.openUrl') as opener:
+                panel.play_final_mix()
+                opener.assert_not_called()
+                self.assertIn('missing or was moved', panel.status.text())
+            panel.close()
+
     def test_owner_model_save_requires_confirmation_and_never_deserializes(self):
         from PyQt5.QtWidgets import QMessageBox
         with tempfile.TemporaryDirectory() as folder:
