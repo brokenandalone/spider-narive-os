@@ -53,6 +53,7 @@ COMPONENTS = {
     "Kali Bay": (
         "kali-bay/ui/kali_bay.py", "kali-bay/bin/kali-bay",
         "kali-bay/runtime/kali_apps.py",
+        "kali-bay/package/install-kali-bay.sh",
     ),
     "Nova and BCN Radio": (
         "media/ai-dj/service.py", "media/ai-dj/nova_host.py",
