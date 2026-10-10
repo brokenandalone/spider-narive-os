@@ -121,12 +121,12 @@ class ReviewEngine:
         for chapter in chapters:
             content = str(chapter.get("content", ""))
             for number, part in enumerate(split_exact(content, segment_size), 1):
-                tasks.append((str(chapter["title"]), number, part))
+                tasks.append((int(chapter.get("id", 0)), str(chapter["title"]), number, part))
         if not tasks:
             raise ValueError("The selected chapter or book has no text.")
         observations, briefing = [], []
         canon_context = str(canon)[:1500]
-        for index, (chapter_title, part_number, content) in enumerate(tasks, 1):
+        for index, (chapter_id, chapter_title, part_number, content) in enumerate(tasks, 1):
             if cancelled is not None and cancelled.is_set():
                 raise ReviewCancelled()
             if progress:
@@ -149,7 +149,7 @@ class ReviewEngine:
                 + content + "\n[MANUSCRIPT ENDS]"
             )
             notes = self._answer(prompt, reply_tokens).strip()
-            label = f"{chapter_title} | segment {part_number}"
+            label = f"{chapter_title} (chapter #{chapter_id}) | segment {part_number}"
             observations.append(f"### {label}\n{notes}")
             briefing.append(f"{label}: {notes[:700]}")
         if cancelled is not None and cancelled.is_set():
