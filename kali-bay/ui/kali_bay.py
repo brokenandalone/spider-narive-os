@@ -899,6 +899,10 @@ class KaliBayWindow(QMainWindow):
         self.webbie_chat_log.appendPlainText("System: " + message)
 
     def webbie_chat_finished(self):
+        finished = self.webbie_worker
+        self.webbie_worker = None
+        if finished is not None:
+            finished.deleteLater()
         self.webbie_chat_entry.setEnabled(True)
         self.webbie_send_button.setEnabled(True)
         self.webbie_chat_entry.setFocus()
