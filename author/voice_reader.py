@@ -13,6 +13,8 @@ from pathlib import Path
 from PyQt5.QtCore import QThread, pyqtSignal
 
 WEBBIE_VOICE = Path(__file__).resolve().parents[1] / "webbie/voice/tts.py"
+RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "spider-os"
+NARRATING_MARKER = RUNTIME_DIR / "webbie-narrating"
 VOICE_BOOTSTRAP = (
     "import sys; sys.path.insert(0, sys.argv[1]); "
     "from tts import speak; speak(sys.stdin.read())"
@@ -97,6 +99,11 @@ class WebbieReader(QThread):
 
     def run(self):
         try:
+            RUNTIME_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+            # The speech listener checks this separate marker to avoid TTS echo.
+            # The resident agent owns webbie-speaking; do not overwrite it.
+            NARRATING_MARKER.write_text(str(os.getpid()), encoding="ascii")
+            os.chmod(NARRATING_MARKER, 0o600)
             total = len(self.queue)
             for index, (chapter, content) in enumerate(self.queue, 1):
                 while not self._go.wait(0.1):
@@ -136,5 +143,10 @@ class WebbieReader(QThread):
         except (OSError, RuntimeError) as error:
             self.changed.emit("Webbie voice error: " + str(error))
         finally:
+            try:
+                if NARRATING_MARKER.read_text(encoding="ascii").strip() == str(os.getpid()):
+                    NARRATING_MARKER.unlink()
+            except OSError:
+                pass
             with self._lock:
                 self._process = None
