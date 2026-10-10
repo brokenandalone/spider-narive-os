@@ -89,6 +89,47 @@ class NativeWorkspaceTests(unittest.TestCase):
                 launch.assert_called_once_with(['/usr/bin/audacity', str(take)])
             panel.close()
 
+    def test_voice_mixing_ui_uses_two_distinct_wavs_and_converted_output(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            backing, singer = root / 'backing.wav', root / 'voice.wav'
+            for path in (backing, singer):
+                with wave.open(str(path), 'wb') as wavfile:
+                    wavfile.setnchannels(1); wavfile.setsampwidth(2); wavfile.setframerate(8000)
+                    wavfile.writeframes(b'\\0\\0' * 100)
+            panel = StudioAIPanel(folder)
+            panel.mix_backing.setText(str(backing))
+            panel.mix_vocal.setText(str(singer))
+            panel.mix_voice_gain.setValue(.75)
+            with patch('studio.ai_panel.VoiceMixWorker') as worker:
+                panel.start_mix()
+                worker.assert_called_once_with(str(backing), str(singer), .75, 1.0)
+            panel.mix_done(str(root / 'final.wav'), 'Saved')
+            self.assertIn('final.wav', panel.status.text())
+            panel.conversion_done(str(singer), 'converted')
+            self.assertEqual(panel.mix_vocal.text(), str(singer))
+            panel.close()
+
+    def test_voice_mix_rejects_missing_and_duplicate_source(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            with patch('studio.ai_panel.VoiceMixWorker') as worker:
+                panel.start_mix()
+                worker.assert_not_called()
+            song = Path(folder) / 'voice.wav'
+            with wave.open(str(song), 'wb') as wavfile:
+                wavfile.setnchannels(1); wavfile.setsampwidth(2); wavfile.setframerate(8000)
+                wavfile.writeframes(b'\\0\\0' * 100)
+            panel.mix_backing.setText(str(song))
+            panel.mix_vocal.setText(str(song))
+            with patch('studio.ai_panel.VoiceMixWorker') as worker:
+                panel.start_mix()
+                worker.assert_not_called()
+            self.assertIn('different', panel.status.text())
+            panel.close()
+
     def test_portal_opens_once_and_browser_fallback_uses_stable_entry(self):
         with tempfile.TemporaryDirectory() as folder:
             panel = SchoolPortal(lambda: Path(folder))
