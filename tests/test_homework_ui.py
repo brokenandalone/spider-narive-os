@@ -113,9 +113,11 @@ class HomeworkUiTests(unittest.TestCase):
             dialog.last_exported_path = Path(folder) / "paper.docx"
             dialog.draft.setPlainText("Draft changed after export.")
             self.assertIsNone(dialog.last_exported_path)
-            with patch("study.school_upload.SchoolDraftUploadDialog") as uploader:
+            with patch("study.school_upload.SchoolDraftUploadDialog") as uploader, \
+                 patch("study.homework_ui.QMessageBox.warning") as warning:
                 dialog.upload_apa_to_school()
                 uploader.assert_not_called()
+                warning.assert_called_once()
                 dialog.last_exported_path = Path(folder) / "paper.docx"
                 dialog.upload_apa_to_school()
                 uploader.assert_called_once()
