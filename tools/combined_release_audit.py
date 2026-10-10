@@ -24,6 +24,7 @@ COMPONENTS = {
         "the-web/shell/webbie_vision_bridge.py",
         "the-web/shell/webbie_computer_panel.py",
         "the-web/shell/main.py", "webbie/actions/autopilot_policy.py",
+        "the-web/package/reconcile-native.py",
     ),
     "Study and school OneDrive": (
         "study/study.py", "study/school_portal.py", "study/homework_ui.py",
@@ -37,13 +38,17 @@ COMPONENTS = {
         "studio/arrangement.py", "studio/voice_dataset.py",
         "studio/owner_voice_model.py", "studio/voice_conversion.py",
         "studio/song_mix.py", "studio/stem_separation.py",
+        "studio/ai_controls.py", "studio/rvc_loopback.py",
+        "studio/voice_profile.py", "studio/package/music-engine.sh",
+        "studio/package/voice-engine.sh",
     ),
     "Author library and continuity": (
         "author/main.py", "author/web_features.py",
         "author/review_engine.py", "author/review_history.py",
         "author/voice_reader.py", "author/commands.py",
         "author/commands_client.py", "author/continuity_engine.py",
-        "author/control_socket.py",
+        "author/control_socket.py", "author/review_cache.py",
+        "author/narration_bookmarks.py",
     ),
     "Kali Bay": (
         "kali-bay/ui/kali_bay.py", "kali-bay/bin/kali-bay",
@@ -51,6 +56,7 @@ COMPONENTS = {
     ),
     "Nova and BCN Radio": (
         "media/ai-dj/service.py", "media/ai-dj/nova_host.py",
+        "media/ai-dj/spider-ai-dj.service",
     ),
     "Forage": ("forage/engine.py",),
 }
