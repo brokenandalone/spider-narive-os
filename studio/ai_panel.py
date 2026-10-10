@@ -191,6 +191,7 @@ class StudioAIPanel(QWidget):
         self.engine_worker = None
         self.trainer = None
         self.training_script = Path(__file__).resolve().parent / 'package' / 'voice-engine.sh'
+        self.last_training_set = None
         self.mix_worker = None
         self.separation_worker = None
         self.finish_after_conversion = False
@@ -317,6 +318,16 @@ class StudioAIPanel(QWidget):
         training_actions.addWidget(self.training_stop_button)
         layout.addLayout(training_actions)
         layout.addWidget(self.dataset_button)
+        training_set_actions = QHBoxLayout()
+        self.open_dataset_button = QPushButton('Open prepared training set')
+        self.open_dataset_button.setEnabled(False)
+        self.open_dataset_button.clicked.connect(self.open_dataset)
+        training_set_actions.addWidget(self.open_dataset_button)
+        self.copy_dataset_button = QPushButton('Copy RVC training audio folder')
+        self.copy_dataset_button.setEnabled(False)
+        self.copy_dataset_button.clicked.connect(self.copy_dataset_path)
+        training_set_actions.addWidget(self.copy_dataset_button)
+        layout.addLayout(training_set_actions)
         layout.addWidget(self.voice_status)
         QApplication.instance().aboutToQuit.connect(self.cancel_capture)
         self.update_voice_status()
@@ -718,9 +729,30 @@ class StudioAIPanel(QWidget):
         self.voice_status.setText('Checking recording lengths and preparing private training data…')
 
     def dataset_result(self, success, message):
-        self.voice_status.setText(
-            'RVC training set prepared at ' + message + '. No voice model has been trained yet.'
-            if success else 'Training set not prepared: ' + message)
+        prepared = Path(message) if success else None
+        valid = bool(prepared and not prepared.is_symlink()
+                     and prepared.is_dir()
+                     and (prepared / 'manifest.json').is_file()
+                     and (prepared / 'audio').is_dir())
+        if valid:
+            self.last_training_set = prepared.resolve()
+            self.voice_status.setText('Private RVC training set: ' + str(prepared)
+                                      + '. No voice model has been trained yet.')
+        else:
+            self.voice_status.setText('Training set not available: ' + str(message))
+        self.open_dataset_button.setEnabled(valid)
+        self.copy_dataset_button.setEnabled(valid)
+
+    def open_dataset(self):
+        if self.last_training_set and self.last_training_set.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_training_set)))
+
+    def copy_dataset_path(self):
+        audio = self.last_training_set / 'audio' if self.last_training_set else None
+        if audio and audio.is_dir() and not audio.is_symlink():
+            QApplication.clipboard().setText(str(audio))
+            self.voice_status.setText('RVC training audio folder copied. Paste it into the local training interface. '
+                                      'No model training has started.')
 
     def dataset_finished(self):
         worker, self.dataset_worker = self.dataset_worker, None
