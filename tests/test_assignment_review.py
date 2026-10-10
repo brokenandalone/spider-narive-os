@@ -8,7 +8,7 @@ from study.assignment_review import (
 
 class AssignmentReviewTests(unittest.TestCase):
     def test_word_counts_and_explicit_limits(self):
-        self.assertEqual(count_words("I can't ignore 200 sources."), 6)
+        self.assertEqual(count_words("I can't ignore 200 sources."), 5)
         self.assertEqual(word_target("Write 250-350 words."), (250, 350))
         self.assertEqual(word_target("Between 300 and 500 words, please."), (300, 500))
         self.assertEqual(word_target("At least 200 words."), (200, None))
@@ -21,7 +21,7 @@ class AssignmentReviewTests(unittest.TestCase):
                                  "I noticed something important. [SOURCE NEEDED]")
         self.assertIn("below the stated minimum of 250", result)
         self.assertIn("1 unresolved source/citation", result)
-        self.assertIn("does not verify citations", result)
+        self.assertIn("Verify every factual claim", result)
         self.assertIn("cannot grade", result)
 
     def test_checks_include_available_course_materials_without_false_verification(self):
