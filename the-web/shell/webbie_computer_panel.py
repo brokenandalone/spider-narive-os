@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'webbie/actions'))
 from desktop_control import DesktopOperator, app_catalog, KEYS
 from task_grants import TaskGrant
+sys.path.insert(0, str(ROOT / 'webbie/agent'))
+from stop_signal import consume_stop
 from screen_capture import capture_window, describe_window
 
 
@@ -173,6 +175,8 @@ class WebbieComputerDialog(QDialog):
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if choice != QMessageBox.Yes:
             return
+        # Clear a stale stop-only signal before accepting this NEW on-screen grant.
+        consume_stop()
         self.grant.activate(task, app.desktop_id, seconds=300)
         self.operator.begin_new_task()
         self.status(f'Authorized: {app.name}. No changes made yet.')
@@ -191,6 +195,11 @@ class WebbieComputerDialog(QDialog):
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
 
     def refresh_status(self):
+        # A deliberate voice/GUI "Webby stop" revokes desktop task grants.
+        # Consume only a stop-only marker, never instructions or approvals.
+        if consume_stop():
+            self.stop()
+            return
         data = self.grant.status()
         active = data['active']
         self.state.setText(
