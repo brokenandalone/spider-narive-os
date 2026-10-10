@@ -212,7 +212,7 @@ open_terminal() {
     require_host_tools
 
     container_exists \
-        || create_container
+        || die "Kali Bay is not configured. Use the explicit setup controls first."
 
     if command -v konsole >/dev/null 2>&1; then
         exec konsole \
@@ -225,6 +225,41 @@ open_terminal() {
         --name "${NAME}"
 }
 
+
+# Opening the package workbench never installs, upgrades or removes software.
+# The owner gets a genuine interactive Kali shell and manually chooses apt
+# operations INSIDE the Kali container, without modifying Ubuntu repositories.
+open_packages() {
+    require_host_tools
+    container_exists || die "Kali Bay container missing. Configure Kali first."
+    if command -v konsole >/dev/null 2>&1; then
+        exec konsole --hold -e distrobox enter --name "${NAME}" -- bash -lc '
+            printf "\\nKALI BAY / KALI PACKAGE MANAGER\\n"
+            printf "This is Kali Linux apt, NOT Ubuntu apt.\\n"
+            printf "Use apt search, apt show, sudo apt install, etc. as needed.\\n"
+            printf "Nothing has been installed or upgraded automatically.\\n\\n"
+            exec bash -l'
+    fi
+    exec distrobox enter --name "${NAME}" -- bash -l
+}
+
+# The inventory only reads the package database. No external searches, package
+# changes, container starts or privileged host operations.
+inventory() {
+    require_host_tools
+    container_exists || die "No Kali Bay container is configured."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Kali container state cannot be inspected."
+    [[ "${running}" == "true" ]] \
+        || die "Kali container is stopped. Open the Kali terminal deliberately."
+    podman exec --user 0 --tty=false "${NAME}" sh -c '
+        echo "Installed Kali package inventory (read only)"
+        dpkg-query -W -f="\${binary:Package}\n" 2>/dev/null |
+          awk "BEGIN {n=0} {n++; if (\$0 ~ /^kali-(tools|linux|desktop)/ && shown < 90) {print; shown++}}
+               END {printf \"Total installed packages: %d\\n\", n}"
+    '
+}
 
 category_shell() {
     local meta="${1:-kali-linux-everything}"
@@ -393,6 +428,12 @@ case "${1:-ui}" in
     terminal|shell|enter)
         open_terminal
         ;;
+    packages)
+        open_packages
+        ;;
+    inventory)
+        inventory
+        ;;
 
     update|upgrade)
         update_kali
@@ -421,6 +462,8 @@ Usage:
   kali-bay
   kali-bay setup
   kali-bay terminal
+  kali-bay packages  # interactive Kali apt shell
+  kali-bay inventory # read-only Kali package inventory
   kali-bay update
   kali-bay status
   kali-bay doctor
