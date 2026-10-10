@@ -25,6 +25,11 @@ if not (ROOT / 'branding/webbie/webbie-face-v1.png').is_file():
 CONFIG = Path.home() / '.config/spider-os/webbie-face.json'
 SIZE = 196
 BOTTOM_MARGIN = 72
+CAPTION_WIDTH = 250
+CAPTION_HEIGHT = 62
+# Shared state is local to the user's private runtime folder.
+sys.path.insert(0, str(ROOT / 'webbie/agent'))
+from heard_caption import latest_heard, pulse_overlay
 SPEECH_FRAMES = (0, .3, .75, .95, .3, 0, .6, .15)
 
 
@@ -129,6 +134,49 @@ def click_through_x11(window):
         if display: xlib.XCloseDisplay(display)
 
 
+class WebbieCaption(QWidget):
+    """Brief translucent speech caption, anchored under the floating portrait."""
+
+    def __init__(self):
+        flags = (Qt.Tool | Qt.FramelessWindowHint |
+                 Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus |
+                 Qt.WindowTransparentForInput)
+        super().__init__(None, flags)
+        self.setObjectName('webbieHeardCaption')
+        self.setWindowTitle('Webbie · Heard you')
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setFixedSize(CAPTION_WIDTH, CAPTION_HEIGHT)
+        self.message = ''
+        self.hide()
+
+    def set_message(self, message):
+        if message != self.message:
+            self.message = message
+            self.update()
+
+    def paintEvent(self, event):
+        if not self.message:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        pane = QRectF(1, 1, CAPTION_WIDTH - 2, CAPTION_HEIGHT - 2)
+        painter.setPen(QPen(QColor(166, 113, 237, 210), 1.5))
+        painter.setBrush(QColor(27, 17, 51, 232))
+        painter.drawRoundedRect(pane, 12, 12)
+        painter.setPen(QColor(195, 159, 252, 255))
+        painter.setFont(QFont('Sans Serif', 8, QFont.Bold))
+        painter.drawText(QRectF(11, 5, CAPTION_WIDTH - 22, 16),
+                         Qt.AlignVCenter | Qt.AlignLeft, 'WEBBIE HEARD')
+        painter.setPen(QColor(249, 244, 255, 255))
+        painter.setFont(QFont('Sans Serif', 10))
+        display = self.message
+        if len(display) > 105:
+            display = display[:102].rsplit(' ', 1)[0] + '…'
+        painter.drawText(QRectF(11, 21, CAPTION_WIDTH - 22, 37),
+                         Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignVCenter, display)
+
+
 class WebbieOverlay(QWidget):
     def __init__(self, root=ROOT, sleep_path=CONFIG, full_screen_check=fullscreen_active):
         flags = Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
@@ -147,6 +195,7 @@ class WebbieOverlay(QWidget):
         self.phase = 0
         self.sleeping = False
         self.allowed = False
+        self.caption = WebbieCaption()
         self.move_corner()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
@@ -154,6 +203,9 @@ class WebbieOverlay(QWidget):
         self.mouth_timer = QTimer(self)
         self.mouth_timer.timeout.connect(self.tick_mouth)
         self.mouth_timer.start(135)
+        self.caption_timer = QTimer(self)
+        self.caption_timer.timeout.connect(self.update_caption)
+        self.caption_timer.start(250)
 
     def tick_mouth(self):
         if self.allowed:
@@ -165,6 +217,33 @@ class WebbieOverlay(QWidget):
         if not screen: return
         box = screen.availableGeometry()
         self.move(box.right() - SIZE - 11, box.bottom() - SIZE - BOTTOM_MARGIN + 1)
+        self.place_caption()
+
+    def place_caption(self):
+        screen = QApplication.primaryScreen()
+        if not screen:
+            return
+        box = screen.availableGeometry()
+        left = max(box.left() + 5, min(
+            self.x() + (SIZE - CAPTION_WIDTH) // 2,
+            box.right() - CAPTION_WIDTH - 5))
+        below = min(self.y() + SIZE + 4, box.bottom() - CAPTION_HEIGHT - 2)
+        self.caption.move(left, below)
+
+    def update_caption(self):
+        if not self.allowed or self.sleeping:
+            self.caption.hide()
+            return
+        message = latest_heard()
+        if not message:
+            self.caption.hide()
+            return
+        self.caption.set_message(message)
+        self.place_caption()
+        if not self.caption.isVisible():
+            self.caption.show()
+            if not click_through_x11(self.caption):
+                self.caption.hide()
 
     def refresh(self):
         self.move_corner()
@@ -174,16 +253,24 @@ class WebbieOverlay(QWidget):
         visible = self.full_screen_check() is False
         if not visible:
             self.allowed = False
+            self.caption.hide()
             self.hide()
             return
         if not self.allowed:
             self.show()
             # Fail closed: never leave a window capturing clicks over desktop.
             if not click_through_x11(self):
+                self.caption.hide()
                 self.hide()
                 self.allowed = False
                 return
             self.allowed = True
+        # Notify the agent that the custom speech bubble can receive captions.
+        try:
+            pulse_overlay()
+        except OSError:
+            pass
+        self.update_caption()
         self.update()
 
     def paintEvent(self, event):
