@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from screen_capture import capture_window, describe_window
 from visual_step import propose_step
+from autopilot_policy import AutopilotPolicy
 from webbie_operator_bridge import OperatorBridge
 
 
@@ -97,6 +98,8 @@ class WebbieComputerDialog(QDialog):
             runner=run, launcher=launcher)
         self.screen_worker = None
         self.step_worker = None
+        self.autopilot = AutopilotPolicy()
+        self.autopilot_revision = 0
         self.pending_step = None
         self.pending_step_target = None
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
@@ -112,6 +115,7 @@ class WebbieComputerDialog(QDialog):
         form = QFormLayout(); layout.addLayout(form)
         self.app_select = QComboBox()
         self.app_select.setObjectName('webbieInstalledProgram')
+        self.app_select.currentIndexChanged.connect(lambda _=None: self.pause_autopilot())
         for app in self.apps:
             self.app_select.addItem(f'{app.name}  [{app.workspace}]', app.desktop_id)
         form.addRow('Installed program', self.app_select)
@@ -139,6 +143,7 @@ class WebbieComputerDialog(QDialog):
         self.refresh_button.clicked.connect(self.refresh_windows); app_row.addWidget(self.refresh_button)
 
         self.windows = QComboBox(); self.windows.setObjectName('webbieWindowSelector')
+        self.windows.currentIndexChanged.connect(lambda _=None: self.pause_autopilot())
         layout.addWidget(self.windows)
         self.bind_button = QPushButton('Authorize selected window')
         self.bind_button.clicked.connect(self.bind_window)
@@ -175,6 +180,15 @@ class WebbieComputerDialog(QDialog):
         self.apply_step_button = QPushButton('Apply reviewed step')
         self.apply_step_button.clicked.connect(self.apply_step)
         planning.addWidget(self.apply_step_button)
+        autopilot_row = QHBoxLayout(); layout.addLayout(autopilot_row)
+        self.autopilot_start = QPushButton('Start supervised Autopilot')
+        self.autopilot_start.setObjectName('webbieAutopilotStart')
+        self.autopilot_start.clicked.connect(self.begin_autopilot)
+        autopilot_row.addWidget(self.autopilot_start)
+        self.autopilot_pause = QPushButton('Pause Autopilot')
+        self.autopilot_pause.setObjectName('webbieAutopilotPause')
+        self.autopilot_pause.clicked.connect(self.pause_autopilot)
+        autopilot_row.addWidget(self.autopilot_pause)
         self.report = QTextEdit(); self.report.setReadOnly(True)
         self.report.setMaximumHeight(150); layout.addWidget(self.report)
         self.report.setPlainText('No program or screen is being controlled.')
@@ -215,6 +229,7 @@ class WebbieComputerDialog(QDialog):
             return
         # Clear a stale stop-only signal before accepting this NEW on-screen grant.
         consume_stop()
+        self.pause_autopilot()
         self.pending_step = None
         self.grant.activate(task, app.desktop_id, seconds=300)
         self.operator.begin_new_task()
@@ -229,6 +244,7 @@ class WebbieComputerDialog(QDialog):
         self.refresh_status()
 
     def stop(self):
+        self.autopilot.stop()
         self.operator.stop()
         self.pending_step = None
         self.pending_step_target = None
@@ -251,10 +267,14 @@ class WebbieComputerDialog(QDialog):
             return
         data = self.grant.status()
         active = data['active']
+        if not active and self.autopilot.active:
+            self.autopilot.stop()
         self.state.setText(
             (f"AUTHORIZED | {data['remaining_seconds']} sec left | "
              f"{data['remaining_actions']} actions | {data['task']}")
             if active else 'OFF | Webbie cannot operate applications')
+        self.autopilot_start.setEnabled(active and not self.autopilot.active)
+        self.autopilot_pause.setEnabled(self.autopilot.active)
         for control in (self.open_button, self.refresh_button, self.bind_button, self.focus_button,
                         self.inspect_button, self.close_button, self.click_button,
                         self.key_button, self.type_button, self.suggest_button):
@@ -321,6 +341,7 @@ class WebbieComputerDialog(QDialog):
             'the window owner. Verify its title and contents yourself.',
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if choice == QMessageBox.Yes:
+            self.pause_autopilot()
             self.action(self.operator.bind_window, target)
 
     def focus_window(self):
@@ -375,6 +396,130 @@ class WebbieComputerDialog(QDialog):
             lambda message: self.status('Local screen observation (untrusted):\n' + message))
         self.screen_worker.failed.connect(self.status)
         self.screen_worker.start()
+
+    def pause_autopilot(self):
+        if self.autopilot.active:
+            self.autopilot.stop()
+            self.status('Autopilot paused. Existing task grant remains revocable.')
+        self.pending_step = None
+        if hasattr(self, 'autopilot_pause'):
+            self.refresh_status()
+
+    def begin_autopilot(self):
+        """One explicit grant for multiple fresh screen observations in one window."""
+        data = self.grant.status()
+        window = self.selected_window()
+        if (not data['active'] or not window or
+                window != self.operator.target_window):
+            self.status('Authorize the task and its exact window first.')
+            return
+        if (self.step_worker and self.step_worker.isRunning()):
+            self.status('A screen inspection is already running.')
+            return
+        if (QMessageBox.question(
+                self, 'Start supervised Webbie Autopilot?',
+                'Webbie may take up to SIX fresh snapshots of this exact window '
+                'and use local Ollama to navigate with simple keys. '
+                'Every click still requires your approval. '
+                'Autopilot stops after two minutes, six actions, uncertainty, '
+                'repeated steps, or STOP. No passwords, messages, purchases, '
+                'deletions or admin tasks. '
+                'The window must not contain sensitive information. '
+                'Do you authorize this limited task?',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No) != QMessageBox.Yes):
+            return
+        try:
+            self.autopilot_revision = self.autopilot.begin(
+                data['task'], window, approved=True)
+        except (ValueError, PermissionError) as error:
+            self.status(str(error)); return
+        self.pending_step = None
+        self.status('Autopilot started for one authorized window and task.')
+        self.refresh_status()
+        QTimer.singleShot(0, lambda: self._autopilot_next(self.autopilot_revision))
+
+    def _autopilot_ready(self, revision, window):
+        return self.autopilot.ready(
+            window=window,
+            granted=self.grant.status()['active'] and
+                    window == self.operator.target_window and
+                    window == self.selected_window(),
+            revision=revision)
+
+    def _autopilot_next(self, revision):
+        window = self.operator.target_window
+        if not self._autopilot_ready(revision, window):
+            self.autopilot.stop()
+            self.status('Autopilot paused because approval expired or the window changed.')
+            self.refresh_status()
+            return
+        if self.step_worker and self.step_worker.isRunning():
+            QTimer.singleShot(200, lambda: self._autopilot_next(revision))
+            return
+        try:
+            if window not in {item['id'] for item in self.operator.windows()}:
+                raise RuntimeError('Authorized window is no longer open')
+            jpeg = capture_window(window, approved=True)
+            qimage = QImage.fromData(jpeg, 'JPEG')
+            if qimage.isNull():
+                raise RuntimeError('Could not inspect the authorized window')
+        except (OSError, ValueError, RuntimeError, PermissionError, InterruptedError) as error:
+            self.autopilot.stop()
+            self.status('Autopilot paused: ' + str(error))
+            self.refresh_status()
+            return
+        self.step_worker = StepWorker(
+            jpeg, self.autopilot.task, qimage.width(), qimage.height(), self)
+        self.step_worker.proposed.connect(
+            lambda plan, token=revision, target=window:
+            self._autopilot_proposed(plan, token, target))
+        self.step_worker.failed.connect(
+            lambda message, token=revision: self._autopilot_failed(message, token))
+        self.step_worker.start()
+        self.status('Autopilot examining fresh window image. STOP is available.')
+
+    def _autopilot_failed(self, message, revision):
+        if revision != self.autopilot.revision:
+            return
+        self.autopilot.stop()
+        self.status('Autopilot paused: ' + message)
+        self.refresh_status()
+
+    def _autopilot_proposed(self, plan, revision, window):
+        if not self._autopilot_ready(revision, window):
+            self.status('Autopilot discarded a stale model suggestion.')
+            return
+        decision = self.autopilot.decide(
+            plan, window=window, granted=True, revision=revision)
+        if decision == 'done':
+            self.status('Autopilot reported task complete. Please verify the screen.')
+            self.refresh_status()
+            return
+        if decision == 'pause':
+            self.status('Autopilot paused for uncertainty, risk or step limit: ' + str(plan))
+            self.refresh_status()
+            return
+        if decision == 'review':
+            self.pending_step = plan
+            self.pending_step_target = window
+            self.status('Autopilot needs click approval: ' + str(plan))
+            self.refresh_status()
+            return
+        if decision == 'auto':
+            result = self.action(self.operator.press, plan['key'])
+            if result is None:
+                self.autopilot.stop()
+                self.status('Autopilot paused after unsuccessful navigation.')
+                return
+            more = self.autopilot.record_step(
+                window=window, granted=self.grant.status()['active'],
+                revision=revision)
+            if more:
+                QTimer.singleShot(200, lambda: self._autopilot_next(revision))
+            else:
+                self.status('Autopilot reached its step limit; screen review required.')
+                self.refresh_status()
 
     def suggest_step(self):
         """Observe ONE approved window, then ask local AI for ONE safe proposal."""
@@ -443,13 +588,27 @@ class WebbieComputerDialog(QDialog):
                 'The model may be mistaken. Do this one step?',
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No) != QMessageBox.Yes):
+            self.pause_autopilot()
             self.status('Suggested step rejected.'); return
+        result = None
         if plan['action'] == 'click':
-            self.action(self.operator.click, plan['x'], plan['y'])
+            result = self.action(self.operator.click, plan['x'], plan['y'])
         elif plan['action'] == 'press':
-            self.action(self.operator.press, plan['key'])
-        # Reinspect the screen before proposing anything else.
-        self.status(self.report.toPlainText() + '\nVerify the window before the next step.')
+            result = self.action(self.operator.press, plan['key'])
+        if self.autopilot.active:
+            revision = self.autopilot_revision
+            window = self.operator.target_window
+            if result is not None and self.autopilot.record_step(
+                    window=window, granted=self.grant.status()['active'],
+                    revision=revision):
+                QTimer.singleShot(200, lambda: self._autopilot_next(revision))
+            else:
+                self.autopilot.stop()
+                self.status('Autopilot stopped after step limit or failed action.')
+        else:
+            self.status(self.report.toPlainText() +
+                        '\nVerify the window before the next step.')
+        self.refresh_status()
 
     def closeEvent(self, event):
         self.stop()
