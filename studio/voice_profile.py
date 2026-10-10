@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -74,7 +75,7 @@ def start_capture(root=None, seconds=30):
 def finish_capture(proc, path, *, stop=False):
     """Stop if requested; accept only a completed, real recording."""
     if stop and proc.poll() is None:
-        proc.send_signal(2)
+        proc.send_signal(signal.SIGINT)
     try:
         _, stderr = proc.communicate(timeout=5)
     except subprocess.TimeoutExpired:
@@ -82,7 +83,7 @@ def finish_capture(proc, path, *, stop=False):
         proc.communicate()
         Path(path).unlink(missing_ok=True)
         raise VoiceSampleError("Recording did not stop cleanly.")
-    if proc.returncode not in (0, 130) or not Path(path).is_file():
+    if proc.returncode not in (0, 130, -signal.SIGINT) or not Path(path).is_file():
         Path(path).unlink(missing_ok=True)
         raise VoiceSampleError("Recording failed. Check microphone permissions or Webbie microphone contention.")
     return _file_check(path)
