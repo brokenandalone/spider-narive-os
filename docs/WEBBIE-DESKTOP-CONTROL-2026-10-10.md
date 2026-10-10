@@ -101,3 +101,47 @@ captures camera/audio, reads the PC's windows, grants application control or
 starts an automation on the owner's computer. Stacked on the Webbie full-screen
 portrait branch; reconcile with PR #30 memory repair and newer installed
 voice/visual files before a single backup-first, reversible install.
+
+## October 10: Supervised Autopilot and PC comparison requirement
+
+- [x] Built a source-only **Supervised Autopilot** for a single explicitly
+  owner-selected X11 window and a user-approved task. It can take a short
+  sequence of fresh screenshots locally, propose an ordinary navigation step,
+  execute a navigation key when confidence is at least 0.90, and rescan
+  afterward. Mouse clicks still require user review. No generic form submit,
+  automatic typing, file deletion, software installation, purchases, outgoing
+  messages, terminal commands or privilege changes.
+- [x] Autopilot refuses high-impact tasks, times out after 120 seconds or six
+  actions, pauses on repeated actions or uncertainty, and fails closed when the
+  selected window or grant changes. The GUI has Start/Pause/STOP controls.
+- [x] Added read-only comparison tooling at
+  `webbie/tools/installed_reconcile_audit.py`. It examines relevant PC
+  source modules and prints source hashes plus feature-marker differences.
+  **It has NOT been run on the owner's currently installed desktop in this
+  GitHub-only development session.** Do not claim a live PC comparison.
+- [ ] **Critical prerequisite for installation:** reconcile the current PC
+  code against this precise PR head rather than the historical frozen commit.
+  The October 9 PC audit reported the installed Webbie agent had ~2,300 lines
+  versus ~965 in the older GitHub release, and brain.py ~850 versus ~147.
+  PC additions include conversation/history/long-term memory, Forage/Firefox
+  research and navigation, voice echo/interruption behavior and a 45-second
+  conversation window. The user subsequently confirmed camera and live preview
+  with local vision working, alongside updated Ollama models, so preserve all
+  of those changes. Historical October 9 hashes are not proof the PC is still
+  byte-identical today.
+- [ ] Do not run the release installer or replace live voice/camera modules
+  until the on-PC read-only report is reviewed and a detached merged candidate
+  passes full integration and rollback checks. Preserve user data and current
+  TTS, face, author library, Studio, Media Center and system services.
+- [ ] Autopilot is not a security sandbox. No end-to-end speaker authentication
+  or arbitrary multi-application operation has been tested on the PC.
+
+Read-only terminal check, from an exact checkout of this PR branch, as the
+normal user (no sudo):
+
+```bash
+python3 webbie/tools/installed_reconcile_audit.py --checkout "$PWD"
+```
+
+The report intentionally refuses to authorize installation even if hashes
+match. A reconciliation HOLD is expected for customized on-PC modules.
