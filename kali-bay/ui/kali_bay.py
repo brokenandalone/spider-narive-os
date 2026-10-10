@@ -621,6 +621,8 @@ class KaliBayWindow(QMainWindow):
         about.setWordWrap(True)
         right.addWidget(about)
         for caption, operation in (
+            ("START EXISTING KALI", self.start_existing_kali),
+            ("KALI HEALTH CHECK", self.open_kali_health),
             ("KALI TERMINAL", self.open_terminal),
             ("KALI PACKAGE MANAGER", self.open_packages),
             ("INSTALLED KALI PACKAGES", self.open_inventory),
@@ -642,7 +644,11 @@ class KaliBayWindow(QMainWindow):
         notice.setStyleSheet("color:#c4aedb;")
         right.addWidget(notice)
         right.addStretch(1)
-        layout.addWidget(actions, 3)
+        actions_scroll = QScrollArea()
+        actions_scroll.setObjectName("kaliDesktopActionsScroll")
+        actions_scroll.setWidgetResizable(True)
+        actions_scroll.setWidget(actions)
+        layout.addWidget(actions_scroll, 3)
         self.filter_desktop_tools()
         return page
 
@@ -776,6 +782,42 @@ class KaliBayWindow(QMainWindow):
             QMessageBox.warning(
                 self, "Kali Bay", f"Could not launch Kali app: {error}"
             )
+
+    def start_existing_kali(self):
+        reply = QMessageBox.question(
+            self, "Start Kali Bay",
+            "Start your existing Kali Linux container? No packages are "
+            "installed and no new container is created. You can run the "
+            "health check afterward.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            result = subprocess.run(
+                [str(MANAGER), "start"],
+                text=True, capture_output=True, check=False, timeout=40,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            QMessageBox.warning(self, "Kali Bay", "Kali start did not finish.")
+            return
+        if result.returncode:
+            QMessageBox.warning(
+                self, "Kali Bay",
+                (result.stderr or result.stdout).strip()[:350]
+                or "Kali could not start."
+            )
+            return
+        QMessageBox.information(
+            self, "Kali Bay",
+            (result.stdout or "The existing Kali container has started.").strip()[:350]
+        )
+        self.refresh_status()
+
+    def open_kali_health(self):
+        # Read-only diagnostic terminal for the existing container.
+        self.launch_terminal_command([MANAGER, "doctor"])
 
     def open_packages(self):
         # Explicit interactive shell in the existing Kali Distrobox.
