@@ -67,7 +67,7 @@ STUDY_KNOWN_BLOBS = {
 
 def git_blob_sha(content):
     data = content.encode('utf-8')
-    header = b'blob ' + str(len(data)).encode('ascii') + b'\\0'
+    header = b'blob ' + str(len(data)).encode('ascii') + b'\0'
     return hashlib.sha1(header + data).hexdigest()
 
 
