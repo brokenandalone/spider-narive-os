@@ -117,7 +117,7 @@ def request_open(desktop_id, *, runtime=None, timeout=3):
     if not isinstance(desktop_id, str) or not APP_ID.fullmatch(desktop_id):
         raise ValueError('Invalid installed application ID')
     path = private_socket_directory(runtime) / NAME
-    if not path.is_file() or path.is_symlink():
+    if path.is_symlink() or not path.exists() or not stat.S_ISSOCK(path.stat().st_mode):
         return 'To open that program, first authorize it in Webbie Computer Control.'
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
