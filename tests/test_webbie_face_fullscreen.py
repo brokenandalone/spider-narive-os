@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'the-web/overlay/webbie_face.py'
@@ -37,25 +38,19 @@ class FullscreenWebbieTests(unittest.TestCase):
                 self.face.set_display_mode('nothing', path)
 
     def test_full_screen_is_transparent_to_input(self):
-        with tempfile.TemporaryDirectory() as folder:
-            old_config = self.face.DISPLAY_CONFIG
-            self.face.DISPLAY_CONFIG = Path(folder) / 'display.json'
-            try:
-                self.face.set_display_mode('fullscreen', self.face.DISPLAY_CONFIG)
-                overlay = self.face.WebbieOverlay(full_screen_check=lambda: False)
-                self.assertTrue(overlay.testAttribute(Qt.WA_TransparentForMouseEvents))
-                self.assertTrue(overlay.windowFlags() & Qt.WindowTransparentForInput)
-                self.assertTrue(overlay.full_screen_mode)
-                screen = QApplication.primaryScreen().geometry()
-                self.assertEqual((overlay.width(), overlay.height()),
-                                 (screen.width(), screen.height()))
-                # No XFixes input-shape check succeeds offscreen: fail closed.
-                overlay.refresh()
-                self.assertFalse(overlay.isVisible())
-                overlay.caption.close()
-                overlay.close()
-            finally:
-                self.face.DISPLAY_CONFIG = old_config
+        with patch.object(self.face, 'full_screen_display', return_value=True):
+            overlay = self.face.WebbieOverlay(full_screen_check=lambda: False)
+            self.assertTrue(overlay.testAttribute(Qt.WA_TransparentForMouseEvents))
+            self.assertTrue(overlay.windowFlags() & Qt.WindowTransparentForInput)
+            self.assertTrue(overlay.full_screen_mode)
+            screen = QApplication.primaryScreen().geometry()
+            self.assertEqual((overlay.width(), overlay.height()),
+                             (screen.width(), screen.height()))
+            # No XFixes input-shape check succeeds offscreen: fail closed.
+            overlay.refresh()
+            self.assertFalse(overlay.isVisible())
+            overlay.caption.close()
+            overlay.close()
 
 
 if __name__ == '__main__':
