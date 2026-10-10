@@ -330,6 +330,7 @@ class StudyWindow(QMainWindow):
         school_actions = QHBoxLayout()
         self.add_action(school_actions, "APA PAPER", self.create_apa_paper)
         self.add_action(school_actions, "MY SNHU", self.open_snhu)
+        self.add_action(school_actions, "SCHOOL ONEDRIVE", self.open_school_onedrive)
         self.add_action(school_actions, "APA GUIDE", self.open_apa_guide)
         outer.addLayout(school_actions)
         self.dashboard = QLabel()
@@ -1188,6 +1189,18 @@ class StudyWindow(QMainWindow):
     def open_snhu(self):
         self.school_tabs.setCurrentIndex(1)
         self.school_portal.open()
+
+    def open_school_onedrive(self):
+        # School Microsoft identity is independent of personal Webbie storage.
+        try:
+            if __package__:
+                from .school_onedrive import SchoolOneDriveDialog
+            else:
+                from school_onedrive import SchoolOneDriveDialog
+            dialog = SchoolOneDriveDialog(self, self.store.course_folder(self.current_course_id))
+            dialog.exec_()
+        except Exception as error:
+            QMessageBox.warning(self, 'School OneDrive', str(error))
 
     def open_apa_guide(self):
         self.launch(['xdg-open', 'https://apastyle.apa.org/instructional-aids/student-paper-setup-guide.pdf'])
