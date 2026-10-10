@@ -30,6 +30,7 @@ managed=(
   the-web/shell/webbie_vision_bridge.py
   webbie/agent/vision_query.py
   webbie/agent/webbie.py
+  webbie/agent/kali_assistant.py
 )
 if [[ $mode == --apply && $EUID -ne 0 ]]; then
     echo 'Use sudo bash ... --apply from your normal Spider OS user.' >&2
