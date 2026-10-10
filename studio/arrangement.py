@@ -19,8 +19,6 @@ def arrangement_text(voices=(), voice_notes="", guitar_one="", guitar_two="", ot
     """Compose bounded creative instructions; do not promise separated tracks."""
     if not isinstance(voices, (tuple, list)) or len(voices) > 3:
         raise ValueError("Choose at most three vocal roles.")
-    if len(voices) != len(set(voices)):
-        raise ValueError("Choose each vocal role only once.")
     for role in voices:
         if role not in VOICE_PRESETS:
             raise ValueError("Unknown vocal role.")
