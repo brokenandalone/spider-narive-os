@@ -5,6 +5,18 @@
 
 **Installation plan:** build the related desktop changes together, publish one combined branch, install once, then log out/in once. Boot branding, voice-agent replacement and Kali package changes require separate qualification and are not silently included.
 
+## October 10 Webbie PC corrections and expanded owner requirement
+
+These current owner-confirmed facts **supersede older camera/face status lines below**.
+
+- [x] **Camera WORKING on installed PC:** owner reports last night's camera upgrade works. No repeat camera install; preserve verified capture settings and voice service.
+- [x] **Portrait visible, sleep flag and Zzz working on PC.** Actual sleeping eyelids **NOT** working on PC: static open eyes remain visible.
+- [x] **Source fix in draft PR #36:** mask open eye pixels before drawing closed lids, plus offscreen regression coverage. **PC visual acceptance pending.**
+- [ ] **URGENT: "Webby stop" fails while Webbie talks.** Older source Whisper listener pauses during TTS, so a string matcher alone cannot solve it. Install a dedicated concurrent, speaker-aware interrupt route and cancellable TTS after reconciling the newer resident agent; verify on PC.
+- [x] **Source foundation in draft PR #36:** reuse installed desktop application catalog for opening any XDG-listed GUI app; window list/focus, pointer, typing, shortcut and close primitives, all denied without trusted local permission; stop flag and tests.
+- [ ] **Full desktop operator:** owner should be able to ask Webbie to open and operate any installed GUI program, rather than only the Spider OS workspaces. Wire to an explicit user-facing task grant/preview, visible state and emergency stop; add fresh opt-in screen understanding, desktop verification, authorized speaker handling, cautious dangerous-action confirmations, and device acceptance tests. No autonomous computer control is live on the PC yet.
+- [ ] Do not bundle older repository voice/vision files over the newer customized working PC files. Prepare **one** owner-requested safe/reversible combined install after reconciliation and CI.
+
 ## Unified cross-chat status and release gate (2026-10-09)
 
 **Authority:** this checklist + [cross-chat handoff](CROSS-CHAT-CONSOLIDATION-2026-10-09.md) + [installation policy](INSTALL-RELEASE-POLICY.md), updated from the accessible Spider OS conversations, GitHub branch history and installed-PC audit. Chat-history retrieval outside the conversation was unavailable; do not claim every chat message has been independently verified. GitHub code and individual PR green checks are *not* proof of a combined or installed build.
@@ -152,7 +164,7 @@
 - [x] Source-built local Ollama model selection from Webbie's existing `config/default.json`, while retaining the current default and loopback Ollama URL. No model is downloaded or switched on the PC without approval.
 - [ ] Install/qualify any future agent-only changes separately from the safe floating-face and OneDrive add-on. Preserve the installed voice patches and services.
 - [ ] Build explicitly opt-in camera awareness of the room with visible recording/active indicator; no silent start, hidden webcam access, or unsolicited cloud upload.
-- [ ] Build separately approved screen awareness with visible sharing state, limited capture, and privacy controls. Neither camera nor screen capture is currently installed as an enabled Webbie feature.
+- [ ] Build separately approved screen awareness with visible sharing state, limited capture, and privacy controls. The camera is now owner-confirmed working on the installed PC (October 10); opt-in screen capture/control is still pending.
 - [x] **Owner decision Oct 9:** Webbie's lower-left face must **remain visible and look asleep**, while ordinary voice input is ignored. Microphone/transcription may remain active solely for an explicit wake phrase. No background jobs or services should stop.
 - [x] Source-built shared quiet-sleep state for the X11 portrait and agent: closed-eyes dimmed appearance, explicit voice sleep/wake phrases, ignore ordinary recognized speech and proactive spoken check-ins, preserve background loops. Agent and desktop installation **pending**.
 - [ ] Qualify Cory/Shayna-only speaker verification for wake commands; an exact phrase from TV/strangers cannot yet be guaranteed rejected.
