@@ -105,10 +105,21 @@ APP_FILES = (
     'study/school_onedrive.py',
     'study/school_portal.py',
     'study/school_upload.py',
-    'study/study.py',
+    'study/study.py', 'study/store.py', 'study/dashboard.py',
+    'study/apa.py', 'study/paper_dialog.py', 'studio/tools.py',
     'webbie/agent/author_voice_bridge.py',
     'webbie/agent/kali_assistant.py',
 )
+# Exact recognized historical Study source blobs from the prior guarded
+# installer. Unknown owner PC edits still block the entire transaction.
+KNOWN_STUDY_BLOBS = {
+    'study/study.py': {
+        '456f0279b397f7776b8ba9a8ccaf',
+        '422029cbc30b462d87ff52eaa6c608b63f9ce499',
+    },
+    'study/store.py': {'c7fa2cef87f66f187e6253a7059f7a5d335703f0'},
+}
+
 UNITS = ('webbie-onedrive.service', 'webbie-onedrive.timer')
 MENU = ('webbie-face-sleep-tonight.desktop',
         'webbie-face-wake.desktop', 'webbie-onedrive-connect.desktop')
@@ -172,6 +183,12 @@ def safe_path(path):
     return True
 
 
+def git_blob_sha(path):
+    data = Path(path).read_bytes()
+    header = b'blob ' + str(len(data)).encode('ascii') + b'\0'
+    return hashlib.sha1(header + data).hexdigest()
+
+
 def known_baseline(root, relative, observed_hash, refs=BASELINES):
     # Baselines are pinned git commits, never owner data or untrusted scripts.
     for ref in refs:
@@ -207,6 +224,9 @@ def inspect(items, project_root=PROJECT_ROOT, refs=BASELINES, known_checker=know
             results.append((item, 'BLOCKED', 'not a regular installed file')); continue
         if sha256(src) == sha256(dest):
             results.append((item, 'CURRENT', 'identical bytes')); continue
+        if item.reference in KNOWN_STUDY_BLOBS:
+            if git_blob_sha(dest) in KNOWN_STUDY_BLOBS[item.reference]:
+                results.append((item, 'UPGRADE', 'recognized exact older Study source')); continue
         if (item.reference and known_checker(project_root, item.reference,
                                              sha256(dest), refs)):
             results.append((item, 'UPGRADE', 'recognized source baseline')); continue
