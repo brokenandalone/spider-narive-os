@@ -92,6 +92,10 @@ class StepWorker(QThread):
 
 
 class WebbieComputerDialog(QDialog):
+    taskApproved = pyqtSignal(str)
+    screenObserved = pyqtSignal(str)
+    authorizationRevoked = pyqtSignal()
+
     def __init__(self, parent=None, *, discover=None, run=None, launcher=None):
         super().__init__(parent)
         self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
@@ -250,6 +254,7 @@ class WebbieComputerDialog(QDialog):
             self.grant.stop()
             self.status('Desktop voice bridge unavailable: ' + str(error))
             return
+        self.taskApproved.emit(task)
         self.status(f'Authorized: {app.name}. No changes made yet.')
         self.refresh_status()
 
@@ -260,6 +265,7 @@ class WebbieComputerDialog(QDialog):
         self.pending_step_target = None
         self.grant.stop()
         self.bridge.deactivate()
+        self.authorizationRevoked.emit()
         self.status('STOPPED. No additional Webbie computer actions are authorized.')
         self.refresh_status()
 
@@ -404,6 +410,7 @@ class WebbieComputerDialog(QDialog):
         self.screen_worker = ScreenWorker(image, self.vision_model, self)
         self.screen_worker.described.connect(
             lambda message: self.status('Local screen observation (untrusted):\n' + message))
+        self.screen_worker.described.connect(self.screenObserved.emit)
         self.screen_worker.failed.connect(self.status)
         self.screen_worker.start()
 
