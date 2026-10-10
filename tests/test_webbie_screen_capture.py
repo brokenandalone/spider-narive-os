@@ -2,7 +2,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 import json
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -52,9 +52,8 @@ class ScreenCaptureTests(unittest.TestCase):
         response.read.return_value = json.dumps({
             'message': {'content': 'An Audacity editing window is visible.'}
         }).encode()
-        ctx = Mock()
-        ctx.__enter__ = Mock(return_value=response)
-        ctx.__exit__ = Mock(return_value=False)
+        ctx = MagicMock()
+        ctx.__enter__.return_value = response
         opener = Mock(return_value=ctx)
         result = self.module.describe_window(image, 'What controls can you see?', opener=opener)
         self.assertIn('Audacity', result)
