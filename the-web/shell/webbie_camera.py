@@ -15,7 +15,7 @@ import urllib.request
 
 MAX_JPEG = 4 * 1024 * 1024
 OLLAMA_CHAT = 'http://127.0.0.1:11434/api/chat'
-DEFAULT_VISION_MODEL = 'gemma3:4b'
+DEFAULT_VISION_MODEL = 'qwen3-vl:2b-instruct'
 CAMERA_PATTERN = re.compile(r'/dev/video[0-9]{1,3}\Z')
 
 
@@ -47,11 +47,20 @@ def capture_jpeg(device, timeout=12):
     valid_camera_path(device)
     command = [
         'ffmpeg', '-hide_banner', '-nostdin', '-loglevel', 'error',
-        '-f', 'video4linux2', '-i', device, '-frames:v', '1',
+        '-f', 'video4linux2',
+        '-input_format', 'mjpeg', '-video_size', '640x480',
+        '-framerate', '15',
+        '-i', device, '-frames:v', '1',
         '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'
     ]
-    result = subprocess.run(command, capture_output=True, timeout=timeout,
-                            check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=timeout,
+                                check=False)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(
+            'Webcam capture timed out at 640x480 MJPEG. Check camera access '
+            'and retry.'
+        ) from None
     if result.returncode != 0:
         raise RuntimeError('Unable to read webcam. Check camera access and try another camera.')
     data = result.stdout
@@ -85,7 +94,11 @@ def describe_frame(jpeg, prompt='Describe what you can actually see in the room.
             'role': 'user', 'content': instruction,
             'images': [base64.b64encode(jpeg).decode('ascii')]
         }],
-        'options': {'num_predict': 220}
+        # CPU-only host: short descriptions and limited context keep responses usable.
+        # Do not leave the vision model resident when Webbie's Qwen3 8B brain
+        # needs the same constrained system memory.
+        'keep_alive': 0,
+        'options': {'num_predict': 48, 'num_ctx': 2048}
     }).encode('utf-8')
     request = urllib.request.Request(
         OLLAMA_CHAT, data=payload,
@@ -101,10 +114,20 @@ def describe_frame(jpeg, prompt='Describe what you can actually see in the room.
         if error.code in (400, 404):
             raise RuntimeError(
                 'The local vision model is missing or does not support images. '
-                'Install an Ollama vision model, such as gemma3:4b.'
+                'Install an Ollama vision model, such as qwen3-vl:2b-instruct.'
             ) from None
         raise RuntimeError('Local vision engine returned an error.') from None
-    except (urllib.error.URLError, TimeoutError):
+    except TimeoutError:
+        raise RuntimeError(
+            f'Local vision model timed out after {timeout} seconds. '
+            'This computer may need more time for CPU inference.'
+        ) from None
+    except urllib.error.URLError as error:
+        if isinstance(error.reason, TimeoutError) or 'timed out' in str(error.reason).lower():
+            raise RuntimeError(
+                f'Local vision model timed out after {timeout} seconds. '
+                'This computer may need more time for CPU inference.'
+            ) from None
         raise RuntimeError('Local Ollama vision service is unavailable.') from None
     if not isinstance(message, str) or not message.strip():
         raise RuntimeError('No description was returned by the local vision model.')

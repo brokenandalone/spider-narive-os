@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-import json, os, re, shutil, subprocess, time, urllib.request, uuid
+import json, os, re, shutil, subprocess, sys, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+# Also work when test harnesses load this source directly by file path.
+# Keep the one Nova host module alongside the service, never in cloud packages.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nova_host import NovaHost, HOST as ON_AIR_HOST, STATION as STATION_NAME
 
 HOST = "127.0.0.1"
@@ -121,9 +125,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.headers(413)
                 self.wfile.write(b'{"error":"Invalid Nova request size"}')
                 return
-            body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            try:
+                body = json.loads(self.rfile.read(length).decode("utf-8"))
+            except (ValueError, UnicodeError):
+                self.headers(400)
+                self.wfile.write(b'{"error":"Invalid JSON request"}')
+                return
             if not isinstance(body, dict):
-                raise ValueError("Nova expects a JSON object")
+                self.headers(400)
+                self.wfile.write(b'{"error":"Nova expects a JSON object"}')
+                return
             script = ollama_script(body)
             ident = f"dj-{int(time.time())}-{uuid.uuid4().hex[:8]}"
             audio = make_audio(script, ident)
