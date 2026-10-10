@@ -13,12 +13,22 @@
 
 ## Limitations and follow-up gates
 
-- The new commands are **Writing Studio buttons**. Resident Webbie voice-to-Author intent routing (e.g. "Hey Webbie, review the current book" and "read me chapter six") remains to be integrated safely with the customized live PC listener. Avoid overwriting installed PC Webbie source.
+- The new commands are **Writing Studio buttons** and explicit typed instructions in The Web's Author Webbie chat panel. These route through an owner-local UNIX socket, rather than pasting the whole book into an LLM prompt. Only the selected book/chapter is accessed, and no automatic review starts.
+- A **fail-closed spoken-command hook** is prepared in Webbie's source. It refuses Author actions unless a separately verified authorized speaker identity is supplied. The baseline Whisper listener has no qualified speaker-verification result, so spoken Author commands are **not yet enabled** until the customized PC voice-gate is reconciled and tested. Never treat ASR text or face recognition as speaker authentication.
 - The book review model is not omniscient: it analyzes bounded segments and synthesizes its own observations. It can miss cross-chapter contradictions or make mistakes. Reports identify segments to revisit.
 - Book review calls may take substantial time depending on model and PC speed. There is no full-book one-prompt context window or hidden skipping to create a fake instant result.
-- The current narrator invokes the established Webbie voice module per section rather than controlling the resident Webbie speaking queue. Test interaction with the live mic, Webbie stop command, and TTS contention before installing.
+- The current narrator invokes the established Webbie voice module per section rather than controlling the resident Webbie speaking queue. It publishes a separate `webbie-narrating` marker for source speech-loop echo suppression. While narration is active, the source listener suppresses microphone transcription, so **spoken stop/barge-in during narration remains unfinished**. Stop, pause and resume buttons remain available. Test the marker, voice identity, mic/TTS contention and interruption behavior on the PC before installing.
 - Online Natasha may require network access; if unavailable the existing Webbie offline fallback remains. Confirm local voice dependencies and audio output on the PC.
 - This update is an open, stacked source PR. Back up the library and preserve the working customized Webbie service, media, encryption and boot. Install only as part of the owner's requested combined upgrade with rollback and live acceptance tests.
+
+## User commands staged
+
+- `Webbie, review this chapter` / `Webbie, review the entire book`.
+- `Webbie, give me a deep review of this book`.
+- `Webbie, read me the whole book` / `Webbie, read me this chapter`.
+- `Pause reading`, `resume narration`, `stop reading`, `cancel review`.
+
+Typed Author chat commands route locally now in source; spoken commands require real voice verification and are not yet enabled by the baseline listener.
 
 ## Verification
 
