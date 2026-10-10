@@ -19,6 +19,17 @@ APP = QApplication.instance() or QApplication([])
 
 
 class CameraSecurityTests(unittest.TestCase):
+    def setUp(self):
+        # The real desktop may already own the user's Webbie vision socket.
+        # Regression tests must never connect to or preempt that socket.
+        self._isolated_runtime = tempfile.TemporaryDirectory()
+        self.addCleanup(self._isolated_runtime.cleanup)
+        runtime = Path(self._isolated_runtime.name) / "runtime"
+        runtime.mkdir(mode=0o700)
+        env = patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(runtime)})
+        env.start()
+        self.addCleanup(env.stop)
+
     def test_no_cameras_mean_no_access(self):
         with patch('webbie_panel.camera_devices', return_value=[]):
             panel = WebbiePanel(ROOT); panel.timer.stop()
