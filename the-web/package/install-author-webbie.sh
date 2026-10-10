@@ -37,6 +37,7 @@ managed=(
   webbie/agent/vision_query.py
   webbie/agent/author_voice_bridge.py
   webbie/agent/webbie.py
+  webbie/voice/whisper_listener.py
 )
 if [[ $mode == --apply && $EUID -ne 0 ]]; then
     echo 'Use sudo bash ... --apply from your normal Spider OS user.' >&2
