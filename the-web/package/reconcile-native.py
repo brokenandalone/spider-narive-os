@@ -144,7 +144,7 @@ def atomic_replace(path, content):
         candidate.unlink(missing_ok=True)
 
 
-def reconcile(source, installed, kind):
+def reconcile(source, installed, kind, *, dry_run=False):
     if not installed.is_file() or not source.is_file():
         print(f'{kind}: source or installed entry absent, skipping')
         return 'missing'
@@ -176,6 +176,9 @@ def reconcile(source, installed, kind):
     else:
         raise ValueError(f'Unsupported reconciliation type: {kind}')
     ast.parse(replacement)
+    if dry_run:
+        print(f'{kind}: recognized older code, safe to reconcile on apply')
+        return 'would-reconcile'
     atomic_replace(installed, replacement)
     print(f'{kind}: reconciled exactly known local variant')
     return 'reconciled'
@@ -185,20 +188,33 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source_root', type=Path)
     parser.add_argument('installed_root', type=Path)
+    parser.add_argument('--check', action='store_true',
+                        help='Preflight installed code; never change files')
     arguments = parser.parse_args()
     source, root = arguments.source_root, arguments.installed_root
+    checking = arguments.check
     results = [
-        reconcile(source / 'system/apps.py', root / 'system/apps.py', 'Author launcher'),
-        reconcile(source / 'studio/main.py', root / 'studio/main.py', 'Studio'),
+        reconcile(source / 'system/apps.py', root / 'system/apps.py', 'Author launcher', dry_run=checking),
+        reconcile(source / 'studio/main.py', root / 'studio/main.py', 'Studio', dry_run=checking),
     ]
     # The dashboard calls store.all_assignments(): upgrade the dependency first.
-    store_status = reconcile(source / 'study/store.py', root / 'study/store.py', 'Study course store')
+    store_status = reconcile(source / 'study/store.py', root / 'study/store.py', 'Study course store', dry_run=checking)
     results.append(store_status)
-    if store_status in ('current', 'reconciled'):
-        results.append(reconcile(source / 'study/study.py', root / 'study/study.py', 'Study workspace'))
+    if store_status in ('current', 'reconciled', 'would-reconcile', 'missing'):
+        # A missing store is installed from the package before apply reconciliation.
+        # Never accept a known old Study UI while leaving a custom store unchanged.
+        results.append(reconcile(
+            source / 'study/study.py', root / 'study/study.py',
+            'Study workspace', dry_run=checking))
     else:
         print('Study workspace: skipped until the course store is reviewed')
-    return 0 if 'conflict' not in results and store_status != 'missing' else 2
+    bad = 'conflict' in results
+    if not checking and store_status == 'missing':
+        bad = True  # Apply expects install-desktop.sh to add missing sources first.
+    print(('NATIVE RECONCILIATION BLOCKED' if bad else
+           'NATIVE RECONCILIATION CHECK PASSED' if checking else
+           'NATIVE RECONCILIATION COMPLETE'))
+    return 2 if bad else 0
 
 
 if __name__ == '__main__':
