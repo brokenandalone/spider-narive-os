@@ -329,6 +329,7 @@ class StudyWindow(QMainWindow):
 
         school_actions = QHBoxLayout()
         self.add_action(school_actions, "APA PAPER", self.create_apa_paper)
+        self.add_action(school_actions, "WEBBIE HOMEWORK", self.open_homework)
         self.add_action(school_actions, "MY SNHU", self.open_snhu)
         self.add_action(school_actions, "SCHOOL ONEDRIVE", self.open_school_onedrive)
         self.add_action(school_actions, "APA GUIDE", self.open_apa_guide)
