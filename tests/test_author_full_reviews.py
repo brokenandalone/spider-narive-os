@@ -10,6 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "author"))
 from review_engine import ReviewEngine, ReviewCancelled, split_exact, preferred_model
+from review_cache import cached_review
 from voice_reader import speech_segments, WebbieReader
 from store import AuthorStore
 
@@ -61,6 +62,27 @@ class AuthorExtendedReviewTests(unittest.TestCase):
         self.assertIn("Deep Chapter Review", result)
         self.assertIn("3 source segments", result)
         self.assertEqual(sum("[MANUSCRIPT BEGINS]" in call for call in calls), 3)
+
+    def test_repeat_reviews_reuse_private_content_hash_cache(self):
+        calls = []
+        def fake(prompt, tokens):
+            calls.append((prompt, tokens))
+            return "Chapter evidence from the first run"
+        with tempfile.TemporaryDirectory() as folder:
+            location = Path(folder) / "reviews.sqlite3"
+            first = cached_review("Full original chapter text", 250, fake,
+                                  path=location, model="qwen3:1.7b")
+            second = cached_review("Full original chapter text", 250, fake,
+                                   path=location, model="qwen3:1.7b")
+            third = cached_review("Changed chapter text", 250, fake,
+                                  path=location, model="qwen3:1.7b")
+            fourth = cached_review("Full original chapter text", 250, fake,
+                                   path=location, model="another-model")
+            self.assertEqual(first, second)
+            self.assertEqual(third, fourth)
+            self.assertEqual(len(calls), 3)
+            self.assertNotIn("Full original chapter text", location.read_bytes().decode(
+                "utf-8", errors="ignore"))
 
     def test_cancel_before_review_makes_zero_model_calls(self):
         cancelled = threading.Event()
