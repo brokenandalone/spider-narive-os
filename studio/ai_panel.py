@@ -9,7 +9,7 @@ import threading
 from PyQt5.QtCore import QThread, QTimer, QUrl, pyqtSignal
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QDoubleSpinBox,
     QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QVBoxLayout, QWidget, QMessageBox)
 from PyQt5.QtCore import Qt
 
@@ -20,6 +20,7 @@ if __package__:
     from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from .voice_conversion import convert_vocal, ConversionError
     from .voice_dataset import prepare_training_set
+    from .song_mix import mix_vocals, MixError, valid_wav
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
@@ -27,6 +28,7 @@ else:
     from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from voice_conversion import convert_vocal, ConversionError
     from voice_dataset import prepare_training_set
+    from song_mix import mix_vocals, MixError, valid_wav
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -84,6 +86,30 @@ class VoiceConvertWorker(QThread):
                              else 'Voice conversion failed. Check your trained model and local engine.')
 
 
+class VoiceMixWorker(QThread):
+    result = pyqtSignal(str, str)
+
+    def __init__(self, backing, vocal, vocal_gain, backing_gain):
+        super().__init__(QApplication.instance())
+        self.backing, self.vocal = backing, vocal
+        self.vocal_gain, self.backing_gain = vocal_gain, backing_gain
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            output = mix_vocals(self.backing, self.vocal, vocal_gain=self.vocal_gain,
+                                backing_gain=self.backing_gain, stop=self.stop)
+            self.result.emit(str(output), "New final WAV mix saved; original backing and vocals unchanged.")
+        except Exception as error:
+            self.result.emit("", str(error) if isinstance(error, MixError)
+                             else "Mix failed. Check FFmpeg and your selected audio files.")
+
+
 class DatasetWorker(QThread):
     result = pyqtSignal(bool, str)
 
@@ -106,6 +132,7 @@ class StudioAIPanel(QWidget):
         self.worker = None
         self.rvc_worker = None
         self.dataset_worker = None
+        self.mix_worker = None
         self.capture_proc = None
         self.capture_file = None
         self.capture_timer = QTimer(self)
@@ -238,6 +265,44 @@ class StudioAIPanel(QWidget):
         self.convert_button = QPushButton('Convert isolated vocal to My Voice')
         self.convert_button.clicked.connect(self.start_conversion)
         layout.addWidget(self.convert_button)
+
+        mix_heading = QLabel("Final song: combine My Voice with instrumental backing")
+        mix_heading.setStyleSheet("font-size:18px; color:#c4b5fd;")
+        layout.addWidget(mix_heading)
+        mix_note = QLabel("Supply an instrumental WAV and the isolated converted vocal WAV. "
+            "This makes a new mixed WAV without changing either source. "
+            "A complete AI song still needs verified stem separation before using this.")
+        mix_note.setWordWrap(True)
+        layout.addWidget(mix_note)
+        mix_form = QFormLayout()
+        self.mix_backing = QLineEdit()
+        self.mix_backing.setPlaceholderText("Select clean instrumental backing WAV")
+        self.mix_vocal = QLineEdit()
+        self.mix_vocal.setPlaceholderText("Converted My Voice WAV from RVC")
+        self.mix_voice_gain = QDoubleSpinBox()
+        self.mix_voice_gain.setRange(0.0, 2.0)
+        self.mix_voice_gain.setSingleStep(0.05)
+        self.mix_voice_gain.setValue(1.0)
+        self.mix_back_gain = QDoubleSpinBox()
+        self.mix_back_gain.setRange(0.0, 2.0)
+        self.mix_back_gain.setSingleStep(0.05)
+        self.mix_back_gain.setValue(1.0)
+        for name, control in (("Instrumental WAV", self.mix_backing),
+                              ("Converted vocal WAV", self.mix_vocal),
+                              ("Vocal level", self.mix_voice_gain),
+                              ("Backing level", self.mix_back_gain)):
+            mix_form.addRow(name, control)
+        layout.addLayout(mix_form)
+        pick_mix = QHBoxLayout()
+        for name, field in (("Choose backing", self.mix_backing),
+                            ("Choose converted vocal", self.mix_vocal)):
+            pick = QPushButton(name)
+            pick.clicked.connect(lambda _=False, target=field: self.pick_conversion_file(target, "WAV (*.wav)"))
+            pick_mix.addWidget(pick)
+        layout.addLayout(pick_mix)
+        self.mix_button = QPushButton("Export final WAV with My Voice")
+        self.mix_button.clicked.connect(self.start_mix)
+        layout.addWidget(self.mix_button)
         buttons = QHBoxLayout()
         self.preset = QPushButton('Broken Sorrow preset')
         self.preset.clicked.connect(lambda: self.style.setPlainText(BROKEN_SORROW))
@@ -275,10 +340,40 @@ class StudioAIPanel(QWidget):
 
     def conversion_done(self, target, message):
         self.status.setText(message + ((' Saved: ' + target) if target else ''))
+        if target:
+            self.mix_vocal.setText(target)
 
     def conversion_finished(self):
         worker, self.rvc_worker = self.rvc_worker, None
         self.convert_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def start_mix(self):
+        if self.mix_worker is not None:
+            return
+        try:
+            backing = str(valid_wav(self.mix_backing.text().strip(), "instrumental backing"))
+            vocal = str(valid_wav(self.mix_vocal.text().strip(), "converted singing vocal"))
+            if backing == vocal:
+                raise MixError("Choose different backing and converted-vocal WAV files.")
+        except (OSError, MixError) as error:
+            self.status.setText(str(error))
+            return
+        self.mix_worker = VoiceMixWorker(backing, vocal,
+                                         self.mix_voice_gain.value(), self.mix_back_gain.value())
+        self.mix_worker.result.connect(self.mix_done)
+        self.mix_worker.finished.connect(self.mix_finished)
+        self.mix_button.setEnabled(False)
+        self.status.setText("Combining backing and converted voice into a new WAV…")
+        self.mix_worker.start()
+
+    def mix_done(self, output, message):
+        self.status.setText(message + ((" " + output) if output else ""))
+
+    def mix_finished(self):
+        worker, self.mix_worker = self.mix_worker, None
+        self.mix_button.setEnabled(True)
         if worker is not None:
             worker.deleteLater()
 
