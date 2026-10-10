@@ -5,6 +5,7 @@ after the user explicitly requests separation. Outputs are inspected rather than
 assuming file names or claiming that a model always isolates voices perfectly.
 """
 from pathlib import Path
+import json
 import os
 import shutil
 import subprocess
@@ -93,6 +94,25 @@ def separate(source, *, rvc_root=None, output_root=None, device="cpu",
                 continue
         if len(valid) < 2:
             raise SeparationError("Expected vocal and instrumental outputs; inspect the job folder.")
-        return destination, sorted(valid)
+        ordered = sorted(valid)
+        receipt = {
+            "schema": 1,
+            "source_wav": str(source),
+            "separator_model": MODEL,
+            "requested_device": device,
+            "role_assignment": "manual_audition_required",
+            "original_preserved": True,
+            "stems": [
+                {"file": str(path.relative_to(destination)),
+                 "bytes": path.stat().st_size,
+                 "role": "unassigned"}
+                for path in ordered
+            ],
+        }
+        receipt_path = destination / "separation.json"
+        with receipt_path.open("x", encoding="utf-8") as manifest:
+            os.chmod(receipt_path, 0o600)
+            json.dump(receipt, manifest, indent=2)
+        return destination, ordered
     except OSError as error:
         raise SeparationError("Could not run the local stem separator.") from error
