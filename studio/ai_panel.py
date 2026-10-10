@@ -387,6 +387,10 @@ class StudioAIPanel(QWidget):
         self.separate_button = QPushButton("Separate vocals and backing")
         self.separate_button.clicked.connect(self.start_separation)
         separation_buttons.addWidget(self.separate_button)
+        self.stop_separation_button = QPushButton("Stop separation")
+        self.stop_separation_button.setEnabled(False)
+        self.stop_separation_button.clicked.connect(self.cancel_separation)
+        separation_buttons.addWidget(self.stop_separation_button)
         layout.addLayout(separation_buttons)
         stem_review_notice = QLabel("Review the extracted WAV files. Listen before marking which one is the "
                                     "singing vocal and which is instrumental. Names alone are not proof.")
@@ -527,6 +531,15 @@ class StudioAIPanel(QWidget):
         except (OSError, MixError) as error:
             self.status.setText(str(error))
             return
+        answer = QMessageBox.question(
+            self, 'Local vocal separation',
+            'Separate this song using the local RVC/PyMSS model? The first run may download '
+            'substantial model weights and may use significant CPU or GPU resources. '
+            'Your source WAV will be preserved.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            self.status.setText('Stem extraction cancelled before model access.')
+            return
         self.separation_directory = None
         self.separation_files.clear()
         self.stem_candidates.clear()
@@ -534,6 +547,7 @@ class StudioAIPanel(QWidget):
         self.separation_worker.result.connect(self.separation_done)
         self.separation_worker.finished.connect(self.separation_finished)
         self.separate_button.setEnabled(False)
+        self.stop_separation_button.setEnabled(True)
         self.status.setText("Extracting stems locally. Existing files are unchanged…")
         self.separation_worker.start()
 
@@ -607,9 +621,16 @@ class StudioAIPanel(QWidget):
         if self.separation_directory and self.separation_directory.is_dir():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.separation_directory)))
 
+    def cancel_separation(self):
+        if self.separation_worker is not None:
+            self.separation_worker.stop.set()
+            self.stop_separation_button.setEnabled(False)
+            self.status.setText('Stopping local vocal separation. Original audio remains unchanged.')
+
     def separation_finished(self):
         worker, self.separation_worker = self.separation_worker, None
         self.separate_button.setEnabled(True)
+        self.stop_separation_button.setEnabled(False)
         if worker is not None:
             worker.deleteLater()
 
