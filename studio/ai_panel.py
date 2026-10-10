@@ -18,11 +18,13 @@ if __package__:
     from .tools import TOOLS, resolve_tool
     from .arrangement import VOICE_OPTIONS
     from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
+    from .voice_conversion import convert_vocal, ConversionError
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
     from arrangement import VOICE_OPTIONS
     from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
+    from voice_conversion import convert_vocal, ConversionError
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -57,11 +59,35 @@ class MusicWorker(QThread):
                              else 'Music operation failed. Check the local engine and saved job status.')
 
 
+class VoiceConvertWorker(QThread):
+    result = pyqtSignal(str, str)
+
+    def __init__(self, model, vocal, index):
+        super().__init__(QApplication.instance())
+        self.model, self.vocal, self.index = model, vocal, index
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            target = convert_vocal(self.model, self.vocal, index=self.index or None,
+                                   stop=self.stop)
+            self.result.emit(str(target), 'Converted isolated vocal saved. Mix it with the original backing in your DAW.')
+        except Exception as error:
+            self.result.emit('', str(error) if isinstance(error, ConversionError)
+                             else 'Voice conversion failed. Check your trained model and local engine.')
+
+
 class StudioAIPanel(QWidget):
     def __init__(self, output_root=None):
         super().__init__()
         self.output_root = Path(output_root) if output_root else Path.home() / 'Documents/Spider Studio/Music/AI Songs'
         self.worker = None
+        self.rvc_worker = None
         self.capture_proc = None
         self.capture_file = None
         self.capture_timer = QTimer(self)
@@ -160,6 +186,37 @@ class StudioAIPanel(QWidget):
         layout.addWidget(self.voice_status)
         QApplication.instance().aboutToQuit.connect(self.cancel_capture)
         self.update_voice_status()
+
+        rvc_heading = QLabel('Trained My Voice: offline vocal conversion')
+        rvc_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
+        layout.addWidget(rvc_heading)
+        rvc_notice = QLabel('Requires a separately trained, trusted local RVC .pth model, optional .index, '
+            'RVC dependencies and an isolated vocal WAV. It changes vocal timbre; it does not create '
+            'new lyrics, correct bad notes, or automatically remix a complete song. Never load untrusted model files.')
+        rvc_notice.setWordWrap(True)
+        layout.addWidget(rvc_notice)
+        convert_form = QFormLayout()
+        self.rvc_model = QLineEdit()
+        self.rvc_model.setPlaceholderText('Select your trained voice .pth file')
+        self.rvc_index = QLineEdit()
+        self.rvc_index.setPlaceholderText('Optional model .index file')
+        self.rvc_vocal = QLineEdit()
+        self.rvc_vocal.setPlaceholderText('Select an isolated vocal WAV, not a full music mix')
+        convert_form.addRow('My Voice model', self.rvc_model)
+        convert_form.addRow('RVC index', self.rvc_index)
+        convert_form.addRow('Isolated singing', self.rvc_vocal)
+        layout.addLayout(convert_form)
+        conversion_actions = QHBoxLayout()
+        for label, field, flt in (('Choose voice model', self.rvc_model, 'RVC model (*.pth)'),
+                                   ('Choose voice index', self.rvc_index, 'RVC index (*.index)'),
+                                   ('Choose isolated vocal', self.rvc_vocal, 'WAV vocals (*.wav)')):
+            choose = QPushButton(label)
+            choose.clicked.connect(lambda _=False, target=field, extension=flt: self.pick_conversion_file(target, extension))
+            conversion_actions.addWidget(choose)
+        layout.addLayout(conversion_actions)
+        self.convert_button = QPushButton('Convert isolated vocal to My Voice')
+        self.convert_button.clicked.connect(self.start_conversion)
+        layout.addWidget(self.convert_button)
         buttons = QHBoxLayout()
         self.preset = QPushButton('Broken Sorrow preset')
         self.preset.clicked.connect(lambda: self.style.setPlainText(BROKEN_SORROW))
@@ -177,6 +234,32 @@ class StudioAIPanel(QWidget):
             button = QPushButton(label); button.clicked.connect(action); actions.addWidget(button)
         layout.addLayout(actions)
         self.refresh()
+
+    def pick_conversion_file(self, field, pattern):
+        path, _ = QFileDialog.getOpenFileName(self, 'Select local voice asset',
+                                              str(Path.home()), pattern)
+        if path:
+            field.setText(path)
+
+    def start_conversion(self):
+        if self.rvc_worker is not None:
+            return
+        self.rvc_worker = VoiceConvertWorker(self.rvc_model.text(),
+            self.rvc_vocal.text(), self.rvc_index.text())
+        self.rvc_worker.result.connect(self.conversion_done)
+        self.rvc_worker.finished.connect(self.conversion_finished)
+        self.convert_button.setEnabled(False)
+        self.status.setText('Converting isolated vocal with locally trained RVC model…')
+        self.rvc_worker.start()
+
+    def conversion_done(self, target, message):
+        self.status.setText(message + ((' Saved: ' + target) if target else ''))
+
+    def conversion_finished(self):
+        worker, self.rvc_worker = self.rvc_worker, None
+        self.convert_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
 
     def update_voice_status(self):
         count = len(samples())
