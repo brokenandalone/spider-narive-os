@@ -557,7 +557,7 @@ class WebbiePanel(QWidget):
                 if str(author_path) not in sys.path:
                     sys.path.insert(0, str(author_path))
                 try:
-                    from control_socket import send_author_command
+                    from commands_client import send_author_command
                     result = send_author_command(text, source='typed')
                 except (ImportError, OSError) as error:
                     result = 'Author command bridge unavailable: ' + str(error)
