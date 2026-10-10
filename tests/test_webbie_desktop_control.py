@@ -90,7 +90,8 @@ class DesktopControlTests(unittest.TestCase):
         ])
         self.operator.press('ctrl+z')
         self.operator.type_text('hello $(touch /tmp/unsafe) ; &&')
-        command, kwargs = self.runner.call_args
+        args, kwargs = self.runner.call_args
+        command = args[0]
         self.assertEqual(command[-1], 'hello $(touch /tmp/unsafe) ; &&')
         self.assertNotIn('shell', kwargs)
         self.assertEqual(command[0], 'xdotool')
