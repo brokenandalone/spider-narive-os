@@ -119,7 +119,6 @@ APP_FILES = (
     'studio/rvc_loopback.py',
     'studio/voice_profile.py',
     'the-web/package/reconcile-native.py',
-            'kali-bay/package/install-kali-bay.sh',
     'kali-bay/package/install-kali-bay.sh',
 )
 # Exact recognized historical Study source blobs from the prior guarded
@@ -168,6 +167,7 @@ def prepare_items(root=PROJECT_ROOT, install=INSTALL_ROOT, units=UNIT_ROOT,
             'study/bin/webbie-homework', 'author/main.py',
             'studio/package/music-engine.sh', 'studio/package/voice-engine.sh',
             'the-web/package/reconcile-native.py',
+            'kali-bay/package/install-kali-bay.sh',
             'studio/main.py', 'study/study.py', 'media/ai-dj/service.py'
         ) else 0o644
         found.append(Item(root / relative, install / relative, mode=mode,
