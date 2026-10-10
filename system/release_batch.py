@@ -109,6 +109,16 @@ APP_FILES = (
     'study/apa.py', 'study/paper_dialog.py', 'studio/tools.py',
     'webbie/agent/author_voice_bridge.py',
     'webbie/agent/kali_assistant.py',
+    # Auxiliary modules omitted by the original PR #48 integration.
+    'author/narration_bookmarks.py',
+    'author/review_cache.py',
+    'media/ai-dj/spider-ai-dj.service',
+    'studio/ai_controls.py',
+    'studio/package/music-engine.sh',
+    'studio/package/voice-engine.sh',
+    'studio/rvc_loopback.py',
+    'studio/voice_profile.py',
+    'the-web/package/reconcile-native.py',
 )
 # Exact recognized historical Study source blobs from the prior guarded
 # installer. Unknown owner PC edits still block the entire transaction.
@@ -154,6 +164,8 @@ def prepare_items(root=PROJECT_ROOT, install=INSTALL_ROOT, units=UNIT_ROOT,
             'the-web/shell/main.py', 'the-web/overlay/webbie_face.py',
             'system/onedrive.py', 'kali-bay/bin/kali-bay',
             'study/bin/webbie-homework', 'author/main.py',
+            'studio/package/music-engine.sh', 'studio/package/voice-engine.sh',
+            'the-web/package/reconcile-native.py',
             'studio/main.py', 'study/study.py', 'media/ai-dj/service.py'
         ) else 0o644
         found.append(Item(root / relative, install / relative, mode=mode,
