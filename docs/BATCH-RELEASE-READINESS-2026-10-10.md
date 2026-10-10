@@ -12,7 +12,7 @@ Owner's request: combine upgrades into one release, back up once, install once, 
 
 ## Current blockers
 
-1. system/release_batch.py still has an older Webbie-centered APP_FILES list, not a manifest of the Studio, Study, Author, Kali, Forage and Media improvements. The new read-only audit enumerates omissions.
+1. The guarded APP_FILES installer manifest has now been expanded to cover the PR #48 native-source changes plus restored Study source. **This is source coverage only**: the live Media/Nova user-unit activation path, executable launch permissions and PC-specific safe destinations still require local validation. Never confuse presence in the manifest with a working application.
 2. Resident webbie/agent/webbie.py still needs wiring for the new Author voice bridge and Kali assistant without losing the customized installed agent's voice, memory, interruption and research behavior.
 3. Real machine's latest script hashes and customizations must be compared before applying replacements.
 4. Voice conversion/model quality, SNHU and school OneDrive authentication, live radio/Media Center, and Kali Distrobox use need actual PC qualification.
