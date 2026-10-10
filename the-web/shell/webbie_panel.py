@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
 from webbie_camera import camera_devices, capture_jpeg, describe_frame
 from webbie_face_profiles_ui import FaceProfileControls
 from webbie_vision_bridge import VisionBridge
+from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_catalog
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'overlay'))
 from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 
@@ -196,6 +197,7 @@ class WebbiePanel(QWidget):
         self._observed_sleep = self.face_sleeping
         self.camera_worker = None
         self.vision_bridge = None
+        self.computer_dialog = None
         self.camera_allowed = False
         self.camera_continuous = False
         self.camera_summary = ''
@@ -275,6 +277,11 @@ class WebbiePanel(QWidget):
         wake_button = QPushButton('Wake Webbie')
         wake_button.clicked.connect(lambda: self.face_mode('wake'))
         choices.addWidget(wake_button)
+        computer_button = QPushButton('Control my computer')
+        computer_button.setObjectName('webbieComputerControlButton')
+        computer_button.setToolTip('Opens a permission-required local desktop operator. No automatic control.')
+        computer_button.clicked.connect(self.open_computer_dialog)
+        layout.addWidget(computer_button)
         self.cloud_label = QLabel(cloud_state_label())
         self.cloud_label.setWordWrap(True)
         layout.addWidget(self.cloud_label)
@@ -545,9 +552,30 @@ class WebbiePanel(QWidget):
             fields.append('Selected title: ' + self.workspace_summary)
         return '[Spider OS workspace context; advisory only]\n' + '\n'.join(fields) + '\n[User request]\n' + text
 
+    def open_computer_dialog(self, suggested_app_id=None):
+        if self.computer_dialog is None:
+            self.computer_dialog = WebbieComputerDialog(self)
+        if suggested_app_id:
+            self.computer_dialog.offer_program(suggested_app_id)
+        self.computer_dialog.show()
+        self.computer_dialog.raise_()
+        self.computer_dialog.activateWindow()
+
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        # A typed request to open an installed program invokes a visible task
+        # grant. No words typed into chat directly authorize computer control.
+        candidates = (self.computer_dialog.apps if self.computer_dialog is not None
+                      else app_catalog().discover_apps())
+        program = parse_open_request(text, candidates)
+        if program is not None:
+            self.open_computer_dialog(program.desktop_id)
+            self.append_message(
+                'Status', 'Choose a task and authorize desktop control in the '
+                'local computer panel. Nothing was opened automatically.')
+            self.entry.clear()
             return
         request = self.prepare_request(text)
         if self.camera_allowed and self.camera_summary:
