@@ -15,12 +15,14 @@ try:
     from .course_materials import read_course_document
     from .paper_dialog import PaperDialog
     from .apa import create_paper
+    from .draft_storage import drafts_folder, save_snapshot, read_snapshot
 except ImportError:
     from homework import (load_style, save_style, clear_style, sample_from_file,
                           build_prompt, webbie_draft, MAX_CONTEXT, MAX_TASK)
     from course_materials import read_course_document
     from paper_dialog import PaperDialog
     from apa import create_paper
+    from draft_storage import drafts_folder, save_snapshot, read_snapshot
 
 
 class DraftWorker(QThread):
@@ -47,6 +49,7 @@ class HomeworkDialog(QDialog):
         self.notes = str(notes)
         self.worker = None
         self.last_mode = "draft"
+        self.last_exported_path = None
         outer = QVBoxLayout(self)
         intro = QLabel("Webbie drafts and revises at your request using local AI. "
                        "You choose what course material and writing samples she sees. "
@@ -119,12 +122,22 @@ class HomeworkDialog(QDialog):
         outer.addLayout(actions)
         self.draft = QTextEdit()
         self.draft.setAcceptRichText(False)
+        self.draft.textChanged.connect(self.invalidate_export)
         self.draft.setPlaceholderText("Webbie's editable draft appears here. No automatic submission.")
         outer.addWidget(self.draft, 1)
         footer = QHBoxLayout()
+        save_button = QPushButton("Save local draft")
+        save_button.clicked.connect(self.save_local_draft)
+        footer.addWidget(save_button)
+        restore_button = QPushButton("Restore a draft")
+        restore_button.clicked.connect(self.restore_local_draft)
+        footer.addWidget(restore_button)
         export = QPushButton("Export as APA Word paper")
         export.clicked.connect(self.export_apa)
         footer.addWidget(export)
+        upload_button = QPushButton("Upload APA Word to school OneDrive")
+        upload_button.clicked.connect(self.upload_apa_to_school)
+        footer.addWidget(upload_button)
         close = QPushButton("Close")
         close.clicked.connect(self.close)
         footer.addWidget(close)
@@ -132,6 +145,56 @@ class HomeworkDialog(QDialog):
         self.status = QLabel("Ready. Nothing is sent to Webbie until you request a draft.")
         self.status.setWordWrap(True)
         outer.addWidget(self.status)
+
+    def invalidate_export(self):
+        # A Word export is only eligible for upload while the editable draft
+        # still matches it. Any edit requires a fresh explicit export.
+        self.last_exported_path = None
+
+    def save_local_draft(self):
+        try:
+            path = save_snapshot(self.course_folder, self.assignment.text(),
+                                 self.draft.toPlainText())
+            self.status.setText("New local draft saved: " + str(path))
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Save draft", str(error))
+
+    def restore_local_draft(self):
+        try:
+            folder = drafts_folder(self.course_folder)
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Restore draft", str(error))
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Restore a saved draft", str(folder), "Draft text (*.txt)")
+        if not path:
+            return
+        try:
+            restored = read_snapshot(path, self.course_folder)
+            current = self.draft.toPlainText()
+            if current.strip() and current != restored:
+                save_snapshot(self.course_folder, self.assignment.text(), current)
+            self.draft.setPlainText(restored)
+            self.status.setText("Previous draft restored; current changes were preserved in a new snapshot.")
+        except (ValueError, OSError, UnicodeError) as error:
+            QMessageBox.warning(self, "Restore draft", str(error))
+
+    def upload_apa_to_school(self):
+        if self.last_exported_path is None:
+            QMessageBox.warning(
+                self, "School OneDrive",
+                "First export your current homework draft as an APA Word file.")
+            return
+        try:
+            if __package__:
+                from .school_upload import SchoolDraftUploadDialog
+            else:
+                from school_upload import SchoolDraftUploadDialog
+            dialog = SchoolDraftUploadDialog(
+                self, self.course_folder, self.last_exported_path)
+            dialog.exec_()
+        except (ValueError, OSError, RuntimeError, ImportError) as error:
+            QMessageBox.warning(self, "School OneDrive", str(error))
 
     def import_style(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -240,9 +303,19 @@ class HomeworkDialog(QDialog):
 
     def draft_ready(self, text):
         if text.strip():
+            previous = self.draft.toPlainText()
+            if previous.strip() and previous != text:
+                try:
+                    save_snapshot(self.course_folder, self.assignment.text(), previous)
+                except (ValueError, OSError) as error:
+                    self.status.setText("Existing work could not be backed up: " + str(error) +
+                                        ". New text was not applied.")
+                    self.release_worker()
+                    return
             self.draft.setPlainText(text)
             self.status.setText(
-                "Draft ready for review. Check facts, sources and assignment requirements.")
+                "Draft ready. Prior version backed up when applicable. "
+                "Review facts, citations and your assignment requirements.")
         else:
             self.status.setText("Webbie returned no draft.")
         self.release_worker()
@@ -279,7 +352,8 @@ class HomeworkDialog(QDialog):
         except (OSError, ValueError, ImportError, FileExistsError) as error:
             QMessageBox.warning(self, "APA export", str(error))
             return
-        self.status.setText("APA draft saved locally: " + file + ". No cloud upload or school submission.")
+        self.last_exported_path = Path(file)
+        self.status.setText("APA draft saved locally: " + file + ". School upload requires a separate action.")
 
     def closeEvent(self, event):
         if self.worker is not None and self.worker.isRunning():
