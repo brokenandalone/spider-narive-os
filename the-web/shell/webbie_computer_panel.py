@@ -22,7 +22,8 @@ from task_grants import TaskGrant
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from screen_capture import capture_window, describe_window
-from webbie_camera import DEFAULT_VISION_MODEL as INSTALLED_CAMERA_VISION_MODEL
+sys.path.insert(0, str(ROOT / 'webbie/brain'))
+from local_models import choose_local_model
 from visual_step import propose_step
 from autopilot_policy import AutopilotPolicy
 from webbie_operator_bridge import OperatorBridge
@@ -61,7 +62,8 @@ class ScreenWorker(QThread):
         try:
             self.described.emit(describe_window(
                 self.jpeg, 'Briefly identify the visible application controls. '
-                'Do not repeat personal or secret data.', model=self.model))
+                'Do not repeat personal or secret data.',
+                model=self.model or choose_local_model('vision')))
         except (ValueError, RuntimeError, OSError) as error:
             self.failed.emit(str(error))
         finally:
@@ -81,7 +83,8 @@ class StepWorker(QThread):
     def run(self):
         try:
             self.proposed.emit(
-                propose_step(self.jpeg, self.task, self.width, self.height, model=self.model))
+                propose_step(self.jpeg, self.task, self.width, self.height,
+                             model=self.model or choose_local_model('vision')))
         except (ValueError, RuntimeError, OSError) as error:
             self.failed.emit(str(error))
         finally:
@@ -89,15 +92,19 @@ class StepWorker(QThread):
 
 
 class WebbieComputerDialog(QDialog):
+    taskApproved = pyqtSignal(str)
+    screenObserved = pyqtSignal(str)
+    authorizationRevoked = pyqtSignal()
+
     def __init__(self, parent=None, *, discover=None, run=None, launcher=None):
         super().__init__(parent)
         self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
         self.setObjectName('webbieComputerControl')
         self.resize(510, 610)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
-        # Reuse the camera model already deployed on the PC; never pull or switch models.
-        self.vision_model = (os.environ.get('WEBBIE_VISION_MODEL') or
-                             INSTALLED_CAMERA_VISION_MODEL)
+        # Resolve preferences against locally INSTALLED Ollama models in the
+        # background worker. Never download or switch the owner's engine.
+        self.vision_model = None
         self.grant = TaskGrant(approve_sensitive=self.approve_sensitive)
         self.operator = ConfinedDesktopOperator(
             permission=self.grant.authorize,
@@ -247,6 +254,7 @@ class WebbieComputerDialog(QDialog):
             self.grant.stop()
             self.status('Desktop voice bridge unavailable: ' + str(error))
             return
+        self.taskApproved.emit(task)
         self.status(f'Authorized: {app.name}. No changes made yet.')
         self.refresh_status()
 
@@ -257,6 +265,7 @@ class WebbieComputerDialog(QDialog):
         self.pending_step_target = None
         self.grant.stop()
         self.bridge.deactivate()
+        self.authorizationRevoked.emit()
         self.status('STOPPED. No additional Webbie computer actions are authorized.')
         self.refresh_status()
 
@@ -372,6 +381,12 @@ class WebbieComputerDialog(QDialog):
         if self.selected_window():
             self.action(self.operator.close_window, self.selected_window())
 
+    def _publish_screen_observation(self, message):
+        # A delayed local vision result after STOP must not restore awareness.
+        if (self.grant.status()['active'] and
+                self.operator.target_window == self.selected_window()):
+            self.screenObserved.emit(message)
+
     def inspect_window(self):
         target = self.selected_window()
         if (not target or target != self.operator.target_window or
@@ -401,6 +416,7 @@ class WebbieComputerDialog(QDialog):
         self.screen_worker = ScreenWorker(image, self.vision_model, self)
         self.screen_worker.described.connect(
             lambda message: self.status('Local screen observation (untrusted):\n' + message))
+        self.screen_worker.described.connect(self._publish_screen_observation)
         self.screen_worker.failed.connect(self.status)
         self.screen_worker.start()
 

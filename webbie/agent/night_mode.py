@@ -16,10 +16,14 @@ SLEEP_COMMANDS = frozenset({
     'webbie go to sleep', 'webbie goodnight', 'webbie good night',
     'goodnight webbie', 'good night webbie',
     'hey web go to sleep', 'hey web goodnight',
+    'webby go to sleep', 'hey webby go to sleep',
+    'webby goodnight', 'webby good night', 'goodnight webby',
+    'hey webby goodnight',
 })
 WAKE_COMMANDS = frozenset({
     'hey webbie wake up', 'webbie wake up',
     'hey web wake up', 'hey webbie wake', 'webbie wake',
+    'webby wake up', 'hey webby wake up', 'webby wake', 'hey webby wake',
 })
 
 

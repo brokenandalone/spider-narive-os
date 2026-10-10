@@ -40,6 +40,7 @@ from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
 from app_open_route import installed_app_request
 from voice_turns import VoiceTurnTracker
+from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
 from vision_query import visual_question, ask_vision
@@ -652,7 +653,8 @@ def voice_listener():
         global awaiting_command_until
         if not is_direct_stop(phrase):
             return
-        awaiting_command_until = 0
+        awaiting_command_until = next_window(
+            awaiting_command_until, 'stop', time.time())
         voice_turns.interrupted()
         speech_playback.stop()
         try:
@@ -689,14 +691,20 @@ def voice_listener():
 
         now = time.time()
 
-        if (
-            now
-            < awaiting_command_until
-        ):
-            awaiting_command_until = 0
+        # Direct stop cancels current output and keeps follow-up listening open.
+        if is_direct_stop(phrase):
+            on_interrupt(phrase)
+            return
+        if is_end_conversation(phrase):
+            awaiting_command_until = next_window(
+                awaiting_command_until, 'end', now)
+            return
 
-            start_voice_turn(phrase)
-
+        if now < awaiting_command_until:
+            woke, command = remove_wake_word(phrase)
+            awaiting_command_until = next_window(
+                awaiting_command_until, 'command', now)
+            start_voice_turn(command if woke and command else phrase)
             return
 
         woke, command = (
@@ -709,13 +717,13 @@ def voice_listener():
             return
 
         if command:
+            awaiting_command_until = next_window(
+                awaiting_command_until, 'command', now)
             start_voice_turn(command)
-
             return
 
-        awaiting_command_until = (
-            time.time() + 10
-        )
+        awaiting_command_until = next_window(
+            awaiting_command_until, 'wake', now)
 
         say(
             f"I'm here, "
