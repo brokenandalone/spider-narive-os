@@ -160,6 +160,17 @@
 
 ## 4. Author — private manuscripts, library and canon
 
+### New audiobook bookmarks and review-section navigation (stacked after PR #42)
+- [x] Source: Webbie stores the spoken section at playback start as a book-specific bookmark in Author's local SQLite database; no manuscript text is copied.
+- [x] Source: Explicit **Resume bookmarked book** control restarts from the saved chapter and spoken section. If book text or chapter order changed, it refuses a stale bookmark rather than skipping or misreading.
+- [x] Source: Completion removes the bookmark; stopping early preserves the last started section for safe replay. Reader pause/resume and stop remain separate actions.
+- [x] Source: New reports capture deterministic exact source segment ranges, and GUI links jump to the reviewed section only if the chapter hash still matches. Unicode UTF-16 cursor positions accounted for.
+- [x] Source regression tests for book position persistence, invalidation, explicit resume, source links and stale review protection.
+- [ ] Qualify audiobook bookmark playback and resume on the actual PC, including long narrated books and the customized Webbie microphone/voice state.
+- [ ] Structured finding-to-sentence evidence and spoken audiobook interruption remain later upgrades.
+
+
+
 ### New saved-review workflow (stacked after PR #37)
 - [x] Source: Completed Webbie chapter and whole-book review reports are saved inside Author's existing SQLite library, included in its normal backups.
 - [x] Source: Open prior reports without calling Ollama again; label findings **OUTDATED** when reviewed chapters or canon have changed.
