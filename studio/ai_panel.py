@@ -19,7 +19,7 @@ if __package__:
     from .arrangement import VOICE_OPTIONS
     from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from .voice_conversion import convert_vocal, ConversionError
-    from .voice_dataset import prepare_training_set
+    from .voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
     from .song_mix import mix_vocals, MixError, valid_wav
     from .stem_separation import separate, SeparationError
 else:
@@ -28,7 +28,7 @@ else:
     from arrangement import VOICE_OPTIONS
     from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from voice_conversion import convert_vocal, ConversionError
-    from voice_dataset import prepare_training_set
+    from voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
     from song_mix import mix_vocals, MixError, valid_wav
     from stem_separation import separate, SeparationError
 
@@ -134,6 +134,20 @@ class VoiceMixWorker(QThread):
                              else "Mix failed. Check FFmpeg and your selected audio files.")
 
 
+class TrainingReadinessWorker(QThread):
+    result = pyqtSignal(object)
+
+    def __init__(self):
+        super().__init__(QApplication.instance())
+        QApplication.instance().aboutToQuit.connect(self.wait)
+
+    def run(self):
+        try:
+            self.result.emit(inspect_samples())
+        except (OSError, VoiceSampleError) as error:
+            self.result.emit({'error': str(error)})
+
+
 class DatasetWorker(QThread):
     result = pyqtSignal(bool, str)
 
@@ -156,6 +170,7 @@ class StudioAIPanel(QWidget):
         self.worker = None
         self.rvc_worker = None
         self.dataset_worker = None
+        self.readiness_worker = None
         self.mix_worker = None
         self.separation_worker = None
         self.finish_after_conversion = False
@@ -249,6 +264,10 @@ class StudioAIPanel(QWidget):
         self.record_button.clicked.connect(self.record_voice)
         self.import_button = QPushButton('Import my vocal sample')
         self.import_button.clicked.connect(self.import_voice)
+        self.readiness_button = QPushButton('Check My Voice training readiness')
+        self.readiness_button.clicked.connect(self.check_voice_readiness)
+        self.readiness_details = QLabel('Select Check to measure usable singing recordings against the 10-minute minimum.')
+        self.readiness_details.setWordWrap(True)
         self.dataset_button = QPushButton('Prepare private RVC training dataset')
         self.dataset_button.clicked.connect(self.prepare_dataset)
         self.voice_status = QLabel('No trained voice model. Recording is opt-in and kept on this computer.')
@@ -256,6 +275,8 @@ class StudioAIPanel(QWidget):
         voice_buttons.addWidget(self.record_button)
         voice_buttons.addWidget(self.import_button)
         layout.addLayout(voice_buttons)
+        layout.addWidget(self.readiness_button)
+        layout.addWidget(self.readiness_details)
         layout.addWidget(self.dataset_button)
         layout.addWidget(self.voice_status)
         QApplication.instance().aboutToQuit.connect(self.cancel_capture)
@@ -478,6 +499,39 @@ class StudioAIPanel(QWidget):
         worker, self.mix_worker = self.mix_worker, None
         self.mix_button.setEnabled(True)
         self.finish_song_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def check_voice_readiness(self):
+        if self.readiness_worker is not None:
+            return
+        self.readiness_button.setEnabled(False)
+        self.readiness_details.setText('Checking local recording durations…')
+        self.readiness_worker = TrainingReadinessWorker()
+        self.readiness_worker.result.connect(self.voice_readiness_done)
+        self.readiness_worker.finished.connect(self.voice_readiness_finished)
+        self.readiness_worker.start()
+
+    def voice_readiness_done(self, report):
+        if 'error' in report:
+            self.readiness_details.setText('Cannot measure My Voice recordings: ' + report['error'])
+            return
+        seconds = float(report['total_seconds'])
+        usable = int(report['usable_clips'])
+        rejected = int(report['rejected_clips'])
+        remaining = max(0.0, MIN_TRAIN_SECONDS - seconds)
+        message = f'Usable: {seconds / 60:.1f} of {MIN_TRAIN_SECONDS / 60:.0f} minutes ({usable} clips).'
+        if rejected:
+            message += f' {rejected} recording(s) rejected: review or re-record.'
+        if report['ready_to_prepare']:
+            message += ' Ready to prepare a PRIVATE training set. No model has been trained.'
+        else:
+            message += f' Need {remaining / 60:.1f} more usable minutes before dataset preparation.'
+        self.readiness_details.setText(message)
+
+    def voice_readiness_finished(self):
+        worker, self.readiness_worker = self.readiness_worker, None
+        self.readiness_button.setEnabled(True)
         if worker is not None:
             worker.deleteLater()
 
