@@ -62,6 +62,7 @@ APP_FILES = (
     'webbie/agent/night_mode.py', 'webbie/agent/workspace_names.py',
     'webbie/agent/interrupt_intent.py', 'webbie/agent/stop_signal.py',
     'webbie/agent/app_open_route.py',
+    'webbie/agent/voice_turns.py',
     'webbie/voice/interruptible_speech.py', 'webbie/voice/whisper_listener.py',
     'webbie/actions/desktop_control.py', 'webbie/actions/task_grants.py',
     'webbie/actions/screen_capture.py',
