@@ -35,13 +35,28 @@ def speech_segments(text, limit=440):
     return result
 
 
+def book_reading_plan(chapters):
+    """Return ordered (title, spoken text, chapter_id, section index) entries."""
+    items = []
+    for chapter in chapters:
+        title = str(chapter["title"])
+        ident = int(chapter["id"])
+        items.append((title, title, ident, 0))
+        for index, part in enumerate(speech_segments(chapter["content"]), 1):
+            items.append((title, part, ident, index))
+    return items
+
+
 class WebbieReader(QThread):
     changed = pyqtSignal(str)
+    positionChanged = pyqtSignal(int, int, int)
+    bookCompleted = pyqtSignal(int)
 
     def __init__(self, parent=None, voice_script=WEBBIE_VOICE):
         super().__init__(parent)
         self.voice_script = Path(voice_script)
         self.queue = []
+        self._book_id = None
         self._stop_flag = threading.Event()
         self._go = threading.Event()
         self._go.set()
@@ -52,22 +67,31 @@ class WebbieReader(QThread):
         return self.voice_script.is_file()
 
     def start_chapter(self, content, title="Chapter"):
-        self._start_queue([(str(title), str(content))])
+        items = [(str(title), str(title), None, 0)]
+        items.extend((str(title), part, None, index) for index, part
+                     in enumerate(speech_segments(content), 1))
+        self._start_queue(items)
 
-    def start_book(self, chapters):
-        self._start_queue([(str(c["title"]), str(c["content"])) for c in chapters])
+    def start_book(self, chapters, *, book_id=None, resume=None):
+        items = book_reading_plan(chapters)
+        if resume is not None:
+            # Never quietly begin at the wrong chapter if a bookmark is bad.
+            matches = [index for index, item in enumerate(items)
+                       if (item[2], item[3]) == tuple(resume)]
+            if not matches:
+                raise ValueError("The saved audiobook position no longer exists.")
+            items = items[matches[0]:]
+        self._start_queue(items, book_id=book_id)
 
-    def _start_queue(self, chapters):
+    def _start_queue(self, items, *, book_id=None):
         if self.isRunning():
             raise RuntimeError("Webbie is already reading. Stop the current reading first.")
         if not self.available():
             raise RuntimeError("Webbie's voice module was not found. Check the Spider OS voice installation.")
-        self.queue = []
-        for title, content in chapters:
-            self.queue.append((title, title))
-            self.queue.extend((title, paragraph) for paragraph in speech_segments(content))
-        if not self.queue:
+        if not items:
             raise ValueError("The selected manuscript has no text to read.")
+        self._book_id = int(book_id) if book_id is not None else None
+        self.queue = items
         self._stop_flag.clear()
         self._go.set()
         super().start()
@@ -105,7 +129,7 @@ class WebbieReader(QThread):
             NARRATING_MARKER.write_text(str(os.getpid()), encoding="ascii")
             os.chmod(NARRATING_MARKER, 0o600)
             total = len(self.queue)
-            for index, (chapter, content) in enumerate(self.queue, 1):
+            for index, (chapter, content, chapter_id, section_index) in enumerate(self.queue, 1):
                 while not self._go.wait(0.1):
                     if self._stop_flag.is_set():
                         break
@@ -113,6 +137,11 @@ class WebbieReader(QThread):
                     break
                 self.changed.emit(
                     f"Webbie reading {chapter} | section {index} of {total}")
+                # Store this section BEFORE speaking it so interruptions
+                # replay, rather than silently skip, unfinished audio.
+                if self._book_id is not None and chapter_id is not None:
+                    self.positionChanged.emit(
+                        self._book_id, chapter_id, section_index)
                 proc = subprocess.Popen(
                     [sys.executable, "-c", VOICE_BOOTSTRAP,
                      str(self.voice_script.parent)],
@@ -137,6 +166,8 @@ class WebbieReader(QThread):
                     break
                 if proc.returncode != 0:
                     raise RuntimeError("Webbie voice stopped unexpectedly.")
+            if not self._stop_flag.is_set() and self._book_id is not None:
+                self.bookCompleted.emit(self._book_id)
             self.changed.emit(
                 "Webbie narration stopped." if self._stop_flag.is_set()
                 else "Webbie finished reading.")
