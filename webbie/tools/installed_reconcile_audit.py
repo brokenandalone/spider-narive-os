@@ -67,6 +67,7 @@ def inventory(path, needles):
         'state': 'present',
         'sha256': sha(path),
         'lines': len(raw.splitlines()),
+        'symbols': sorted(funcs)[:500],
         'missing_repair_symbols': sorted(set(needles) - funcs),
     }
 
@@ -91,6 +92,10 @@ def report(root=ROOT, install=INSTALL):
             'installed': live,
             'checkout': checked_in,
             'byte_identical': same,
+            'pc_only_symbols': sorted(
+                set(live.get('symbols', [])) - set(checked_in.get('symbols', [])))[:100],
+            'github_only_symbols': sorted(
+                set(checked_in.get('symbols', [])) - set(live.get('symbols', [])))[:100],
             'action': 'keep installed; reconciliation required' if not same
                       else 'identical; review required before deploying',
         }
