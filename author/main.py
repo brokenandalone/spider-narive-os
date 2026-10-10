@@ -255,6 +255,12 @@ class AuthorWindow(QMainWindow):
                 self.status.setText('Library backup saved.')
 
     def closeEvent(self, event):
+        if not self.toolkit.shutdown():
+            self.status.setText(
+                'Webbie is stopping the active review or narration. '
+                'Close Author again when the task has finished.')
+            event.ignore()
+            return
         if self.flush():
             self.timer.stop(); self.store.close(); event.accept()
         else:
