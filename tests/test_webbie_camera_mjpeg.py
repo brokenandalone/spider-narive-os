@@ -72,8 +72,10 @@ class OnnWebcamTests(unittest.TestCase):
         with patch.object(camera.urllib.request, "urlopen", return_value=response) as send:
             self.assertIn("desk", camera.describe_frame(JPEG, timeout=180))
         payload = json.loads(send.call_args.args[0].data)
-        self.assertEqual(payload["options"]["num_predict"], 110)
-        self.assertEqual(payload["model"], "gemma3:4b")
+        self.assertEqual(payload["options"]["num_predict"], 48)
+        self.assertEqual(payload["options"]["num_ctx"], 2048)
+        self.assertEqual(payload["keep_alive"], 0)
+        self.assertEqual(payload["model"], "qwen3-vl:2b-instruct")
         self.assertEqual(len(payload["messages"][0]["images"]), 1)
 
 
