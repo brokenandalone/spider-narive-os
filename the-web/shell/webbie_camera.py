@@ -15,7 +15,7 @@ import urllib.request
 
 MAX_JPEG = 4 * 1024 * 1024
 OLLAMA_CHAT = 'http://127.0.0.1:11434/api/chat'
-DEFAULT_VISION_MODEL = 'gemma3:4b'
+DEFAULT_VISION_MODEL = 'qwen3-vl:2b-instruct'
 CAMERA_PATTERN = re.compile(r'/dev/video[0-9]{1,3}\Z')
 
 
@@ -94,7 +94,11 @@ def describe_frame(jpeg, prompt='Describe what you can actually see in the room.
             'role': 'user', 'content': instruction,
             'images': [base64.b64encode(jpeg).decode('ascii')]
         }],
-        'options': {'num_predict': 110}
+        # CPU-only host: short descriptions and limited context keep responses usable.
+        # Do not leave the vision model resident when Webbie's Qwen3 8B brain
+        # needs the same constrained system memory.
+        'keep_alive': 0,
+        'options': {'num_predict': 48, 'num_ctx': 2048}
     }).encode('utf-8')
     request = urllib.request.Request(
         OLLAMA_CHAT, data=payload,
@@ -110,7 +114,7 @@ def describe_frame(jpeg, prompt='Describe what you can actually see in the room.
         if error.code in (400, 404):
             raise RuntimeError(
                 'The local vision model is missing or does not support images. '
-                'Install an Ollama vision model, such as gemma3:4b.'
+                'Install an Ollama vision model, such as qwen3-vl:2b-instruct.'
             ) from None
         raise RuntimeError('Local vision engine returned an error.') from None
     except TimeoutError:
