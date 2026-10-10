@@ -38,6 +38,7 @@ from brain import respond
 from interruptible_speech import InterruptibleSpeech
 from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
+from app_open_route import installed_app_request
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
 from vision_query import visual_question, ask_vision
@@ -532,10 +533,11 @@ def handle_command(command, voice=False):
         if built_in:
             reply = built_in
         else:
-            reply = respond(
-                command,
-                context_name=current_name(),
-            )
+            # A spoken installed-app launch only requests the exact current
+            # owner-selected GUI grant; it cannot create one or run commands.
+            app_reply = installed_app_request(command) if voice else None
+            reply = (app_reply if app_reply is not None else
+                     respond(command, context_name=current_name()))
 
     if voice:
         say(reply)
