@@ -160,6 +160,18 @@
 
 ## 4. Author — private manuscripts, library and canon
 
+### New saved-review workflow (stacked after PR #37)
+- [x] Source: Completed Webbie chapter and whole-book review reports are saved inside Author's existing SQLite library, included in its normal backups.
+- [x] Source: Open prior reports without calling Ollama again; label findings **OUTDATED** when reviewed chapters or canon have changed.
+- [x] Source: Jump from saved report to its reviewed chapters by stable chapter ID, not by guessing text or parsing AI-generated names.
+- [x] Source: Export the displayed review to a new text file without overwriting an existing file.
+- [x] Added disposable-library and GUI regression tests. The manuscript stays unchanged unless the writer approves an independent edit.
+- [ ] Complete source CI and integrate the new module in a single coordinated, backup-first installer.
+- [ ] On-device confirmation of review history, stale labels, chapter jumps, restore and exports with actual imported Broken World chapters.
+- [ ] Later: add finding-level position links, structured issue severity, manually marked resolutions and stronger multi-book canon checking.
+
+
+
 ### October 10 source additions: full manuscript review and Webbie narration
 
 - [x] Source: on-demand full chapter and full book reviews with **quick/deep** modes, bounded local Ollama segmentation and progress/cancel controls (installation pending).
