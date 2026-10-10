@@ -21,7 +21,10 @@ VOICE_BOOTSTRAP = (
 
 def speech_segments(text, limit=440):
     """Return short speech segments in original reading order."""
-    from review_engine import split_exact
+    if __package__:
+        from .review_engine import split_exact
+    else:
+        from review_engine import split_exact
     result = []
     for paragraph in str(text).splitlines():
         if paragraph.strip():
