@@ -82,6 +82,27 @@ esac
         self.assertNotIn("distrobox", calls)
         self.assertNotIn("konsole", calls)
 
+    def test_kali_package_workbench_opens_interactive_shell_without_apt(self):
+        result, calls = self.run_action("packages", "")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("konsole --hold -e distrobox enter --name kali-bay -- bash", calls)
+        self.assertNotIn("apt-get install", calls)
+        self.assertNotIn("podman exec", calls)
+
+    def test_kali_installed_package_inventory_is_readonly(self):
+        result, calls = self.run_action("inventory", "")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("podman exec --user 0 --tty=false kali-bay", calls)
+        self.assertNotIn("distrobox", calls)
+        self.assertNotIn("podman start", calls)
+
+    def test_stopped_inventory_must_not_start_kali(self):
+        result, calls = self.run_action("inventory", "", running=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stopped", result.stderr)
+        self.assertNotIn("podman exec", calls)
+        self.assertNotIn("distrobox", calls)
+
     def test_gui_launch_has_no_arbitrary_arguments(self):
         result, calls = self.run_action("tool", "wireshark")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -124,6 +145,10 @@ assert window.security_tabs.tabText(0) == 'DESKTOP HUB'
 assert window.security_tabs.tabText(1) == 'OFFENSIVE'
 assert window.security_tabs.tabText(2) == 'PURPLE DEFENSE'
 assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU)
+from PyQt5.QtWidgets import QPushButton
+buttons = [b.text() for b in window.findChildren(QPushButton)]
+assert 'KALI PACKAGE MANAGER' in buttons
+assert 'INSTALLED KALI PACKAGES' in buttons
 window.desktop_search.setText('Wireshark')
 assert window.desktop_list.count() == 1
 assert window.desktop_list.item(0).data(module.Qt.UserRole) == 'wireshark'
