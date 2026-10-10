@@ -38,6 +38,31 @@ SPEAKING_MARKER = (
     RUNTIME_DIR
     / "webbie-speaking"
 )
+NARRATING_MARKER = RUNTIME_DIR / "webbie-narrating"
+
+
+def speaking_or_narrating():
+    if SPEAKING_MARKER.exists():
+        return True
+    try:
+        owner_pid = int(NARRATING_MARKER.read_text(encoding="ascii").strip())
+        if owner_pid <= 1:
+            return False
+        os.kill(owner_pid, 0)
+        return True
+    except FileNotFoundError:
+        return False
+    except (ValueError, PermissionError):
+        # Unknown marker owner is safer to treat as active until reviewed.
+        return True
+    except ProcessLookupError:
+        try:
+            NARRATING_MARKER.unlink()
+        except OSError:
+            pass
+        return False
+    except OSError:
+        return False
 
 
 def ready():
@@ -156,7 +181,7 @@ def listen_forever(
     while should_continue():
 
         # Do not let Webbie hear herself talking.
-        if SPEAKING_MARKER.exists():
+        if speaking_or_narrating():
             time.sleep(0.25)
             continue
 
@@ -178,7 +203,7 @@ def listen_forever(
 
             # If Webbie began speaking during capture,
             # throw this chunk away.
-            if SPEAKING_MARKER.exists():
+            if speaking_or_narrating():
                 continue
 
             phrase = transcribe(
