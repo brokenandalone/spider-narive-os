@@ -2,11 +2,23 @@
 
 Reordered October 9, 2026, late evening, America/Indiana/Vincennes. This order supersedes earlier ordering. Repository: `brokenandalone/spider-narive-os`.
 
-The owner's next priorities are reliable Webbie, preserving PC repairs, contextual awareness and more natural interaction, then Studio music creation with his own voice. **The owner is actively repairing Webbie on the PC in parallel.** Do not build a competing voice fix or overwrite that work. Bring the resulting working files back into GitHub.
+**Latest owner priority: Studio music generation as soon as possible. It is the next active GitHub feature build and does not wait for the full contextual-awareness roadmap or unrelated desktop polish.** Preserve ongoing PC repairs and release safeguards in parallel. **The owner is actively repairing Webbie on the PC in parallel.** Do not build a competing voice fix or overwrite that work. Bring the resulting working files back into GitHub.
 
 Continue GitHub work between installations. Prepare **one combined install per owner request**, not one per day or many small installs. `[x]` completes only the stated source/test/installation task; these are separate from real PC acceptance. Earlier details remain in [the historical checklist](archive/MASTER-UPGRADE-CHECKLIST-before-20261010.md); its older status statements are historical.
 
-## 1. Webbie reliability: PC repair in progress, then source reconciliation
+## 1. Studio music generation and production
+
+**Delivery order:** first a generated, playable song from lyrics/style input; next the owner's singing voice and Broken Sorrow tuning; then deeper arrangement, stems and regeneration/editing controls where supported. Hardware/backend qualification determines attainable quality and timing. No paid hosted backend is assumed or enabled.
+
+- [ ] Inventory GPU/VRAM/RAM/storage and select an attainable local music-generation baseline.
+- [ ] Review model licenses, song length, lyrics adherence, instrumental/vocal quality and actual generation time.
+- [ ] Implement real generation with lyrics/style controls, progress/cancel, saved audio and playback. A controls schema is not music generation.
+- [ ] Add the owner's consenting singing reference and evaluate voice fidelity through listening tests.
+- [ ] Support Broken Sorrow style, arrangements, iterative edits and DAW/session export.
+- [ ] Qualify PR #27 controls against an actual backend; do not claim Suno parity from the specification alone.
+- [ ] Verify production launchers, recording devices, PipeWire/JACK routing and project templates while preserving customized Studio tabs/projects.
+
+## 2. Webbie reliability: PC repair in progress, then source reconciliation
 
 - [ ] **IN PROGRESS ON PC:** reliable wake/answers, multi-turn follow-up, Webbie stop, microphone recovery and correct launcher. Use the result of this repair as the voice baseline.
 - [ ] Import the final working agent, TTS, listener and associated voice-gate changes together; preserve speaker authorization, webcam microphone discovery, voice-storage permissions and USB recovery.
@@ -20,7 +32,7 @@ Continue GitHub work between installations. Prepare **one combined install per o
 - [x] PR #29 contains camera capture and Qwen3-VL preference changes. Owner subsequently confirms webcam vision works through Webbie.
 - [ ] Compare final PC camera files/settings with PR #29 before asserting exact equality; retain optional independent Cory/Shayna face profiles.
 
-## 2. Preserve all PC repairs in one qualified GitHub update
+## 3. Preserve all PC repairs in one qualified GitHub update
 
 - [x] Compare supplied PC code/diffs with PR #29 head `d41e4b7`; record gaps in [PC reconciliation](PC-RECONCILIATION-2026-10-10.md).
 - [ ] Collect final files/hashes after the active PC repair and resolve differences without wholesale replacement.
@@ -30,7 +42,7 @@ Continue GitHub work between installations. Prepare **one combined install per o
 - [ ] On the owner's install request, deliver one frozen revision, preflight, backup, combined installation, activation and acceptance pass. No repeated logouts for source work.
 - [ ] Give the complete sequential setup/control tutorial after installation and acceptance.
 
-## 3. Webbie context, memory and natural interaction
+## 4. Webbie context, memory and natural interaction
 
 Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more_human_like_and_life_.md`. Its generic numbered references and empty Sources section do not establish its claims. These are requested development/research directions, not verified capabilities.
 
@@ -44,16 +56,6 @@ Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more
 - [ ] **Advanced training research:** compare models, retrieval, human feedback and optional hybrid approaches against hardware, licenses, privacy and measured usefulness. Neuroscience-inspired methods are research options, not required dependencies.
 - [ ] **Interaction effects:** keep clear AI identity and controllable personalization/proactivity; evaluate usefulness and unwanted intrusive behavior over time.
 - [ ] Qualify offline operation, selected model fallback and latency before marking complete.
-
-## 4. Studio music generation and production
-
-- [ ] Inventory GPU/VRAM/RAM/storage and select an attainable local music-generation baseline.
-- [ ] Review model licenses, song length, lyrics adherence, instrumental/vocal quality and actual generation time.
-- [ ] Implement real generation with lyrics/style controls, progress/cancel, saved audio and playback. A controls schema is not music generation.
-- [ ] Add the owner's consenting singing reference and evaluate voice fidelity through listening tests.
-- [ ] Support Broken Sorrow style, arrangements, iterative edits and DAW/session export.
-- [ ] Qualify PR #27 controls against an actual backend; do not claim Suno parity from the specification alone.
-- [ ] Verify production launchers, recording devices, PipeWire/JACK routing and project templates while preserving customized Studio tabs/projects.
 
 ## 5. Essential desktop controls
 
@@ -73,7 +75,7 @@ Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more
 
 ## 7. Forage and Deep Forage evidence quality
 
-**The source-free report defect is an immediate reliability fix being handled alongside priorities 1–2**, before more research is used as an implementation basis.
+**The source-free report defect is an immediate reliability fix being handled alongside the current build and PC reconciliation**, before more research is used as an implementation basis.
 
 - [x] Source-tested: skip synthesis when no usable evidence is retrieved and save an explicit incomplete result.
 - [x] Source-tested: withhold drafts with missing/out-of-range numeric citations or generic Source Material placeholders; preserve actual links.
