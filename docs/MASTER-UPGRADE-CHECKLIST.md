@@ -160,6 +160,17 @@
 
 ## 4. Author — private manuscripts, library and canon
 
+### Cross-book Broken World continuity ledger (PR stacked after #44)
+- [x] Source: New opt-in **World Continuity** tab with explicit multi-book selection, progress, cancel, report and exclusive-create TXT export. Select at least two books; never scan unrelated library titles automatically.
+- [x] Source: Local Ollama examines every bounded chapter/canon/Story Bible segment of the selected books and proposes fact cards. Cards are accepted only when a short **exact quotation** exists in that specific source segment.
+- [x] Source: Group verified facts by category/subject, compare across books, validate both evidence IDs on every model-suggested candidate issue; retain cited book/chapter/segment/character offsets and evidence index. No book modification or automatic canon rewrites.
+- [x] Source: Conservative output labels contradictions **possible**, recognizes mysteries, flashbacks, unreliable narrators, chronology changes; states no finding does not prove consistency. Quotes do not constitute proof of a contradiction.
+- [x] Source tests for full-segment coverage, rejected invented quotes, paired citations, cancellation, empty evidence and opt-in UI.
+- [ ] Finish source CI, whole-book load/performance tests and on-PC local model/microphone/Author integration.
+- [ ] Later: alias/identity resolution between differently named characters; author-approved canon registry; structured issue triage and status; linked story timelines; report persistence.
+
+
+
 ### New audiobook bookmarks and review-section navigation (stacked after PR #42)
 - [x] Source: Webbie stores the spoken section at playback start as a book-specific bookmark in Author's local SQLite database; no manuscript text is copied.
 - [x] Source: Explicit **Resume bookmarked book** control restarts from the saved chapter and spoken section. If book text or chapter order changed, it refuses a stale bookmark rather than skipping or misreading.

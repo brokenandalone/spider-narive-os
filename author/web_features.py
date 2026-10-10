@@ -16,11 +16,13 @@ if __package__:
     from .review_engine import ReviewEngine, ReviewCancelled
     from .review_history import ReviewHistory
     from .narration_bookmarks import NarrationBookmarks, book_fingerprint
+    from .continuity_engine import ContinuityEngine, ReviewCancelled
 else:
     from voice_reader import WebbieReader
     from review_engine import ReviewEngine, ReviewCancelled
     from review_history import ReviewHistory
     from narration_bookmarks import NarrationBookmarks, book_fingerprint
+    from continuity_engine import ContinuityEngine, ReviewCancelled
 from PyQt5.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QTabWidget, QTextEdit,
@@ -62,6 +64,34 @@ class ReviewWorker(QThread):
             self.failed.emit('Review could not finish: ' + str(error))
 
 
+class ContinuityWorker(QThread):
+    progress = pyqtSignal(str)
+    ready = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, books, parent=None):
+        super().__init__(parent)
+        self.books = books
+        self.cancelled = threading.Event()
+
+    def cancel(self):
+        self.cancelled.set()
+
+    def run(self):
+        try:
+            report = ContinuityEngine().review(
+                self.books, progress=self.progress.emit,
+                cancelled=self.cancelled)
+            if not self.cancelled.is_set():
+                self.ready.emit(report)
+            else:
+                self.failed.emit('Cross-book check cancelled. Manuscripts unchanged.')
+        except ReviewCancelled:
+            self.failed.emit('Cross-book check cancelled. Manuscripts unchanged.')
+        except Exception as error:
+            self.failed.emit('Cross-book check failed: ' + str(error))
+
+
 class AuthorToolkit(QWidget):
     jumpRequested = pyqtSignal(dict)
     reviewSegmentRequested = pyqtSignal(dict)
@@ -84,6 +114,7 @@ class AuthorToolkit(QWidget):
         self.narration_source_hash = None
         self.narration_book_id = None
         self.review_worker = None
+        self.continuity_worker = None
         self.review_session = None
         self.history = ReviewHistory(self.store)
         layout = QVBoxLayout(self)
@@ -225,6 +256,32 @@ class AuthorToolkit(QWidget):
         self.compare_result.setPlaceholderText('Revisions are shown here without changing the manuscript.')
         t.addWidget(self.compare_result, 1)
         tabs.addTab(tools, 'Publishing & Revisions')
+        continuity = QWidget()
+        cl = QVBoxLayout(continuity)
+        cl.addWidget(QLabel('Cross-book continuity: select the books you want checked.'))
+        cl.addWidget(QLabel(
+            'Webbie compares quoted evidence from manuscript chapters, '
+            'book canon and Story Bible entries. Nothing starts automatically.'))
+        self.continuity_books = QListWidget()
+        self.continuity_books.setSelectionMode(QListWidget.MultiSelection)
+        cl.addWidget(self.continuity_books)
+        self.continuity_button = QPushButton('Webbie: Check selected books for contradictions')
+        self.continuity_button.clicked.connect(self.start_continuity)
+        cl.addWidget(self.continuity_button)
+        self.continuity_cancel_button = QPushButton('Cancel cross-book check')
+        self.continuity_cancel_button.clicked.connect(self.cancel_continuity)
+        self.continuity_cancel_button.setEnabled(False)
+        cl.addWidget(self.continuity_cancel_button)
+        self.continuity_status = QLabel('Select two or more books and start an on-demand check.')
+        self.continuity_status.setWordWrap(True)
+        cl.addWidget(self.continuity_status)
+        self.continuity_result = QTextEdit()
+        self.continuity_result.setReadOnly(True)
+        cl.addWidget(self.continuity_result, 1)
+        self.continuity_export_button = QPushButton('Export cross-book report as TXT')
+        self.continuity_export_button.clicked.connect(self.export_continuity)
+        cl.addWidget(self.continuity_export_button)
+        tabs.addTab(continuity, 'World Continuity')
         self.set_book(None)
 
     def mark_story(self, *_):
@@ -255,6 +312,7 @@ class AuthorToolkit(QWidget):
         self.refresh_stats()
         self.refresh_review_history()
         self.refresh_bookmark_status()
+        self.refresh_continuity_books()
 
     def refresh_stats(self):
         if self.book_id is not None:
@@ -460,6 +518,9 @@ class AuthorToolkit(QWidget):
             self.bookmark_status.setText('Cannot load audiobook bookmark: ' + str(exc))
 
     def start_review(self, scope):
+        if self.continuity_worker and self.continuity_worker.isRunning():
+            self.review_status.setText('Finish the cross-book check first.')
+            return
         if self.review_worker is not None and self.review_worker.isRunning():
             return
         if self.book_id is None:
@@ -623,8 +684,96 @@ class AuthorToolkit(QWidget):
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, 'Review export', str(error))
 
+    def refresh_continuity_books(self):
+        # Never silently select the whole library. Only the current book is
+        # preselected; explicit additional choices are required.
+        selected = {item.data(Qt.UserRole)
+                    for item in self.continuity_books.selectedItems()}
+        self.continuity_books.clear()
+        for book in self.store.books():
+            item = QListWidgetItem(book['title'])
+            item.setData(Qt.UserRole, book['id'])
+            self.continuity_books.addItem(item)
+            if book['id'] in selected or (
+                    not selected and self.book_id == book['id']):
+                item.setSelected(True)
+
+    def start_continuity(self):
+        if ((self.continuity_worker and self.continuity_worker.isRunning()) or
+                (self.review_worker and self.review_worker.isRunning())):
+            self.continuity_status.setText('Webbie is already running a review.')
+            return
+        book_ids = [item.data(Qt.UserRole)
+                    for item in self.continuity_books.selectedItems()]
+        if len(book_ids) < 2:
+            self.continuity_status.setText(
+                'Select at least two books. No AI review has started.')
+            return
+        if self.save_editor is not None and not self.save_editor():
+            return
+        try:
+            by_id = {r['id']: dict(r) for r in self.store.books()}
+            snapshot = []
+            for ident in book_ids:
+                book = by_id[ident]
+                book['chapters'] = [
+                    dict(c) for c in self.store.chapters(ident)]
+                book['story_bible'] = [
+                    dict(e) for e in self.store.story_entries(ident)]
+                snapshot.append(book)
+        except (KeyError, ValueError, OSError) as error:
+            self.continuity_status.setText(
+                'Could not prepare a safe manuscript snapshot: ' + str(error))
+            return
+        self.continuity_worker = ContinuityWorker(snapshot, self)
+        self.continuity_worker.progress.connect(self.continuity_status.setText)
+        self.continuity_worker.ready.connect(self.continuity_complete)
+        self.continuity_worker.failed.connect(self.continuity_status.setText)
+        self.continuity_worker.finished.connect(self.continuity_finished)
+        self.continuity_result.setPlainText(
+            'Cross-book continuity check started locally. Each selected source '
+            'section will be examined, and any findings need writer confirmation.')
+        self.continuity_button.setEnabled(False)
+        self.continuity_cancel_button.setEnabled(True)
+        self.continuity_worker.start()
+
+    def cancel_continuity(self):
+        if self.continuity_worker and self.continuity_worker.isRunning():
+            self.continuity_worker.cancel()
+            self.continuity_status.setText(
+                'Stopping after the current local model request…')
+
+    def continuity_finished(self):
+        self.continuity_button.setEnabled(True)
+        self.continuity_cancel_button.setEnabled(False)
+
+    def continuity_complete(self, report):
+        self.continuity_result.setPlainText(report)
+        self.continuity_status.setText(
+            'Cross-book evidence review complete. Please verify possible '
+            'contradictions before changing canon. No book edited.')
+
+    def export_continuity(self):
+        report = self.continuity_result.toPlainText()
+        if not report.startswith('# Webbie Cross-Book Continuity Check'):
+            QMessageBox.information(
+                self, 'Continuity export', 'Finish a continuity check first.')
+            return
+        dest, _ = QFileDialog.getSaveFileName(
+            self, 'Export continuity report', 'world-continuity.txt',
+            'Text document (*.txt)')
+        if dest:
+            try:
+                with open(dest, 'x', encoding='utf-8') as handle:
+                    handle.write(report)
+            except (OSError, ValueError) as error:
+                QMessageBox.warning(self, 'Continuity export', str(error))
+
     def shutdown(self):
         # Keep QObject/QThread alive until a pending inference finishes.
+        if self.continuity_worker and self.continuity_worker.isRunning():
+            self.cancel_continuity()
+            return False
         if self.review_worker and self.review_worker.isRunning():
             self.cancel_review()
             return False

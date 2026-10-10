@@ -22,6 +22,7 @@ managed=(
   author/speech.py
   author/publishing.py
   author/review_engine.py
+  author/continuity_engine.py
   author/review_cache.py
   author/review_history.py
   author/narration_bookmarks.py
