@@ -92,7 +92,7 @@ def cleanup():
 
 
 class Handler(BaseHTTPRequestHandler):
-    def headers(self, status=200):
+    def send_json_headers(self, status=200):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -104,35 +104,35 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_OPTIONS(self):
-        self.headers(204)
+        self.send_json_headers(204)
 
     def do_GET(self):
         if self.path == "/health":
-            self.headers(200)
+            self.send_json_headers(200)
             self.wfile.write(json.dumps({"ok": True, "service": "Spider AI DJ", "host": ON_AIR_HOST, "station": STATION_NAME, "port": PORT}).encode())
             return
-        self.headers(404)
+        self.send_json_headers(404)
         self.wfile.write(b'{"error":"not found"}')
 
     def do_POST(self):
         if self.path != "/dj/prepare":
-            self.headers(404)
+            self.send_json_headers(404)
             self.wfile.write(b'{"error":"not found"}')
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > 24 * 1024:
-                self.headers(413)
+                self.send_json_headers(413)
                 self.wfile.write(b'{"error":"Invalid Nova request size"}')
                 return
             try:
                 body = json.loads(self.rfile.read(length).decode("utf-8"))
             except (ValueError, UnicodeError):
-                self.headers(400)
+                self.send_json_headers(400)
                 self.wfile.write(b'{"error":"Invalid JSON request"}')
                 return
             if not isinstance(body, dict):
-                self.headers(400)
+                self.send_json_headers(400)
                 self.wfile.write(b'{"error":"Nova expects a JSON object"}')
                 return
             script = ollama_script(body)
@@ -153,10 +153,10 @@ class Handler(BaseHTTPRequestHandler):
                     "crossfadeSeconds": 3.0,
                 },
             }
-            self.headers(200)
+            self.send_json_headers(200)
             self.wfile.write(json.dumps(response).encode("utf-8"))
         except Exception as error:
-            self.headers(500)
+            self.send_json_headers(500)
             self.wfile.write(json.dumps({"error": str(error)}).encode("utf-8"))
 
 
