@@ -39,6 +39,7 @@ from interruptible_speech import InterruptibleSpeech
 from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
 from app_open_route import installed_app_request
+from voice_turns import VoiceTurnTracker
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
 from vision_query import visual_question, ask_vision
@@ -92,6 +93,7 @@ running = True
 speech_lock = threading.Lock()
 voice_turn_lock = threading.Lock()
 speech_playback = InterruptibleSpeech()
+voice_turns = VoiceTurnTracker()
 awaiting_command_until = 0.0
 
 
@@ -504,7 +506,7 @@ def handle_builtin(command):
     return None
 
 
-def handle_command(command, voice=False):
+def handle_command(command, voice=False, expected_turn=None):
     command = str(command or "").strip()
 
     if not command:
@@ -512,6 +514,7 @@ def handle_command(command, voice=False):
 
     # Stop is a direct, strictly matched intervention, not a generated answer.
     if is_direct_stop(command):
+        voice_turns.interrupted()
         speech_playback.stop()
         try:
             request_stop()
@@ -540,6 +543,9 @@ def handle_command(command, voice=False):
                      respond(command, context_name=current_name()))
 
     if voice:
+        # A completed model request cannot resume speaking after STOP.
+        if expected_turn is not None and not voice_turns.current(expected_turn):
+            return 'Stopped.'
         say(reply)
 
     else:
@@ -634,9 +640,10 @@ def voice_listener():
         # run on the reply thread. An overlap is ignored, not queued.
         if not voice_turn_lock.acquire(blocking=False):
             return
+        expected_turn = voice_turns.start()
         def worker():
             try:
-                handle_command(command, voice=True)
+                handle_command(command, voice=True, expected_turn=expected_turn)
             finally:
                 voice_turn_lock.release()
         threading.Thread(target=worker, name='webbie-voice-turn', daemon=True).start()
@@ -646,6 +653,7 @@ def voice_listener():
         if not is_direct_stop(phrase):
             return
         awaiting_command_until = 0
+        voice_turns.interrupted()
         speech_playback.stop()
         try:
             request_stop()
