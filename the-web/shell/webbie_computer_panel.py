@@ -1,0 +1,292 @@
+"""Webbie computer-control surface, explicitly opened and approved by the owner.
+
+Source-only. No autonomous LLM action or microphone adapter is connected yet.
+The dialog uses the existing installed XDG menu and restricted X11 driver.
+The user personally grants a limited task and can revoke it any time.
+"""
+from pathlib import Path
+import sys
+
+from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QSpinBox, QTextEdit, QVBoxLayout)
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'webbie/actions'))
+from desktop_control import DesktopOperator, app_catalog, KEYS
+from task_grants import TaskGrant
+from screen_capture import capture_window, describe_window
+
+
+def parse_open_request(message, apps):
+    """Offer UI control only for a specifically installed desktop app.
+
+    The command text does not itself grant permissions. Other instructions
+    remain in Webbie's normal conversation handler.
+    """
+    import re
+    phrase = re.sub(r'\s+', ' ', str(message).strip())
+    match = re.fullmatch(
+        r'(?:hey\s+)?(?:webbie|webby|web)[, ]+\s*(?:open|launch|start)\s+(.+?)'
+        r'|(?:open|launch|start)\s+(.+?)', phrase, flags=re.I)
+    if not match:
+        return None
+    name = (match.group(1) or match.group(2) or '').strip(' ,.!?')
+    candidates = [app for app in apps if
+                  app.name.casefold() == name.casefold() or
+                  app.desktop_id.casefold().removesuffix('.desktop') == name.casefold()]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+class ScreenWorker(QThread):
+    described = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, jpeg, parent=None):
+        super().__init__(parent)
+        self.jpeg = jpeg
+
+    def run(self):
+        try:
+            self.described.emit(describe_window(
+                self.jpeg, 'Briefly identify the visible application controls. '
+                'Do not repeat personal or secret data.'))
+        except (ValueError, RuntimeError, OSError) as error:
+            self.failed.emit(str(error))
+        finally:
+            self.jpeg = None
+
+
+class WebbieComputerDialog(QDialog):
+    def __init__(self, parent=None, *, discover=None, run=None, launcher=None):
+        super().__init__(parent)
+        self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
+        self.setObjectName('webbieComputerControl')
+        self.resize(510, 610)
+        self.apps = list(discover() if discover else app_catalog().discover_apps())
+        self.grant = TaskGrant(approve_sensitive=self.approve_sensitive)
+        self.operator = DesktopOperator(
+            permission=self.grant.authorize,
+            discover=lambda: self.apps,
+            runner=run, launcher=launcher)
+        self.screen_worker = None
+
+        layout = QVBoxLayout(self)
+        notice = QLabel(
+            'CONTROL IS OFF BY DEFAULT. Choose an installed program and a '
+            'specific task. Permission lasts up to five minutes or 75 actions, '
+            'whichever comes first. Webbie cannot change system settings '
+            'or run arbitrary shell commands through this tool.')
+        notice.setWordWrap(True); layout.addWidget(notice)
+        form = QFormLayout(); layout.addLayout(form)
+        self.app_select = QComboBox()
+        self.app_select.setObjectName('webbieInstalledProgram')
+        for app in self.apps:
+            self.app_select.addItem(f'{app.name}  [{app.workspace}]', app.desktop_id)
+        form.addRow('Installed program', self.app_select)
+        self.task = QLineEdit()
+        self.task.setPlaceholderText('Example: help edit the current guitar recording')
+        form.addRow('Approved task', self.task)
+
+        auth_row = QHBoxLayout(); layout.addLayout(auth_row)
+        self.grant_button = QPushButton('Authorize this task')
+        self.grant_button.clicked.connect(self.authorize)
+        auth_row.addWidget(self.grant_button)
+        self.stop_button = QPushButton('STOP WEBBIE')
+        self.stop_button.setObjectName('webbieEmergencyStop')
+        self.stop_button.clicked.connect(self.stop)
+        self.stop_button.setStyleSheet('background:#6e1e55; color:white; font-weight:bold')
+        auth_row.addWidget(self.stop_button)
+        self.state = QLabel('OFF | Webbie cannot operate applications')
+        self.state.setWordWrap(True)
+        layout.addWidget(self.state)
+
+        app_row = QHBoxLayout(); layout.addLayout(app_row)
+        self.open_button = QPushButton('Open selected program')
+        self.open_button.clicked.connect(self.open_app); app_row.addWidget(self.open_button)
+        self.refresh_button = QPushButton('Find open windows')
+        self.refresh_button.clicked.connect(self.refresh_windows); app_row.addWidget(self.refresh_button)
+
+        self.windows = QComboBox(); self.windows.setObjectName('webbieWindowSelector')
+        layout.addWidget(self.windows)
+        window_row = QHBoxLayout(); layout.addLayout(window_row)
+        self.focus_button = QPushButton('Focus window')
+        self.focus_button.clicked.connect(self.focus_window); window_row.addWidget(self.focus_button)
+        self.inspect_button = QPushButton('Inspect window once')
+        self.inspect_button.clicked.connect(self.inspect_window); window_row.addWidget(self.inspect_button)
+        self.close_button = QPushButton('Close window')
+        self.close_button.clicked.connect(self.close_window); window_row.addWidget(self.close_button)
+
+        row = QHBoxLayout(); layout.addLayout(row)
+        self.click_x = QSpinBox(); self.click_x.setRange(0, 16384); self.click_x.setPrefix('X ')
+        self.click_y = QSpinBox(); self.click_y.setRange(0, 16384); self.click_y.setPrefix('Y ')
+        self.click_button = QPushButton('Click at coordinates')
+        self.click_button.clicked.connect(self.click)
+        row.addWidget(self.click_x); row.addWidget(self.click_y); row.addWidget(self.click_button)
+        row2 = QHBoxLayout(); layout.addLayout(row2)
+        self.key = QComboBox()
+        self.key.addItems(sorted(KEYS))
+        self.key_button = QPushButton('Press selected key')
+        self.key_button.clicked.connect(self.press)
+        row2.addWidget(self.key, 1); row2.addWidget(self.key_button)
+        row3 = QHBoxLayout(); layout.addLayout(row3)
+        self.to_type = QLineEdit(); self.to_type.setPlaceholderText('Text to type in the focused program')
+        self.type_button = QPushButton('Type')
+        self.type_button.clicked.connect(self.type_text)
+        row3.addWidget(self.to_type, 1); row3.addWidget(self.type_button)
+        self.report = QTextEdit(); self.report.setReadOnly(True)
+        self.report.setMaximumHeight(150); layout.addWidget(self.report)
+        self.report.setPlainText('No program or screen is being controlled.')
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.refresh_status)
+        self.timer.start(1000)
+        self.refresh_status()
+
+    def status(self, message):
+        self.report.setPlainText(message)
+
+    def selected_app(self):
+        identity = self.app_select.currentData()
+        return next((app for app in self.apps if app.desktop_id == identity), None)
+
+    def offer_program(self, app_id):
+        for n in range(self.app_select.count()):
+            if self.app_select.itemData(n) == app_id:
+                self.app_select.setCurrentIndex(n)
+                return True
+        return False
+
+    def authorize(self):
+        app = self.selected_app()
+        task = self.task.text().strip()
+        if app is None or not task:
+            self.status('Select an installed application and describe the task.')
+            return
+        choice = QMessageBox.question(
+            self, 'Authorize Webbie computer control?',
+            f'Allow Webbie to work in {app.name} for this task?\n\n'
+            f'{task[:300]}\n\n'
+            'Expires after five minutes or 75 actions. You can press STOP '
+            'at any moment. Program changes can affect your files; review '
+            'each change. Do not grant a task that requires passwords.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if choice != QMessageBox.Yes:
+            return
+        self.grant.activate(task, app.desktop_id, seconds=300)
+        self.operator.begin_new_task()
+        self.status(f'Authorized: {app.name}. No changes made yet.')
+        self.refresh_status()
+
+    def stop(self):
+        self.operator.stop()
+        self.grant.stop()
+        self.status('STOPPED. No additional Webbie computer actions are authorized.')
+        self.refresh_status()
+
+    def approve_sensitive(self, action, preview):
+        return QMessageBox.question(
+            self, 'Confirm Webbie change',
+            f'{preview}\n\nConfirm this potentially destructive computer action?',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
+
+    def refresh_status(self):
+        data = self.grant.status()
+        active = data['active']
+        self.state.setText(
+            (f"AUTHORIZED | {data['remaining_seconds']} sec left | "
+             f"{data['remaining_actions']} actions | {data['task']}")
+            if active else 'OFF | Webbie cannot operate applications')
+        for control in (self.open_button, self.refresh_button, self.focus_button,
+                        self.inspect_button, self.close_button, self.click_button,
+                        self.key_button, self.type_button):
+            control.setEnabled(active)
+        if not active and not self.operator.cancelled.is_set():
+            self.operator.stop()
+
+    def action(self, method, *args):
+        try:
+            outcome = method(*args)
+        except (ValueError, RuntimeError, PermissionError, InterruptedError, OSError) as error:
+            self.status(str(error))
+            return None
+        self.status(str(outcome))
+        self.refresh_status()
+        return outcome
+
+    def open_app(self):
+        app = self.selected_app()
+        if app:
+            self.action(self.operator.open_app, app.name)
+
+    def refresh_windows(self):
+        listing = self.action(self.operator.windows)
+        if listing is None:
+            return
+        self.windows.clear()
+        for item in listing:
+            self.windows.addItem(item['title'] or item['id'], item['id'])
+        self.status(f'Found {len(listing)} windows. Select the target you want to operate.')
+
+    def selected_window(self):
+        return self.windows.currentData()
+
+    def focus_window(self):
+        if self.selected_window():
+            self.action(self.operator.focus, self.selected_window())
+
+    def click(self):
+        # The owner chooses exact coordinates. Autonomous pointer movement from
+        # LLM-derived screen contents is intentionally NOT connected yet.
+        self.action(self.operator.click, self.click_x.value(), self.click_y.value())
+
+    def press(self):
+        self.action(self.operator.press, self.key.currentText())
+
+    def type_text(self):
+        if self.to_type.text():
+            self.action(self.operator.type_text, self.to_type.text())
+            self.to_type.clear()
+
+    def close_window(self):
+        if self.selected_window():
+            self.action(self.operator.close_window, self.selected_window())
+
+    def inspect_window(self):
+        target = self.selected_window()
+        if not target or not self.grant.status()['active']:
+            return
+        if self.screen_worker and self.screen_worker.isRunning():
+            self.status('Current window inspection is still running.')
+            return
+        choice = QMessageBox.question(
+            self, 'Share this window with LOCAL Webbie?',
+            'Take one screenshot of this selected application window and send '
+            'it only to the local Ollama vision model? It may contain private '
+            'information. Do not inspect password or financial windows.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if choice != QMessageBox.Yes:
+            return
+        try:
+            # Permission covers observation but NEVER retains this image.
+            if not self.grant.authorize('observe.windows', 'Inspect selected window'):
+                raise PermissionError('Task authorization expired')
+            if target not in {item['id'] for item in self.operator.windows()}:
+                raise ValueError('The selected window no longer exists')
+            image = capture_window(target, approved=True)
+        except (ValueError, RuntimeError, PermissionError, OSError) as error:
+            self.status(str(error)); return
+        self.status('Local Ollama is describing this one authorized window.')
+        self.screen_worker = ScreenWorker(image, self)
+        self.screen_worker.described.connect(
+            lambda message: self.status('Local screen observation (untrusted):\n' + message))
+        self.screen_worker.failed.connect(self.status)
+        self.screen_worker.start()
+
+    def closeEvent(self, event):
+        self.stop()
+        if self.screen_worker and self.screen_worker.isRunning():
+            self.hide()
+            event.ignore()
+        else:
+            event.accept()
