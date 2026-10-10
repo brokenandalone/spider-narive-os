@@ -6,6 +6,10 @@ are preserved and marked outdated when reviewed sources change.
 """
 import hashlib
 import json
+try:
+    from .review_engine import split_exact
+except ImportError:
+    from review_engine import split_exact
 
 
 def digest(text):
@@ -31,19 +35,47 @@ class ReviewHistory:
                     ON review_reports(book_id,id DESC);
             """)
 
-    def manifest(self, book_id, chapters, canon):
+    def manifest(self, book_id, chapters, canon, depth="quick"):
+        if depth not in ("quick", "deep"):
+            raise ValueError("Invalid review depth.")
         known = {c["id"]: c for c in self.store.chapters(book_id)}
-        entries = []
+        entries, sections = [], []
+        limit = 6100 if depth == "quick" else 3100
         for chapter in chapters:
             if chapter["id"] not in known:
                 raise ValueError("Chapter does not belong to selected book.")
-            entries.append({
-                "id": int(chapter["id"]), "title": str(chapter["title"]),
-                "sha256": digest(chapter["content"])
-            })
+            chapter_id = int(chapter["id"])
+            content = str(chapter["content"])
+            fingerprint = digest(content)
+            entries.append({"id": chapter_id, "title": str(chapter["title"]),
+                            "sha256": fingerprint})
+            offset = 0
+            for number, part in enumerate(split_exact(content, limit), 1):
+                sections.append({
+                    "chapter_id": chapter_id, "number": number,
+                    "start": offset, "end": offset + len(part),
+                })
+                offset += len(part)
         if not entries or len({c["id"] for c in entries}) != len(entries):
             raise ValueError("Review must contain distinct chapters.")
-        return {"chapters": entries, "canon_sha256": digest(canon)}
+        return {"chapters": entries, "segments": sections,
+                "canon_sha256": digest(canon)}
+
+    def sections_for_report(self, report):
+        """Return exact source offsets captured for completed review."""
+        manifest = json.loads(report["manifest_json"])
+        chapters = {item["id"]: item for item in manifest["chapters"]}
+        sections = []
+        for segment in manifest.get("segments", []):
+            chapter = chapters.get(segment.get("chapter_id"))
+            if chapter:
+                sections.append({
+                    "book_id": report["book_id"], "kind": "chapter",
+                    "item_id": chapter["id"], "chapter_title": chapter["title"],
+                    "number": segment["number"], "start": segment["start"],
+                    "end": segment["end"], "chapter_sha256": chapter["sha256"],
+                })
+        return sections
 
     def save(self, book_id, scope, depth, report, manifest):
         if scope not in ("book", "chapter") or depth not in ("quick", "deep"):
