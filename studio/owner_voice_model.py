@@ -84,6 +84,8 @@ def load_owner_model(*, root=None):
         return None
     try:
         data = json.loads(target.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None
         if data.get("schema") != 1 or data.get("profile") != "Justin Therapy":
             return None
         model = data["model"]
