@@ -42,7 +42,7 @@ class VoiceProfileTests(unittest.TestCase):
 
     def test_capture_explicit_alsa_command_only(self):
         with tempfile.TemporaryDirectory() as folder:
-            with patch('studio.voice_profile.shutil.which', return_value='/usr/bin/arecord') if False else patch.object(voice.shutil, 'which', return_value='/usr/bin/arecord'):
+            with patch.object(voice.shutil, 'which', return_value='/usr/bin/arecord'):
                 with patch.object(voice.subprocess, 'Popen') as launch:
                     launch.return_value = Mock()
                     proc, file = voice.start_capture(folder, seconds=30)
