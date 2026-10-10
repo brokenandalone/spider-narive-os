@@ -135,6 +135,30 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertIn('trained', panel.status.text())
             panel.close()
 
+    def test_prepared_voice_dataset_can_open_and_copy_private_audio_path(self):
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            self.assertFalse(panel.open_dataset_button.isEnabled())
+            self.assertFalse(panel.copy_dataset_button.isEnabled())
+            prepared = Path(folder) / 'dataset-one'
+            (prepared / 'audio').mkdir(parents=True)
+            (prepared / 'manifest.json').write_text('{"owner_consent":true}')
+            panel.dataset_result(True, str(prepared))
+            self.assertTrue(panel.open_dataset_button.isEnabled())
+            self.assertTrue(panel.copy_dataset_button.isEnabled())
+            with patch('studio.ai_panel.QDesktopServices.openUrl') as opener:
+                panel.open_dataset()
+                opener.assert_called_once()
+                self.assertEqual(opener.call_args.args[0].toLocalFile(), str(prepared))
+            with patch('studio.ai_panel.QApplication.clipboard') as clipboard:
+                panel.copy_dataset_path()
+                clipboard.return_value.setText.assert_called_once_with(str(prepared / 'audio'))
+                self.assertIn('copied', panel.voice_status.text())
+            panel.dataset_result(False, 'Not enough usable recordings')
+            self.assertFalse(panel.open_dataset_button.isEnabled())
+            self.assertFalse(panel.copy_dataset_button.isEnabled())
+            panel.close()
+
     def test_engine_check_worker_reports_read_only_cli_result(self):
         from PyQt5.QtTest import QSignalSpy
         from studio.ai_panel import EngineCheckWorker
