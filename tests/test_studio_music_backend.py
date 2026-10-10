@@ -15,7 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'studio'))
+# File-path imports need no global sys.path change. A legacy
+# studio/studio.py must not shadow the Studio package during tests.
 spec = importlib.util.spec_from_file_location('music_backend_test', ROOT / 'studio/music_backend.py')
 m = importlib.util.module_from_spec(spec); sys.modules[spec.name] = m; spec.loader.exec_module(m)
 
