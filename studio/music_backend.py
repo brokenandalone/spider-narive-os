@@ -8,9 +8,12 @@ from dataclasses import asdict, dataclass
 import ipaddress
 import json
 import os
+import secrets
+import shutil
 from pathlib import Path
 import tempfile
 import threading
+import mimetypes
 import time
 from urllib.parse import urlsplit, urljoin
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
@@ -50,6 +53,8 @@ class SongRequest:
     guitar_one: str = ''
     guitar_two: str = ''
     other_instruments: str = ''
+    vocal_mode: str = 'ai_lead'
+    source_audio: str = ''
 
     def payload(self):
         for name, limit in (('title', 200), ('style', 8000), ('lyrics', 20000)):
@@ -73,17 +78,48 @@ class SongRequest:
         prompt = self.style.strip() + ('\n\n' + band if band else '')
         if len(prompt) > 12000:
             raise ValueError('Combined arrangement is too long.')
+        if self.vocal_mode not in ('ai_lead', 'with_my_vocal', 'backing_for_my_vocal'):
+            raise ValueError('Choose AI singers, guest vocals, or backing for your recording.')
+        if self.instrumental and self.vocal_mode == 'with_my_vocal':
+            raise ValueError('Guest singers and instrumental-only cannot be selected together.')
+        if self.vocal_mode != 'ai_lead':
+            check_audio_input(self.source_audio)
+            prompt += ('\nPreserve the human source singer and arrange additional original co-vocalists around the recorded lead where possible.'
+                       if self.vocal_mode == 'with_my_vocal' else
+                       '\nCreate complementary musical backing around the supplied source vocal.')
+        elif self.source_audio:
+            raise ValueError('Source audio is only used in a recording-assisted mode.')
         result = {
             'prompt': prompt,
             'lyrics': '[Instrumental]' if self.instrumental else self.lyrics,
             'audio_duration': self.duration, 'batch_size': self.takes,
             'seed': self.seed, 'use_random_seed': self.seed == -1,
-            'audio_format': 'wav', 'task_type': 'text2music',
+            'audio_format': 'wav',
+            'task_type': {'ai_lead': 'text2music', 'with_my_vocal': 'cover',
+                          'backing_for_my_vocal': 'complete'}[self.vocal_mode],
             'use_format': False, 'use_cot_caption': False,
         }
+        if self.vocal_mode == 'with_my_vocal':
+            result['audio_cover_strength'] = 0.8
         if self.bpm:
             result['bpm'] = self.bpm
         return result
+
+
+AUDIO_MAX = 64 * 1024 * 1024
+AUDIO_TYPES = {'.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.flac': 'audio/flac'}
+
+
+def check_audio_input(path):
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError('Select a recording of your vocals first.')
+    src = Path(path).expanduser()
+    if src.suffix.lower() not in AUDIO_TYPES or not src.is_file() or src.is_symlink():
+        raise ValueError('Choose a regular WAV, MP3 or FLAC recording.')
+    size = src.stat().st_size
+    if not 0 < size <= AUDIO_MAX:
+        raise ValueError('The recording must be between 1 byte and 64 MiB.')
+    return src
 
 
 def write_manifest(path, data):
