@@ -1191,6 +1191,27 @@ class StudyWindow(QMainWindow):
         self.school_tabs.setCurrentIndex(1)
         self.school_portal.open()
 
+    def open_homework(self):
+        """Open Webbie's writing editor for the currently selected course."""
+        try:
+            if __package__:
+                from .homework_ui import HomeworkDialog
+            else:
+                from homework_ui import HomeworkDialog
+            course = self.store.course(self.current_course_id) if self.current_course_id else None
+            selected_row = self.assignment_table.currentRow()
+            selected = self.assignment_table.item(selected_row, 0) if selected_row >= 0 else None
+            dialog = HomeworkDialog(
+                self,
+                course=course["name"] if course else "",
+                assignment=selected.text() if selected else "",
+                notes=self.store.get_notes(self.current_course_id) if course else "",
+                folder=self.store.course_folder(self.current_course_id),
+            )
+            dialog.exec_()
+        except Exception as error:
+            QMessageBox.warning(self, "Webbie Homework", str(error))
+
     def open_school_onedrive(self):
         # School Microsoft identity is independent of personal Webbie storage.
         try:
