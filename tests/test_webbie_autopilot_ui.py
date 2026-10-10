@@ -26,7 +26,7 @@ class AutopilotGuiTests(unittest.TestCase):
 
     def test_owner_approved_autopilot_is_bounded_and_stop_revokes(self):
         with tempfile.TemporaryDirectory() as folder, \
-             patch.dict(os.environ,{'DISPLAY':':0}), \
+             patch.dict(os.environ,{'DISPLAY':':0'}), \
              patch('webbie_operator_bridge.private_socket_directory',
                    return_value=Path(folder)):
             app=SimpleNamespace(name='Audacity',desktop_id='audacity.desktop',
@@ -56,7 +56,7 @@ class AutopilotGuiTests(unittest.TestCase):
 
     def test_rejects_autopilot_without_task_window(self):
         with tempfile.TemporaryDirectory() as folder, \
-             patch.dict(os.environ,{'DISPLAY':':0}), \
+             patch.dict(os.environ,{'DISPLAY':':0'}), \
              patch('webbie_operator_bridge.private_socket_directory',
                    return_value=Path(folder)):
             app=SimpleNamespace(name='Firefox',desktop_id='firefox.desktop',
