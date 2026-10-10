@@ -123,6 +123,43 @@ class HomeworkUiTests(unittest.TestCase):
                 uploader.assert_called_once()
             dialog.close()
 
+    def test_rubric_preflight_runs_without_model_and_keeps_draft(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(course="PSY-328", folder=Path(folder))
+            dialog.directions.setPlainText("Write 250 to 350 words and cite sources.")
+            dialog.draft.setPlainText("My opening paragraph. [SOURCE NEEDED]")
+            with patch("study.homework_ui.DraftWorker") as worker:
+                dialog.check_draft()
+                worker.assert_not_called()
+            self.assertIn("below the stated minimum of 250",
+                          dialog.review_notes.toPlainText())
+            self.assertIn("source/citation placeholder",
+                          dialog.review_notes.toPlainText())
+            self.assertEqual(dialog.draft.toPlainText(),
+                             "My opening paragraph. [SOURCE NEEDED]")
+            dialog.close()
+
+    def test_ai_rubric_review_is_separate_and_never_rewrites_draft(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(course="SOC-112", folder=Path(folder))
+            dialog.directions.setPlainText("Discuss inequality in education.")
+            dialog.draft.setPlainText("Educational inequality affects students.")
+            before = dialog.draft.toPlainText()
+            with patch("study.homework_ui.DraftWorker") as worker:
+                dialog.review_draft()
+                prompt = worker.call_args.args[0]
+                self.assertIn("Do not rewrite the complete essay", prompt)
+                self.assertIn(before, prompt)
+                self.assertFalse(dialog.review_button.isEnabled())
+            dialog.review_ready("Checklist", "Add more concrete examples.")
+            self.assertIn("Add more concrete examples.",
+                          dialog.review_notes.toPlainText())
+            self.assertEqual(dialog.draft.toPlainText(), before)
+            dialog.worker = None
+            dialog.close()
+
     def test_draft_is_editable_before_export(self):
         with tempfile.TemporaryDirectory() as folder:
             with patch("study.homework_ui.load_style", return_value=""):
