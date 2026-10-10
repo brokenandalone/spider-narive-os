@@ -253,6 +253,31 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertTrue(panel.finish_song_button.isEnabled())
             panel.close()
 
+    def test_generated_take_handoff_never_starts_heavy_model_automatically(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            studio = root / 'songs'
+            source_dir = studio / 'song-test'
+            source_dir.mkdir(parents=True)
+            wav = source_dir / 'take-1.wav'
+            with wave.open(str(wav), 'wb') as audio:
+                audio.setnchannels(1); audio.setsampwidth(2); audio.setframerate(8000)
+                audio.writeframes(b'\\0\\0' * 100)
+            panel = StudioAIPanel(studio)
+            with patch.object(panel, 'selected', return_value=wav), \
+                 patch('studio.ai_panel.SeparationWorker') as worker:
+                panel.use_take_for_separation()
+                self.assertEqual(panel.separation_source.text(), str(wav.resolve()))
+                worker.assert_not_called()
+                self.assertIn('when ready', panel.status.text())
+            outside = root / 'outside.wav'
+            outside.write_bytes(wav.read_bytes())
+            with patch.object(panel, 'selected', return_value=outside):
+                panel.use_take_for_separation()
+                self.assertIn('not a saved Spider Studio', panel.status.text())
+            panel.close()
+
     def test_explicit_review_and_assignment_of_separated_stems(self):
         import wave
         with tempfile.TemporaryDirectory() as folder:
