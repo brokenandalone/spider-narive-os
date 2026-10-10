@@ -48,7 +48,10 @@ class BackendTests(unittest.TestCase):
                 self.send_response(200); self.end_headers()
                 self.wfile.write(json.dumps({'code': 200, 'error': None, 'data': data}).encode())
             def do_POST(self):
-                payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                raw = self.rfile.read(int(self.headers['Content-Length']))
+                content_type = self.headers.get('Content-Type', '')
+                payload = ({'multipart': raw, 'content_type': content_type} if
+                           content_type.startswith('multipart/form-data') else json.loads(raw))
                 owner.calls.append((self.path, payload, self.headers.get('Authorization')))
                 if self.path == '/release_task':
                     self.reply({'task_id': 'fixture-task', 'status': 'queued'})
@@ -118,6 +121,39 @@ class BackendTests(unittest.TestCase):
         with self.assertRaises(m.MusicError): self.client.generate(self.song, self.fixture.name, timeout=0)
         self.assertEqual(sum(path == '/release_task' for path, *_ in self.calls), 1)
         self.assertEqual(json.loads(next(Path(self.fixture.name).glob('*/job.json')).read_text())['task_id'], 'fixture-task')
+
+    def test_reference_audio_uses_local_multipart_without_claiming_voice_clone(self):
+        reference = Path(self.fixture.name) / 'my-voice.wav'
+        reference.write_bytes(self.audio)
+        song = m.SongRequest('Song', 'Original metal', 'My lyric',
+                             voice_reference=str(reference))
+        folder = self.client.generate(song, self.fixture.name)
+        request = self.calls[1][1]
+        self.assertIn(b'name="reference_audio"', request['multipart'])
+        self.assertNotIn(b'name="src_audio"', request['multipart'])
+        self.assertIn(b'name="task_type"', request['multipart'])
+        self.assertEqual((folder / 'voice-reference.wav').read_bytes(), self.audio)
+        self.assertEqual(json.loads((folder / 'job.json').read_text())['status'], 'completed')
+
+    def test_guest_vocal_cover_keeps_original_source_unmodified(self):
+        original = Path(self.fixture.name) / 'original.wav'
+        original.write_bytes(self.audio)
+        song = m.SongRequest('Duet', 'Gothic rock', '[Singer 1] Intro', vocal_mode='with_my_vocal',
+                             source_audio=str(original), vocal_lineup=('Original feminine alto',))
+        folder = self.client.generate(song, self.fixture.name)
+        submission = self.calls[1][1]['multipart']
+        self.assertIn(b'name="src_audio"', submission)
+        self.assertNotIn(b'name="reference_audio"', submission)
+        self.assertIn(b'cover', submission)
+        self.assertEqual((folder / 'original-vocal.wav').read_bytes(), self.audio)
+        self.assertEqual(original.read_bytes(), self.audio)
+
+    def test_source_audio_required_for_guest_vocal(self):
+        song = m.SongRequest('Duet', 'Gothic rock', 'Lyrics', vocal_mode='with_my_vocal')
+        with self.assertRaises(ValueError):
+            song.payload()
+        with self.assertRaises(ValueError):
+            m.SongRequest('Song', 'Rock', 'Words', source_audio='/tmp/does-not-exist').payload()
 
     def test_request_validation_and_instrumental(self):
         for kwargs in ({'duration': True}, {'takes': 8}, {'bpm': 10}, {'seed': -2}):
