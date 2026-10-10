@@ -19,7 +19,7 @@ class WebbieHomeworkTests(unittest.TestCase):
         self.assertIn("PSY-328", prompt)
         self.assertIn("Compare two theories", prompt)
         self.assertIn("AUTHENTIC USER WRITING SAMPLE", prompt)
-        self.assertIn("do not fabricate", prompt.lower())
+        self.assertIn("fabricate research", prompt.lower())
         self.assertIn("SOURCE NEEDED", prompt)
         self.assertNotIn("submit automatically", prompt)
 
