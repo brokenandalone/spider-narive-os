@@ -69,6 +69,8 @@ class TaskGrant:
                     self.clock() >= self._expires or self._remaining <= 0 or
                     action not in ROUTINE | SENSITIVE):
                 return False
+            if action == 'app.open' and preview != 'app_id=' + self._app_id:
+                return False
             if action in SENSITIVE:
                 # This invokes a trusted local on-screen dialog. Callbacks
                 # based solely on LLM/speech text must NOT be used here.
