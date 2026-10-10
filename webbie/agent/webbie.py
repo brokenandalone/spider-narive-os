@@ -621,6 +621,11 @@ def voice_listener():
             phrase
         )
 
+        # Whisper often spells Webbie as Webby. Normalize the exact name
+        # before wake, sleep, and conversation handling. Do not treat
+        # unrelated words such as "wavy" as an unrestricted wake phrase.
+        phrase = re.sub(r"\bwebby\b", "webbie", phrase)
+
         if not phrase:
             return
 
