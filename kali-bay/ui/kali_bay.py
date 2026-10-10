@@ -663,7 +663,7 @@ class KaliBayWindow(QMainWindow):
             if not isinstance(apps, list):
                 raise ValueError("Unexpected Kali application inventory.")
             import re
-            id_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\\.desktop$")
+            id_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\.desktop$")
             cleaned = []
             for app in apps[:1500]:
                 if not isinstance(app, dict):
