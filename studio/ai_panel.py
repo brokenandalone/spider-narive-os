@@ -195,6 +195,8 @@ class StudioAIPanel(QWidget):
         self.trainer = None
         self.training_script = Path(__file__).resolve().parent / 'package' / 'voice-engine.sh'
         self.last_training_set = None
+        self.last_converted_vocal = None
+        self.last_final_mix = None
         self.mix_worker = None
         self.separation_worker = None
         self.separation_directory = None
@@ -462,6 +464,16 @@ class StudioAIPanel(QWidget):
         self.mix_button = QPushButton("Export final WAV with My Voice")
         self.mix_button.clicked.connect(self.start_mix)
         layout.addWidget(self.mix_button)
+        listening_actions = QHBoxLayout()
+        self.play_converted_button = QPushButton('Listen to converted My Voice')
+        self.play_converted_button.setEnabled(False)
+        self.play_converted_button.clicked.connect(self.play_converted_voice)
+        listening_actions.addWidget(self.play_converted_button)
+        self.play_final_mix_button = QPushButton('Listen to final mix')
+        self.play_final_mix_button.setEnabled(False)
+        self.play_final_mix_button.clicked.connect(self.play_final_mix)
+        listening_actions.addWidget(self.play_final_mix_button)
+        layout.addLayout(listening_actions)
         buttons = QHBoxLayout()
         self.preset = QPushButton('Broken Sorrow preset')
         self.preset.clicked.connect(lambda: self.style.setPlainText(BROKEN_SORROW))
@@ -565,6 +577,8 @@ class StudioAIPanel(QWidget):
 
     def conversion_done(self, target, message):
         self.status.setText(message + ((' Saved: ' + target) if target else ''))
+        self.last_converted_vocal = Path(target) if target else None
+        self.play_converted_button.setEnabled(bool(target))
         if target:
             self.mix_vocal.setText(target)
         if self.finish_after_conversion:
@@ -712,6 +726,22 @@ class StudioAIPanel(QWidget):
 
     def mix_done(self, output, message):
         self.status.setText(message + ((" " + output) if output else ""))
+        self.last_final_mix = Path(output) if output else None
+        self.play_final_mix_button.setEnabled(bool(output))
+
+    def _play_checked_wav(self, path):
+        try:
+            verified = valid_wav(path, 'saved song')
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(verified))):
+                self.status.setText('The audio player did not open. Try your installed Studio DAW.')
+        except (OSError, MixError, TypeError):
+            self.status.setText('That output WAV is missing or was moved. Reopen the saved audio job.')
+
+    def play_converted_voice(self):
+        self._play_checked_wav(self.last_converted_vocal)
+
+    def play_final_mix(self):
+        self._play_checked_wav(self.last_final_mix)
 
     def mix_finished(self):
         worker, self.mix_worker = self.mix_worker, None
