@@ -15,6 +15,8 @@ class UnsafeRVCVersion(ValueError):
 
 PUBLIC_BIND = 'server_name="0.0.0.0"'
 LOCAL_BIND = 'server_name="127.0.0.1"'
+PUBLIC_PROBE = 'host="0.0.0.0"'
+LOCAL_PROBE = 'host="127.0.0.1"'
 PUBLIC_SHARE = ".launch(share=True)"
 LOCAL_SHARE = '.launch(share=False, server_name="127.0.0.1")'
 
@@ -22,11 +24,14 @@ LOCAL_SHARE = '.launch(share=False, server_name="127.0.0.1")'
 def build_local_ui(source_text):
     if not isinstance(source_text, str):
         raise UnsafeRVCVersion("RVC's original WebUI source could not be read.")
-    if source_text.count(PUBLIC_BIND) != 1 or source_text.count(PUBLIC_SHARE) != 1:
+    if (source_text.count(PUBLIC_BIND) != 1
+            or source_text.count(PUBLIC_PROBE) != 1
+            or source_text.count(PUBLIC_SHARE) != 1):
         raise UnsafeRVCVersion("Unknown RVC WebUI release; refusing to expose a training server.")
     patched = source_text.replace(PUBLIC_BIND, LOCAL_BIND, 1)
+    patched = patched.replace(PUBLIC_PROBE, LOCAL_PROBE, 1)
     patched = patched.replace(PUBLIC_SHARE, LOCAL_SHARE, 1)
-    if PUBLIC_BIND in patched or PUBLIC_SHARE in patched:
+    if "0.0.0.0" in patched or "share=True" in patched:
         raise UnsafeRVCVersion("RVC WebUI still has an untrusted public bind.")
     return patched
 
