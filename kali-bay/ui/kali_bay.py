@@ -552,18 +552,21 @@ class KaliBayWindow(QMainWindow):
         actions.setObjectName("kaliDesktopQuickActions")
         right = QVBoxLayout(actions)
         right.setSpacing(12)
-        hero = QLabel("KALI × SPIDER")
+        hero = QLabel("KALI LINUX × SPIDER OS")
         hero.setStyleSheet("font-size:24px;font-weight:bold;color:#c084fc;")
         right.addWidget(hero)
         about = QLabel(
-            "Kali-style security environment, powered by the existing "
-            "Kali Distrobox container. The desktop, wallpaper and assistant "
-            "belong to Spider OS. This is not a separate Kali XFCE session."
+            "Use actual Kali Linux applications, the interactive Kali "
+            "terminal and Kali's own apt repositories within your existing "
+            "Distrobox installation. Spider OS provides the desktop workspace "
+            "and Webbie. No separate VM is required for ordinary tool use."
         )
         about.setWordWrap(True)
         right.addWidget(about)
         for caption, operation in (
             ("KALI TERMINAL", self.open_terminal),
+            ("KALI PACKAGE MANAGER", self.open_packages),
+            ("INSTALLED KALI PACKAGES", self.open_inventory),
             ("KALI FILES", self.open_kali_files),
             ("ASK WEBBIE · SECURITY ASSISTANT", self.open_webbie_security),
             ("OFFENSIVE SECURITY", lambda: self.security_tabs.setCurrentIndex(1)),
@@ -607,6 +610,15 @@ class KaliBayWindow(QMainWindow):
             QMessageBox.information(self, "Kali Bay", "Select a tool first.")
             return
         self.open_tool(item.data(Qt.UserRole))
+
+    def open_packages(self):
+        # Explicit interactive shell in the existing Kali Distrobox.
+        # No apt action runs until the user types it inside the terminal.
+        self.launch_terminal_command([MANAGER, "packages"])
+
+    def open_inventory(self):
+        # Read-only installed package report with no container startup.
+        self.launch_terminal_command([MANAGER, "inventory"])
 
     def open_kali_files(self):
         # This dedicated Distrobox home is already created by the Kali manager.
