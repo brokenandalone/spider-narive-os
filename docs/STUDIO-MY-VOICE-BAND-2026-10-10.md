@@ -35,6 +35,8 @@ All the above have GitHub source tests. **No user recordings, trained voice weig
 4. A vocal selection populates the local RVC conversion source; an instrumental selection populates the final mix backing. The same WAV cannot serve both roles. Converted vocal selection is cleared when a new singing source is chosen.
 5. **Convert My Voice and make final mix** uses a separately, genuinely trained and trusted owner RVC model, then produces a new WAV while keeping the original recording, separated tracks and converted vocals.
 
+Each separation job now saves a private `separation.json` receipt listing the original WAV, the selected separator model, all valid extracted WAV candidates, and each candidate's deliberately **unassigned** role. Stereo/mix outputs and intermediate files stay local. The RVC conversion and PyMSS adapters also accept the standard Linux virtual-environment Python executable symlink; audio sources and pretrained voice-model symlinks remain rejected. Both changes are covered by source tests.
+
 **Source implementation is not acceptance:** a real GPU/CPU qualification, model installation, consented owner-voice training, separation-quality audition and full production render have not occurred on the user's PC. In particular, extracted voices may contain artifacts, the original AI singer can bleed into the backing, the generated two guitars may be inseparable, and the output does not yet imply pitch correction or a verified Suno v6 substitute.
 
 ## What My Voice must eventually mean
