@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'studio'))
 spec = importlib.util.spec_from_file_location('music_backend_test', ROOT / 'studio/music_backend.py')
 m = importlib.util.module_from_spec(spec); sys.modules[spec.name] = m; spec.loader.exec_module(m)
 
@@ -122,6 +123,35 @@ class BackendTests(unittest.TestCase):
         for kwargs in ({'duration': True}, {'takes': 8}, {'bpm': 10}, {'seed': -2}):
             with self.assertRaises(ValueError): m.SongRequest('x', 'y', 'z', **kwargs).payload()
         self.assertEqual(m.SongRequest('x', 'y', instrumental=True).payload()['lyrics'], '[Instrumental]')
+
+    def test_three_original_singers_and_dual_guitars_reach_local_prompt(self):
+        song = m.SongRequest('Duet test', 'Dark metal', '[Singer 1] Verse\\n[Singer 2] Chorus',
+            vocal_lineup=('Justin Therapy (original baritone)', 'Original feminine alto',
+                          'Jason (original character voice)'),
+            vocal_notes='Alternate verses with singer labels and share final chorus',
+            guitar_one='Heavy rhythm riffs on a seven-string',
+            guitar_two='Independent melodic lead harmony and solo',
+            other_instruments='Bass, drums and piano')
+        prompt = song.payload()['prompt']
+        self.assertIn('feminine alto', prompt)
+        self.assertIn('Jason', prompt)
+        self.assertIn('Guitarist 1', prompt)
+        self.assertIn('Guitarist 2', prompt)
+        self.assertIn('Bass, drums and piano', prompt)
+        self.assertIn('Dark metal', prompt)
+        # A named text role is not proof that actual voice identity is replicated.
+        self.assertIn('invented rather than cloned', prompt)
+
+    def test_lineup_roles_are_validated_without_voice_cloning(self):
+        for singers in (('Unknown real vocalist',),
+                        ('Original feminine alto', 'Original feminine alto'),
+                        ('Original feminine alto',) * 4):
+            with self.assertRaises(ValueError):
+                m.SongRequest('Test', 'Rock', 'lyrics', vocal_lineup=singers).payload()
+        with self.assertRaises(ValueError):
+            m.SongRequest('Test', 'Rock', 'lyrics', guitar_one='a' * 401).payload()
+        default = m.SongRequest('Test', 'Rock', 'lyrics').payload()
+        self.assertEqual(default['prompt'], 'Rock')
 
     def test_no_remote_endpoint_credentials_or_proxy(self):
         for url in ('http://example.com:8001', 'http://user:pass@127.0.0.1:8001',
