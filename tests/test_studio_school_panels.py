@@ -135,6 +135,36 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertIn('trained', panel.status.text())
             panel.close()
 
+    def test_training_readiness_reports_usable_and_rejected_clips(self):
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            panel.voice_readiness_done({
+                'total_seconds': 480.0, 'usable_clips': 16, 'rejected_clips': 1,
+                'ready_to_prepare': False,
+            })
+            self.assertIn('8.0 of 10 minutes', panel.readiness_details.text())
+            self.assertIn('1 recording(s) rejected', panel.readiness_details.text())
+            self.assertIn('2.0 more usable minutes', panel.readiness_details.text())
+            panel.voice_readiness_done({
+                'total_seconds': 660.0, 'usable_clips': 22, 'rejected_clips': 0,
+                'ready_to_prepare': True,
+            })
+            self.assertIn('Ready to prepare', panel.readiness_details.text())
+            self.assertIn('No model has been trained', panel.readiness_details.text())
+            panel.voice_readiness_done({'error': 'ffprobe is missing'})
+            self.assertIn('ffprobe is missing', panel.readiness_details.text())
+            panel.close()
+
+    def test_training_readiness_uses_background_worker(self):
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            with patch('studio.ai_panel.TrainingReadinessWorker') as worker:
+                panel.check_voice_readiness()
+                worker.assert_called_once()
+                self.assertFalse(panel.readiness_button.isEnabled())
+                self.assertIn('Checking', panel.readiness_details.text())
+            panel.close()
+
     def test_finish_song_chain_rejects_missing_instrumental(self):
         with tempfile.TemporaryDirectory() as folder:
             panel = StudioAIPanel(folder)
