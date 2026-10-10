@@ -253,6 +253,45 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertTrue(panel.finish_song_button.isEnabled())
             panel.close()
 
+    def test_owner_model_save_requires_confirmation_and_never_deserializes(self):
+        from PyQt5.QtWidgets import QMessageBox
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            panel.rvc_model.setText(str(Path(folder) / 'trained.pth'))
+            panel.rvc_index.setText(str(Path(folder) / 'trained.index'))
+            with patch('studio.ai_panel.QMessageBox.question', return_value=QMessageBox.No), \
+                 patch('studio.ai_panel.remember_owner_model') as saver:
+                panel.remember_my_voice_model()
+                saver.assert_not_called()
+            with patch('studio.ai_panel.QMessageBox.question', return_value=QMessageBox.Yes), \
+                 patch('studio.ai_panel.remember_owner_model') as saver:
+                panel.remember_my_voice_model()
+                saver.assert_called_once_with(
+                    str(Path(folder) / 'trained.pth'), str(Path(folder) / 'trained.index'), consent=True)
+                self.assertIn('No audio identity verified', panel.saved_model_status.text())
+            panel.close()
+
+    def test_owner_model_restore_and_forget_do_not_delete_weights(self):
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            paths = {'model': str(Path(folder) / 'owner.pth'),
+                     'index': str(Path(folder) / 'owner.index')}
+            with patch('studio.ai_panel.load_owner_model', return_value=paths):
+                panel.restore_my_voice_model()
+                self.assertEqual(panel.rvc_model.text(), paths['model'])
+                self.assertEqual(panel.rvc_index.text(), paths['index'])
+                self.assertIn('listening test', panel.saved_model_status.text())
+            with patch('studio.ai_panel.forget_owner_model') as forgetting:
+                panel.forget_my_voice_model()
+                forgetting.assert_called_once()
+                self.assertEqual(panel.rvc_model.text(), '')
+                self.assertEqual(panel.rvc_index.text(), '')
+                self.assertIn('remain untouched', panel.saved_model_status.text())
+            with patch('studio.ai_panel.load_owner_model', return_value=None):
+                panel.restore_my_voice_model()
+                self.assertIn('No valid saved owner model', panel.saved_model_status.text())
+            panel.close()
+
     def test_generated_take_handoff_never_starts_heavy_model_automatically(self):
         import wave
         with tempfile.TemporaryDirectory() as folder:
