@@ -33,6 +33,7 @@ BASELINES = (
     '6370ebde7b79029603747968266ccaf79aa78c00',  # workspace name/model
     '83d692b4c3115a2f4edeed2730a77774c2b49364',  # camera
     'a20727cc3aff0f0e9e5c96e2249663c82c1e0e26',  # quiet sleep
+    'd27b0fa48670b8e3efda9e0b410cc2096ea47675',  # selective Kali source #13
 )
 
 # Files only. No passwords, auth files, models, service state, databases,
@@ -59,6 +60,7 @@ APP_FILES = (
     'webbie/agent/webbie.py', 'webbie/agent/kali_assistant.py', 'webbie/agent/vision_query.py',
     'webbie/agent/night_mode.py', 'webbie/agent/workspace_names.py',
     'webbie/brain/brain.py', 'system/onedrive.py',
+    'kali-bay/bin/kali-bay', 'kali-bay/ui/kali_bay.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
 )
@@ -94,7 +96,7 @@ def prepare_items(root=PROJECT_ROOT, install=INSTALL_ROOT, units=UNIT_ROOT,
     for relative in APP_FILES:
         mode = 0o755 if relative in (
             'the-web/shell/main.py', 'the-web/overlay/webbie_face.py',
-            'system/onedrive.py') else 0o644
+            'system/onedrive.py', 'kali-bay/bin/kali-bay') else 0o644
         found.append(Item(root / relative, install / relative, mode=mode,
                           reference=relative))
     for unit in UNITS:
