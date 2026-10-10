@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QHBoxLayout,
                              QLabel, QLineEdit, QMessageBox, QPushButton,
                              QSpinBox, QTextEdit, QVBoxLayout)
@@ -20,6 +21,7 @@ from task_grants import TaskGrant
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from screen_capture import capture_window, describe_window
+from visual_step import propose_step
 from webbie_operator_bridge import OperatorBridge
 
 
@@ -62,6 +64,25 @@ class ScreenWorker(QThread):
             self.jpeg = None
 
 
+class StepWorker(QThread):
+    proposed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+    def __init__(self, jpeg, task, width, height, parent=None):
+        super().__init__(parent)
+        self.jpeg = jpeg
+        self.task = task
+        self.width = width
+        self.height = height
+    def run(self):
+        try:
+            self.proposed.emit(
+                propose_step(self.jpeg, self.task, self.width, self.height))
+        except (ValueError, RuntimeError, OSError) as error:
+            self.failed.emit(str(error))
+        finally:
+            self.jpeg = None
+
+
 class WebbieComputerDialog(QDialog):
     def __init__(self, parent=None, *, discover=None, run=None, launcher=None):
         super().__init__(parent)
@@ -75,6 +96,9 @@ class WebbieComputerDialog(QDialog):
             discover=lambda: self.apps,
             runner=run, launcher=launcher)
         self.screen_worker = None
+        self.step_worker = None
+        self.pending_step = None
+        self.pending_step_target = None
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
         self.bridge.openRequested.connect(self.handle_voice_open)
 
@@ -144,6 +168,13 @@ class WebbieComputerDialog(QDialog):
         self.type_button = QPushButton('Type')
         self.type_button.clicked.connect(self.type_text)
         row3.addWidget(self.to_type, 1); row3.addWidget(self.type_button)
+        planning = QHBoxLayout(); layout.addLayout(planning)
+        self.suggest_button = QPushButton('Webbie: suggest next safe step')
+        self.suggest_button.clicked.connect(self.suggest_step)
+        planning.addWidget(self.suggest_button)
+        self.apply_step_button = QPushButton('Apply reviewed step')
+        self.apply_step_button.clicked.connect(self.apply_step)
+        planning.addWidget(self.apply_step_button)
         self.report = QTextEdit(); self.report.setReadOnly(True)
         self.report.setMaximumHeight(150); layout.addWidget(self.report)
         self.report.setPlainText('No program or screen is being controlled.')
@@ -184,6 +215,7 @@ class WebbieComputerDialog(QDialog):
             return
         # Clear a stale stop-only signal before accepting this NEW on-screen grant.
         consume_stop()
+        self.pending_step = None
         self.grant.activate(task, app.desktop_id, seconds=300)
         self.operator.begin_new_task()
         try:
@@ -198,6 +230,8 @@ class WebbieComputerDialog(QDialog):
 
     def stop(self):
         self.operator.stop()
+        self.pending_step = None
+        self.pending_step_target = None
         self.grant.stop()
         self.bridge.deactivate()
         self.status('STOPPED. No additional Webbie computer actions are authorized.')
@@ -223,9 +257,13 @@ class WebbieComputerDialog(QDialog):
             if active else 'OFF | Webbie cannot operate applications')
         for control in (self.open_button, self.refresh_button, self.bind_button, self.focus_button,
                         self.inspect_button, self.close_button, self.click_button,
-                        self.key_button, self.type_button):
+                        self.key_button, self.type_button, self.suggest_button):
             control.setEnabled(active)
+        self.apply_step_button.setEnabled(
+            active and self.pending_step is not None and
+            self.pending_step.get('action') in {'click', 'press'})
         if not active:
+            self.pending_step = None
             self.bridge.deactivate()
             if not self.operator.cancelled.is_set():
                 self.operator.stop()
@@ -338,9 +376,85 @@ class WebbieComputerDialog(QDialog):
         self.screen_worker.failed.connect(self.status)
         self.screen_worker.start()
 
+    def suggest_step(self):
+        """Observe ONE approved window, then ask local AI for ONE safe proposal."""
+        grant = self.grant.status()
+        window_id = self.selected_window()
+        if (not grant['active'] or not window_id or
+                window_id != self.operator.target_window):
+            self.status('Approve your task and bind the exact window first.')
+            return
+        if self.step_worker and self.step_worker.isRunning():
+            self.status('Webbie is already inspecting the selected window.')
+            return
+        if (QMessageBox.question(
+                self, 'Share one window frame?',
+                'Send one snapshot of the authorized window to local Ollama '
+                'to suggest a routine next step? No action will happen '
+                'automatically. Avoid password, banking and private windows.',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No) != QMessageBox.Yes):
+            return
+        try:
+            current = {w['id'] for w in self.operator.windows()}
+            if window_id not in current:
+                raise ValueError('Window closed or changed; select it again')
+            image = capture_window(window_id, approved=True)
+            qimage = QImage.fromData(image, 'JPEG')
+            if qimage.isNull():
+                raise RuntimeError('Cannot determine window screenshot dimensions')
+        except (OSError, ValueError, RuntimeError, PermissionError) as error:
+            self.status(str(error)); return
+        self.pending_step = None
+        self.pending_step_target = window_id
+        self.step_worker = StepWorker(
+            image, grant['task'], qimage.width(), qimage.height(), self)
+        self.step_worker.proposed.connect(self.step_proposed)
+        self.step_worker.failed.connect(self.status)
+        self.step_worker.start()
+        self.status('Webbie is proposing one step from a fresh local screen snapshot.')
+        self.refresh_status()
+
+    def step_proposed(self, plan):
+        if (not self.grant.status()['active'] or
+                self.pending_step_target != self.operator.target_window):
+            self.pending_step = None
+            self.status('Task expired or target changed. Proposal discarded.')
+            return
+        self.pending_step = plan if plan.get('action') in ('click', 'press') else None
+        self.status('Untrusted local AI suggestion: ' + str(plan) +
+                    '\nNo action taken. Review the exact operation.')
+        self.refresh_status()
+
+    def apply_step(self):
+        plan = self.pending_step
+        self.pending_step = None
+        self.refresh_status()
+        if not plan or not self.grant.status()['active']:
+            return
+        if self.pending_step_target != self.operator.target_window:
+            self.status('Target changed; proposal discarded.')
+            return
+        detail = (f"Click at ({plan['x']}, {plan['y']})" if plan['action']=='click'
+                  else "Press " + plan['key'])
+        if (QMessageBox.question(
+                self, 'Review Webbie proposed action',
+                f"{detail}\nReason: {plan['reason']}\n"
+                'The model may be mistaken. Do this one step?',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No) != QMessageBox.Yes):
+            self.status('Suggested step rejected.'); return
+        if plan['action'] == 'click':
+            self.action(self.operator.click, plan['x'], plan['y'])
+        elif plan['action'] == 'press':
+            self.action(self.operator.press, plan['key'])
+        # Reinspect the screen before proposing anything else.
+        self.status(self.report.toPlainText() + '\nVerify the window before the next step.')
+
     def closeEvent(self, event):
         self.stop()
-        if self.screen_worker and self.screen_worker.isRunning():
+        if ((self.screen_worker and self.screen_worker.isRunning()) or
+                (self.step_worker and self.step_worker.isRunning())):
             self.hide()
             event.ignore()
         else:
