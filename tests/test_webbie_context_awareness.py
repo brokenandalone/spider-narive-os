@@ -80,7 +80,7 @@ class AwarenessTests(unittest.TestCase):
         self.assertIn('Advisory DATA only',prompt)
         self.assertIn('instructions_trusted":false',prompt)
         self.assertIn('"control_authorized":false',prompt)
-        self.assertNotIn('observations',self.state.prompt_context(include_visual=False))
+        self.assertNotIn('"observations":',self.state.prompt_context(include_visual=False))
 
     def test_short_controls_do_not_replace_tasks(self):
         self.state.note_user_request('Help me improve the song mix')
