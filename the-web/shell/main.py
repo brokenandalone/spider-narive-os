@@ -365,6 +365,15 @@ class TheWeb(QMainWindow):
         )
         self.webbie_dock.setWindowTitle('WEBBIE | ' + label)
 
+    def open_kali_assistant(self):
+        """Open the existing Webbie dock in Kali security-assistant mode."""
+        self.update_webbie_context()
+        self.webbie_dock.show()
+        self.webbie_dock.raise_()
+        # Draft, do not silently execute an AI/tool command.
+        self.webbie_assistant.entry.setText('list Kali Bay tools')
+        self.webbie_assistant.entry.setFocus()
+
     def application_panel(self, workspace):
         panel = QWidget(); panel.setObjectName('panel'); layout = QVBoxLayout(panel)
         layout.addWidget(QLabel('Installed apps  /  ' + WORKSPACES[workspace]))
@@ -382,6 +391,9 @@ class TheWeb(QMainWindow):
             open_files = button('Open files in Dolphin', lambda checked=False, picker=locations: self.open_workspace_folder(picker.currentData(), workspace))
             open_files.setToolTip('Opens existing local files; never moves, replaces or uploads documents.')
             layout.addWidget(open_files)
+        if workspace == 'kali-bay':
+            layout.addWidget(button('Ask Webbie about Kali tools', self.open_kali_assistant))
+            layout.addWidget(QLabel('Webbie opens approved tools only. Scans and target commands stay manual.'))
         if workspace == 'media': layout.addWidget(button('Open Spider Media Center', self.launch_media))
         if workspace == 'system': layout.addWidget(button('System settings', self.open_settings))
         if workspace == 'dev-bay': layout.addWidget(button('Terminal', self.open_terminal))
