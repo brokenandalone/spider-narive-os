@@ -57,8 +57,12 @@ def inventory(path, needles):
         return {'state': 'invalid-python', 'error_type': type(error).__name__}
     funcs = set()
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            funcs.add(node.name)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Name)):
+            funcs.add(node.name if hasattr(node, 'name') else node.id)
+        elif isinstance(node, ast.ImportFrom):
+            funcs.update(alias.asname or alias.name for alias in node.names)
+        elif isinstance(node, ast.Import):
+            funcs.update(alias.asname or alias.name.split('.')[0] for alias in node.names)
     return {
         'state': 'present',
         'sha256': sha(path),
