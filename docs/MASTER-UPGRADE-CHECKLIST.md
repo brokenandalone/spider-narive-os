@@ -17,6 +17,15 @@ These current owner-confirmed facts **supersede older camera/face status lines b
 - [ ] **Full desktop operator:** owner should be able to ask Webbie to open and operate any installed GUI program, rather than only the Spider OS workspaces. Wire to an explicit user-facing task grant/preview, visible state and emergency stop; add fresh opt-in screen understanding, desktop verification, authorized speaker handling, cautious dangerous-action confirmations, and device acceptance tests. No autonomous computer control is live on the PC yet.
 - [ ] Do not bundle older repository voice/vision files over the newer customized working PC files. Prepare **one** owner-requested safe/reversible combined install after reconciliation and CI.
 
+## October 10 owner choice: Webbie Autopilot, installed-PC baseline first
+
+- [x] Source-built a six-step, two-minute **Supervised Autopilot** policy for one owner-approved task and exact window, with fresh local screen vision after every step and immediate pause/STOP. Automatic ordinary navigation keys are allowed at high confidence, but clicks require on-screen confirmation. No destructive, administrative, sending, purchasing or credential tasks in autopilot.
+- [x] Webbie computer panel exposes Start/Pause/STOP Autopilot and rejects stale screen responses when task or selected window changes. Uses the installed camera's local vision model rather than forcing a different download.
+- [x] Source-built a read-only PC-versus-GitHub comparison at `webbie/tools/installed_reconcile_audit.py` reporting hashes and installed-only versus GitHub-only code symbols. It never modifies the PC or approves a new installation.
+- [ ] **MANDATORY BEFORE INSTALL:** run the audit on the **currently installed** Spider OS PC. Previously recorded on-device source was ~2,300-line Webbie agent and ~850-line brain versus far smaller old GitHub sources, with installed-only memory, research/Firefox navigation and interrupt/voice customizations. Camera and local image understanding were subsequently confirmed working. This historical comparison is not proof of today's live file hashes.
+- [ ] Reconcile latest actual PC source into GitHub candidate without losing model selection, conversation memory, camera, face, voice, wake/sleep, Author, Studio or Media. Hold release until detached merged-source tests and a backup-first reversible install plan pass. Do not overwrite the owner-modified agent from the older GitHub branch.
+- [ ] Full unsupervised multistep computer operation remains future work; supervised six-step autopilot is source-built, not installed or independently PC-tested.
+
 ## Unified cross-chat status and release gate (2026-10-09)
 
 **Authority:** this checklist + [cross-chat handoff](CROSS-CHAT-CONSOLIDATION-2026-10-09.md) + [installation policy](INSTALL-RELEASE-POLICY.md), updated from the accessible Spider OS conversations, GitHub branch history and installed-PC audit. Chat-history retrieval outside the conversation was unavailable; do not claim every chat message has been independently verified. GitHub code and individual PR green checks are *not* proof of a combined or installed build.
