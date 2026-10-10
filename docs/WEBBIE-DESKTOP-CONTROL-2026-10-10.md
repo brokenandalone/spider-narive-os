@@ -35,6 +35,38 @@ Owner report, October 10, 2026:
    ignoring quoted material and longer sentences. This is a **classifier only**,
    not an installed voice hotword/interrupt implementation.
 
+## October 10 development follow-up
+
+- [x] **Source-only** desktop-control Qt dialog integrated inside the resident
+  Webbie panel, with a selected installed app, visible task description,
+  five-minute/75-operation grant, independent risky-action confirmation,
+  windows/focus/keys/type/click actions, and a user-visible STOP WEBBIE control.
+  It starts denied; no request alone can activate the permission grant.
+- [x] **Source-only** single authorized selected-window JPEG snapshot in memory
+  and optional loopback Ollama screenshot description (no screenshot files);
+  separate on-screen consent for each inspection.
+- [x] **Source-only** stop propagation from agent to desktop-panel grant via a
+  private one-way marker, with symlink checks and no authorization channel.
+- [x] **Source-only** interruptible edge-tts/mpv/espeak subprocess wrapper,
+  background reply thread, and single-microphone Whisper stop-only barge-in
+  during speech, recognizing exact Webbie/Webby stop commands. This is not
+  proof of reliable speaker/echo separation on the installed webcam microphone.
+- [x] **Source-only** strict voice "open Audacity" routing through a local
+  Unix socket exposed solely while the owner-selected desktop task is active.
+  The spoken request must match the exact approved installed-app desktop ID.
+  No voice command can create a grant, switch apps or submit arbitrary GUI
+  actions. The UI uses the user's installed XDG launcher rather than model
+  string execution.
+- [x] Reversible release manifest updated with matched new module sources.
+  Unknown owner-customized live files must BLOCK installation until manually
+  reconciled.
+
+**Still absent:** reliable autonomous multi-step GUI planner and verifier,
+selected-window confinement of pointer/keyboard actions, owner/Shayna
+speaker-grade authorization and hardware-tested TTS barge-in. The local GUI
+still requires direct user operation of its controls after permission, except
+for explicit voice app-open requests. Do not claim full remote/agentic control.
+
 ## Remaining integration work before Webbie can operate apps on demand
 
 - Build the owner-visible control permission surface, foreground task indicator,
