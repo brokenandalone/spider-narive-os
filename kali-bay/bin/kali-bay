@@ -321,7 +321,7 @@ category_shell() {
 # App IDs are exact basenames. Never accept arbitrary file paths or arguments.
 app_id_valid() {
     local id="${1:-}"
-    [[ "${#id}" -le 108 && "${id}" =~ ^[[:alnum:]][[:alnum:]_.+-]*\.desktop$ ]] \
+    [[ "${#id}" -le 108 && "${id}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._+-]*\.desktop$ ]] \
         || die "Invalid Kali desktop application identifier."
 }
 app_ready() {
