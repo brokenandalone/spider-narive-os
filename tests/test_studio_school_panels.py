@@ -12,6 +12,7 @@ from PyQt5.QtTest import QTest
 import time
 from studio.ai_panel import StudioAIPanel, BROKEN_SORROW
 from study.school_portal import SchoolPortal, SCHOOL_URL
+from study.school_onedrive import SchoolOneDriveDialog, REMOTE
 
 app = QApplication.instance() or QApplication([])
 
@@ -79,6 +80,34 @@ class NativeWorkspaceTests(unittest.TestCase):
             with patch('study.school_portal.QDesktopServices.openUrl', return_value=True) as launch:
                 panel.external(); launch.assert_called_once_with(QUrl(SCHOOL_URL))
             panel.close()
+
+
+    def test_school_onedrive_remote_is_separate_from_webbie(self):
+        self.assertEqual(REMOTE, 'school_onedrive')
+        with tempfile.TemporaryDirectory() as folder:
+            with patch('study.school_onedrive.remote_ready', return_value=False):
+                panel = SchoolOneDriveDialog(None, Path(folder))
+                panel.download()
+                self.assertIn('Configure', panel.status.text())
+                panel.close()
+
+    def test_school_onedrive_browse_uses_async_rclone_and_navigates(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch('study.school_onedrive.remote_ready', return_value=True):
+                panel = SchoolOneDriveDialog(None, Path(folder))
+                with patch('study.school_onedrive.QProcess') as process_factory:
+                    proc = process_factory.return_value
+                    panel.browse()
+                    proc.setArguments.assert_called_once_with(
+                        ['lsjson', 'school_onedrive:', '--max-depth', '1',
+                         '--max-duration', '20s'])
+                    proc.start.assert_called_once()
+                panel.browse_process = None
+                panel.remote_folder = 'PSY-328/Module 2'
+                panel.parent_folder()
+                self.assertEqual(panel.remote_folder, 'PSY-328')
+                panel.browse_process = None
+                panel.close()
 
     def test_download_follows_current_course_and_cancel_does_not_accept(self):
         with tempfile.TemporaryDirectory() as folder:
