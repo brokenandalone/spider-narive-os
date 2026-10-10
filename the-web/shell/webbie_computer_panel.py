@@ -22,7 +22,8 @@ from task_grants import TaskGrant
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from screen_capture import capture_window, describe_window
-from webbie_camera import DEFAULT_VISION_MODEL as INSTALLED_CAMERA_VISION_MODEL
+sys.path.insert(0, str(ROOT / 'webbie/brain'))
+from local_models import choose_local_model
 from visual_step import propose_step
 from autopilot_policy import AutopilotPolicy
 from webbie_operator_bridge import OperatorBridge
@@ -61,7 +62,8 @@ class ScreenWorker(QThread):
         try:
             self.described.emit(describe_window(
                 self.jpeg, 'Briefly identify the visible application controls. '
-                'Do not repeat personal or secret data.', model=self.model))
+                'Do not repeat personal or secret data.',
+                model=self.model or choose_local_model('vision')))
         except (ValueError, RuntimeError, OSError) as error:
             self.failed.emit(str(error))
         finally:
@@ -81,7 +83,8 @@ class StepWorker(QThread):
     def run(self):
         try:
             self.proposed.emit(
-                propose_step(self.jpeg, self.task, self.width, self.height, model=self.model))
+                propose_step(self.jpeg, self.task, self.width, self.height,
+                             model=self.model or choose_local_model('vision')))
         except (ValueError, RuntimeError, OSError) as error:
             self.failed.emit(str(error))
         finally:
@@ -95,9 +98,9 @@ class WebbieComputerDialog(QDialog):
         self.setObjectName('webbieComputerControl')
         self.resize(510, 610)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
-        # Reuse the camera model already deployed on the PC; never pull or switch models.
-        self.vision_model = (os.environ.get('WEBBIE_VISION_MODEL') or
-                             INSTALLED_CAMERA_VISION_MODEL)
+        # Resolve preferences against locally INSTALLED Ollama models in the
+        # background worker. Never download or switch the owner's engine.
+        self.vision_model = None
         self.grant = TaskGrant(approve_sensitive=self.approve_sensitive)
         self.operator = ConfinedDesktopOperator(
             permission=self.grant.authorize,
