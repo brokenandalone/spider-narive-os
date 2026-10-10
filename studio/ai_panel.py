@@ -134,6 +134,23 @@ class VoiceMixWorker(QThread):
                              else "Mix failed. Check FFmpeg and your selected audio files.")
 
 
+class EngineCheckWorker(QThread):
+    result = pyqtSignal(str)
+
+    def __init__(self, script):
+        super().__init__(QApplication.instance())
+        self.script = str(script)
+        QApplication.instance().aboutToQuit.connect(self.wait)
+
+    def run(self):
+        try:
+            report = subprocess.run(['bash', self.script, '--check'],
+                capture_output=True, text=True, timeout=12, check=True)
+            self.result.emit(report.stdout[-3000:] or 'No readiness information was returned.')
+        except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+            self.result.emit('Local voice-engine check failed: ' + str(error))
+
+
 class TrainingReadinessWorker(QThread):
     result = pyqtSignal(object)
 
@@ -171,6 +188,7 @@ class StudioAIPanel(QWidget):
         self.rvc_worker = None
         self.dataset_worker = None
         self.readiness_worker = None
+        self.engine_worker = None
         self.trainer = None
         self.training_script = Path(__file__).resolve().parent / 'package' / 'voice-engine.sh'
         self.mix_worker = None
@@ -524,15 +542,23 @@ class StudioAIPanel(QWidget):
             worker.deleteLater()
 
     def check_training_engine(self):
+        if self.engine_worker is not None:
+            return
         if not self.training_script.is_file() or self.training_script.is_symlink():
             self.engine_status.setText('The Spider Studio voice-engine helper has not been installed.')
             return
-        try:
-            report = subprocess.run(['bash', str(self.training_script), '--check'],
-                capture_output=True, text=True, timeout=12, check=True)
-            self.engine_status.setText(report.stdout[-3000:] or 'No readiness information was returned.')
-        except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
-            self.engine_status.setText('Local voice-engine check failed: ' + str(error))
+        self.engine_check_button.setEnabled(False)
+        self.engine_status.setText('Checking CPU, disk, local RVC installation and audio tools…')
+        self.engine_worker = EngineCheckWorker(self.training_script)
+        self.engine_worker.result.connect(self.engine_status.setText)
+        self.engine_worker.finished.connect(self.engine_check_finished)
+        self.engine_worker.start()
+
+    def engine_check_finished(self):
+        worker, self.engine_worker = self.engine_worker, None
+        self.engine_check_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
 
     def launch_trainer(self):
         if self.trainer is not None:
