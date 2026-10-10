@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 
-from PyQt5.QtCore import Qt, QRectF, QTimer
+from PyQt5.QtCore import Qt, QRect, QRectF, QTimer
 from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
 from PyQt5.QtWidgets import QApplication, QWidget
 
@@ -23,6 +23,7 @@ ROOT = Path('/usr/local/lib/spider-os')
 if not (ROOT / 'branding/webbie/webbie-face-v1.png').is_file():
     ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path.home() / '.config/spider-os/webbie-face.json'
+DISPLAY_CONFIG = Path.home() / '.config/spider-os/webbie-face-display.json'
 SIZE = 196
 BOTTOM_MARGIN = 72
 CAPTION_WIDTH = 250
@@ -72,6 +73,35 @@ def set_sleep(mode, path=CONFIG, now=None):
     finally:
         if os.path.exists(tmp): os.unlink(tmp)
     return data
+
+
+def full_screen_display(path=DISPLAY_CONFIG):
+    """User-selectable portrait overlay size, independent of quiet/sleep mode."""
+    try:
+        data = json.loads(Path(path).read_text(encoding='utf-8'))
+        return data.get('fullscreen') is True
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
+def set_display_mode(mode, path=DISPLAY_CONFIG):
+    if mode not in ('fullscreen', 'compact', 'toggle-display'):
+        raise ValueError('Unknown Webbie display mode')
+    enabled = ((not full_screen_display(path)) if mode == 'toggle-display'
+               else mode == 'fullscreen')
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, temporary = tempfile.mkstemp(prefix='.webbie-display-', dir=path.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, 'w', encoding='utf-8') as output:
+            json.dump({'fullscreen': enabled}, output)
+            output.write('\n')
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return enabled
 
 
 def active_window_id(data):
@@ -195,6 +225,7 @@ class WebbieOverlay(QWidget):
         self.phase = 0
         self.sleeping = False
         self.allowed = False
+        self.full_screen_mode = None
         self.caption = WebbieCaption()
         self.move_corner()
         self.timer = QTimer(self)
@@ -214,20 +245,51 @@ class WebbieOverlay(QWidget):
 
     def move_corner(self):
         screen = QApplication.primaryScreen()
-        if not screen: return
-        box = screen.availableGeometry()
-        self.move(box.right() - SIZE - 11, box.bottom() - SIZE - BOTTOM_MARGIN + 1)
+        if not screen:
+            return
+        new_mode = full_screen_display()
+        if new_mode:
+            box = screen.geometry()
+            new_size = (box.width(), box.height())
+            new_position = (box.left(), box.top())
+        else:
+            box = screen.availableGeometry()
+            new_size = (SIZE, SIZE)
+            new_position = (box.right() - SIZE - 11,
+                            box.bottom() - SIZE - BOTTOM_MARGIN + 1)
+        if (self.full_screen_mode != new_mode or
+                (self.width(), self.height()) != new_size):
+            # Reapply the empty X11 input region every time window size changes.
+            # If XFixes is unavailable refresh() will keep the overlay hidden.
+            self.caption.hide()
+            self.hide()
+            self.allowed = False
+            self.setFixedSize(*new_size)
+            self.full_screen_mode = new_mode
+        self.move(*new_position)
         self.place_caption()
+
+    def portrait_geometry(self):
+        """Image bounding square inside this window, in local coordinates."""
+        if not self.full_screen_mode:
+            return 0, 0, SIZE
+        size = max(SIZE, min(int(self.width() * .80), int(self.height() * .73)))
+        size = min(size, self.width() - 12, self.height() - 12)
+        x = (self.width() - size) // 2
+        y = max(8, (self.height() - size - CAPTION_HEIGHT - 12) // 2)
+        return x, y, size
 
     def place_caption(self):
         screen = QApplication.primaryScreen()
         if not screen:
             return
-        box = screen.availableGeometry()
+        box = screen.geometry() if self.full_screen_mode else screen.availableGeometry()
+        x, y, size = self.portrait_geometry()
         left = max(box.left() + 5, min(
-            self.x() + (SIZE - CAPTION_WIDTH) // 2,
+            self.x() + x + (size - CAPTION_WIDTH) // 2,
             box.right() - CAPTION_WIDTH - 5))
-        below = min(self.y() + SIZE + 4, box.bottom() - CAPTION_HEIGHT - 2)
+        below = min(self.y() + y + size + 5,
+                    box.bottom() - CAPTION_HEIGHT - 2)
         self.caption.move(left, below)
 
     def update_caption(self):
@@ -247,10 +309,10 @@ class WebbieOverlay(QWidget):
 
     def refresh(self):
         self.move_corner()
-        # Sleep keeps her face visible; fullscreen hides it. Voice only
-        # accepts an explicit wake phrase, and background work continues.
+        # Explicit fullscreen face mode can stay visible above other fullscreen
+        # windows. Compact mode keeps the existing auto-hide behavior.
         self.sleeping = asleep(self.sleep_path)
-        visible = self.full_screen_check() is False
+        visible = bool(self.full_screen_mode) or self.full_screen_check() is False
         if not visible:
             self.allowed = False
             self.caption.hide()
@@ -278,25 +340,29 @@ class WebbieOverlay(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
-        # The circular portrait fades into the existing desktop; alpha stays
-        # below 1 even over the head, so buttons remain visible underneath.
-        painter.setOpacity(.53)
+        x, y, image_size = self.portrait_geometry()
+        painter.translate(x, y)
+        painter.scale(image_size / SIZE, image_size / SIZE)
+        frame = QRect(0, 0, SIZE, SIZE)
+        # Even when the overlay window spans the screen, only the portrait
+        # is painted. The rest is transparent and X11 passes all input through.
+        painter.setOpacity(.37 if self.full_screen_mode else .53)
         circle = QPainterPath()
         circle.addEllipse(QRectF(7, 7, SIZE - 14, SIZE - 14))
         painter.setClipPath(circle)
-        painter.drawPixmap(self.rect(), self.closed)
+        painter.drawPixmap(frame, self.closed)
         if not self.sleeping and (self.runtime / 'webbie-speaking').is_file() and not self.speaking.isNull():
             # Blend mouth only; do not flash a second full portrait.
             mouth = QPainterPath()
             mouth.addEllipse(QRectF(SIZE * .445, SIZE * .467, SIZE * .151, SIZE * .096))
             painter.setClipPath(mouth)
             painter.setOpacity(.53 * SPEECH_FRAMES[self.phase % len(SPEECH_FRAMES)])
-            painter.drawPixmap(self.rect(), self.speaking)
+            painter.drawPixmap(frame, self.speaking)
         if self.sleeping:
             # Keep her face in view, with clearly closed eyes and subdued glow.
             painter.setClipping(False)
             painter.setOpacity(.93)
-            painter.fillRect(self.rect(), QColor(22, 12, 48, 76))
+            painter.fillRect(frame, QColor(22, 12, 48, 76))
             pen = QPen(QColor(91, 55, 132, 228), 4)
             pen.setCapStyle(Qt.RoundCap)
             painter.setPen(pen)
@@ -309,16 +375,23 @@ class WebbieOverlay(QWidget):
                 painter.drawPath(eyelid)
             painter.setPen(QColor(230, 210, 255, 235))
             painter.setFont(QFont('Sans Serif', 18, QFont.Bold))
-            painter.drawText(self.rect().adjusted(112, 0, -4, -132),
+            painter.drawText(frame.adjusted(112, 0, -4, -132),
                              Qt.AlignCenter, 'Zzz')
 
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv:
-        if len(argv) != 1 or argv[0] not in ('sleep', 'sleep-tonight', 'wake', 'status'):
-            raise SystemExit('Usage: webbie-face [sleep|sleep-tonight|wake|status]')
-        if argv[0] == 'status':
+        if len(argv) != 1 or argv[0] not in ('sleep', 'sleep-tonight', 'wake', 'status',
+                                               'fullscreen', 'compact', 'toggle-display',
+                                               'display-status'):
+            raise SystemExit('Usage: webbie-face [sleep|wake|status|fullscreen|compact|toggle-display|display-status]')
+        if argv[0] == 'display-status':
+            print('fullscreen' if full_screen_display() else 'compact')
+        elif argv[0] in ('fullscreen', 'compact', 'toggle-display'):
+            mode = set_display_mode(argv[0])
+            print('Webbie face: ' + ('fullscreen (click-through)' if mode else 'compact'))
+        elif argv[0] == 'status':
             print('asleep' if asleep() else 'awake')
         else:
             set_sleep(argv[0])
