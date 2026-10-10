@@ -52,6 +52,8 @@ class HomeworkDialog(QDialog):
         self.worker = None
         self.last_mode = "draft"
         self.last_exported_path = None
+        self.review_source_draft = None
+        self.review_is_stale = False
         outer = QVBoxLayout(self)
         intro = QLabel("Webbie drafts and revises at your request using local AI. "
                        "You choose what course material and writing samples she sees. "
@@ -166,9 +168,15 @@ class HomeworkDialog(QDialog):
         outer.addWidget(self.status)
 
     def invalidate_export(self):
-        # A Word export is only eligible for upload while the editable draft
-        # still matches it. Any edit requires a fresh explicit export.
+        # A Word export is only eligible while the editable draft matches it.
         self.last_exported_path = None
+        prior = self.review_source_draft
+        if (prior is not None and self.draft.toPlainText() != prior
+                and not self.review_is_stale):
+            self.review_is_stale = True
+            self.review_notes.setPlainText(
+                "Your draft changed after this review was requested. "
+                "Run the check or rubric review again for the current version.")
 
     def save_local_draft(self):
         try:
@@ -303,6 +311,8 @@ class HomeworkDialog(QDialog):
         except ValueError as error:
             QMessageBox.warning(self, "Homework review", str(error))
             return
+        self.review_source_draft = self.draft.toPlainText()
+        self.review_is_stale = False
         self.review_notes.setPlainText(report)
         self.status.setText("Local preflight complete. No grade or source verification is implied.")
 
@@ -324,6 +334,8 @@ class HomeworkDialog(QDialog):
         except ValueError as error:
             QMessageBox.warning(self, "Homework review", str(error))
             return
+        self.review_source_draft = self.draft.toPlainText()
+        self.review_is_stale = False
         self.review_notes.setPlainText(checklist + "\n\nWebbie is reviewing the selected rubric...")
         self.worker = DraftWorker(prompt, self)
         self.worker.ready.connect(lambda response: self.review_ready(checklist, response))
@@ -337,6 +349,14 @@ class HomeworkDialog(QDialog):
         self.worker.start()
 
     def review_ready(self, checklist, response):
+        if self.review_is_stale:
+            self.review_notes.setPlainText(
+                "Webbie completed feedback on an earlier version. "
+                "The current draft changed while review was running. "
+                "Request a new review before using this feedback.\n\n" +
+                checklist + "\n\nREVIEW OF THE EARLIER VERSION:\n" + response)
+            self.status.setText("Review is outdated because the draft changed.")
+            return
         self.review_notes.setPlainText(checklist + "\n\nWEBBIE'S RUBRIC REVIEW:\n" + response)
         self.status.setText("Review ready. Feedback is advisory; verify the rubric and references.")
 
