@@ -10,7 +10,9 @@ SCRIPT = Path(__file__).resolve().parents[1] / "studio/package/voice-engine.sh"
 
 class LoopbackTrainingTests(unittest.TestCase):
     def setUp(self):
-        self.rvc = ('def serve(app):\n'
+        self.rvc = ('def find_available_port(port, host="0.0.0.0"):\n'
+                    '    return port\n'
+                    'def serve(app):\n'
                     '    app.launch(server_name="0.0.0.0", inbrowser=False)\n'
                     '    app.queue().launch(share=True)\n')
 
