@@ -50,3 +50,7 @@ wmctrl
 
 # Embedded school workspace browser
 python3-pyqt5.qtwebengine
+
+# Optional school OneDrive integration and selected PDF text extraction
+rclone
+poppler-utils
