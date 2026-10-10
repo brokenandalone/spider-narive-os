@@ -40,6 +40,25 @@ class StemTests(unittest.TestCase):
             with self.assertRaises(stems.SeparationError):
                 stems.command(root, python, song, output, device="shell;rm -rf")
 
+    def test_python_venv_symlink_is_not_mistaken_for_unsafe_audio_input(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'tools/pymss').mkdir(parents=True)
+            (root / 'tools/pymss/cli.py').touch()
+            executable = root / 'python-base'
+            executable.touch()
+            interpreter = root / 'python-venv'
+            interpreter.symlink_to(executable)
+            input_file = root / 'song.wav'
+            wav(input_file)
+            output = root / 'outputs'
+            output.mkdir()
+            args = stems.command(root, interpreter, input_file, output)
+            self.assertEqual(args[0], str(interpreter))
+            interpreter.unlink()
+            with self.assertRaises(stems.SeparationError):
+                stems.command(root, interpreter, input_file, output)
+
     def test_separation_returns_independent_audio_and_preserves_original(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
