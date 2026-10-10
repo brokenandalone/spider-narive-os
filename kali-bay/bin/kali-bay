@@ -208,11 +208,29 @@ update_kali() {
 }
 
 
+start_existing() {
+    require_host_tools
+    container_exists || die "No Kali container exists. Nothing was created."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali Bay before starting."
+    if [[ "${running}" == "true" ]]; then
+        echo "Kali Bay is already running."
+        return 0
+    fi
+    echo "Starting ONLY the existing rootless Kali Bay container."
+    # Explicit owner action only. Does not reinstall packages, create a new
+    # container, change networks or touch host privileges.
+    podman start "${NAME}" >/dev/null || die "Kali Bay container did not start."
+    echo "Kali Bay container started; check doctor before package work."
+}
+
+
 open_terminal() {
     require_host_tools
 
     container_exists \
-        || create_container
+        || die "Kali Bay is not configured. Use the explicit setup controls first."
 
     if command -v konsole >/dev/null 2>&1; then
         exec konsole \
@@ -225,6 +243,41 @@ open_terminal() {
         --name "${NAME}"
 }
 
+
+# Opening the package workbench never installs, upgrades or removes software.
+# The owner gets a genuine interactive Kali shell and manually chooses apt
+# operations INSIDE the Kali container, without modifying Ubuntu repositories.
+open_packages() {
+    require_host_tools
+    container_exists || die "Kali Bay container missing. Configure Kali first."
+    if command -v konsole >/dev/null 2>&1; then
+        exec konsole --hold -e distrobox enter --name "${NAME}" -- bash -lc '
+            printf "\\nKALI BAY / KALI PACKAGE MANAGER\\n"
+            printf "This is Kali Linux apt, NOT Ubuntu apt.\\n"
+            printf "Use apt search, apt show, sudo apt install, etc. as needed.\\n"
+            printf "Nothing has been installed or upgraded automatically.\\n\\n"
+            exec bash -l'
+    fi
+    exec distrobox enter --name "${NAME}" -- bash -l
+}
+
+# The inventory only reads the package database. No external searches, package
+# changes, container starts or privileged host operations.
+inventory() {
+    require_host_tools
+    container_exists || die "No Kali Bay container is configured."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Kali container state cannot be inspected."
+    [[ "${running}" == "true" ]] \
+        || die "Kali container is stopped. Open the Kali terminal deliberately."
+    podman exec --user 0 --tty=false "${NAME}" sh -c '
+        echo "Installed Kali package inventory (read only)"
+        dpkg-query -W -f="\${binary:Package}\n" 2>/dev/null |
+          awk "BEGIN {n=0} {n++; if (\$0 ~ /^kali-(tools|linux|desktop)/ && shown < 90) {print; shown++}}
+               END {printf \"Total installed packages: %d\\n\", n}"
+    '
+}
 
 category_shell() {
     local meta="${1:-kali-linux-everything}"
@@ -279,6 +332,104 @@ category_shell() {
 }
 
 
+# No arbitrary executable names, shell fragments or arguments are accepted.
+# Kali GUI programs run as the existing container user, never as root.
+# The full Kali applications menu is sourced from distro-owned .desktop
+# launchers in the running container, not a list guessed by Spider OS.
+# App IDs are exact basenames. Never accept arbitrary file paths or arguments.
+app_id_valid() {
+    local id="${1:-}"
+    [[ "${#id}" -le 108 && "${id}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._+-]*\.desktop$ ]] \
+        || die "Invalid Kali desktop application identifier."
+}
+app_ready() {
+    require_host_tools
+    container_exists || die "Kali Bay container is missing."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali container."
+    [[ "${running}" == "true" ]] \
+        || die "Kali container is stopped. Open its terminal deliberately."
+}
+apps_json() {
+    app_ready
+    [[ -f "${KALI_ROOT}/runtime/kali_apps.py" ]] \
+        || die "Kali application inventory module is missing."
+    # Read-only: stream the packaged, fixed Python source to the Kali
+    # interpreter. No user-provided expressions, shell or file system edits.
+    podman exec --user 0 --tty=false --interactive "${NAME}" python3 - \
+        < "${KALI_ROOT}/runtime/kali_apps.py"
+}
+app_check() {
+    app_id_valid "${1:-}"
+    app_ready
+    podman exec --user 0 --tty=false "${NAME}" sh -c \
+      'test -f "/usr/share/applications/$1" && command -v gio >/dev/null 2>&1' \
+      sh "$1" || die "This Kali application or the required gio launcher is missing."
+    printf 'ready\n'
+}
+app_open() {
+    local id="${1:-}"
+    app_check "${id}" >/dev/null
+    # gio reads the actual Kali system desktop entry and uses its declared
+    # Exec field as intended. No bash expansion and no arbitrary host command.
+    exec distrobox enter --name "${NAME}" -- \
+        gio launch "/usr/share/applications/${id}"
+}
+
+tool_metadata() {
+    TOOL_BINARY=""
+    TOOL_MODE=""
+    case "${1:-}" in
+        wireshark|burpsuite|zaproxy|ghidra|clamtk)
+            TOOL_BINARY="$1"
+            TOOL_MODE="gui"
+            ;;
+        nmap|msfconsole|suricata|yara|lynis)
+            TOOL_BINARY="$1"
+            TOOL_MODE="terminal"
+            ;;
+        *)
+            die "Unknown tool identifier. Refusing arbitrary command execution."
+            ;;
+    esac
+}
+
+tool_check() {
+    tool_metadata "${1:-}"
+    require_host_tools
+    container_exists || die "Kali Bay does not exist yet. No setup was started."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali Bay."
+    [[ "${running}" == "true" ]] \
+        || die "Kali Bay is stopped. Start it deliberately from the terminal."
+    podman exec --user 0 --tty=false "${NAME}" \
+        sh -c 'command -v "$1" >/dev/null 2>&1' sh "${TOOL_BINARY}" \
+        || die "${TOOL_BINARY} is not installed in Kali Bay."
+    printf 'ready\n'
+}
+
+launch_tool() {
+    local tool_id="${1:-}"
+    tool_check "${tool_id}" >/dev/null
+    if [[ "${TOOL_MODE}" == "gui" ]]; then
+        exec distrobox enter --name "${NAME}" -- "${TOOL_BINARY}"
+    fi
+
+    # CLI choices only open a labeled interactive workbench. They do not
+    # run a scan or start a daemon without a subsequent user command.
+    if command -v konsole >/dev/null 2>&1; then
+        exec konsole --hold -e distrobox enter --name "${NAME}" -- \
+            bash -lc 'printf "KALI BAY: %s is installed.\n" "$1"; printf "No action has been run.\n"; exec bash' \
+            kali-bay "${TOOL_BINARY}"
+    fi
+    exec distrobox enter --name "${NAME}" -- \
+        bash -lc 'printf "KALI BAY: %s is installed.\n" "$1"; printf "No action has been run.\n"; exec bash' \
+        kali-bay "${TOOL_BINARY}"
+}
+
+
 status() {
     if full_toolset_installed; then
         echo "ready"
@@ -309,13 +460,31 @@ info() {
 
 launch_ui() {
     exec python3 \
-        "${KALI_ROOT}/ui/kali_bay.py"
+        "${KALI_ROOT}/ui/kali_bay.py" "$@"
 }
 
 
 case "${1:-ui}" in
     ui)
         launch_ui
+        ;;
+    offensive|purple)
+        launch_ui "--$1"
+        ;;
+    apps-json)
+        apps_json
+        ;;
+    app-check)
+        app_check "${2:-}"
+        ;;
+    app-open)
+        app_open "${2:-}"
+        ;;
+    tool-check)
+        tool_check "${2:-}"
+        ;;
+    tool)
+        launch_tool "${2:-}"
         ;;
 
     create)
@@ -328,6 +497,15 @@ case "${1:-ui}" in
 
     terminal|shell|enter)
         open_terminal
+        ;;
+    start)
+        start_existing
+        ;;
+    packages)
+        open_packages
+        ;;
+    inventory)
+        inventory
         ;;
 
     update|upgrade)
@@ -357,9 +535,18 @@ Usage:
   kali-bay
   kali-bay setup
   kali-bay terminal
+  kali-bay start    # explicit existing container start only
+  kali-bay packages  # interactive Kali apt shell
+  kali-bay inventory # read-only Kali package inventory
   kali-bay update
   kali-bay status
   kali-bay doctor
+  kali-bay apps-json   # read-only installed Kali desktop applications
+  kali-bay app-check <system.desktop>
+  kali-bay app-open <system.desktop> # only on explicit user click
+  kali-bay tool-check <approved-id>
+  kali-bay tool <approved-id>
+  kali-bay offensive|purple
   kali-bay info
   kali-bay category <metapackage> <title>
 EOF

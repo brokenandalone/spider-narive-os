@@ -1,3 +1,7 @@
+# Current priority authority
+
+Use [MASTER-UPGRADE-CHECKLIST.md](MASTER-UPGRADE-CHECKLIST.md) for the owner's reordered priorities and [PC reconciliation](PC-RECONCILIATION-2026-10-10.md) for source/PC differences. The PC Webbie repair is in progress separately. Earlier entries below do not override later confirmed Author import or webcam operation.
+
 # Installed Spider OS: Master Build and Upgrade Checklist
 
 **Decision date:** 2026-10-07  

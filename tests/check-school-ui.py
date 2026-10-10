@@ -29,8 +29,10 @@ with tempfile.TemporaryDirectory() as folder:
              patch.object(study.QFileDialog,'getSaveFileName',return_value=(str(target),'')):
             panel.create_apa_paper()
         assert target.is_file()
-        with patch.object(panel,'launch') as launch:
-            panel.open_snhu();assert launch.call_args.args[0]==['xdg-open','https://my.snhu.edu/']
+        with patch.object(panel.school_portal, 'open') as opened:
+            panel.open_snhu()
+            assert panel.school_tabs.currentWidget() is panel.school_portal
+            assert opened.called
         panel.close();app.processEvents()
         reopened=study.StudyWindow()
         assert reopened.notes.toPlainText()=='Saved course notes'

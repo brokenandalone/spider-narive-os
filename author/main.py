@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Native Author library, chapter editor, autosave, snapshots and canon notebook."""
+import hashlib
 import sys
 from pathlib import Path
 from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QTextCursor
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDialog,
     QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget)
@@ -10,9 +12,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .store import AuthorStore
     from .web_features import AuthorToolkit
+    from .control_socket import AuthorCommandServer
 else:
     from store import AuthorStore
     from web_features import AuthorToolkit
+    from control_socket import AuthorCommandServer
 
 
 class AuthorWindow(QMainWindow):
@@ -36,12 +40,13 @@ class AuthorWindow(QMainWindow):
         split = QSplitter(); self.split = split; layout.addWidget(split)
         self.books = QListWidget(); split.addWidget(self.books)
         self.chapters = QListWidget(); split.addWidget(self.chapters)
-        tabs = QTabWidget(); split.addWidget(tabs)
+        tabs = QTabWidget(); self.editor_tabs = tabs; split.addWidget(tabs)
         self.editor = QTextEdit(); self.editor.setAcceptRichText(False)
         self.canon = QTextEdit(); self.canon.setAcceptRichText(False)
         tabs.addTab(self.editor, 'Chapter'); tabs.addTab(self.canon, 'Canon notes')
         self.toolkit = AuthorToolkit(self.store, self.current_chapter, self.flush, self.editor)
         self.toolkit.jumpRequested.connect(self.jump_to_search_result)
+        self.toolkit.reviewSegmentRequested.connect(self.jump_to_review_segment)
         self.toolkit.reviewRequested.connect(self.author_review_requested)
         self.toolkit.editRequested.connect(self.apply_revised_passage)
         tabs.addTab(self.toolkit, 'Writing Studio')
@@ -51,6 +56,33 @@ class AuthorWindow(QMainWindow):
         self.chapters.currentItemChanged.connect(self.select_chapter)
         self.timer = QTimer(self); self.timer.timeout.connect(self.autosave); self.timer.start(2000)
         self.load_books()
+        self.command_server = AuthorCommandServer(self)
+        self.command_server.intentReady.connect(self.handle_author_intent)
+        self.command_server.start()
+
+    def handle_author_intent(self, intent):
+        """Execute a previously validated request in the GUI thread only."""
+        if not self.isVisible():
+            self.status.setText('Author command ignored: Author Bay is not visible.')
+            return
+        action = intent.get('action')
+        if action == 'review':
+            self.toolkit.review_depth.setCurrentIndex(
+                1 if intent.get('depth') == 'deep' else 0)
+            self.toolkit.start_review(intent['scope'])
+        elif action == 'read':
+            if intent['scope'] == 'book':
+                self.toolkit.read_book()
+            else:
+                self.toolkit.read_aloud()
+        elif action == 'cancel_review':
+            self.toolkit.cancel_review()
+        elif action == 'pause_reading':
+            self.toolkit.reader.pause()
+        elif action == 'resume_reading':
+            self.toolkit.reader.resume()
+        elif action == 'stop_reading':
+            self.toolkit.reader.stop()
 
     def action(self, function):
         try:
@@ -246,6 +278,48 @@ class AuthorWindow(QMainWindow):
                     self.toolkit.reference_list.setCurrentRow(index)
                     break
 
+    def jump_to_review_segment(self, section):
+        """Highlight only the original, hash-verified review source segment."""
+        try:
+            book_id, chapter_id = int(section['book_id']), int(section['item_id'])
+            start, end = int(section['start']), int(section['end'])
+            expected = section['chapter_sha256']
+        except (KeyError, ValueError, TypeError):
+            self.status.setText('Review link is invalid. No text was selected.')
+            return
+        if self.book_id != book_id or not self.flush():
+            self.status.setText('Select the reviewed book and save changes first.')
+            return
+        try:
+            chapter = self.store.chapter(chapter_id)
+        except ValueError:
+            self.status.setText('The linked chapter no longer exists.')
+            return
+        content = chapter['content']
+        if (hashlib.sha256(content.encode('utf-8')).hexdigest() != expected
+                or not 0 <= start < end <= len(content)):
+            self.status.setText(
+                'Review section is outdated after edits. '
+                'Open the chapter normally or request a new review.')
+            return
+        self.jump_to_search_result({
+            'kind': 'chapter', 'book_id': book_id, 'item_id': chapter_id})
+        if self.chapter_id != chapter_id or self.editor.toPlainText() != content:
+            self.status.setText('Could not select original review section safely.')
+            return
+        # QTextCursor positions count UTF-16 units, unlike Python string
+        # indexing. Convert offsets so emoji and astral characters do not
+        # silently shift the highlighted evidence range.
+        qt_start = len(content[:start].encode('utf-16-le')) // 2
+        qt_end = len(content[:end].encode('utf-16-le')) // 2
+        cursor = self.editor.textCursor()
+        cursor.setPosition(qt_start)
+        cursor.setPosition(qt_end, QTextCursor.KeepAnchor)
+        self.editor.setTextCursor(cursor)
+        self.editor_tabs.setCurrentWidget(self.editor)
+        self.editor.ensureCursorVisible()
+        self.status.setText('Selected exact section from Webbie review. No edits made.')
+
     def backup(self):
         if not self.flush():
             return
@@ -255,7 +329,14 @@ class AuthorWindow(QMainWindow):
                 self.status.setText('Library backup saved.')
 
     def closeEvent(self, event):
+        if not self.toolkit.shutdown():
+            self.status.setText(
+                'Webbie is stopping the active review or narration. '
+                'Close Author again when the task has finished.')
+            event.ignore()
+            return
         if self.flush():
+            self.command_server.stop()
             self.timer.stop(); self.store.close(); event.accept()
         else:
             event.ignore()

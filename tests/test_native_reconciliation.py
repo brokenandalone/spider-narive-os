@@ -36,6 +36,7 @@ class NativeReconciliationTests(unittest.TestCase):
         upstream = (ROOT / 'studio/main.py').read_text()
         previous = helper.legacy_studio(upstream)
         self.assertNotIn('self.tool_tabs = QTabWidget()', previous)
+        self.assertNotIn('StudioAIPanel', previous)
         self.assertIn("QFont('Sans Serif', 22, QFont.Bold)", previous)
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / 'upstream.py'; source.write_text(upstream)
@@ -46,6 +47,7 @@ class NativeReconciliationTests(unittest.TestCase):
             self.assertIn("QFont('Sans Serif', 22, QFont.Bold)", updated)
             self.assertIn('content.setContentsMargins(50, 48, 50, 48)', updated)
             self.assertIn('Refresh installed tools', updated)
+            self.assertIn('self.ai_panel = StudioAIPanel()', updated)
             self.assertIn('Webbie remains the resident AI service', updated)
             self.assertEqual(helper.reconcile(source, dest, 'Studio'), 'current')
 
