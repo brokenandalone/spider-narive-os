@@ -30,6 +30,29 @@ class NativeWorkspaceTests(unittest.TestCase):
             self.assertFalse(panel.lyrics.isEnabled())
             panel.close()
 
+    def test_multiple_singers_and_second_guitar_controls(self):
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            self.assertEqual(panel.voice_boxes[0].currentText(), 'Justin Therapy (original baritone)')
+            panel.voice_boxes[1].setCurrentText('Original feminine alto')
+            panel.voice_boxes[2].setCurrentText('J-Cold (original character voice)')
+            self.assertTrue(panel.two_guitarists.isChecked())
+            self.assertTrue(panel.guitar_two.isEnabled())
+            panel.two_guitarists.setChecked(False)
+            self.assertFalse(panel.guitar_two.isEnabled())
+            panel.title.setText('Two guitar voices')
+            panel.style.setPlainText('Dark metal')
+            panel.lyrics.setPlainText('[Singer 1] Verse\\n[Singer 2] Chorus')
+            with patch('studio.ai_panel.MusicWorker') as worker:
+                panel.start()
+                request = worker.call_args.args[1]
+                self.assertIn('Original feminine alto', request.vocal_lineup)
+                self.assertIn('J-Cold (original character voice)', request.vocal_lineup)
+                self.assertEqual(request.guitar_two, '')
+                self.assertIn('Guitarist 1', request.payload()['prompt'])
+                worker.return_value.stop.set.assert_not_called()
+            panel.close()
+
     def test_worker_runs_without_blocking_panel_and_reenables_controls(self):
         with tempfile.TemporaryDirectory() as folder:
             panel = StudioAIPanel(folder)
