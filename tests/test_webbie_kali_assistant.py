@@ -39,6 +39,40 @@ class KaliIntentTests(unittest.TestCase):
         self.assertEqual(assistant.parse_request("list Kali Bay tools"),
                          ("list", None))
 
+    def test_native_kali_shell_and_packages_intents(self):
+        self.assertEqual(
+            assistant.parse_request("Webbie, open Kali terminal"), ("shell", None)
+        )
+        self.assertEqual(
+            assistant.parse_request("open Kali package manager"),
+            ("packages", None),
+        )
+        self.assertEqual(
+            assistant.parse_request("show installed Kali packages"),
+            ("inventory", None),
+        )
+        for phrase in (
+            "Webbie, install wireshark in Kali",
+            "run sudo apt full-upgrade",
+            "run nmap against a target",
+            "open Kali terminal; sudo id",
+        ):
+            self.assertIsNone(assistant.parse_request(phrase))
+
+    def test_explicit_native_shell_starts_only_manager_terminal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = Path(tmp) / "kali-bay"
+            manager.write_text("#!/bin/sh\\n", encoding="utf-8")
+            manager.chmod(0o700)
+            with patch.object(assistant.subprocess, "Popen") as spawn:
+                answer = assistant.handle_kali_request(
+                    "open Kali package manager", manager=manager
+                )
+                self.assertIn("Kali package manager shell", answer)
+                self.assertEqual(
+                    spawn.call_args.args[0], [str(manager), "packages"]
+                )
+
     def test_no_arbitrary_shell_or_active_scan(self):
         for command in (
             "open wireshark; echo compromised",
