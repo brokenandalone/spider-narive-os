@@ -61,6 +61,7 @@ class AuthorCommandServer(QThread):
         self.path = author_socket_path() if socket_path is None else Path(socket_path)
         self._stop = threading.Event()
         self._server = None
+        self._owns_socket = False
 
     def stop(self):
         self._stop.set()
@@ -88,6 +89,7 @@ class AuthorCommandServer(QThread):
                         raise RuntimeError("Author command receiver is already running.")
             with socket.socket(socket.AF_UNIX) as listener:
                 listener.bind(str(self.path))
+                self._owns_socket = True
                 os.chmod(self.path, 0o600)
                 self._server = listener
                 listener.listen(4)
@@ -147,7 +149,7 @@ class AuthorCommandServer(QThread):
         finally:
             self._server = None
             try:
-                if self.path.is_socket() and self.path.lstat().st_uid == os.getuid():
+                if self._owns_socket and self.path.is_socket() and self.path.lstat().st_uid == os.getuid():
                     self.path.unlink()
             except OSError:
                 pass
