@@ -95,7 +95,7 @@ class DesktopOperator:
         # No permissive default, including for read-only screen/window metadata.
         if self.permission is None or self.permission(action, preview) is not True:
             raise PermissionError('Desktop control has not been authorized in the local UI')
-        if self.cancelled.is_set():
+        if self.cancelled.is_set() and action != 'task.begin':
             raise InterruptedError('Webbie desktop task stopped by user')
 
     def run(self, command):
