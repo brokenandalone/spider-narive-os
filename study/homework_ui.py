@@ -11,12 +11,14 @@ from PyQt5.QtWidgets import (
 )
 try:
     from .homework import (load_style, save_style, clear_style, sample_from_file,
-                           build_prompt, webbie_draft)
+                           build_prompt, webbie_draft, MAX_CONTEXT, MAX_TASK)
+    from .course_materials import read_course_document
     from .paper_dialog import PaperDialog
     from .apa import create_paper
 except ImportError:
     from homework import (load_style, save_style, clear_style, sample_from_file,
-                          build_prompt, webbie_draft)
+                          build_prompt, webbie_draft, MAX_CONTEXT, MAX_TASK)
+    from course_materials import read_course_document
     from paper_dialog import PaperDialog
     from apa import create_paper
 
@@ -93,6 +95,15 @@ class HomeworkDialog(QDialog):
             button.clicked.connect(action)
             sample_buttons.addWidget(button)
         outer.addLayout(sample_buttons)
+        materials_buttons = QHBoxLayout()
+        for label, handler in [
+            ("Import local course document", self.import_local_material),
+            ("Use school OneDrive document", self.import_school_material),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(handler)
+            materials_buttons.addWidget(button)
+        outer.addLayout(materials_buttons)
         actions = QHBoxLayout()
         self.generate_buttons = []
         for label, mode in [
@@ -133,6 +144,55 @@ class HomeworkDialog(QDialog):
             self.status.setText("Sample loaded for this session. Save it only if you want Webbie to remember it.")
         except (OSError, ValueError, ImportError) as error:
             QMessageBox.warning(self, "Writing sample", str(error))
+
+    def add_selected_material(self, kind, text):
+        """The selected source is visible and editable before any model request."""
+        if kind == "style":
+            # Use as style only. Never silently persist a school document.
+            self.style.setPlainText(text[:12000])
+            self.status.setText("Selected sample loaded for style only. Save it separately if desired.")
+            return
+        target = self.directions if kind == "instructions" else self.materials
+        current = target.toPlainText().strip()
+        separator = "\n\n" if current else ""
+        limit = MAX_TASK if kind == "instructions" else MAX_CONTEXT
+        if len(current) + len(separator) + len(text) > limit:
+            QMessageBox.warning(
+                self, "Document import",
+                "This document exceeds the context limit when combined "
+                "with the existing text. Shorten or replace the earlier excerpt first.")
+            return
+        target.setPlainText(current + separator + text)
+        self.status.setText("Selected source added for review. Webbie has not been contacted.")
+
+    def import_local_material(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose a local school document", str(self.course_folder),
+            "School documents (*.txt *.md *.docx *.pdf)")
+        if not path:
+            return
+        try:
+            body = read_course_document(path)
+        except (ValueError, OSError, RuntimeError, ImportError,
+                UnicodeError, TimeoutError) as error:
+            QMessageBox.warning(self, "Course document", str(error))
+            return
+        self.add_selected_material("materials",
+            "LOCAL COURSE FILE: " + Path(path).name +
+            "\nUser-selected text, not a verified bibliographic citation:\n" + body)
+
+    def import_school_material(self):
+        try:
+            if __package__:
+                from .school_material_picker import SchoolMaterialPicker
+            else:
+                from school_material_picker import SchoolMaterialPicker
+            picker = SchoolMaterialPicker(self, self.course_folder)
+            if picker.exec_() == QDialog.Accepted and picker.selected_material:
+                kind, text = picker.selected_material
+                self.add_selected_material(kind, text)
+        except (ValueError, OSError, RuntimeError, ImportError) as error:
+            QMessageBox.warning(self, "School OneDrive", str(error))
 
     def save_style(self):
         try:
