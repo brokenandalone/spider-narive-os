@@ -100,6 +100,54 @@ class NativeReconciliationTests(unittest.TestCase):
                 self.assertEqual(helper.reconcile(source, destination, kind), 'conflict')
                 self.assertEqual(destination.read_text(), custom)
 
+    def test_native_check_does_not_modify_recognized_old_study_code(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            source = base / 'src'
+            installed = base / 'installed'
+            (source / 'study').mkdir(parents=True)
+            (installed / 'study').mkdir(parents=True)
+            for name in ('study.py', 'store.py'):
+                (source / 'study' / name).write_text(
+                    (ROOT / 'study' / name).read_text())
+            original_store = '# old course store; preserve before apply\npass\n'
+            original_ui = '# old study interface\npass\n'
+            (installed / 'study/store.py').write_text(original_store)
+            (installed / 'study/study.py').write_text(original_ui)
+            with patch.dict(helper.STUDY_KNOWN_BLOBS, {
+                'Study course store': {helper.git_blob_sha(original_store)},
+                'Study workspace': {helper.git_blob_sha(original_ui)},
+            }), patch('sys.argv', ['reconcile-native.py', str(source), str(installed), '--check']):
+                self.assertEqual(helper.main(), 0)
+            self.assertEqual((installed / 'study/store.py').read_text(), original_store)
+            self.assertEqual((installed / 'study/study.py').read_text(), original_ui)
+
+    def test_native_check_blocks_custom_store_without_editing_anything(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            source = base / 'src'
+            installed = base / 'installed'
+            (source / 'study').mkdir(parents=True)
+            (installed / 'study').mkdir(parents=True)
+            for name in ('study.py', 'store.py'):
+                (source / 'study' / name).write_text(
+                    (ROOT / 'study' / name).read_text())
+            custom = '# locally customized store\npass\n'
+            (installed / 'study/store.py').write_text(custom)
+            with patch('sys.argv', ['reconcile-native.py', str(source), str(installed), '--check']):
+                self.assertEqual(helper.main(), 2)
+            self.assertEqual((installed / 'study/store.py').read_text(), custom)
+
+    def test_desktop_installer_preflights_and_backs_up_study_store(self):
+        installer = (ROOT / 'the-web/package/install-desktop.sh').read_text()
+        preflight = 'reconcile-native.py" "$source_root" "$root" --check'
+        self.assertIn(preflight, installer)
+        self.assertLess(installer.index(preflight), installer.index('apt-get install -y'))
+        backup_line = next(line for line in installer.splitlines()
+                           if line.startswith('for relative in the-web/shell the-web/overlay'))
+        self.assertIn('study/store.py', backup_line)
+        self.assertIn("exit 3", installer)
+
     def test_installer_fills_missing_workspace_files_and_keeps_source_backups(self):
         installer = (ROOT / 'the-web/package/install-desktop.sh').read_text()
         self.assertIn('system/apps.py; do', installer)
