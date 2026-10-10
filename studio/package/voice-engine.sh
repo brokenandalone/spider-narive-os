@@ -2,15 +2,15 @@
 # Optional, isolated RVC training UI preparation. No sudo or OS service edits.
 set -euo pipefail
 
-mode="\${1:---check}"
+mode="${1:---check}"
 if [[ $# -gt 1 ]] || [[ ! "$mode" =~ ^--(help|check|clone|prepare-cpu|launch-local)$ ]]; then
     echo "Usage: voice-engine.sh [--help|--check|--clone|--prepare-cpu|--launch-local]" >&2
     exit 2
 fi
 
-script_dir="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source_root="$(cd -- "$script_dir/../.." && pwd)"
-rvc_root="\${XDG_DATA_HOME:-$HOME/.local/share}/spider-os/voice-engine/Retrieval-based-Voice-Conversion-WebUI"
+rvc_root="${XDG_DATA_HOME:-$HOME/.local/share}/spider-os/voice-engine/Retrieval-based-Voice-Conversion-WebUI"
 remote_url="https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI.git"
 
 if [[ "$mode" == --help ]]; then
@@ -116,6 +116,6 @@ if [[ "$mode" == --launch-local ]]; then
     echo "Use the RVC training interface to create your model from the prepared owner dataset."
     echo "RVC may choose another port if occupied. Never expose this service publicly."
     cd "$rvc_root"
-    export PYTHONPATH="$rvc_root\${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH="$rvc_root${PYTHONPATH:+:$PYTHONPATH}"
     exec "$rvc_root/.venv/bin/python" "$rvc_root/.spider-webui-local.py" --noautoopen
 fi
