@@ -24,6 +24,11 @@ class CameraSecurityTests(unittest.TestCase):
         # Regression tests must never connect to or preempt that socket.
         self._isolated_runtime = tempfile.TemporaryDirectory()
         self.addCleanup(self._isolated_runtime.cleanup)
+        # The owner's real face may be sleeping during offline tests. A
+        # synthetic test must not inherit sleep state from the desktop.
+        awake = patch("webbie_panel.face_asleep", return_value=False)
+        awake.start()
+        self.addCleanup(awake.stop)
         runtime = Path(self._isolated_runtime.name) / "runtime"
         runtime.mkdir(mode=0o700)
         env = patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(runtime)})
