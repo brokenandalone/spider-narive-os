@@ -49,6 +49,15 @@ class OfflineVoiceConversionTests(unittest.TestCase):
         self.assertIn('rmvpe', args)
         self.assertIn('--index', args)
 
+    def test_regular_linux_venv_symlinked_python_is_supported(self):
+        alias = self.rvc / '.venv/bin/python-symlink'
+        alias.symlink_to(self.python)
+        args = voice.conversion_command(self.rvc, alias, self.model, self.vocal, self.output)
+        self.assertEqual(args[0], str(alias))
+        alias.unlink()
+        with self.assertRaises(voice.ConversionError):
+            voice.conversion_command(self.rvc, alias, self.model, self.vocal, self.output)
+
     def test_refuse_untrained_model_overwrite_or_invalid_pitch(self):
         cases = [{'model': self.root / 'absent.pth'}, {'pitch': 30}]
         for kwargs in cases:
