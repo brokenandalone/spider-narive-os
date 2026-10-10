@@ -14,7 +14,7 @@ UI = ROOT / "kali-bay/ui/kali_bay.py"
 
 
 class KaliToolLauncherTests(unittest.TestCase):
-    def run_action(self, action, tool, running=True, installed=True):
+    def run_action(self, action, tool, running=True, installed=True, exists=True):
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)
             mock = work / "bin"
@@ -24,7 +24,8 @@ class KaliToolLauncherTests(unittest.TestCase):
             podman.write_text("""#!/bin/sh
 printf 'podman %s\\n' "$*" >> "$MOCK_CALLS"
 case "$1 $2" in
-  "container exists") exit 0;;
+  "container exists") if [ "$MOCK_EXISTS" = "1" ]; then exit 0; else exit 1; fi;;
+  "start kali-bay") exit 0;;
   "inspect --format") if [ "$MOCK_RUNNING" = "1" ]; then echo true; else echo false; fi; exit 0;;
   "exec --user") if [ "$MOCK_INSTALLED" = "1" ]; then exit 0; else exit 3; fi;;
   *) exit 71;;
@@ -45,6 +46,7 @@ esac
                 MOCK_CALLS=str(calls),
                 MOCK_RUNNING="1" if running else "0",
                 MOCK_INSTALLED="1" if installed else "0",
+                MOCK_EXISTS="1" if exists else "0",
             )
             result = subprocess.run(
                 ["bash", str(KALI), action, tool],
@@ -102,6 +104,29 @@ esac
         self.assertIn("stopped", result.stderr)
         self.assertNotIn("podman exec", calls)
         self.assertNotIn("distrobox", calls)
+
+    def test_explicit_start_only_starts_existing_rootless_kali(self):
+        result, calls = self.run_action("start", "", running=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("podman start kali-bay", calls)
+        self.assertNotIn("distrobox create", calls)
+        self.assertNotIn("apt-get", calls)
+        self.assertNotIn("sudo", calls)
+
+    def test_missing_kali_start_fails_closed(self):
+        result, calls = self.run_action(
+            "start", "", running=False, exists=False
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("No Kali container", result.stderr)
+        self.assertNotIn("podman start", calls)
+        self.assertNotIn("distrobox create", calls)
+
+    def test_already_running_kali_not_restarted(self):
+        result, calls = self.run_action("start", "", running=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("already running", result.stdout)
+        self.assertNotIn("podman start", calls)
 
     def test_app_ids_reject_shell_fragments_before_container_access(self):
         for bad in ("../wireshark.desktop", "/etc/passwd", "tool;id.desktop",
@@ -188,6 +213,9 @@ assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU)
 from PyQt5.QtWidgets import QPushButton
 buttons = [b.text() for b in window.findChildren(QPushButton)]
 assert 'KALI PACKAGE MANAGER' in buttons
+assert 'START EXISTING KALI' in buttons
+assert 'KALI HEALTH CHECK' in buttons
+assert window.findChild(module.QScrollArea, 'kaliDesktopActionsScroll') is not None
 assert 'INSTALLED KALI PACKAGES' in buttons
 assert 'LOAD ALL INSTALLED KALI APPS' in buttons
 from unittest.mock import patch
