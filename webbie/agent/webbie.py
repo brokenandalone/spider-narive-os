@@ -39,6 +39,7 @@ from tts import speak
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
 from vision_query import visual_question, ask_vision
+from author_voice_bridge import dispatch_verified_author_voice
 
 
 CONFIG_FILE = (
@@ -499,7 +500,7 @@ def handle_builtin(command):
     return None
 
 
-def handle_command(command, voice=False):
+def handle_command(command, voice=False, speaker_verified=False):
     command = str(command or "").strip()
 
     if not command:
@@ -510,9 +511,20 @@ def handle_command(command, voice=False):
         last_input="voice" if voice else "text",
     )
 
-    # Speech-triggered camera questions work only with consent granted in
-    # The Web GUI. They cannot enable the webcam or bypass quiet sleep.
-    if voice and visual_question(command):
+    # A verified-speaker result must come from the separately validated voice
+    # authentication gate. Speech recognition/wake-word alone is NOT enough.
+    # The current baseline listener does not pass it, so this route stays
+    # disabled until the owner's PC voice-gate reconciliation is qualified.
+    author_reply = (
+        dispatch_verified_author_voice(
+            command, speaker_verified=True, workspace=current_workspace())
+        if voice and speaker_verified and not quiet_asleep()
+        else None
+    )
+    if author_reply is not None:
+        reply = author_reply
+    # Speech-triggered camera questions require their own existing consent.
+    elif voice and visual_question(command):
         reply = ask_vision(command)
     else:
         built_in = handle_builtin(command)

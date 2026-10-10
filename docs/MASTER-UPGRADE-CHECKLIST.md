@@ -160,6 +160,18 @@
 
 ## 4. Author — private manuscripts, library and canon
 
+### October 10 source additions: full manuscript review and Webbie narration
+
+- [x] Source: on-demand full chapter and full book reviews with **quick/deep** modes, bounded local Ollama segmentation and progress/cancel controls (installation pending).
+- [x] Source: chapter and full book read-aloud using Webbie's configured voice, with pause/resume/stop (installation pending).
+- [x] Added focused regression tests for full-text chunk coverage, cancel behavior, no manuscript rewrites and configured Webbie voice.
+- [ ] Verify CI and merge the new stacked Author PR in dependency order.
+- [ ] Live-test Author reviews on imported test manuscript, performance, voice playback and mic/TTS contention.
+- [ ] Connect natural spoken commands to Author using the **reconciled live PC** Webbie agent, without breaking its working customizations.
+- [ ] Enhance review history, canon consistency across books, and jump-to-finding navigation.
+
+
+
 - [x] Prepared a private import with 20 editable library entries, Broken City front matter + chapters 1–16, and 23 original DOCX documents; ZIP extracted on owner PC.
 - [x] **Author Bay library import complete and owner-confirmed:** content is imported, opens in Author Bay, and Oct 9 database audit found 20 books, 39 chapters and 20 imported fingerprints. **Never repeat import, recreate library, or overwrite current chapters.** Backup verification and original DOCX preservation remain separate tasks.
 - [ ] Open a representative book, confirm all expected content including companion materials and canon, and test safe edits/version history without overwriting existing chapters.
