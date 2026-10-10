@@ -615,6 +615,35 @@ class KaliBayWindow(QMainWindow):
                 self, "Kali Desktop", "The full Kali desktop controller is not installed."
             )
             return False
+        if action == "manager" and not shutil_which("virt-manager"):
+            QMessageBox.information(
+                self, "Kali Desktop",
+                "virt-manager is not installed yet. Check full Kali readiness first."
+            )
+            return False
+        if action == "console":
+            if not shutil_which("virt-viewer"):
+                QMessageBox.information(
+                    self, "Kali Desktop",
+                    "virt-viewer is not installed. Use the VM manager after setup."
+                )
+                return False
+            try:
+                import json
+                probe = subprocess.run(
+                    [sys.executable, str(VM_GATEWAY), "status"],
+                    capture_output=True, text=True, timeout=13, check=False,
+                )
+                state = json.loads(probe.stdout).get("state")
+            except (OSError, subprocess.TimeoutExpired, ValueError):
+                state = None
+            if state != "running":
+                QMessageBox.information(
+                    self, "Kali Desktop",
+                    "No running full Kali Linux VM is available. "
+                    "Choose Set Up / Manage Kali VM first."
+                )
+                return False
         try:
             subprocess.Popen(
                 [sys.executable, str(VM_GATEWAY), action],
