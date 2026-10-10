@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +60,41 @@ class NativeReconciliationTests(unittest.TestCase):
             dest = Path(folder) / 'installed.py'; dest.write_text(previous)
             self.assertEqual(helper.reconcile(source, dest, 'Studio'), 'conflict')
             self.assertEqual(dest.read_text(), previous)
+
+
+    def test_known_study_baselines_are_recorded(self):
+        self.assertIn('456f0279b397f7776b8ba9c6d970d493a9a8ccaf',
+                      helper.STUDY_KNOWN_BLOBS['Study workspace'])
+        self.assertIn('422029cbc30b462d87ff52eaa6c608b63f9ce499',
+                      helper.STUDY_KNOWN_BLOBS['Study workspace'])
+        self.assertIn('c7fa2cef87f66f187e6253a7059f7a5d335703f0',
+                      helper.STUDY_KNOWN_BLOBS['Study course store'])
+
+    def test_known_study_source_updates_without_touching_course_data(self):
+        for kind, relative in [('Study workspace', 'study/study.py'),
+                               ('Study course store', 'study/store.py')]:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
+                old = '# exact baseline\\nprint("legacy")\\n'
+                source = ROOT / relative
+                destination = Path(folder) / 'installed.py'
+                destination.write_text(old)
+                with patch.dict(helper.STUDY_KNOWN_BLOBS,
+                                {kind: {helper.git_blob_sha(old)}}):
+                    self.assertEqual(helper.reconcile(source, destination, kind),
+                                     'reconciled')
+                self.assertEqual(destination.read_text(), source.read_text())
+                self.assertEqual(helper.reconcile(source, destination, kind), 'current')
+
+    def test_unknown_study_edits_are_never_overwritten(self):
+        for kind, relative in [('Study workspace', 'study/study.py'),
+                               ('Study course store', 'study/store.py')]:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
+                source = ROOT / relative
+                destination = Path(folder) / 'installed.py'
+                custom = '# personal local edits\\nprint("keep me")\\n'
+                destination.write_text(custom)
+                self.assertEqual(helper.reconcile(source, destination, kind), 'conflict')
+                self.assertEqual(destination.read_text(), custom)
 
     def test_installer_fills_missing_workspace_files_and_keeps_source_backups(self):
         installer = (ROOT / 'the-web/package/install-desktop.sh').read_text()
