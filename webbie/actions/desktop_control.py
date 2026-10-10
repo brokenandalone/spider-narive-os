@@ -114,10 +114,10 @@ class DesktopOperator:
                 for a in apps]
 
     def open_app(self, query):
-        self.require('app.open', f'Open the installed application named {query!r}')
         catalog = app_catalog()
         apps = catalog.discover_apps() if self.discover is None else self.discover()
         app = select_app(query, apps)
+        self.require('app.open', 'app_id=' + app.desktop_id)
         command = catalog.launch_command(app)
         self.launcher(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                       stderr=subprocess.DEVNULL, start_new_session=True)
