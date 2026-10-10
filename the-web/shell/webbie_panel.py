@@ -549,6 +549,23 @@ class WebbiePanel(QWidget):
         text = self.entry.text().strip()
         if not text or self.pending:
             return
+        # Explicit Author requests stay local: no entire book is pasted into
+        # the chat socket or a remote service, and no unrequested review runs.
+        if self.workspace_mode == 'Author Editor':
+            author_path = self.root / 'author'
+            if author_path.is_dir():
+                if str(author_path) not in sys.path:
+                    sys.path.insert(0, str(author_path))
+                try:
+                    from control_socket import send_author_command
+                    result = send_author_command(text, source='typed')
+                except (ImportError, OSError) as error:
+                    result = 'Author command bridge unavailable: ' + str(error)
+                if result is not None:
+                    self.append_message('You', text)
+                    self.append_message('Webbie', result)
+                    self.entry.clear()
+                    return
         request = self.prepare_request(text)
         if self.camera_allowed and self.camera_summary:
             # Only descriptive text, not webcam frames, joins a message
