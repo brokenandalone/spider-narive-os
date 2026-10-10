@@ -86,6 +86,7 @@ APP_FILES = (
     'kali-bay/ui/kali_bay.py',
     'media/ai-dj/nova_host.py',
     'media/ai-dj/service.py',
+    'studio/__init__.py',
     'studio/ai_panel.py',
     'studio/arrangement.py',
     'studio/main.py',
