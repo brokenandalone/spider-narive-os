@@ -135,6 +135,22 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertIn('trained', panel.status.text())
             panel.close()
 
+    def test_engine_check_worker_reports_read_only_cli_result(self):
+        from PyQt5.QtTest import QSignalSpy
+        from studio.ai_panel import EngineCheckWorker
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'voice-engine.sh'
+            path.write_text('#!/bin/bash\\n')
+            worker = EngineCheckWorker(path)
+            observed = QSignalSpy(worker.result)
+            with patch('studio.ai_panel.subprocess.run') as audit:
+                audit.return_value.stdout = 'Read-only hardware readiness check'
+                worker.run()
+                audit.assert_called_once()
+                self.assertEqual(audit.call_args.args[0], ['bash', str(path), '--check'])
+            self.assertEqual(len(observed), 1)
+            self.assertIn('Read-only hardware', observed[0][0])
+
     def test_voice_training_setup_stays_read_only_and_launcher_requires_consent(self):
         from PyQt5.QtWidgets import QMessageBox
         with tempfile.TemporaryDirectory() as folder:
@@ -147,12 +163,15 @@ class NativeWorkspaceTests(unittest.TestCase):
                 panel.launch_trainer()
                 process.assert_not_called()
             script.write_text('#!/bin/bash\nexit 0\n')
-            with patch('studio.ai_panel.subprocess.run') as audit:
-                audit.return_value.stdout = 'RVC checkout: present; models need review'
+            with patch('studio.ai_panel.EngineCheckWorker') as audit:
                 panel.check_training_engine()
-                audit.assert_called_once()
-                self.assertEqual(audit.call_args.args[0], ['bash', str(script), '--check'])
+                audit.assert_called_once_with(script)
+                audit.return_value.start.assert_called_once()
+                self.assertFalse(panel.engine_check_button.isEnabled())
+                panel.engine_status.setText('RVC checkout: present; models need review')
                 self.assertIn('models need review', panel.engine_status.text())
+                panel.engine_check_finished()
+                self.assertTrue(panel.engine_check_button.isEnabled())
             with patch('studio.ai_panel.QMessageBox.question', return_value=QMessageBox.No), \
                  patch('studio.ai_panel.QProcess') as process:
                 panel.launch_trainer()
