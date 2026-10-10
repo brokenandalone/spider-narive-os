@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import threading
 
-from PyQt5.QtCore import QThread, QUrl, pyqtSignal
+from PyQt5.QtCore import QThread, QTimer, QUrl, pyqtSignal
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
@@ -17,10 +17,12 @@ if __package__:
     from .music_backend import LocalMusicClient, SongRequest, MusicError
     from .tools import TOOLS, resolve_tool
     from .arrangement import VOICE_OPTIONS
+    from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
     from arrangement import VOICE_OPTIONS
+    from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -60,6 +62,10 @@ class StudioAIPanel(QWidget):
         super().__init__()
         self.output_root = Path(output_root) if output_root else Path.home() / 'Documents/Spider Studio/Music/AI Songs'
         self.worker = None
+        self.capture_proc = None
+        self.capture_file = None
+        self.capture_timer = QTimer(self)
+        self.capture_timer.timeout.connect(self.poll_capture)
         layout = QVBoxLayout(self)
         heading = QLabel('Create a song')
         heading.setStyleSheet('font-size:22px; color:#c4b5fd;')
@@ -116,6 +122,44 @@ class StudioAIPanel(QWidget):
         self.other_instruments = QLineEdit('Bass guitar, live acoustic drums, atmospheric piano')
         band.addRow('Rest of band', self.other_instruments)
         layout.addLayout(band)
+
+        voice_heading = QLabel('My Voice: record first, build a personal voice model next')
+        voice_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
+        layout.addWidget(voice_heading)
+        voice_disclaimer = QLabel('Recording your voice does not train a singing-voice model. '
+            'A stored sample can experimentally influence ACE-Step via reference audio; '
+            'matching your identity, improving pitch, and retaining you as lead are NOT guaranteed. '
+            'The separate trained voice-conversion stage is pending local model setup and tests.')
+        voice_disclaimer.setWordWrap(True)
+        layout.addWidget(voice_disclaimer)
+        voice_form = QFormLayout()
+        self.vocal_mode = QComboBox()
+        self.vocal_mode.addItem('Generate original AI lead singer(s)', 'ai_lead')
+        self.vocal_mode.addItem('Arrange guest singers around my recording (experimental cover)', 'with_my_vocal')
+        self.vocal_mode.addItem('Continue music from my recording (experimental)', 'backing_for_my_vocal')
+        voice_form.addRow('Vocal workflow', self.vocal_mode)
+        self.source_audio = QLineEdit()
+        self.source_audio.setPlaceholderText('Choose an existing vocal WAV/MP3/FLAC recording')
+        self.source_browse = QPushButton('Choose recorded vocals')
+        self.source_browse.clicked.connect(self.choose_source)
+        voice_form.addRow('Input recording', self.source_audio)
+        voice_form.addRow('', self.source_browse)
+        self.use_voice_reference = QCheckBox('Use latest My Voice sample as experimental style reference')
+        voice_form.addRow('', self.use_voice_reference)
+        layout.addLayout(voice_form)
+        voice_buttons = QHBoxLayout()
+        self.record_button = QPushButton('Record 30-second My Voice sample')
+        self.record_button.clicked.connect(self.record_voice)
+        self.import_button = QPushButton('Import my vocal sample')
+        self.import_button.clicked.connect(self.import_voice)
+        self.voice_status = QLabel('No trained voice model. Recording is opt-in and kept on this computer.')
+        self.voice_status.setWordWrap(True)
+        voice_buttons.addWidget(self.record_button)
+        voice_buttons.addWidget(self.import_button)
+        layout.addLayout(voice_buttons)
+        layout.addWidget(self.voice_status)
+        QApplication.instance().aboutToQuit.connect(self.cancel_capture)
+        self.update_voice_status()
         buttons = QHBoxLayout()
         self.preset = QPushButton('Broken Sorrow preset')
         self.preset.clicked.connect(lambda: self.style.setPlainText(BROKEN_SORROW))
@@ -134,6 +178,67 @@ class StudioAIPanel(QWidget):
         layout.addLayout(actions)
         self.refresh()
 
+    def update_voice_status(self):
+        count = len(samples())
+        self.voice_status.setText(f'{count} private My Voice recording(s) collected. '
+            'Training and consistent AI singing in your actual voice require a separate voice model.')
+
+    def choose_source(self):
+        path, _ = QFileDialog.getOpenFileName(self, 'Select vocal performance',
+            str(Path.home() / 'Music'), 'Audio (*.wav *.mp3 *.flac)')
+        if path:
+            self.source_audio.setText(path)
+
+    def import_voice(self):
+        path, _ = QFileDialog.getOpenFileName(self, 'Import a recording of your own voice',
+            str(Path.home() / 'Music'), 'Audio (*.wav *.mp3 *.flac)')
+        if not path:
+            return
+        try:
+            import_sample(path, consent=True)
+            self.update_voice_status()
+            self.status.setText('Voice sample saved privately. No model has been trained yet.')
+        except (OSError, VoiceSampleError) as error:
+            self.status.setText(str(error))
+
+    def record_voice(self):
+        if self.capture_proc is not None:
+            self.finish_voice(stop=True)
+            return
+        try:
+            self.capture_proc, self.capture_file = start_capture(seconds=30)
+            self.record_button.setText('Stop recording and keep sample')
+            self.voice_status.setText('Recording your voice for up to 30 seconds. Microphone is active.')
+            self.capture_timer.start(500)
+        except (OSError, VoiceSampleError) as error:
+            self.status.setText(str(error))
+
+    def poll_capture(self):
+        if self.capture_proc is not None and self.capture_proc.poll() is not None:
+            self.finish_voice(stop=False)
+
+    def finish_voice(self, stop=False):
+        self.capture_timer.stop()
+        proc, path = self.capture_proc, self.capture_file
+        self.capture_proc, self.capture_file = None, None
+        if proc is None:
+            return
+        self.record_button.setText('Record 30-second My Voice sample')
+        try:
+            finish_capture(proc, path, stop=stop)
+            self.update_voice_status()
+            self.status.setText('My Voice sample saved. A trained voice model is still needed for identity-matched singing.')
+        except (OSError, VoiceSampleError) as error:
+            self.status.setText(str(error))
+
+    def cancel_capture(self):
+        if self.capture_proc is not None:
+            self.finish_voice(stop=True)
+
+    def closeEvent(self, event):
+        self.cancel_capture()
+        super().closeEvent(event)
+
     def start(self, check_only=False):
         if self.worker is not None:
             return
@@ -142,13 +247,19 @@ class StudioAIPanel(QWidget):
                                       os.environ.get('ACESTEP_API_KEY'))
             singers = tuple(box.currentText() for box in self.voice_boxes
                             if box.currentText() != 'None')
+            own = samples() if self.use_voice_reference.isChecked() and not check_only else []
+            if self.use_voice_reference.isChecked() and not own and not check_only:
+                raise ValueError('Record or import a My Voice sample first.')
             request = None if check_only else SongRequest(
                 self.title.text(), self.style.toPlainText(), self.lyrics.toPlainText(),
                 self.instrumental.isChecked(), self.duration.value(), self.takes.value(), self.bpm.value(),
                 vocal_lineup=singers, vocal_notes=self.voice_notes.toPlainText(),
                 guitar_one=self.guitar_one.text(),
                 guitar_two=self.guitar_two.text() if self.two_guitarists.isChecked() else '',
-                other_instruments=self.other_instruments.text())
+                other_instruments=self.other_instruments.text(),
+                vocal_mode=self.vocal_mode.currentData(),
+                source_audio=self.source_audio.text().strip() if self.vocal_mode.currentData() != 'ai_lead' else '',
+                voice_reference=str(own[0]) if own else '')
             if request:
                 request.payload()
         except ValueError as error:
