@@ -22,6 +22,7 @@ if __package__:
     from .voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
     from .song_mix import mix_vocals, MixError, valid_wav
     from .stem_separation import separate, SeparationError
+    from .owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
@@ -31,6 +32,7 @@ else:
     from voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
     from song_mix import mix_vocals, MixError, valid_wav
     from stem_separation import separate, SeparationError
+    from owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -362,6 +364,21 @@ class StudioAIPanel(QWidget):
             choose.clicked.connect(lambda _=False, target=field, extension=flt: self.pick_conversion_file(target, extension))
             conversion_actions.addWidget(choose)
         layout.addLayout(conversion_actions)
+        owner_model_buttons = QHBoxLayout()
+        self.remember_voice_model_button = QPushButton('Remember my trained voice model')
+        self.remember_voice_model_button.clicked.connect(self.remember_my_voice_model)
+        owner_model_buttons.addWidget(self.remember_voice_model_button)
+        self.restore_voice_model_button = QPushButton('Use saved voice model')
+        self.restore_voice_model_button.clicked.connect(self.restore_my_voice_model)
+        owner_model_buttons.addWidget(self.restore_voice_model_button)
+        self.forget_voice_model_button = QPushButton('Forget saved model selection')
+        self.forget_voice_model_button.clicked.connect(self.forget_my_voice_model)
+        owner_model_buttons.addWidget(self.forget_voice_model_button)
+        layout.addLayout(owner_model_buttons)
+        self.saved_model_status = QLabel('A saved model pointer is not proof of voice identity or audio quality.')
+        self.saved_model_status.setWordWrap(True)
+        layout.addWidget(self.saved_model_status)
+        self.restore_my_voice_model(quiet=True)
         self.convert_button = QPushButton('Convert isolated vocal to My Voice')
         self.convert_button.clicked.connect(self.start_conversion)
         layout.addWidget(self.convert_button)
@@ -471,6 +488,46 @@ class StudioAIPanel(QWidget):
                                               str(Path.home()), pattern)
         if path:
             field.setText(path)
+
+    def remember_my_voice_model(self):
+        answer = QMessageBox.question(
+            self, 'Remember owner-trained voice model',
+            'Confirm the selected .pth and optional .index are your own locally trained voice model, '
+            'or are recordings and model files you are authorized to use. Only their file locations '
+            'are stored privately; model weights are never loaded merely by remembering the selection. '
+            'The voice identity and sound quality have NOT been verified.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            remember_owner_model(self.rvc_model.text().strip(),
+                                 self.rvc_index.text().strip() or None, consent=True)
+            self.saved_model_status.setText('Private owner model selection saved. No audio identity verified.')
+        except (OSError, VoiceSampleError) as error:
+            self.saved_model_status.setText('Cannot save trained model selection: ' + str(error))
+
+    def restore_my_voice_model(self, quiet=False):
+        try:
+            saved = load_owner_model()
+        except (OSError, VoiceSampleError) as error:
+            self.saved_model_status.setText('Could not check the private model selection: ' + str(error))
+            return
+        if saved:
+            self.rvc_model.setText(saved['model'])
+            self.rvc_index.setText(saved['index'])
+            self.saved_model_status.setText('Saved local voice model selected. '
+                                            'A listening test must still verify it sounds like you.')
+        elif not quiet:
+            self.saved_model_status.setText('No valid saved owner model. Train one in RVC or select a trusted .pth file.')
+
+    def forget_my_voice_model(self):
+        try:
+            forget_owner_model()
+            self.rvc_model.clear()
+            self.rvc_index.clear()
+            self.saved_model_status.setText('Forgot the saved selection. Model weights and training recordings remain untouched.')
+        except (OSError, VoiceSampleError) as error:
+            self.saved_model_status.setText('Could not forget saved model selection: ' + str(error))
 
     def start_song_finish(self):
         if self.rvc_worker is not None or self.mix_worker is not None:
