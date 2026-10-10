@@ -253,6 +253,66 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertTrue(panel.finish_song_button.isEnabled())
             panel.close()
 
+    def test_explicit_review_and_assignment_of_separated_stems(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            vocal, instrumental, unrelated = (root / name for name in
+                                              ('singing.wav', 'backing.wav', 'unrelated.wav'))
+            for source in (vocal, instrumental, unrelated):
+                with wave.open(str(source), 'wb') as wavfile:
+                    wavfile.setnchannels(1); wavfile.setsampwidth(2); wavfile.setframerate(8000)
+                    wavfile.writeframes(b'\\0\\0' * 100)
+            panel = StudioAIPanel(folder)
+            self.assertEqual(panel.stem_candidates.count(), 0)
+            panel.separation_done(str(root), [str(vocal), str(instrumental)], 'Stems ready')
+            self.assertEqual(panel.stem_candidates.count(), 2)
+            self.assertFalse(panel.rvc_vocal.text())
+            self.assertFalse(panel.mix_backing.text())
+            panel.stem_candidates.setCurrentRow(0)
+            with patch('studio.ai_panel.QDesktopServices.openUrl') as player:
+                player.return_value = True
+                panel.listen_stem()
+                player.assert_called_once()
+                self.assertEqual(player.call_args.args[0].toLocalFile(), str(vocal))
+            panel.assign_vocal_stem()
+            self.assertEqual(panel.rvc_vocal.text(), str(vocal))
+            panel.assign_instrumental_stem()
+            self.assertIn('already assigned', panel.status.text())
+            self.assertFalse(panel.mix_backing.text())
+            panel.stem_candidates.setCurrentRow(1)
+            panel.assign_instrumental_stem()
+            self.assertEqual(panel.mix_backing.text(), str(instrumental))
+            panel.assign_vocal_stem()
+            self.assertIn('already assigned', panel.status.text())
+            self.assertEqual(panel.rvc_vocal.text(), str(vocal))
+            self.assertNotIn(unrelated.resolve(), panel.separation_files)
+            panel.close()
+
+    def test_separated_stem_rejects_out_of_job_and_clears_failed_results(self):
+        import wave
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            job = root / 'stems'
+            job.mkdir()
+            good = job / 'voice.wav'
+            elsewhere = root / 'other.wav'
+            for source in (good, elsewhere):
+                with wave.open(str(source), 'wb') as audio:
+                    audio.setnchannels(1); audio.setsampwidth(2); audio.setframerate(8000)
+                    audio.writeframes(b'\\0\\0' * 100)
+            panel = StudioAIPanel(folder)
+            panel.separation_done(str(job), [str(good), str(elsewhere)], 'ready')
+            self.assertEqual(panel.stem_candidates.count(), 1)
+            panel.stem_candidates.setCurrentRow(0)
+            panel.assign_vocal_stem()
+            self.assertEqual(panel.rvc_vocal.text(), str(good))
+            panel.separation_done('', [], 'engine failed')
+            self.assertEqual(panel.stem_candidates.count(), 0)
+            self.assertIsNone(panel.separation_directory)
+            self.assertIn('engine failed', panel.status.text())
+            panel.close()
+
     def test_voice_mixing_ui_uses_two_distinct_wavs_and_converted_output(self):
         import wave
         with tempfile.TemporaryDirectory() as folder:
