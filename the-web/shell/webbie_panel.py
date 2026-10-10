@@ -571,6 +571,13 @@ class WebbiePanel(QWidget):
             + '\n[Spider OS workspace context; advisory only]\n'
             + '\n'.join(fields) + '\n[User request]\n' + text)
 
+    def _remember_consented_screen(self, description):
+        # Screen descriptions are short-lived, advisory, and never a
+        # permission to operate the desktop or identify the speaker.
+        if not self.face_sleeping:
+            self.awareness.observation(
+                'screen', description, consent=True, ttl=45)
+
     def show_awareness(self):
         # Inspectable short-term context, not a long-term-memory database.
         # Camera observations stay out of this display unless vision is enabled.
@@ -583,6 +590,11 @@ class WebbiePanel(QWidget):
     def open_computer_dialog(self, suggested_app_id=None):
         if self.computer_dialog is None:
             self.computer_dialog = WebbieComputerDialog(self)
+            self.computer_dialog.taskApproved.connect(self.awareness.note_user_request)
+            self.computer_dialog.screenObserved.connect(
+                self._remember_consented_screen)
+            self.computer_dialog.authorizationRevoked.connect(
+                lambda: self.awareness.revoke_observation('screen'))
         if suggested_app_id:
             self.computer_dialog.offer_program(suggested_app_id)
         self.computer_dialog.show()
