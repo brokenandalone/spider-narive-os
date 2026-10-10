@@ -59,7 +59,7 @@ class VoiceProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'take.wav'
             path.write_bytes(b'test')
-            proc = Mock(); proc.returncode = 0
+            proc = Mock(); proc.returncode = 0; proc.communicate.return_value = (b'', b'')
             self.assertEqual(voice.finish_capture(proc, path), path)
             proc.returncode = 1
             with self.assertRaises(voice.VoiceSampleError):
