@@ -17,11 +17,18 @@ if [[ -z "$user" || "$user" == root ]]; then echo 'Run sudo from your normal des
 user_home="$(getent passwd "$user" | cut -d: -f6)"
 root=/usr/local/lib/spider-os
 # Reject incomplete packages before installing dependencies or changing files.
-for relative in the-web/shell/main.py the-web/shell/system_panel.py the-web/shell/system_status.py the-web/shell/webbie_panel.py the-web/shell/media_panel.py the-web/shell/media_transport.py the-web/shell/audio_controls.py the-web/shell/build_info.py the-web/overlay/webbie_face.py the-web/overlay/webbie-face-autostart.desktop system/onedrive.py system/service/webbie-onedrive.service system/service/webbie-onedrive.timer branding/webbie/webbie-face-v1.png branding/webbie/webbie-face-speaking-v1.png the-web/session/the-web-session the-web/session/apply-lock-screen.py the-web/package/patch-native-imports.py the-web/package/reconcile-native.py branding/wallpapers/collection.json distro/config/sessions/the-web.desktop system/apps.py; do
+for relative in the-web/shell/main.py the-web/shell/system_panel.py the-web/shell/system_status.py the-web/shell/webbie_panel.py the-web/shell/media_panel.py the-web/shell/media_transport.py the-web/shell/audio_controls.py the-web/shell/build_info.py the-web/overlay/webbie_face.py the-web/overlay/webbie-face-autostart.desktop system/onedrive.py system/service/webbie-onedrive.service system/service/webbie-onedrive.timer branding/webbie/webbie-face-v1.png branding/webbie/webbie-face-speaking-v1.png the-web/session/the-web-session the-web/session/apply-lock-screen.py the-web/package/patch-native-imports.py the-web/package/reconcile-native.py branding/wallpapers/collection.json distro/config/sessions/the-web.desktop system/apps.py study/study.py study/store.py study/homework.py study/homework_ui.py study/assignment_review.py study/course_materials.py study/school_material_picker.py study/school_onedrive.py study/school_upload.py study/draft_storage.py studio/ai_panel.py; do
     test -s "$source_root/$relative" || { echo "Incomplete build: $relative" >&2; exit 1; }
 done
 if [[ -f "$source_root/SHA256SUMS" ]]; then
     (cd "$source_root" && sha256sum --strict -c SHA256SUMS) || { echo 'Build checksum verification failed.' >&2; exit 1; }
+fi
+# Before apt, backups, or ANY installed files are touched, reject unknown
+# customized native app code. Source differences recognized by the helper can
+# be safely reconciled only after backups are prepared below.
+if ! python3 "$source_root/the-web/package/reconcile-native.py" "$source_root" "$root" --check; then
+    echo 'Native workspace conflicts detected. No installation changes were made.' >&2
+    exit 3
 fi
 if ! command -v startplasma-x11 >/dev/null; then
     # Ubuntu 25.10/26.04 split the X11 session out of plasma-workspace.
@@ -45,7 +52,7 @@ done
 stamp="$(date +%Y%m%d-%H%M%S)"
 backup="$root/upgrade-backups/the-web-$stamp"
 install -d "$backup" "$root/the-web" "$root/branding/wallpapers" /usr/share/xsessions /usr/local/bin
-for relative in the-web/shell the-web/overlay the-web/install-receipt.json branding/webbie system/onedrive.py author/main.py studio/main.py study/study.py system/apps.py; do
+for relative in the-web/shell the-web/overlay the-web/install-receipt.json branding/webbie system/onedrive.py author/main.py studio/main.py study/study.py study/store.py system/apps.py; do
     if [[ -e "$root/$relative" ]]; then
         install -d "$backup/$(dirname "$relative")"
         cp -a "$root/$relative" "$backup/$relative"
@@ -94,7 +101,9 @@ if [[ ! -f "$root/system/apps.py" ]]; then install -Dm644 "$source_root/system/a
 # The owner's known nine-line Author launcher difference and Studio spacing
 # customizations can be reconciled exactly. Unknown differences are skipped.
 if ! python3 "$source_root/the-web/package/reconcile-native.py" "$source_root" "$root"; then
-    echo 'One or more native workspaces needs a manual code review; existing files were preserved.' >&2
+    echo 'Installed native workspace code changed since preflight. Stop and review the backup before continuing.' >&2
+    echo "Backup: $backup" >&2
+    exit 3
 fi
 python3 "$source_root/the-web/package/patch-native-imports.py" "$root"
 install -m755 "$source_root/the-web/session/the-web-session" /usr/local/bin/the-web-session
