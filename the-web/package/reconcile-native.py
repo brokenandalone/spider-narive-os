@@ -7,6 +7,7 @@ The desktop installer backs up original files before invoking this helper.
 from pathlib import Path
 import argparse
 import ast
+import hashlib
 import os
 import tempfile
 
@@ -49,6 +50,25 @@ STUDIO_OLD_ACTIONS = """    def launch(self, command):
         self.status.setText('No supported DAW is installed. Install Ardour or Carla to use Music Studio.')
 
 """
+
+# Exact Git blob IDs for older Study versions known to be on the upgrade path.
+# These fingerprints prevent overwriting unfamiliar owner-local modifications.
+# Git SHA-1 here identifies known content; it is not used for authentication.
+STUDY_KNOWN_BLOBS = {
+    'Study workspace': {
+        '456f0279b397f7776b8ba9c6d970d493a9a8ccaf',  # original main
+        '422029cbc30b462d87ff52eaa6c608b63f9ce499',  # School PR #8
+    },
+    'Study course store': {
+        'c7fa2cef87f66f187e6253a7059f7a5d335703f0',  # original main
+    },
+}
+
+
+def git_blob_sha(content):
+    data = content.encode('utf-8')
+    header = b'blob ' + str(len(data)).encode('ascii') + b'\\0'
+    return hashlib.sha1(header + data).hexdigest()
 
 
 def one_replace(text, old, new):
@@ -140,7 +160,7 @@ def reconcile(source, installed, kind):
             print('Author launcher: unfamiliar local changes, preserving; manual review required')
             return 'conflict'
         replacement = upstream
-    else:
+    elif kind == 'Studio':
         if 'self.tool_tabs = QTabWidget()' in current:
             print('Studio: tools tabs already present; preserving local version')
             return 'current'
@@ -148,6 +168,13 @@ def reconcile(source, installed, kind):
             print('Studio: unfamiliar local changes, preserving; manual review required')
             return 'conflict'
         replacement = enhanced_studio(upstream)
+    elif kind in STUDY_KNOWN_BLOBS:
+        if git_blob_sha(current) not in STUDY_KNOWN_BLOBS[kind]:
+            print(f'{kind}: unknown local edits, preserving; manual review required')
+            return 'conflict'
+        replacement = upstream
+    else:
+        raise ValueError(f'Unsupported reconciliation type: {kind}')
     ast.parse(replacement)
     atomic_replace(installed, replacement)
     print(f'{kind}: reconciled exactly known local variant')
@@ -164,7 +191,14 @@ def main():
         reconcile(source / 'system/apps.py', root / 'system/apps.py', 'Author launcher'),
         reconcile(source / 'studio/main.py', root / 'studio/main.py', 'Studio'),
     ]
-    return 0 if 'conflict' not in results else 2
+    # The dashboard calls store.all_assignments(): upgrade the dependency first.
+    store_status = reconcile(source / 'study/store.py', root / 'study/store.py', 'Study course store')
+    results.append(store_status)
+    if store_status in ('current', 'reconciled'):
+        results.append(reconcile(source / 'study/study.py', root / 'study/study.py', 'Study workspace'))
+    else:
+        print('Study workspace: skipped until the course store is reviewed')
+    return 0 if 'conflict' not in results and store_status != 'missing' else 2
 
 
 if __name__ == '__main__':
