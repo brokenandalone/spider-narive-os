@@ -10,9 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .store import AuthorStore
     from .web_features import AuthorToolkit
+    from .control_socket import AuthorCommandServer
 else:
     from store import AuthorStore
     from web_features import AuthorToolkit
+    from control_socket import AuthorCommandServer
 
 
 class AuthorWindow(QMainWindow):
@@ -51,6 +53,33 @@ class AuthorWindow(QMainWindow):
         self.chapters.currentItemChanged.connect(self.select_chapter)
         self.timer = QTimer(self); self.timer.timeout.connect(self.autosave); self.timer.start(2000)
         self.load_books()
+        self.command_server = AuthorCommandServer(self)
+        self.command_server.intentReady.connect(self.handle_author_intent)
+        self.command_server.start()
+
+    def handle_author_intent(self, intent):
+        """Execute a previously validated request in the GUI thread only."""
+        if not self.isVisible():
+            self.status.setText('Author command ignored: Author Bay is not visible.')
+            return
+        action = intent.get('action')
+        if action == 'review':
+            self.toolkit.review_depth.setCurrentIndex(
+                1 if intent.get('depth') == 'deep' else 0)
+            self.toolkit.start_review(intent['scope'])
+        elif action == 'read':
+            if intent['scope'] == 'book':
+                self.toolkit.read_book()
+            else:
+                self.toolkit.read_aloud()
+        elif action == 'cancel_review':
+            self.toolkit.cancel_review()
+        elif action == 'pause_reading':
+            self.toolkit.reader.pause()
+        elif action == 'resume_reading':
+            self.toolkit.reader.resume()
+        elif action == 'stop_reading':
+            self.toolkit.reader.stop()
 
     def action(self, function):
         try:
@@ -262,6 +291,7 @@ class AuthorWindow(QMainWindow):
             event.ignore()
             return
         if self.flush():
+            self.command_server.stop()
             self.timer.stop(); self.store.close(); event.accept()
         else:
             event.ignore()
