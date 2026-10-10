@@ -38,7 +38,9 @@ def conversion_command(rvc_dir, python_bin, model, src, dest, index=None, pitch=
     if root.is_symlink() or not script.is_file() or script.is_symlink():
         raise ConversionError("Verified local RVC infer/cli.py is not installed.")
     python = Path(python_bin)
-    if python.is_symlink() or not python.is_file():
+    # Linux virtualenv launchers are often symlinks to the system interpreter.
+    # Require a real readable target; never reject a normal venv symlink.
+    if not python.is_file():
         raise ConversionError("RVC's isolated Python environment is not ready.")
     model_path = valid_file(model, {".pth"}, "trained voice model")
     src_path = valid_file(src, {".wav"}, "isolated vocal WAV")
