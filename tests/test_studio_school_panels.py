@@ -278,6 +278,34 @@ class NativeWorkspaceTests(unittest.TestCase):
                 self.assertIn('not a saved Spider Studio', panel.status.text())
             panel.close()
 
+    def test_stem_separation_requires_opt_in_and_can_be_stopped(self):
+        import wave
+        from PyQt5.QtWidgets import QMessageBox
+        with tempfile.TemporaryDirectory() as folder:
+            wav = Path(folder) / 'song.wav'
+            with wave.open(str(wav), 'wb') as audio:
+                audio.setnchannels(1); audio.setsampwidth(2); audio.setframerate(8000)
+                audio.writeframes(b'\\0\\0' * 100)
+            panel = StudioAIPanel(folder)
+            panel.separation_source.setText(str(wav))
+            with patch('studio.ai_panel.QMessageBox.question', return_value=QMessageBox.No), \
+                 patch('studio.ai_panel.SeparationWorker') as worker:
+                panel.start_separation()
+                worker.assert_not_called()
+                self.assertFalse(panel.stop_separation_button.isEnabled())
+            with patch('studio.ai_panel.QMessageBox.question', return_value=QMessageBox.Yes), \
+                 patch('studio.ai_panel.SeparationWorker') as worker:
+                panel.start_separation()
+                worker.assert_called_once_with(str(wav.resolve()))
+                worker.return_value.start.assert_called_once()
+                self.assertTrue(panel.stop_separation_button.isEnabled())
+                panel.cancel_separation()
+                worker.return_value.stop.set.assert_called_once()
+                self.assertFalse(panel.stop_separation_button.isEnabled())
+                panel.separation_finished()
+                self.assertTrue(panel.separate_button.isEnabled())
+            panel.close()
+
     def test_explicit_review_and_assignment_of_separated_stems(self):
         import wave
         with tempfile.TemporaryDirectory() as folder:
