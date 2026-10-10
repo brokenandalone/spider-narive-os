@@ -51,6 +51,31 @@ class OnnWebcamTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "Unable to read webcam"):
                     camera.capture_jpeg("/dev/video0")
 
+    def test_ollama_cpu_timeout_is_not_mislabeled_as_service_offline(self):
+        from urllib.error import URLError
+        with patch.object(camera.urllib.request, "urlopen", side_effect=TimeoutError):
+            with self.assertRaisesRegex(RuntimeError, "timed out after 180 seconds"):
+                camera.describe_frame(JPEG, timeout=180)
+        with patch.object(camera.urllib.request, "urlopen",
+                          side_effect=URLError(TimeoutError())):
+            with self.assertRaisesRegex(RuntimeError, "timed out after 180 seconds"):
+                camera.describe_frame(JPEG, timeout=180)
+
+    def test_short_camera_description_preserves_model_and_no_cloud_endpoint(self):
+        from unittest.mock import MagicMock
+        import json
+        response = MagicMock()
+        response.geturl.return_value = camera.OLLAMA_CHAT
+        response.read.return_value = json.dumps(
+            {"message": {"content": "A desk and a lamp."}}).encode()
+        response.__enter__.return_value = response
+        with patch.object(camera.urllib.request, "urlopen", return_value=response) as send:
+            self.assertIn("desk", camera.describe_frame(JPEG, timeout=180))
+        payload = json.loads(send.call_args.args[0].data)
+        self.assertEqual(payload["options"]["num_predict"], 110)
+        self.assertEqual(payload["model"], "gemma3:4b")
+        self.assertEqual(len(payload["messages"][0]["images"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
