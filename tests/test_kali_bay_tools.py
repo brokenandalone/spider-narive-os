@@ -105,7 +105,7 @@ esac
         self.assertIn('"tool-check", tool_id', source)
         self.assertIn('"tool", tool_id', source)
 
-    def test_qt_workspace_has_both_security_tabs(self):
+    def test_qt_workspace_has_hybrid_desktop_and_security_tabs(self):
         # An isolated child process keeps Qt's global singleton out of
         # unrelated source-check tests and needs no real Kali installation.
         import sys
@@ -119,9 +119,21 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 app = QApplication([])
 window = module.KaliBayWindow()
-assert window.security_tabs.count() == 2
-assert window.security_tabs.tabText(0) == 'OFFENSIVE'
-assert window.security_tabs.tabText(1) == 'PURPLE DEFENSE'
+assert window.security_tabs.count() == 3
+assert window.security_tabs.tabText(0) == 'DESKTOP HUB'
+assert window.security_tabs.tabText(1) == 'OFFENSIVE'
+assert window.security_tabs.tabText(2) == 'PURPLE DEFENSE'
+assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU)
+window.desktop_search.setText('Wireshark')
+assert window.desktop_list.count() == 1
+assert window.desktop_list.item(0).data(module.Qt.UserRole) == 'wireshark'
+window.desktop_search.clear()
+window.desktop_category.setCurrentText('Detection')
+assert window.desktop_list.count() == 2
+window.desktop_category.setCurrentText('All categories')
+assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU)
+window.security_tabs.setCurrentIndex(2)
+assert window.security_tabs.currentIndex() == 2
 assert 'DIRECT SECURITY TOOL LAUNCHERS' in [
     widget.text()
     for widget in window.findChildren(module.QLabel)
