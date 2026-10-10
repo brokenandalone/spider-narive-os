@@ -1,6 +1,6 @@
 # Spider OS master upgrade checklist
 
-Reordered October 9, 2026, late evening, America/Indiana/Vincennes. This order supersedes earlier ordering. Repository: `brokenandalone/spider-narive-os`.
+Reordered October 10, 2026, America/Indiana/Indianapolis. This order supersedes earlier ordering. Repository: `brokenandalone/spider-narive-os`.
 
 **Latest owner priority: Studio music generation as soon as possible. It is the next active GitHub feature build and does not wait for the full contextual-awareness roadmap or unrelated desktop polish.** Preserve ongoing PC repairs and release safeguards in parallel. **The owner is actively repairing Webbie on the PC in parallel.** Do not build a competing voice fix or overwrite that work. Bring the resulting working files back into GitHub.
 
@@ -12,13 +12,23 @@ Continue GitHub work between installations. Prepare **one combined install per o
 
 - [ ] Inventory GPU/VRAM/RAM/storage and select an attainable local music-generation baseline.
 - [ ] Review model licenses, song length, lyrics adherence, instrumental/vocal quality and actual generation time.
-- [ ] Implement real generation with lyrics/style controls, progress/cancel, saved audio and playback. A controls schema is not music generation.
+- [x] PR #34 implements native Studio lyrics/style job submission, background progress, Stop waiting, validated saved WAV takes, playback/export and installed Audacity handoff. Ten local protocol tests pass; actual engine rendering is still unverified.
+- [ ] Render and audition a real song on the PC. Stop waiting does not cancel backend GPU work. Qualify detached-job recovery and model capabilities.
 - [ ] Add the owner's consenting singing reference and evaluate voice fidelity through listening tests.
-- [ ] Support Broken Sorrow style, arrangements, iterative edits and DAW/session export.
+- [x] Add editable Broken Sorrow style preset and WAV export in PR #34.
+- [ ] Add supported arrangement edits, stems, own-voice rendering and DAW/session handoffs; reuse installed Studio software instead of duplicating it.
 - [ ] Qualify PR #27 controls against an actual backend; do not claim Suno parity from the specification alone.
 - [ ] Verify production launchers, recording devices, PipeWire/JACK routing and project templates while preserving customized Studio tabs/projects.
 
-## 2. Webbie reliability: PC repair in progress, then source reconciliation
+## 2. School inside Study: latest owner priority
+
+- [x] PR #34 adds My SNHU within Study alongside courses, coursework, notes and APA tools, with persistent browser profile and course-specific download destinations.
+- [ ] Qualify QtWebEngine on the PC, sign in through the school portal, reach Brightspace and download a real course file. No account is connected by source work alone.
+- [ ] Verify current SNHU coursework, assignments/due dates, dashboard and APA exports; automatic school synchronization is not implemented.
+- [ ] Preserve Word formatting preferences and connect reviewable Webbie assistance.
+- [ ] Add sourced, location/date-aware NA/AA lookup and requested reminders.
+
+## 3. Webbie reliability: PC repair in progress, then source reconciliation
 
 - [ ] **IN PROGRESS ON PC:** reliable wake/answers, multi-turn follow-up, Webbie stop, microphone recovery and correct launcher. Use the result of this repair as the voice baseline.
 - [ ] Import the final working agent, TTS, listener and associated voice-gate changes together; preserve speaker authorization, webcam microphone discovery, voice-storage permissions and USB recovery.
@@ -32,17 +42,18 @@ Continue GitHub work between installations. Prepare **one combined install per o
 - [x] PR #29 contains camera capture and Qwen3-VL preference changes. Owner subsequently confirms webcam vision works through Webbie.
 - [ ] Compare final PC camera files/settings with PR #29 before asserting exact equality; retain optional independent Cory/Shayna face profiles.
 
-## 3. Preserve all PC repairs in one qualified GitHub update
+## 4. Preserve all PC repairs in one qualified GitHub update
 
 - [x] Compare supplied PC code/diffs with PR #29 head `d41e4b7`; record gaps in [PC reconciliation](PC-RECONCILIATION-2026-10-10.md).
 - [ ] Collect final files/hashes after the active PC repair and resolve differences without wholesale replacement.
 - [ ] Keep installer blocking for unknown local changes, one backup manifest and tested rollback. Do not whitelist custom files to bypass review.
+- [ ] Include active PC-side PRs #31 (Webby alias), #32 (heard-speech caption) and #33 (optional full-screen portrait) in the final source comparison; do not overwrite them with an older baseline.
 - [ ] Consolidate compatible PR work; verify CI on exact source revisions, then merge qualified changes. Preserve the frozen release until the replacement is ready.
 - [ ] Add qualified Forage changes to the combined install after comparing the installed engine; it is not currently in the combined manifest.
 - [ ] On the owner's install request, deliver one frozen revision, preflight, backup, combined installation, activation and acceptance pass. No repeated logouts for source work.
 - [ ] Give the complete sequential setup/control tutorial after installation and acceptance.
 
-## 4. Webbie context, memory and natural interaction
+## 5. Webbie context, memory and natural interaction
 
 Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more_human_like_and_life_.md`. Its generic numbered references and empty Sources section do not establish its claims. These are requested development/research directions, not verified capabilities.
 
@@ -57,7 +68,7 @@ Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more
 - [ ] **Interaction effects:** keep clear AI identity and controllable personalization/proactivity; evaluate usefulness and unwanted intrusive behavior over time.
 - [ ] Qualify offline operation, selected model fallback and latency before marking complete.
 
-## 5. Essential desktop controls
+## 6. Essential desktop controls
 
 - [ ] Qualify Close/Minimize/Restore, taskbar/overview, Firefox focus and unsaved-work prompts.
 - [ ] Verify volume/mic controls, input/output switching, mixer and media keys.
@@ -65,7 +76,7 @@ Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more
 - [ ] Finish network/Bluetooth/power/brightness/display/drive controls and multi-monitor behavior.
 - [ ] Preserve installed wallpapers/purple identity; verify floating-face placement, click-through and fullscreen handling.
 
-## 6. Author and Webbie in every bay
+## 7. Author and Webbie in every bay
 
 - [x] Owner confirms Author import works and entries open. Do not list the import itself as missing.
 - [ ] Verify counts, originals, independent backups, autosave, snapshots and restore.
@@ -73,7 +84,7 @@ Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more
 - [ ] Use Writer in Author, Justin in Studio, Student in Study, Spider in Kali Bay and Cory normally, preserving overrides.
 - [ ] Connect Webbie to real scoped actions in every bay, with approval before manuscript edits or risky system actions.
 
-## 7. Forage and Deep Forage evidence quality
+## 8. Forage and Deep Forage evidence quality
 
 **The source-free report defect is an immediate reliability fix being handled alongside the current build and PC reconciliation**, before more research is used as an implementation basis.
 
@@ -83,12 +94,6 @@ Added from the owner's report `2026-10-09_23-04-16_Ways_to_make_Resident_AI_more
 - [ ] Verify real search/provider behavior on the PC; retain the old report as unverified rather than relabeling it.
 - [ ] Add claim-to-source support checks, dates/quality and explicit uncertainty. Claims about installed Webbie also need actual code/runtime evidence.
 - [ ] Finish research queues, cancel/progress, history, local indexing and source-preserving exports to Study/Author.
-
-## 8. Study and recovery assistance
-
-- [ ] Verify current SNHU coursework, assignments/due dates, dashboard and APA exports.
-- [ ] Preserve Word formatting preferences and connect reviewable Webbie assistance.
-- [ ] Add sourced, location/date-aware NA/AA lookup and requested reminders.
 
 ## 9. Media Center, radio and AI DJ
 
