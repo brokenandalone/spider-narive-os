@@ -154,7 +154,9 @@ class DesktopOperator:
     def press(self, key):
         if key not in KEYS:
             raise ValueError('Unsupported keystroke; only reviewed shortcuts are allowed')
-        self.require('keyboard.key', f'Press {key}')
+        action = ('keyboard.change.confirm' if key in
+                  {'Delete', 'ctrl+x', 'ctrl+s'} else 'keyboard.key')
+        self.require(action, f'Press {key} in the foreground application')
         self.run(['xdotool', 'key', '--clearmodifiers', key])
         return {'pressed': key}
 
@@ -175,7 +177,7 @@ class DesktopOperator:
         return {'close_requested': window_id}
 
     def stop(self):
-        """Always allow an immediate local cancel, even without permissions."""
+        """Block subsequent actions immediately; a current OS call may finish."""
         self.cancelled.set()
         return {'stopped': True}
 
