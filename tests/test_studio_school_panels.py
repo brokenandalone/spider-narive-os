@@ -102,7 +102,7 @@ class NativeWorkspaceTests(unittest.TestCase):
             panel.mix_backing.setText(str(backing))
             panel.rvc_vocal.setText(str(lead))
             panel.rvc_model.setText(str(root / 'my-voice.pth'))
-            with patch.object(panel, 'start_conversion') as conversion, \\
+            with patch.object(panel, 'start_conversion') as conversion, \
                  patch.object(panel, 'start_mix') as mixing:
                 panel.start_song_finish()
                 conversion.assert_called_once()
