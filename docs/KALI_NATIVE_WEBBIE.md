@@ -16,6 +16,13 @@ this native release.
   Konsole. If the Kali container does not exist, the launcher now stops
   and directs the owner to explicit setup rather than silently creating a
   new container.
+- **START EXISTING KALI** is an explicit confirmed owner action that uses
+  rootless `podman start kali-bay` only if that container already exists.
+  No new container, host packages or Kali packages are installed; a running
+  container is not restarted. **KALI HEALTH CHECK** runs the existing
+  read-only `kali-bay doctor` diagnostic.
+- Kali Desktop Hub's quick actions are scrollable so all Kali controls and
+  Webbie remain reachable on smaller screens.
 - **KALI PACKAGE MANAGER** opens a Kali shell and explains apt; it does
   not update, install or remove packages automatically. The owner can
   operate `apt`, `dpkg` and `sudo` inside Kali interactively as Kali
