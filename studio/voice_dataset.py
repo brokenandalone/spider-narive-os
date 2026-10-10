@@ -11,7 +11,10 @@ import shutil
 import subprocess
 import tempfile
 import uuid
-from .voice_profile import HOME, samples, VoiceSampleError
+try:
+    from .voice_profile import HOME, samples, VoiceSampleError
+except ImportError:
+    from voice_profile import HOME, samples, VoiceSampleError
 
 MIN_TRAIN_SECONDS = 600.0
 
