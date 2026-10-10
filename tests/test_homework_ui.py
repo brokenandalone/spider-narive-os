@@ -49,6 +49,37 @@ class HomeworkUiTests(unittest.TestCase):
                 warning.assert_called_once()
             dialog.close()
 
+    def test_imported_material_is_visible_and_editable_before_model_use(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(folder=Path(folder))
+            dialog.add_selected_material("instructions",
+                                         "SCHOOL ONEDRIVE FILE: rubric.txt\nWrite 300 words.")
+            dialog.add_selected_material("materials",
+                                         "SCHOOL ONEDRIVE FILE: reading.txt\nCourse evidence.")
+            dialog.add_selected_material("style", "My previous discussion post.")
+            self.assertIn("Write 300 words.", dialog.directions.toPlainText())
+            self.assertIn("Course evidence.", dialog.materials.toPlainText())
+            self.assertEqual(dialog.style.toPlainText(), "My previous discussion post.")
+            dialog.directions.setPlainText("Revised instructor directions.")
+            self.assertEqual(dialog.directions.toPlainText(), "Revised instructor directions.")
+            dialog.close()
+
+    def test_school_material_picker_requires_explicit_accept(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("study.homework_ui.load_style", return_value=""):
+                dialog = HomeworkDialog(folder=Path(folder))
+            with patch("study.school_material_picker.SchoolMaterialPicker") as picker_type:
+                picker = picker_type.return_value
+                picker.exec_.return_value = 0
+                picker.selected_material = ("materials", "Private document")
+                dialog.import_school_material()
+                self.assertNotIn("Private document", dialog.materials.toPlainText())
+                picker.exec_.return_value = 1
+                dialog.import_school_material()
+                self.assertIn("Private document", dialog.materials.toPlainText())
+            dialog.close()
+
     def test_draft_is_editable_before_export(self):
         with tempfile.TemporaryDirectory() as folder:
             with patch("study.homework_ui.load_style", return_value=""):
