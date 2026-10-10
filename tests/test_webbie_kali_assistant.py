@@ -61,7 +61,7 @@ class KaliIntentTests(unittest.TestCase):
                     patch.object(assistant.subprocess, "run", return_value=response) as run, \
                     patch.object(assistant.subprocess, "Popen") as popen:
                 answer = assistant.handle_kali_request("check Kali VM status")
-                self.assertIn("not configured", answer)
+                self.assertIn("No full Kali desktop VM is configured yet", answer)
                 self.assertEqual(run.call_args.args[0][-1], "status")
                 popen.assert_not_called()
 
