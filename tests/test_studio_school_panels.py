@@ -101,7 +101,9 @@ class NativeWorkspaceTests(unittest.TestCase):
             panel = StudioAIPanel(folder)
             panel.mix_backing.setText(str(backing))
             panel.rvc_vocal.setText(str(lead))
-            panel.rvc_model.setText(str(root / 'my-voice.pth'))
+            model = root / 'my-voice.pth'
+            model.write_bytes(b'test-model-placeholder')
+            panel.rvc_model.setText(str(model))
             with patch.object(panel, 'start_conversion') as conversion, \
                  patch.object(panel, 'start_mix') as mixing:
                 panel.start_song_finish()
