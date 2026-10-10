@@ -11,7 +11,7 @@ import time
 
 ROUTINE = frozenset({
     'observe.apps', 'observe.windows', 'app.open', 'window.focus',
-    'pointer.click', 'keyboard.key', 'keyboard.type', 'task.begin',
+    'pointer.click', 'keyboard.key', 'keyboard.type', 'task.begin', 'window.target',
 })
 SENSITIVE = frozenset({'window.close.confirm', 'keyboard.change.confirm'})
 MAX_SECONDS = 600
