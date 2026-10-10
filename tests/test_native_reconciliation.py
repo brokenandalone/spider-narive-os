@@ -74,7 +74,7 @@ class NativeReconciliationTests(unittest.TestCase):
         for kind, relative in [('Study workspace', 'study/study.py'),
                                ('Study course store', 'study/store.py')]:
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
-                old = '# exact baseline\\nprint("legacy")\\n'
+                old = '# exact baseline\nprint("legacy")\n'
                 source = ROOT / relative
                 destination = Path(folder) / 'installed.py'
                 destination.write_text(old)
@@ -91,7 +91,7 @@ class NativeReconciliationTests(unittest.TestCase):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
                 source = ROOT / relative
                 destination = Path(folder) / 'installed.py'
-                custom = '# personal local edits\\nprint("keep me")\\n'
+                custom = '# personal local edits\nprint("keep me")\n'
                 destination.write_text(custom)
                 self.assertEqual(helper.reconcile(source, destination, kind), 'conflict')
                 self.assertEqual(destination.read_text(), custom)
