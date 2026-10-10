@@ -21,6 +21,7 @@ if __package__:
     from .voice_conversion import convert_vocal, ConversionError
     from .voice_dataset import prepare_training_set
     from .song_mix import mix_vocals, MixError, valid_wav
+    from .stem_separation import separate, SeparationError
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
@@ -29,6 +30,7 @@ else:
     from voice_conversion import convert_vocal, ConversionError
     from voice_dataset import prepare_training_set
     from song_mix import mix_vocals, MixError, valid_wav
+    from stem_separation import separate, SeparationError
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -86,6 +88,28 @@ class VoiceConvertWorker(QThread):
                              else 'Voice conversion failed. Check your trained model and local engine.')
 
 
+class SeparationWorker(QThread):
+    result = pyqtSignal(str, str)
+
+    def __init__(self, source):
+        super().__init__(QApplication.instance())
+        self.source = source
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            directory, stems = separate(self.source, stop=self.stop)
+            self.result.emit(str(directory), f"Extracted {len(stems)} WAV candidates. Listen, then assign vocal and backing separately.")
+        except Exception as error:
+            self.result.emit("", str(error) if isinstance(error, SeparationError)
+                             else "Stem separation failed. Check the installed RVC/PyMSS engine.")
+
+
 class VoiceMixWorker(QThread):
     result = pyqtSignal(str, str)
 
@@ -133,6 +157,7 @@ class StudioAIPanel(QWidget):
         self.rvc_worker = None
         self.dataset_worker = None
         self.mix_worker = None
+        self.separation_worker = None
         self.capture_proc = None
         self.capture_file = None
         self.capture_timer = QTimer(self)
@@ -266,6 +291,25 @@ class StudioAIPanel(QWidget):
         self.convert_button.clicked.connect(self.start_conversion)
         layout.addWidget(self.convert_button)
 
+        separator_heading = QLabel("Separate generated-song vocals and backing")
+        separator_heading.setStyleSheet("font-size:18px; color:#c4b5fd;")
+        layout.addWidget(separator_heading)
+        separator_description = QLabel("Select a generated WAV, extract stems with your local RVC/PyMSS model, "
+            "then audition the output files before assigning them as lead vocal or backing. "
+            "First use may download model weights.")
+        separator_description.setWordWrap(True)
+        layout.addWidget(separator_description)
+        self.separation_source = QLineEdit()
+        self.separation_source.setPlaceholderText("Generated full-song WAV")
+        layout.addWidget(self.separation_source)
+        separation_buttons = QHBoxLayout()
+        self.select_separation = QPushButton("Choose generated WAV")
+        self.select_separation.clicked.connect(lambda: self.pick_conversion_file(self.separation_source, "WAV (*.wav)"))
+        separation_buttons.addWidget(self.select_separation)
+        self.separate_button = QPushButton("Separate vocals and backing")
+        self.separate_button.clicked.connect(self.start_separation)
+        separation_buttons.addWidget(self.separate_button)
+        layout.addLayout(separation_buttons)
         mix_heading = QLabel("Final song: combine My Voice with instrumental backing")
         mix_heading.setStyleSheet("font-size:18px; color:#c4b5fd;")
         layout.addWidget(mix_heading)
@@ -346,6 +390,32 @@ class StudioAIPanel(QWidget):
     def conversion_finished(self):
         worker, self.rvc_worker = self.rvc_worker, None
         self.convert_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def start_separation(self):
+        if self.separation_worker is not None:
+            return
+        try:
+            source = str(valid_wav(self.separation_source.text().strip(), "generated song"))
+        except (OSError, MixError) as error:
+            self.status.setText(str(error))
+            return
+        self.separation_worker = SeparationWorker(source)
+        self.separation_worker.result.connect(self.separation_done)
+        self.separation_worker.finished.connect(self.separation_finished)
+        self.separate_button.setEnabled(False)
+        self.status.setText("Extracting stems locally. Existing files are unchanged…")
+        self.separation_worker.start()
+
+    def separation_done(self, directory, message):
+        self.status.setText(message + ((" Folder: " + directory) if directory else ""))
+        if directory:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(directory))
+
+    def separation_finished(self):
+        worker, self.separation_worker = self.separation_worker, None
+        self.separate_button.setEnabled(True)
         if worker is not None:
             worker.deleteLater()
 
