@@ -24,6 +24,7 @@ managed=(
   author/review_engine.py
   author/review_cache.py
   author/review_history.py
+  author/narration_bookmarks.py
   author/voice_reader.py
   author/commands.py
   author/commands_client.py
