@@ -27,6 +27,8 @@ class InstalledReconciliationTests(unittest.TestCase):
             self.assertFalse(result['install_allowed'])
             self.assertEqual(result['overall'], 'RECONCILIATION_HOLD')
             self.assertIn(files[0], result['changed_or_missing_modules'])
+            self.assertIn('owner_customized', result['files'][files[0]]['pc_only_symbols'])
+            self.assertIn('pristine', result['files'][files[0]]['github_only_symbols'])
             self.assertEqual((installed/files[0]).read_bytes(), original)
 
     def test_missing_and_symlink_are_not_followed(self):
