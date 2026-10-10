@@ -1,5 +1,6 @@
 """Offline safe-stem extraction tests; simulated PyMSS CLI only."""
 from pathlib import Path
+import json
 import tempfile
 import threading
 import unittest
@@ -75,6 +76,16 @@ class StemTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), original)
             self.assertTrue(all(p.exists() for p in candidates))
             self.assertEqual(output.stat().st_mode & 0o777, 0o700)
+            manifest_file = output / 'separation.json'
+            self.assertEqual(manifest_file.stat().st_mode & 0o777, 0o600)
+            report = json.loads(manifest_file.read_text())
+            self.assertEqual(report['separator_model'], stems.MODEL)
+            self.assertTrue(report['original_preserved'])
+            self.assertEqual(report['role_assignment'], 'manual_audition_required')
+            self.assertEqual(len(report['stems']), 2)
+            self.assertTrue(all(track['role'] == 'unassigned' for track in report['stems']))
+            self.assertEqual({entry['file'] for entry in report['stems']},
+                             {source.name for source in candidates})
 
     def test_aborts_before_start_and_rejects_symlinks(self):
         with tempfile.TemporaryDirectory() as folder:
