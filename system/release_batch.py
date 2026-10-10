@@ -119,6 +119,8 @@ APP_FILES = (
     'studio/rvc_loopback.py',
     'studio/voice_profile.py',
     'the-web/package/reconcile-native.py',
+            'kali-bay/package/install-kali-bay.sh',
+    'kali-bay/package/install-kali-bay.sh',
 )
 # Exact recognized historical Study source blobs from the prior guarded
 # installer. Unknown owner PC edits still block the entire transaction.
