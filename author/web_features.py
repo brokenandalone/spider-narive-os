@@ -64,6 +64,7 @@ class ReviewWorker(QThread):
 
 class AuthorToolkit(QWidget):
     jumpRequested = pyqtSignal(dict)
+    reviewSegmentRequested = pyqtSignal(dict)
     reviewRequested = pyqtSignal(str)
     editRequested = pyqtSignal()
 
@@ -169,6 +170,11 @@ class AuthorToolkit(QWidget):
         self.review_chapters.setMaximumHeight(115)
         self.review_chapters.itemActivated.connect(self.jump_to_reviewed_chapter)
         t.addWidget(self.review_chapters)
+        t.addWidget(QLabel('Review source sections (double-click to highlight):'))
+        self.review_sections = QListWidget()
+        self.review_sections.setMaximumHeight(140)
+        self.review_sections.itemActivated.connect(self.jump_to_review_section)
+        t.addWidget(self.review_sections)
         self.export_review_button = QPushButton('Export displayed review as TXT')
         self.export_review_button.clicked.connect(self.export_review)
         t.addWidget(self.export_review_button)
@@ -476,7 +482,7 @@ class AuthorToolkit(QWidget):
         canon = self.store.canon(self.book_id)
         self.review_session = {
             'book_id': self.book_id, 'scope': scope, 'depth': depth,
-            'manifest': self.history.manifest(self.book_id, chapters, canon),
+            'manifest': self.history.manifest(self.book_id, chapters, canon, depth=depth),
         }
         self.review_worker = ReviewWorker(chapters, str(book['title']), scope, depth,
                                           canon, self)
@@ -546,11 +552,13 @@ class AuthorToolkit(QWidget):
         else:
             self.review_result.clear()
             self.review_chapters.clear()
+            self.review_sections.clear()
             self.review_freshness.setText('No saved review selected.')
 
     def open_saved_review(self, index):
         report_id = self.saved_reviews.itemData(index) if index >= 0 else None
         self.review_chapters.clear()
+        self.review_sections.clear()
         if report_id is None or self.book_id is None:
             self.review_result.clear()
             self.review_freshness.setText('Select a saved report to inspect it.')
@@ -571,6 +579,11 @@ class AuthorToolkit(QWidget):
                     'item_id': chapter['id'],
                 })
                 self.review_chapters.addItem(item)
+            for segment in self.history.sections_for_report(row):
+                item = QListWidgetItem(
+                    f"{segment['chapter_title']} | segment {segment['number']}")
+                item.setData(Qt.UserRole, segment)
+                self.review_sections.addItem(item)
         except (ValueError, OSError, KeyError) as error:
             self.review_freshness.setText('Cannot open saved review: ' + str(error))
 
@@ -578,6 +591,22 @@ class AuthorToolkit(QWidget):
         target = item.data(Qt.UserRole)
         if target is not None:
             self.jumpRequested.emit(target)
+
+    def jump_to_review_section(self, item):
+        section = item.data(Qt.UserRole)
+        if section is None:
+            return
+        self.reviewSegmentRequested.emit(section)
+        # Place the corresponding editorial observation in view too.
+        report = self.review_result
+        marker = (
+            f"### {section['chapter_title']} "
+            f"(chapter #{section['item_id']}) | segment {section['number']}")
+        report.moveCursor(report.textCursor().Start)
+        if not report.find(marker):
+            self.review_freshness.setText(
+                self.review_freshness.text() +
+                ' The older report has no matching segment heading.')
 
     def export_review(self):
         report = self.review_result.toPlainText()
