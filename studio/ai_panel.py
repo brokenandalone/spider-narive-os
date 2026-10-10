@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import threading
 
-from PyQt5.QtCore import QThread, QTimer, QUrl, pyqtSignal
+from PyQt5.QtCore import QThread, QTimer, QUrl, QProcess, pyqtSignal
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QDoubleSpinBox,
@@ -171,6 +171,8 @@ class StudioAIPanel(QWidget):
         self.rvc_worker = None
         self.dataset_worker = None
         self.readiness_worker = None
+        self.trainer = None
+        self.training_script = Path(__file__).resolve().parent / 'package' / 'voice-engine.sh'
         self.mix_worker = None
         self.separation_worker = None
         self.finish_after_conversion = False
@@ -277,6 +279,25 @@ class StudioAIPanel(QWidget):
         layout.addLayout(voice_buttons)
         layout.addWidget(self.readiness_button)
         layout.addWidget(self.readiness_details)
+        trainer_header = QLabel('Private voice trainer')
+        trainer_header.setStyleSheet('font-size:18px; color:#c4b5fd;')
+        layout.addWidget(trainer_header)
+        self.engine_status = QLabel('Training requires the local RVC engine and a prepared, owner-approved dataset.')
+        self.engine_status.setWordWrap(True)
+        self.engine_status.setTextFormat(Qt.PlainText)
+        layout.addWidget(self.engine_status)
+        training_actions = QHBoxLayout()
+        self.engine_check_button = QPushButton('Check training setup')
+        self.engine_check_button.clicked.connect(self.check_training_engine)
+        training_actions.addWidget(self.engine_check_button)
+        self.training_launch_button = QPushButton('Open local RVC training interface')
+        self.training_launch_button.clicked.connect(self.launch_trainer)
+        training_actions.addWidget(self.training_launch_button)
+        self.training_stop_button = QPushButton('Stop local trainer')
+        self.training_stop_button.clicked.connect(self.stop_trainer)
+        self.training_stop_button.setEnabled(False)
+        training_actions.addWidget(self.training_stop_button)
+        layout.addLayout(training_actions)
         layout.addWidget(self.dataset_button)
         layout.addWidget(self.voice_status)
         QApplication.instance().aboutToQuit.connect(self.cancel_capture)
@@ -502,6 +523,71 @@ class StudioAIPanel(QWidget):
         if worker is not None:
             worker.deleteLater()
 
+    def check_training_engine(self):
+        if not self.training_script.is_file() or self.training_script.is_symlink():
+            self.engine_status.setText('The Spider Studio voice-engine helper has not been installed.')
+            return
+        try:
+            report = subprocess.run(['bash', str(self.training_script), '--check'],
+                capture_output=True, text=True, timeout=12, check=True)
+            self.engine_status.setText(report.stdout[-3000:] or 'No readiness information was returned.')
+        except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+            self.engine_status.setText('Local voice-engine check failed: ' + str(error))
+
+    def launch_trainer(self):
+        if self.trainer is not None:
+            return
+        if not self.training_script.is_file() or self.training_script.is_symlink():
+            self.engine_status.setText('Training launcher is missing from Studio installation.')
+            return
+        answer = QMessageBox.question(self, 'Start private My Voice trainer',
+            'Start the local-only RVC training interface? This can use significant CPU/GPU/RAM. '
+            'It will not automatically record you, begin model training or download voice data. '
+            'Only train with your own or authorized vocal recordings.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        runner = QProcess(self)
+        runner.setProcessChannelMode(QProcess.MergedChannels)
+        runner.setProgram('bash')
+        runner.setArguments([str(self.training_script), '--launch-local'])
+        runner.setWorkingDirectory(str(self.training_script.parent))
+        runner.readyReadStandardOutput.connect(self.trainer_output)
+        runner.errorOccurred.connect(self.trainer_error)
+        runner.finished.connect(self.trainer_finished)
+        self.trainer = runner
+        self.training_launch_button.setEnabled(False)
+        self.training_stop_button.setEnabled(True)
+        self.engine_status.setText('Starting private local RVC trainer. The engine may require dependencies or model weights.')
+        runner.start()
+
+    def trainer_output(self):
+        if self.trainer:
+            raw = bytes(self.trainer.readAllStandardOutput()).decode('utf-8', errors='replace').strip()
+            if raw:
+                self.engine_status.setText(raw[-1400:])
+
+    def trainer_error(self, _error):
+        if self.trainer is not None:
+            self.engine_status.setText('Could not launch the local trainer. Check the RVC setup and Python environment.')
+
+    def trainer_finished(self, _exit_code, _exit_status):
+        runner, self.trainer = self.trainer, None
+        self.training_stop_button.setEnabled(False)
+        self.training_launch_button.setEnabled(True)
+        if runner is not None:
+            runner.deleteLater()
+
+    def stop_trainer(self):
+        if self.trainer and self.trainer.state() != QProcess.NotRunning:
+            self.engine_status.setText('Stopping the local training interface…')
+            self.trainer.terminate()
+            QTimer.singleShot(3000, self.force_stop_trainer)
+
+    def force_stop_trainer(self):
+        if self.trainer and self.trainer.state() != QProcess.NotRunning:
+            self.trainer.kill()
+
     def check_voice_readiness(self):
         if self.readiness_worker is not None:
             return
@@ -621,6 +707,7 @@ class StudioAIPanel(QWidget):
             self.finish_voice(stop=True)
 
     def closeEvent(self, event):
+        self.stop_trainer()
         self.cancel_capture()
         super().closeEvent(event)
 
