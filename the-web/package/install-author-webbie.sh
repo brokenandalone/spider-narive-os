@@ -21,6 +21,12 @@ managed=(
   author/web_features.py
   author/speech.py
   author/publishing.py
+  author/review_engine.py
+  author/review_cache.py
+  author/voice_reader.py
+  author/commands.py
+  author/commands_client.py
+  author/control_socket.py
   the-web/shell/main.py
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py
@@ -29,6 +35,7 @@ managed=(
   the-web/shell/webbie_face_profiles_ui.py
   the-web/shell/webbie_vision_bridge.py
   webbie/agent/vision_query.py
+  webbie/agent/author_voice_bridge.py
   webbie/agent/webbie.py
 )
 if [[ $mode == --apply && $EUID -ne 0 ]]; then
