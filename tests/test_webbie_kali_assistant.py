@@ -39,6 +39,32 @@ class KaliIntentTests(unittest.TestCase):
         self.assertEqual(assistant.parse_request("list Kali Bay tools"),
                          ("list", None))
 
+    def test_full_kali_vm_intents_are_explicit(self):
+        self.assertEqual(assistant.parse_request("Webbie, open full Kali desktop"),
+                         ("vm_console", None))
+        self.assertEqual(assistant.parse_request("check Kali VM status"),
+                         ("vm_status", None))
+        self.assertEqual(assistant.parse_request("open Kali VM manager"),
+                         ("vm_manager", None))
+        for text in ("start Kali VM", "delete Kali VM", "use Kali VM to scan subnet",
+                     "open full Kali desktop; whoami"):
+            self.assertIsNone(assistant.parse_request(text))
+
+    def test_webbie_vm_status_readonly(self):
+        with tempfile.TemporaryDirectory() as d:
+            vm_file = Path(d) / "kali_desktop.py"
+            vm_file.write_text("print('placeholder')", encoding="utf-8")
+            response = subprocess.CompletedProcess(
+                [], 0, '{"state":"not-configured"}', "",
+            )
+            with patch.object(assistant, "_vm_controller", return_value=vm_file), \
+                    patch.object(assistant.subprocess, "run", return_value=response) as run, \
+                    patch.object(assistant.subprocess, "Popen") as popen:
+                answer = assistant.handle_kali_request("check Kali VM status")
+                self.assertIn("No full Kali desktop VM is configured yet", answer)
+                self.assertEqual(run.call_args.args[0][-1], "status")
+                popen.assert_not_called()
+
     def test_no_arbitrary_shell_or_active_scan(self):
         for command in (
             "open wireshark; echo compromised",

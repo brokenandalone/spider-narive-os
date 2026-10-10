@@ -13,6 +13,8 @@ from pathlib import Path
 
 INSTALLED_MANAGER = Path("/usr/local/lib/spider-os/kali-bay/bin/kali-bay")
 SOURCE_MANAGER = Path(__file__).resolve().parents[2] / "kali-bay/bin/kali-bay"
+VM_CONTROLLER = Path("/usr/local/lib/spider-os/kali-bay/vm/kali_desktop.py")
+SOURCE_VM_CONTROLLER = Path(__file__).resolve().parents[2] / "kali-bay/vm/kali_desktop.py"
 
 # IDs are hardcoded to the audited "kali-bay tool" command's allowlist.
 APPROVED_TOOLS = {
@@ -78,6 +80,22 @@ def parse_request(message: str):
     phrase = literal_user_text(message)
     if not phrase or len(phrase) > 180:
         return None
+    compact = phrase.casefold().strip()
+    if compact in (
+        "check kali vm status", "check kali desktop status",
+        "check full kali desktop status", "what is kali vm status",
+    ):
+        return ("vm_status", None)
+    if compact in (
+        "open kali linux desktop", "open full kali desktop",
+        "open kali desktop", "show kali desktop",
+    ):
+        return ("vm_console", None)
+    if compact in (
+        "open kali vm manager", "open kali virtual machine manager",
+        "open virt manager for kali",
+    ):
+        return ("vm_manager", None)
     if _STATUS.fullmatch(phrase):
         return ("status", None)
     if _TOOLS.fullmatch(phrase):
@@ -104,6 +122,54 @@ def _manager():
     return None
 
 
+def _vm_controller():
+    if VM_CONTROLLER.is_file():
+        return VM_CONTROLLER
+    if SOURCE_VM_CONTROLLER.is_file():
+        return SOURCE_VM_CONTROLLER
+    return None
+
+
+def _full_kali_action(operation):
+    """No voice-controlled VM power, install, guest-shell or privilege action."""
+    command = _vm_controller()
+    if command is None:
+        return "The full Kali desktop controller is not installed yet."
+    import sys
+    if operation == "vm_status":
+        import json
+        try:
+            result = subprocess.run(
+                [sys.executable, str(command), "status"],
+                capture_output=True, text=True, timeout=13, check=False,
+            )
+            status = json.loads(result.stdout).get("state", "unavailable")
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return "I couldn't read the Kali VM state."
+        return {
+            "running": "The full Kali Linux desktop VM is running.",
+            "stopped": "Kali VM is configured but stopped.",
+            "paused": "Kali VM is paused.",
+            "not-configured": "No full Kali desktop VM is configured yet. Use Kali Bay's VM Manager.",
+            "unavailable": "Kali VM status is unavailable. Check libvirt service and permissions.",
+        }.get(status, "Kali VM state was not recognized.")
+    command_name = "console" if operation == "vm_console" else "manager"
+    try:
+        subprocess.Popen(
+            [sys.executable, str(command), command_name],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True,
+        )
+    except OSError:
+        return "I couldn't request the full Kali desktop window."
+    if operation == "vm_console":
+        return (
+            "Requested the full Kali Linux desktop console. "
+            "It will open only if the existing VM is running."
+        )
+    return "Requested virt-manager for the full Kali Linux desktop setup."
+
+
 def _excerpt(text: str, limit: int = 280) -> str:
     # Do not echo ANSI/control escapes or unlimited third-party output.
     value = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", str(text or ""))
@@ -121,12 +187,15 @@ def handle_kali_request(message: str, manager=None):
     if intent is None:
         return None
     operation, value = intent
+    if operation in ("vm_status", "vm_console", "vm_manager"):
+        return _full_kali_action(operation)
     if operation == "list":
         return (
             "I can check Kali Bay status and open Wireshark, Burp Suite, "
             "OWASP ZAP, Ghidra, ClamTK, or the Nmap, Metasploit, "
             "Suricata, YARA and Lynis workbenches. I won't run a "
-            "scan, attack or privileged command on your behalf."
+            "scan, attack or privileged command on your behalf. "
+            "I can also check or open the full Kali desktop VM."
         )
     command = Path(manager) if manager is not None else _manager()
     if command is None or not command.is_file() or not os.access(command, os.X_OK):
