@@ -58,3 +58,11 @@ The distro package list includes `python3-pyqt5.qtwebengine`; existing installat
 The desktop installer previously copied only *missing* Study sources. Existing `study/study.py` remained old, and an existing `study/store.py` could lack the dashboard's `all_assignments()` method. The native reconciliation helper now recognizes two exact prior Study UI fingerprints (original and School dashboard PR #8) and the original course store fingerprint. It updates only these known source versions after the installer backs up installed files. Unrecognized local edits are reported as conflicts and left unchanged. It upgrades the store before the UI so a known old-store/new-UI mismatch cannot occur.
 
 This is **not** a full installed-app replacement or confirmation of deployment. The final combined installation still requires comparing the PC with source, retaining PC Webbie repairs, testing SNHU SSO and downloads, and verifying rollback. No course databases, passwords or assignments are committed.
+
+## School OneDrive, October 10 (source only, PC verification pending)
+
+Study now includes **School OneDrive**, separate from Webbie's personal `webbie_onedrive` service. It opens the university Microsoft 365 sign-in and offers optional interactive `rclone config` for the `school_onedrive` remote. A university tenant may restrict this authorization.
+
+The first version supports user-initiated one-file upload and download via an asynchronous rclone process. It does **not** automatically upload all school files, delete, overwrite, scan a full account, or merge the school drive into Webbie's personal timer. The cloud-relative path is entered manually until a proper folder browser is added. Existing files are skipped, not overwritten, and the user selects each local file/destination. Study stores no school passwords, tokens, or OAuth credentials.
+
+PC acceptance remains necessary: confirm that `rclone` exists, select the correct school Microsoft OneDrive drive, verify browser-based sign-in, transfer both directions using test files, check offline/invalid path handling and confirm conflict reporting. Do not consider this a replacement for the university-managed OneDrive workflow until acceptance. Adding file browsing, explicit course folder mappings, and safe bidirectional sync with version/conflict detection are follow-up tasks.
