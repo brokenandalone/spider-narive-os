@@ -31,7 +31,8 @@ def command(rvc_root, python, source, destination, device="cpu"):
     root, exe = Path(rvc_root), Path(python)
     if root.is_symlink() or not (root / "tools/pymss/cli.py").is_file():
         raise SeparationError("Local RVC PyMSS CLI is missing.")
-    if exe.is_symlink() or not exe.is_file():
+    # Python virtualenv interpreters commonly symlink to a system Python binary.
+    if not exe.is_file():
         raise SeparationError("Local RVC Python environment is missing.")
     if device not in ("cpu", "cuda", "auto"):
         raise SeparationError("Device must be cpu, cuda or auto.")
