@@ -2,6 +2,7 @@
 import json, os, re, shutil, subprocess, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from nova_host import NovaHost, HOST as ON_AIR_HOST, STATION as STATION_NAME
 
 HOST = "127.0.0.1"
 PORT = 9876
@@ -10,6 +11,8 @@ OLLAMA = "http://127.0.0.1:11434/api/chat"
 VOICE = "en-AU-NatashaNeural"
 CACHE = Path.home() / ".cache" / "spider-os" / "ai-dj"
 CACHE.mkdir(parents=True, exist_ok=True)
+
+PERSONA = NovaHost()
 
 
 def track_text(track):
@@ -22,39 +25,28 @@ def track_text(track):
     return f"{title} by {artist}" if artist else str(title)
 
 
-def ollama_script(current, nxt):
-    prompt = (
-        "You are Nova, the local AI radio host inside Spider Media Player on Spider OS. "
-        "Write a natural radio transition of no more than 35 words. "
-        "Do not quote lyrics. Do not invent facts about the artists. "
-        f"The song ending is: {track_text(current)}. "
-        f"The next song is: {track_text(nxt)}. "
-        "Return only the words the DJ should say."
-    )
-    payload = {
-        "model": MODEL,
-        "stream": False,
-        "messages": [
-            {"role": "system", "content": "You write concise radio DJ links."},
-            {"role": "user", "content": prompt},
-        ],
-    }
-    req = urllib.request.Request(
-        OLLAMA,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=45) as response:
+def ollama_script(body):
+    """Generate Nova's live copy with the existing model, or use the fallback."""
+    def generate(messages):
+        payload = {
+            "model": MODEL,
+            "stream": False,
+            "think": False,
+            "messages": messages,
+            "options": {"temperature": 0.85, "top_p": 0.9}
+        }
+        req = urllib.request.Request(
+            OLLAMA,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        # Always leave time for the TTS stage or a canned fallback.
+        with urllib.request.urlopen(req, timeout=12) as response:
             data = json.loads(response.read().decode("utf-8"))
-        text = data.get("message", {}).get("content", "").strip()
-        text = re.sub(r"<think>.*?</think>", "", text, flags=re.S | re.I).strip()
-        if text:
-            return text
-    except Exception:
-        pass
-    return f"That was {track_text(current)}. Coming up next, {track_text(nxt)}."
+        return data.get("message", {}).get("content", "")
+
+    return PERSONA.compose(body, generate)
 
 
 def make_audio(text, ident):
@@ -66,7 +58,7 @@ def make_audio(text, ident):
             subprocess.run(
                 [str(edge), "--voice", VOICE, "--text", text, "--write-media", str(mp3)],
                 check=True,
-                timeout=60,
+                timeout=22,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -77,7 +69,7 @@ def make_audio(text, ident):
     espeak = shutil.which("espeak-ng")
     if espeak:
         try:
-            subprocess.run([espeak, "-v", "en-au+f3", "-s", "165", "-w", str(wav), text], check=True, timeout=60)
+            subprocess.run([espeak, "-v", "en-au+f3", "-s", "165", "-w", str(wav), text], check=True, timeout=10)
             if wav.exists() and wav.stat().st_size:
                 return wav
         except Exception:
@@ -113,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self.headers(200)
-            self.wfile.write(json.dumps({"ok": True, "service": "Spider AI DJ", "port": PORT}).encode())
+            self.wfile.write(json.dumps({"ok": True, "service": "Spider AI DJ", "host": ON_AIR_HOST, "station": STATION_NAME, "port": PORT}).encode())
             return
         self.headers(404)
         self.wfile.write(b'{"error":"not found"}')
@@ -125,18 +117,30 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 24 * 1024:
+                self.headers(413)
+                self.wfile.write(b'{"error":"Invalid Nova request size"}')
+                return
             body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
-            current = body.get("currentTrack") or {}
-            nxt = body.get("nextTrack") or {}
-            script = ollama_script(current, nxt)
+            if not isinstance(body, dict):
+                raise ValueError("Nova expects a JSON object")
+            script = ollama_script(body)
             ident = f"dj-{int(time.time())}-{uuid.uuid4().hex[:8]}"
             audio = make_audio(script, ident)
             cleanup()
+            remaining = max(0.0, min(180.0, float(body.get("secondsRemaining") or 0)))
             response = {
                 "id": ident,
                 "type": body.get("type") or "transition",
+                "host": ON_AIR_HOST,
+                "station": STATION_NAME,
                 "script": script,
                 "audioFile": audio.resolve().as_uri(),
+                "talkOver": {
+                    "startSecondsBeforeEnd": min(9.0, max(3.0, remaining - 1)) if remaining else 6.0,
+                    "duckLevel": 0.28,
+                    "crossfadeSeconds": 3.0,
+                },
             }
             self.headers(200)
             self.wfile.write(json.dumps(response).encode("utf-8"))
@@ -147,7 +151,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     cleanup()
-    print(f"Spider AI DJ listening on http://{HOST}:{PORT}", flush=True)
+    print(f"{ON_AIR_HOST} for {STATION_NAME} listening on http://{HOST}:{PORT}", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
 
 
