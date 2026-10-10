@@ -103,6 +103,40 @@ esac
         self.assertNotIn("podman exec", calls)
         self.assertNotIn("distrobox", calls)
 
+    def test_app_ids_reject_shell_fragments_before_container_access(self):
+        for bad in ("../wireshark.desktop", "/etc/passwd", "tool;id.desktop",
+                    "tool.desktop --help", "tool$(id).desktop", "not_desktop"):
+            result, calls = self.run_action("app-open", bad)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Invalid Kali desktop application", result.stderr)
+            self.assertEqual(calls, "")
+
+    def test_kali_app_preflight_does_not_start_container(self):
+        result, calls = self.run_action(
+            "app-check", "wireshark.desktop", running=False
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stopped", result.stderr)
+        self.assertNotIn("podman exec", calls)
+        self.assertNotIn("distrobox", calls)
+
+    def test_kali_app_click_launches_fixed_guest_desktop_file(self):
+        result, calls = self.run_action("app-open", "wireshark.desktop")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "distrobox enter --name kali-bay -- gio launch "
+            "/usr/share/applications/wireshark.desktop", calls
+        )
+        self.assertNotIn("sudo ", calls)
+        self.assertNotIn("apt-get", calls)
+
+    def test_kali_app_catalog_is_read_only(self):
+        result, calls = self.run_action("apps-json", "")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("podman exec --user 0 --tty=false --interactive", calls)
+        self.assertNotIn("distrobox", calls)
+        self.assertNotIn("podman start", calls)
+
     def test_gui_launch_has_no_arbitrary_arguments(self):
         result, calls = self.run_action("tool", "wireshark")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -149,6 +183,28 @@ from PyQt5.QtWidgets import QPushButton
 buttons = [b.text() for b in window.findChildren(QPushButton)]
 assert 'KALI PACKAGE MANAGER' in buttons
 assert 'INSTALLED KALI PACKAGES' in buttons
+assert 'LOAD ALL INSTALLED KALI APPS' in buttons
+from unittest.mock import patch
+from subprocess import CompletedProcess
+import json
+payload = {"applications": [
+    {"id": "real-kali.desktop", "name": "Actual Kali App",
+     "category": "X-Kali-Tools", "description": "Installed in Kali"},
+    {"id": "../../host.desktop", "name": "Unsafe", "category": "Other"},
+]}
+with patch.object(module.subprocess, "run", return_value=CompletedProcess(
+    [], 0, json.dumps(payload), ""
+)) as read, patch.object(module.subprocess, "Popen") as start:
+    window.load_installed_desktop_apps()
+    assert read.call_args.args[0][-1] == "apps-json"
+    assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU) + 1
+    assert window.desktop_apps_status.text().startswith("1 installed")
+    start.assert_not_called()
+window.desktop_category.setCurrentText("X-Kali-Tools")
+assert window.desktop_list.count() == 1
+selected = window.desktop_list.currentItem()
+assert selected.data(module.Qt.UserRole) == ("app", "real-kali.desktop")
+window.desktop_category.setCurrentText("All categories")
 window.desktop_search.setText('Wireshark')
 assert window.desktop_list.count() == 1
 assert window.desktop_list.item(0).data(module.Qt.UserRole) == 'wireshark'
@@ -156,7 +212,7 @@ window.desktop_search.clear()
 window.desktop_category.setCurrentText('Detection')
 assert window.desktop_list.count() == 2
 window.desktop_category.setCurrentText('All categories')
-assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU)
+assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU) + 1
 window.security_tabs.setCurrentIndex(2)
 assert window.security_tabs.currentIndex() == 2
 assert 'DIRECT SECURITY TOOL LAUNCHERS' in [
