@@ -98,15 +98,15 @@ class AuthorCommandTests(unittest.TestCase):
                 win.chapters.setCurrentRow(0)
                 win.show()
                 APP.processEvents()
-                with patch.object(win.toolkit, "start_review") as review, (
-                    patch.object(win.toolkit, "read_book") as narrate):
-                    win.handle_author_intent({
-                        "action": "review", "scope": "book", "depth": "deep"})
-                    review.assert_called_once_with("book")
-                    narrate.assert_not_called()
-                    self.assertEqual(win.toolkit.review_depth.currentIndex(), 1)
-                    win.handle_author_intent({"action": "read", "scope": "book"})
-                    narrate.assert_called_once()
+                with patch.object(win.toolkit, "start_review") as review:
+                    with patch.object(win.toolkit, "read_book") as narrate:
+                        win.handle_author_intent({
+                            "action": "review", "scope": "book", "depth": "deep"})
+                        review.assert_called_once_with("book")
+                        narrate.assert_not_called()
+                        self.assertEqual(win.toolkit.review_depth.currentIndex(), 1)
+                        win.handle_author_intent({"action": "read", "scope": "book"})
+                        narrate.assert_called_once()
             finally:
                 win.close()
                 APP.processEvents()
