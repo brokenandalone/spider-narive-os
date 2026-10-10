@@ -8,13 +8,21 @@ from dataclasses import asdict, dataclass
 import ipaddress
 import json
 import os
+import secrets
+import shutil
 from pathlib import Path
 import tempfile
 import threading
+import mimetypes
 import time
 from urllib.parse import urlsplit, urljoin
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 import wave
+
+try:
+    from .arrangement import arrangement_text
+except ImportError:
+    from arrangement import arrangement_text
 
 
 class MusicError(RuntimeError):
@@ -40,6 +48,14 @@ class SongRequest:
     takes: int = 2
     bpm: int = 0
     seed: int = -1
+    vocal_lineup: tuple = ()
+    vocal_notes: str = ''
+    guitar_one: str = ''
+    guitar_two: str = ''
+    other_instruments: str = ''
+    vocal_mode: str = 'ai_lead'
+    source_audio: str = ''
+    voice_reference: str = ''
 
     def payload(self):
         for name, limit in (('title', 200), ('style', 8000), ('lyrics', 20000)):
@@ -58,17 +74,55 @@ class SongRequest:
                 raise ValueError(f'{name} must be an integer between {low} and {high}')
         if type(self.bpm) is not int or (self.bpm != 0 and not 30 <= self.bpm <= 300):
             raise ValueError('Tempo must be 0 (automatic) or 30–300 BPM.')
+        band = arrangement_text(self.vocal_lineup, self.vocal_notes,
+                                self.guitar_one, self.guitar_two, self.other_instruments)
+        prompt = self.style.strip() + ('\n\n' + band if band else '')
+        if len(prompt) > 12000:
+            raise ValueError('Combined arrangement is too long.')
+        if self.vocal_mode not in ('ai_lead', 'with_my_vocal', 'backing_for_my_vocal'):
+            raise ValueError('Choose AI singers, guest vocals, or backing for your recording.')
+        if self.instrumental and self.vocal_mode == 'with_my_vocal':
+            raise ValueError('Guest singers and instrumental-only cannot be selected together.')
+        if self.vocal_mode != 'ai_lead':
+            check_audio_input(self.source_audio)
+            prompt += ('\nPreserve the human source singer and arrange additional original co-vocalists around the recorded lead where possible.'
+                       if self.vocal_mode == 'with_my_vocal' else
+                       '\nCreate complementary musical backing around the supplied source vocal.')
+        elif self.source_audio:
+            raise ValueError('Source audio is only used in a recording-assisted mode.')
+        if self.voice_reference:
+            check_audio_input(self.voice_reference)
         result = {
-            'prompt': self.style.strip(),
+            'prompt': prompt,
             'lyrics': '[Instrumental]' if self.instrumental else self.lyrics,
             'audio_duration': self.duration, 'batch_size': self.takes,
             'seed': self.seed, 'use_random_seed': self.seed == -1,
-            'audio_format': 'wav', 'task_type': 'text2music',
+            'audio_format': 'wav',
+            'task_type': {'ai_lead': 'text2music', 'with_my_vocal': 'cover',
+                          'backing_for_my_vocal': 'complete'}[self.vocal_mode],
             'use_format': False, 'use_cot_caption': False,
         }
+        if self.vocal_mode == 'with_my_vocal':
+            result['audio_cover_strength'] = 0.8
         if self.bpm:
             result['bpm'] = self.bpm
         return result
+
+
+AUDIO_MAX = 64 * 1024 * 1024
+AUDIO_TYPES = {'.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.flac': 'audio/flac'}
+
+
+def check_audio_input(path):
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError('Select a recording of your vocals first.')
+    src = Path(path).expanduser()
+    if src.suffix.lower() not in AUDIO_TYPES or not src.is_file() or src.is_symlink():
+        raise ValueError('Choose a regular WAV, MP3 or FLAC recording.')
+    size = src.stat().st_size
+    if not 0 < size <= AUDIO_MAX:
+        raise ValueError('The recording must be between 1 byte and 64 MiB.')
+    return src
 
 
 def write_manifest(path, data):
@@ -97,19 +151,39 @@ class LocalMusicClient:
         self.api_key = api_key or ''
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
 
-    def _request(self, path, payload=None):
+    def _request(self, path, payload=None, audio=None, reference=None):
         headers = {}
         if self.api_key:
             headers['Authorization'] = 'Bearer ' + self.api_key
         body = None
-        if payload is not None:
+        if audio is not None or reference is not None:
+            # A bounded upload can be assembled in memory; HTTP stays strictly loopback.
+            boundary = secrets.token_hex(16)
+            pieces = []
+            for key, value in payload.items():
+                encoded = (json.dumps(value) if isinstance(value, (dict, list))
+                           else str(value).lower() if isinstance(value, bool) else str(value)).encode('utf-8')
+                pieces.append(('--' + boundary + '\r\nContent-Disposition: form-data; name="' +
+                               key + '"\r\n\r\n').encode() + encoded + b'\r\n')
+            for field, source in (('src_audio', audio), ('reference_audio', reference)):
+                if source is None:
+                    continue
+                recording = check_audio_input(str(source))
+                pieces.append(('--' + boundary + '\r\nContent-Disposition: form-data; name="' + field +
+                               '"; filename="recording' + recording.suffix.lower() +
+                               '"\r\nContent-Type: ' + AUDIO_TYPES[recording.suffix.lower()] +
+                               '\r\n\r\n').encode() + recording.read_bytes() + b'\r\n')
+            pieces.append(('--' + boundary + '--\r\n').encode())
+            body = b''.join(pieces)
+            headers['Content-Type'] = 'multipart/form-data; boundary=' + boundary
+        elif payload is not None:
             body = json.dumps(payload).encode()
             headers['Content-Type'] = 'application/json'
         return Request(self.base_url + path, data=body, headers=headers)
 
-    def _json(self, path, payload=None):
+    def _json(self, path, payload=None, audio=None, reference=None):
         try:
-            with self.opener.open(self._request(path, payload), timeout=10) as response:
+            with self.opener.open(self._request(path, payload, audio, reference), timeout=60 if (audio is not None or reference is not None) else 10) as response:
                 raw = response.read(1024 * 1024 + 1)
             if len(raw) > 1024 * 1024:
                 raise MusicError('Oversized response from local music service.')
@@ -195,8 +269,29 @@ class LocalMusicClient:
         write_manifest(manifest, job)
         progress('Submitting song to the local engine…')
         try:
+            local_audio = None
+            if request.vocal_mode != 'ai_lead':
+                source = check_audio_input(request.source_audio)
+                target = folder / ('original-vocal' + source.suffix.lower())
+                # Preserve the original vocal as an unmodified reference beside every new take.
+                with source.open('rb') as stream, target.open('xb') as output:
+                    os.chmod(target, 0o600)
+                    shutil.copyfileobj(stream, output)
+                job['source_file'] = target.name
+                write_manifest(manifest, job)
+                local_audio = target
+            ref_audio = None
+            if request.voice_reference:
+                reference = check_audio_input(request.voice_reference)
+                ref_target = folder / ('voice-reference' + reference.suffix.lower())
+                with reference.open('rb') as stream, ref_target.open('xb') as output:
+                    os.chmod(ref_target, 0o600)
+                    shutil.copyfileobj(stream, output)
+                ref_audio = ref_target
+                job['voice_reference_file'] = ref_target.name
+                write_manifest(manifest, job)
             # Never auto-retry submission: a lost response may still have queued a job.
-            submitted = self._json('/release_task', payload)
+            submitted = self._json('/release_task', payload, audio=local_audio, reference=ref_audio)
             task_id = submitted.get('task_id') if isinstance(submitted, dict) else None
             if not isinstance(task_id, str) or not task_id or len(task_id) > 200:
                 raise MusicError('The service did not return a valid task ID; do not blindly resubmit.')

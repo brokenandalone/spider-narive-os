@@ -5,6 +5,23 @@
 
 **Installation plan:** build the related desktop changes together, publish one combined branch, install once, then log out/in once. Boot branding, voice-agent replacement and Kali package changes require separate qualification and are not silently included.
 
+## Owner priority override: Studio music and My Voice (October 10, 2026)
+
+- [x] Source-added **Studio AI** local song requests, AI lead/guest-singer roles, two guitarists, independent WAV takes, original-sample backup and music-engine hardware preflight. These are controls and source-regression tests, **not** verified local song renders or true separate guitar stems.
+- [x] Source-added **My Voice** user-initiated mic recording/import, optional locally submitted voice reference and private sample storage. No voice model is trained merely by recording.
+- [x] Source-added original female alto/soprano and original Jason/J-Cold role presets, explicitly **not** unauthorized voice cloning.
+- [x] Source-added private My Voice training readiness (ten-minute recording audit), consented dataset preparation and verified folder handoff, plus read-only local RVC setup checks and explicit user-approved loopback-only training-interface launch/stop. **A trained model is still not present or verified on the owner's PC.**
+- [x] Source-added explicit separated vocal conversion plus final-mix handoff, keeping originals intact; real AI-generation, RVC training, stem separation and end-to-end fidelity are pending device tests.
+- [x] Source-added a reviewed *generated WAV take → stem separation → explicit vocal/backing assignment* workflow, with audition controls, large-model-download confirmation and cancellation. The native finishing button then routes a trained owner vocal into an original-preserving WAV mix; genuine model training and real PC render quality remain unverified.
+- [x] Source-added one-owner **remember trained RVC model** selector with explicit permission, private pointer metadata (no model-copy/deserialization), changed-file detection and forget-only-pointer control. Also added local audition controls for converted voice and final WAV. This is not training or voice-quality verification.
+- [ ] **TOP STUDIO PRIORITY:** Build, train and qualify a private learned Justin Therapy singing-voice profile. Use enough clean original recordings, RVC or an audited singing-voice conversion backend, preserve generated lead and original vocal, and check pitch and timbre separately. Confirm PC audio, available GPU and real output quality before advertising recognizable clone.
+- [ ] Connect trained profile to song-making: no fresh recording needed to sing as Justin Therapy, or optionally add female/other singer harmony to a supplied recorded lead; real separate tracks/stems, guitarists and DAW handoff after model qualification.
+- [ ] PC smoke test My SNHU embedded in Study, sign-in and downloads without moving into a new workspace.
+- [ ] Reconcile #34 Studio/Study and My Voice branch into one *guarded* release with #30 PC voice/memory repairs and Webbie face branches; only install on explicit owner request after backing up installed custom files.
+- [ ] Keep native boot, Author library, OneDrive consent, Kali Purple and working Webbie mic/service unchanged through Studio qualification.
+
+Detail: [STUDIO-MY-VOICE-BAND-2026-10-10.md](STUDIO-MY-VOICE-BAND-2026-10-10.md).
+
 ## Unified cross-chat status and release gate (2026-10-09)
 
 **Authority:** this checklist + [cross-chat handoff](CROSS-CHAT-CONSOLIDATION-2026-10-09.md) + [installation policy](INSTALL-RELEASE-POLICY.md), updated from the accessible Spider OS conversations, GitHub branch history and installed-PC audit. Chat-history retrieval outside the conversation was unavailable; do not claim every chat message has been independently verified. GitHub code and individual PR green checks are *not* proof of a combined or installed build.
