@@ -67,6 +67,7 @@ APP_FILES = (
     'webbie/actions/desktop_control.py', 'webbie/actions/window_safety.py',
     'webbie/actions/task_grants.py',
     'webbie/actions/screen_capture.py', 'webbie/actions/visual_step.py',
+    'webbie/actions/autopilot_policy.py',
     'webbie/brain/brain.py', 'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
