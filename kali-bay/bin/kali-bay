@@ -255,7 +255,7 @@ inventory() {
         || die "Kali container is stopped. Open the Kali terminal deliberately."
     podman exec --user 0 --tty=false "${NAME}" sh -c '
         echo "Installed Kali package inventory (read only)"
-        dpkg-query -W -f="${binary:Package}\\n" 2>/dev/null |
+        dpkg-query -W -f="\${binary:Package}\n" 2>/dev/null |
           awk "BEGIN {n=0} {n++; if (\$0 ~ /^kali-(tools|linux|desktop)/ && shown < 90) {print; shown++}}
                END {printf \"Total installed packages: %d\\n\", n}"
     '
