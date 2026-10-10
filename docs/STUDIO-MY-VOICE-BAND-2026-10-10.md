@@ -14,7 +14,18 @@ Branch stacks on the Studio v6/Study workspace PR. Source CI is a unit and simul
 7. RVC `infer/cli.py` support for converting an **isolated WAV vocal** using a **separately trained** trusted local RVC model. Vocal conversion is not itself model training or pitch/timing correction.
 8. A private FFmpeg WAV mixer with separate converted-voice and backing inputs, two volume controls, an audio limiter, cancellation and an immutable-original policy. It saves new 48 kHz WAV exports with private job receipts. Studio's source UI offers this final-mix stage, and automatically fills the converted-voice path after RVC succeeds.
 9. An opt-in training-engine script `studio/package/voice-engine.sh`. Its read-only `--check` reports readiness, `--clone` obtains upstream RVC only when requested, `--prepare-cpu` installs CPU dependencies to an isolated venv only when requested, and `--launch-local` uses a **source-checked, private** WebUI copy. Unlike upstream's default Gradio bind, both the visible training UI and the port probe are patched to loopback, with public sharing disabled. Unknown changes fail closed. **This is a manual RVC training tool, not yet an automated one-click train-and-sing pipeline.**
-10. PyMSS generated-song separation via `studio/stem_separation.py` and a new Studio AI control. It invokes the documented RVC PyMSS vocal separation model using local Python and protected per-job output; on first explicit use the model may download weights. The tool opens the output folder and asks the owner to audition and identify the resulting WAV files rather than assigning potentially mislabeled stems automatically. The current split step does **not** prove quality, eliminate backing bleed, or automatically convert the extracted singer into the owner profile. Real separation is still dependent on a trained-model install and PC acceptance.\n\n
+10. PyMSS generated-song separation via `studio/stem_separation.py` and a new Studio AI control. It invokes the documented RVC PyMSS vocal separation model using local Python and protected per-job output; on first explicit use the model may download weights. The tool opens the output folder and asks the owner to audition and identify the resulting WAV files rather than assigning potentially mislabeled stems automatically. The current split step does **not** prove quality, eliminate backing bleed, or automatically convert the extracted singer into the owner profile. Real separation is still dependent on a trained-model install and PC acceptance.
+
+## Training workflow newly implemented in the Studio source
+
+1. **Check My Voice training readiness** measures real media duration with local ffprobe, reports usable/rejected clips, and shows how much remains of the ten-minute minimum. It runs outside the UI thread and does **not** train a model.
+2. **Prepare private RVC training dataset** asks for voice-owner consent, copies samples into an owner-private directory, saves SHA-256 checksums and never alters source recordings.
+3. **Open prepared training set / Copy RVC training audio folder** gives the user the exact path for the separately installed local RVC training UI. Both controls remain disabled until a prepared dataset is verified.
+4. **Check training setup** calls the opt-in helper in read-only mode from a background worker; it inventories local RVC/Python/GPU/disk prerequisites.
+5. **Open local RVC training interface** requires a new explicit confirmation, runs the guarded loopback-only training UI as an ordinary user-managed process and has a Stop control. Opening the interface is not itself model training; the owner must configure and start their own training inside it.
+6. Once real trained owner voice-model and index files exist, Studio can perform conversion of selected isolated vocal WAVs and optionally chain conversion into its private final WAV mixer. The generated-song stem separator requires real local PyMSS dependencies and listening checks before using its results.
+
+All the above have GitHub source tests. **No user recordings, trained voice weights, on-device RVC setup, or end-to-end listening acceptance have been produced by source commits.**
 
 ## What My Voice must eventually mean
 
@@ -25,6 +36,8 @@ Next work:
 - [x] Consented private capture/import UI and WAV/reference safeguards.
 - [x] Band arrangement and gender/guest original-singer prompt controls.
 - [x] Own-song audio-conditioned cover and extension controls using documented local ACE-Step protocol.
+- [x] Add a native check of usable singing duration/rejected clips plus the private dataset folder open/copy handoff.
+- [x] Add guarded user-confirmed local RVC trainer UI launch/stop and nonblocking read-only dependency check (source and mock tests only).
 - [x] Add consent-confirmed offline RVC dataset preparation inside Studio AI. Duration probing uses local ffprobe, requires at least 10 minutes of valid recording, creates protected copies plus a SHA-256 manifest and never begins training. No recordings have been collected on the owner's PC by this GitHub work.
 - [ ] Record and review a sufficiently varied, clean **real training dataset** over several sessions; aim for 10–30 minutes to evaluate RVC, longer when available. Include quiet singing, sustained vowels, expressive passages, rough and clean techniques. Never auto-enroll from microphone listening or webcam.
 - [ ] Test RVC voice conversion training and inference with own licensed recording only. Confirm GPU/VRAM, CPU fallback, model licensing, output identity and artifact preservation. On PC, use official RVC training steps rather than a guessed command. **RVC timbre conversion is not automatic intonation correction.**
@@ -47,7 +60,7 @@ RVC source and training guide: https://github.com/RVC-Project/Retrieval-based-Vo
 
 ## Merge and install gates
 
-- [ ] GitHub source test suite passes on branch head.
+- [ ] GitHub source tests pass on the exact next release candidate commit (the head can change as new features are committed).
 - [ ] Compare current PC `/usr/local/lib/spider-os/studio` and `study` with source and preserve local modifications.
 - [ ] Collect PC GPU and CPU RAM information **without changing packages**.
 - [ ] Qualified rollback backup, preflight, and combined install manifest.
