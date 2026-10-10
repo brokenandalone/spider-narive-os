@@ -289,12 +289,14 @@ class HomeworkDialog(QDialog):
         self.worker = DraftWorker(prompt, self)
         self.worker.ready.connect(self.draft_ready)
         self.worker.failed.connect(self.draft_failed)
+        self.worker.finished.connect(self.release_worker)
         for button in self.generate_buttons:
             button.setEnabled(False)
         self.status.setText("Webbie is writing locally. Existing work remains editable after completion.")
         self.worker.start()
 
     def release_worker(self):
+        # Never destroy a QThread before its finished signal fires.
         if self.worker is not None:
             self.worker.deleteLater()
             self.worker = None
@@ -310,7 +312,6 @@ class HomeworkDialog(QDialog):
                 except (ValueError, OSError) as error:
                     self.status.setText("Existing work could not be backed up: " + str(error) +
                                         ". New text was not applied.")
-                    self.release_worker()
                     return
             self.draft.setPlainText(text)
             self.status.setText(
@@ -318,11 +319,9 @@ class HomeworkDialog(QDialog):
                 "Review facts, citations and your assignment requirements.")
         else:
             self.status.setText("Webbie returned no draft.")
-        self.release_worker()
 
     def draft_failed(self, error):
         self.status.setText("Webbie could not draft: " + error)
-        self.release_worker()
 
     def export_apa(self):
         if not self.draft.toPlainText().strip():
