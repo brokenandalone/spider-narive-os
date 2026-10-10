@@ -389,6 +389,11 @@ class StudioAIPanel(QWidget):
         except (MixError, OSError) as error:
             self.status.setText(str(error))
             return
+        # Validate the trained model before starting any background job.
+        model = Path(self.rvc_model.text().strip()).expanduser()
+        if model.is_symlink() or not model.is_file() or model.suffix.lower() != '.pth':
+            self.status.setText('Choose an existing, trusted, trained My Voice .pth model.')
+            return
         self.finish_after_conversion = True
         self.finish_song_button.setEnabled(False)
         self.start_conversion()
