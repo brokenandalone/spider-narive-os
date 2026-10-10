@@ -3,9 +3,11 @@
 import os
 import subprocess
 import sys
+import socket
+import stat
 from pathlib import Path
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
     QFont,
@@ -17,6 +19,8 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QDockWidget,
+    QPlainTextEdit,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -201,6 +205,45 @@ class WallpaperSurface(QWidget):
         painter.end()
 
 
+class KaliWebbieReplyWorker(QThread):
+    """Send typed Kali Bay questions to the EXISTING Webbie resident socket."""
+
+    received = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, message, sock_path, parent=None):
+        super().__init__(parent)
+        self.message = message
+        self.sock_path = Path(sock_path)
+
+    def run(self):
+        try:
+            entry = self.sock_path.stat()
+            if not stat.S_ISSOCK(entry.st_mode) or entry.st_uid != os.getuid():
+                self.failed.emit("Webbie's private session socket is unavailable.")
+                return
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                client.settimeout(110)
+                client.connect(str(self.sock_path))
+                client.sendall(self.message.encode("utf-8"))
+                output = []
+                size = 0
+                while True:
+                    part = client.recv(16384)
+                    if not part:
+                        break
+                    size += len(part)
+                    if size > 262144:
+                        raise ValueError("Webbie response was too large.")
+                    output.append(part)
+            answer = b"".join(output).decode("utf-8", errors="replace").strip()
+            if not answer:
+                raise ValueError("Webbie did not send a reply.")
+            self.received.emit(answer)
+        except (OSError, ValueError) as error:
+            self.failed.emit("Webbie connection: " + str(error))
+
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -222,6 +265,7 @@ class KaliBayWindow(QMainWindow):
         )
 
         self.build_ui()
+        self.build_webbie_dock()
         self.load_wallpaper()
         self.refresh_status()
         if "--purple" in sys.argv[1:]:
@@ -763,27 +807,111 @@ class KaliBayWindow(QMainWindow):
             QMessageBox.warning(self, "Kali Bay", str(error))
 
     def open_webbie_security(self):
-        # The Web owns one persistent Webbie panel; never start a duplicate
-        # resident voice agent or bypass the main shell's consent checks.
-        parent = self.parentWidget()
-        while parent is not None:
-            if hasattr(parent, "open_kali_assistant"):
-                parent.open_kali_assistant()
-                return
-            if hasattr(parent, "toggle_webbie_assistant"):
-                parent.update_webbie_context()
-                dock = getattr(parent, "webbie_dock", None)
-                if dock is not None and dock.isVisible():
-                    dock.raise_()
-                else:
-                    parent.toggle_webbie_assistant()
-                return
-            parent = parent.parentWidget()
-        QMessageBox.information(
-            self, "Webbie",
-            "Open Kali Bay inside The Web and use Ask Webbie. "
-            "The standalone Kali window does not start a second Webbie."
+        # This is a lightweight second UI for the SAME resident Webbie socket,
+        # not a duplicate listener, model, portrait or privileged service.
+        self.webbie_dock.show()
+        self.webbie_dock.raise_()
+        self.webbie_chat_entry.setFocus()
+
+    def build_webbie_dock(self):
+        """One optional inline chat UI for the already-running Webbie agent.
+
+        Not another LLM instance, voice listener, webcam or authentication
+        service. The same strict Kali action bridge handles explicit messages.
+        """
+        self.webbie_worker = None
+        self.webbie_dock = QDockWidget("WEBBIE | KALI BAY", self)
+        self.webbie_dock.setObjectName("kaliWebbieAssistantDock")
+        self.webbie_dock.setAllowedAreas(
+            Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea
         )
+        panel = QWidget()
+        panel.setObjectName("kaliWebbieChatPanel")
+        panel.setStyleSheet(
+            "QWidget#kaliWebbieChatPanel {background:#170e27;color:#f3e8ff;}"
+            "QPlainTextEdit, QLineEdit {background:#0c0718;color:#f3e8ff;"
+            "border:1px solid #6842a0;border-radius:7px;padding:6px;}"
+        )
+        layout = QVBoxLayout(panel)
+        title = QLabel("WEBBIE · SECURITY ASSISTANT")
+        title.setStyleSheet("font-weight:bold;color:#c4b5fd;")
+        layout.addWidget(title)
+        hint = QLabel(
+            "This chat uses the existing resident Webbie. "
+            "No separate AI or camera is started. "
+            "Dynamic Kali applications are still opened by you."
+        )
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.webbie_chat_log = QPlainTextEdit()
+        self.webbie_chat_log.setObjectName("kaliWebbieConversation")
+        self.webbie_chat_log.setReadOnly(True)
+        layout.addWidget(self.webbie_chat_log, 1)
+        self.webbie_chat_entry = QLineEdit()
+        self.webbie_chat_entry.setObjectName("kaliWebbieEntry")
+        self.webbie_chat_entry.setPlaceholderText(
+            "Ask Webbie about Kali or an installed tool…"
+        )
+        self.webbie_chat_entry.returnPressed.connect(self.send_webbie_chat)
+        layout.addWidget(self.webbie_chat_entry)
+        self.webbie_send_button = QPushButton("SEND TO WEBBIE")
+        self.webbie_send_button.setObjectName("kaliWebbieSend")
+        self.webbie_send_button.clicked.connect(self.send_webbie_chat)
+        layout.addWidget(self.webbie_send_button)
+        self.webbie_dock.setWidget(panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.webbie_dock)
+        self.webbie_dock.hide()
+
+    def send_webbie_chat(self):
+        content = self.webbie_chat_entry.text().strip()
+        if not content or (self.webbie_worker and self.webbie_worker.isRunning()):
+            return
+        if len(content.encode("utf-8")) > 8000:
+            self.webbie_chat_log.appendPlainText("System: Shorten your question.")
+            return
+        base = os.environ.get(
+            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
+        )
+        sock = Path(base) / "spider-os" / "webbie.sock"
+        request = (
+            "[Spider OS workspace context; advisory only]\\n"
+            "Workspace: Kali Bay\\n"
+            "Mode: Security Assistant\\n"
+            "Preferred address: Spider; this is not identity verification.\\n"
+            "[User request]\\n" + content
+        )
+        self.webbie_chat_log.appendPlainText("You: " + content)
+        self.webbie_chat_entry.clear()
+        self.webbie_chat_entry.setEnabled(False)
+        self.webbie_send_button.setEnabled(False)
+        self.webbie_chat_log.appendPlainText("Webbie: thinking…")
+        worker = KaliWebbieReplyWorker(request, sock, self)
+        self.webbie_worker = worker
+        worker.received.connect(self.webbie_answer)
+        worker.failed.connect(self.webbie_error)
+        worker.finished.connect(self.webbie_chat_finished)
+        worker.start()
+
+    def webbie_answer(self, answer):
+        self.webbie_chat_log.appendPlainText("Webbie: " + answer)
+
+    def webbie_error(self, message):
+        self.webbie_chat_log.appendPlainText("System: " + message)
+
+    def webbie_chat_finished(self):
+        self.webbie_chat_entry.setEnabled(True)
+        self.webbie_send_button.setEnabled(True)
+        self.webbie_chat_entry.setFocus()
+
+    def closeEvent(self, event):
+        if self.webbie_worker and self.webbie_worker.isRunning():
+            event.ignore()
+            self.webbie_chat_log.appendPlainText(
+                "System: The current Webbie reply is finishing."
+            )
+            self.webbie_dock.show()
+            return
+        super().closeEvent(event)
 
     def build_category_page(self, categories, description):
         page = QWidget()
