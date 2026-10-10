@@ -34,7 +34,7 @@ COMPONENTS = {
         "study/school_material_picker.py", "study/bin/webbie-homework",
     ),
     "Studio music and vocals": (
-        "studio/main.py", "studio/ai_panel.py", "studio/music_backend.py",
+        "studio/__init__.py", "studio/main.py", "studio/ai_panel.py", "studio/music_backend.py",
         "studio/arrangement.py", "studio/voice_dataset.py",
         "studio/owner_voice_model.py", "studio/voice_conversion.py",
         "studio/song_mix.py", "studio/stem_separation.py",
