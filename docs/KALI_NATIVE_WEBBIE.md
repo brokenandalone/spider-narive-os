@@ -22,12 +22,28 @@ this native release.
   intends, subject to container and user permissions.
 - **INSTALLED KALI PACKAGES** presents a read-only package inventory by
   querying the existing, running container, without starting it.
-- Existing Kali tools, Offensive and Purple categories, searchable native
-  app launcher and persistent Kali files all remain in place.
+- The Kali Bay Desktop Hub has **LOAD ALL INSTALLED KALI APPS**. It queries
+  the running container's real system application menu using `kali-bay
+  apps-json`, validates installed `*.desktop` identifiers, and merges the
+  installed entries into the searchable/filtered list. The list isn't limited
+  to Spider's ten featured shortcuts.
+- An owner-selected application uses `kali-bay app-check <id>` followed by
+  `kali-bay app-open <id>` via Kali's own `gio launch`. System desktop files
+  are read from `/usr/share/applications` inside Kali, not Spider OS host
+  binaries. No shell command or path is accepted from the app label.
+- **LOAD ALL INSTALLED KALI APPS** only reads the running container and does
+  not start it, install packages or launch applications. If the container
+  is stopped, Kali Bay reports why the catalog is unavailable.
+- Existing Kali tools, Offensive and Purple categories, the ten featured
+  static shortcuts and persistent Kali files all remain in place.
 - Webbie can answer questions about Kali tools and open the interactive
   terminal, Kali package manager or read-only inventory on an **explicit,
   literal user request**. No model-generated, camera-generated or
   workspace-metadata text may supply executable commands.
+- Webbie additionally supports **list installed Kali apps** and
+  **find Kali app Wireshark**, executing only a read-only inventory query.
+  Dynamic apps require manual selection in Kali Bay; Webbie does not
+  execute arbitrary desktop entries from voice or language-model output.
 - The existing Webbie voice profile and The Web assistant dock are reused;
   Kali Bay does not spawn a second Webbie.
 
