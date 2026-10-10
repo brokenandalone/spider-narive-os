@@ -14,7 +14,8 @@ class TaskGrantTests(unittest.TestCase):
         g = mod.TaskGrant(clock=lambda: now[0])
         self.assertFalse(g.authorize('app.open', 'Open Audacity'))
         g.activate('Edit the song', 'audacity.desktop', seconds=120)
-        self.assertTrue(g.authorize('app.open', 'Open Audacity'))
+        self.assertTrue(g.authorize('app.open', 'app_id=audacity.desktop'))
+        self.assertFalse(g.authorize('app.open', 'app_id=not-selected.desktop'))
         self.assertEqual(g.status()['remaining_actions'], mod.MAX_ACTIONS - 1)
         now[0] += 121
         self.assertFalse(g.authorize('observe.windows', 'Watch'))
