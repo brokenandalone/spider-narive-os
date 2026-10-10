@@ -124,6 +124,13 @@ assert window.security_tabs.tabText(0) == 'DESKTOP HUB'
 assert window.security_tabs.tabText(1) == 'OFFENSIVE'
 assert window.security_tabs.tabText(2) == 'PURPLE DEFENSE'
 assert window.desktop_list.count() == len(module.DESKTOP_TOOL_MENU)
+from PyQt5.QtWidgets import QPushButton
+buttons = [b.text() for b in window.findChildren(QPushButton)]
+for expected in ("CHECK KALI DESKTOP", "OPEN FULL KALI DESKTOP",
+                 "SET UP / MANAGE KALI VM", "START EXISTING KALI VM",
+                 "KALI TERMINAL", "KALI FILES"):
+    assert expected in buttons, expected
+assert 'not checked' in window.vm_state_label.text()
 window.desktop_search.setText('Wireshark')
 assert window.desktop_list.count() == 1
 assert window.desktop_list.item(0).data(module.Qt.UserRole) == 'wireshark'
