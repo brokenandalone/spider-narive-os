@@ -27,6 +27,16 @@ Branch stacks on the Studio v6/Study workspace PR. Source CI is a unit and simul
 
 All the above have GitHub source tests. **No user recordings, trained voice weights, on-device RVC setup, or end-to-end listening acceptance have been produced by source commits.**
 
+## Generated song → trained voice → finished mix (source workflow)
+
+1. Generate an original song with Studio AI and choose its saved WAV take. **Send take to vocal separator** fills the separation source field but does not start a model or download anything.
+2. **Separate vocals and backing** requires explicit confirmation first, because PyMSS may download large model weights. The extraction can be stopped without modifying the generated take.
+3. A native review list displays the extracted WAV candidates. The user auditions each and manually chooses **Use as singing vocal** or **Use as instrumental**. The app does not trust filenames or silently assume an extracted track is clean.
+4. A vocal selection populates the local RVC conversion source; an instrumental selection populates the final mix backing. The same WAV cannot serve both roles. Converted vocal selection is cleared when a new singing source is chosen.
+5. **Convert My Voice and make final mix** uses a separately, genuinely trained and trusted owner RVC model, then produces a new WAV while keeping the original recording, separated tracks and converted vocals.
+
+**Source implementation is not acceptance:** a real GPU/CPU qualification, model installation, consented owner-voice training, separation-quality audition and full production render have not occurred on the user's PC. In particular, extracted voices may contain artifacts, the original AI singer can bleed into the backing, the generated two guitars may be inseparable, and the output does not yet imply pitch correction or a verified Suno v6 substitute.
+
 ## What My Voice must eventually mean
 
 The owner's explicit goal is to **record a voice dataset once, then synthesize future studio-sung parts with a recognizable owner voice that is pitch/timing/prod improved**, even when no fresh lead vocal is recorded. The present sample/ACE-Step reference control is a first data collection and creative reference step, **not** the required learned singing identity.
