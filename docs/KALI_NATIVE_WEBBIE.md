@@ -44,8 +44,13 @@ this native release.
   **find Kali app Wireshark**, executing only a read-only inventory query.
   Dynamic apps require manual selection in Kali Bay; Webbie does not
   execute arbitrary desktop entries from voice or language-model output.
-- The existing Webbie voice profile and The Web assistant dock are reused;
-  Kali Bay does not spawn a second Webbie.
+- The existing Webbie resident agent and voice service are reused.
+  The standalone Kali Bay window now has its own purple **WEBBIE | KALI BAY**
+  text-chat dock, which connects asynchronously to Webbie's existing private
+  per-user Unix socket. No second AI model, microphone listener, camera or
+  privileged daemon is launched. Only explicitly typed messages are sent;
+  the response is displayed without blocking Kali Bay's main GUI. The Web's
+  original Webbie assistant dock remains independent but uses the same agent.
 
 ## What is Kali and what is Spider OS
 - The GUI/window manager and desktop integrations are **Spider OS**.
