@@ -9,7 +9,11 @@ if [[ "${1:-}" == --check ]]; then
         command -v "$command" >/dev/null || { echo "Missing: $command" >&2; exit 1; }
     done
     python3 -c 'from PyQt5.QtWidgets import QApplication'
-    echo 'Desktop prerequisites passed.'; exit 0
+    if ! python3 "$source_root/the-web/package/reconcile-native.py" "$source_root" /usr/local/lib/spider-os --check; then
+        echo 'Native workspace conflicts: desktop upgrade is not safe to apply yet.' >&2
+        exit 3
+    fi
+    echo 'Desktop prerequisites and native-code preflight passed.'; exit 0
 fi
 if [[ $EUID -ne 0 ]]; then echo 'Run with sudo; this installs a selectable desktop session.' >&2; exit 1; fi
 user="${SUDO_USER:-}"
