@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 from PyQt5.QtCore import Qt, QTimer, QSize, QDateTime, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap
@@ -37,10 +38,11 @@ from quick_settings import QuickSettingsPanel
 from window_overview import WindowOverview
 from appearance import LIGHT_STYLE, appearance_file, load_theme, save_theme
 from readability import load_menu_size, save_menu_size, readability_css
-from navigation_core import INTERNAL_ACTIONS
+from navigation_core import INTERNAL_ACTIONS, valid_window_id
 from navigation_state import (navigation_file, load_navigation, save_navigation,
                               record_recent, toggle_favorite)
 from desktop_state import read_desktop_state, write_desktop_state
+from workspace_navigation import adjacent_index, other_tab_names, workspace_context_summary
 from command_palette import CommandPalette
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
@@ -213,7 +215,10 @@ class Taskbar(QWidget):
         self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
         self.window_scan_worker = None
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(3000)
-        self.last_tasks = None; self.refresh()
+        self.last_tasks = None
+        self.window_items = []
+        self.last_window_scan_at = 0.0
+        self.refresh()
 
     def position(self):
         geometry = QApplication.primaryScreen().geometry()
@@ -239,6 +244,9 @@ class Taskbar(QWidget):
         self.window_scan_worker = None
 
     def render_tasks(self, tasks):
+        # This is also the bounded, trusted snapshot used by Quick Launch.
+        self.window_items = [task for task in tasks if valid_window_id(task.ident)][:120]
+        self.last_window_scan_at = time.monotonic()
         screen_width = QApplication.primaryScreen().geometry().width()
         visible_count = max(0, min(5, (screen_width - 870) // 185))
         signature = (screen_width, tuple((task.ident, task.title) for task in tasks))
@@ -302,13 +310,22 @@ class TheWeb(QMainWindow):
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self._palette_shortcut = QShortcut(QKeySequence('Ctrl+K'), self)
         self._palette_shortcut.activated.connect(self.toggle_command_palette)
+        self._next_tab_shortcut = QShortcut(QKeySequence('Ctrl+PgDown'), self)
+        self._next_tab_shortcut.activated.connect(lambda: self.cycle_tab(1))
+        self._previous_tab_shortcut = QShortcut(QKeySequence('Ctrl+PgUp'), self)
+        self._previous_tab_shortcut.activated.connect(lambda: self.cycle_tab(-1))
+        self._home_shortcut = QShortcut(QKeySequence('Ctrl+Alt+Home'), self)
+        self._home_shortcut.activated.connect(self.show_desktop)
         self._pinned_shortcuts = []
         for number in range(1, 9):
             shortcut = QShortcut(QKeySequence(f'Ctrl+Alt+{number}'), self)
             shortcut.activated.connect(
                 lambda slot=number - 1: self.open_pinned_slot(slot))
             self._pinned_shortcuts.append(shortcut)
-        self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.currentChanged.connect(self.tab_changed)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.tabBar().tabMoved.connect(self.tab_moved)
+        self.tabs.tabBar().customContextMenuRequested.connect(self.tab_context_menu)
         self.set_workspace('default')
         if restore: self.restore_state()
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_status); self.timer.start(15000)
@@ -333,7 +350,15 @@ class TheWeb(QMainWindow):
         header.addWidget(self.face_display_button)
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
         header.addWidget(button('Quick Launch', self.toggle_command_palette))
-        self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName('workspaceTabs')
+        self.tabs.setProperty('home', True)
+        self.tabs.setTabsClosable(True)
+        self.tabs.setMovable(True)
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tabs.setAccessibleName('Spider OS workspace tabs')
+        outer.addWidget(self.tabs, 1)
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
         welcome = QLabel('Your workspaces'); welcome.setFont(QFont('Sans Serif', 22, QFont.Bold)); home_layout.addWidget(welcome)
         self.pinned_title = QLabel('Pinned workspaces  ·  customize in Quick Launch')
@@ -354,6 +379,7 @@ class TheWeb(QMainWindow):
             grid.addWidget(shortcut, index // 4, index % 4)
         home.setProperty('workspace', 'default'); self.tabs.addTab(home, 'The Web'); self.workspace_widgets['default'] = home
         self.tabs.tabBar().setTabButton(0, self.tabs.tabBar().RightSide, None)
+        self.tabs.setTabToolTip(0, 'The Web home · Ctrl+Alt+Home')
         wallpaper_row = QHBoxLayout(); outer.addLayout(wallpaper_row)
         self.background_picker = QComboBox()
         for name, label in WORKSPACES.items(): self.background_picker.addItem(label, name)
@@ -474,8 +500,11 @@ class TheWeb(QMainWindow):
                 summary = str(native.webbie_context())[:600]
             except Exception:
                 summary = ''
+        tabs = [WORKSPACES.get(self.tabs.widget(i).property('workspace'), 'Workspace')
+                for i in range(self.tabs.count())]
+        advisory = workspace_context_summary(label, tabs, summary)
         self.webbie_assistant.set_workspace_context(
-            label, mode=self.WEBBIE_MODES.get(name, 'Normal'), summary=summary
+            label, mode=self.WEBBIE_MODES.get(name, 'Normal'), summary=advisory
         )
         self.webbie_dock.setWindowTitle('WEBBIE | ' + label)
 
@@ -670,7 +699,10 @@ class TheWeb(QMainWindow):
                     heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
                     body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1)
                 layout.addWidget(surface, 1)
-            self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
+            self.workspace_widgets[name] = page
+            position = self.tabs.addTab(page, WORKSPACES[name])
+            self.tabs.setTabToolTip(position, 'Workspace: ' + WORKSPACES[name] +
+                                    '\nDrag to reorder. Right-click for tab actions.')
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
         if name != 'default':
             self.remember_navigation('workspace', name)
