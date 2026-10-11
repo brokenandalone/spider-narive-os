@@ -10,7 +10,10 @@ import threading
 import time
 import wave
 
-from .song_mix import MixError, valid_wav
+if __package__:
+    from .song_mix import MixError, valid_wav
+else:
+    from song_mix import MixError, valid_wav
 
 ROLES = ('backing', 'lead_vocal', 'guest_vocal', 'rhythm_guitar',
          'lead_guitar', 'bass', 'drums', 'keys')
