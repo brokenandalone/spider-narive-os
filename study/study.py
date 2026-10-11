@@ -535,6 +535,11 @@ class StudyWindow(QMainWindow):
             assignment_buttons
         )
 
+        planner_buttons = QHBoxLayout()
+        self.add_action(planner_buttons, "IMPORT CSV ASSIGNMENTS", self.import_csv_assignments)
+        self.add_action(planner_buttons, "EXPORT COURSE CALENDAR", self.export_course_calendar)
+        assignments_layout.addLayout(planner_buttons)
+
         self.tabs.addTab(
             assignments_tab,
             "Assignments",
@@ -983,6 +988,77 @@ class StudyWindow(QMainWindow):
 
         self.load_assignments()
 
+    def import_csv_assignments(self):
+        """Preview selected CSV assignments before creating local coursework."""
+        if not self.current_course_id:
+            return
+        folder = self.store.course_folder(self.current_course_id)
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Choose assignments CSV", str(folder),
+            "Comma-separated assignments (*.csv)")
+        if not filename:
+            return
+        try:
+            if __package__:
+                from .assignment_planner import parse_assignment_csv
+            else:
+                from assignment_planner import parse_assignment_csv
+            result = parse_assignment_csv(filename, self.store.assignments(self.current_course_id))
+            rows = result["rows"]
+            if not rows:
+                self.status.setText(
+                    f"No new open assignments. {result['skipped']} duplicates; "
+                    f"{result['completed']} completed rows skipped.")
+                return
+            names = "\\n".join(
+                f"• {title} ({due or 'date not specified'})"
+                for title, due in rows[:8])
+            more = f"\\n...and {len(rows) - 8} more." if len(rows) > 8 else ""
+            answer = QMessageBox.question(
+                self, "Import assignment preview",
+                f"Add {len(rows)} open assignments to this course?\\n"
+                f"{result['skipped']} duplicates; {result['completed']} completed rows skipped.\\n\\n"
+                + names + more + "\\n\\nNo school files will be uploaded.")
+            if answer != QMessageBox.Yes:
+                self.status.setText("Assignment import cancelled; no changes made.")
+                return
+            self.store.add_assignments_bulk(self.current_course_id, rows)
+            self.load_assignments()
+            self.status.setText(f"Imported {len(rows)} assignments to the selected course.")
+        except (OSError, UnicodeError, ValueError) as error:
+            QMessageBox.warning(self, "Assignment import", str(error))
+
+    def export_course_calendar(self):
+        """Owner-triggered .ics export covers all locally tracked courses."""
+        if not self.current_course_id:
+            return
+        if __package__:
+            from .assignment_planner import write_calendar
+        else:
+            from assignment_planner import write_calendar
+        folder = self.store.course_folder(self.current_course_id)
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Export all Study assignment deadlines",
+            str(folder / "study-assignments.ics"),
+            "Calendar (*.ics)")
+        if not target:
+            return
+        if not target.lower().endswith(".ics"):
+            target += ".ics"
+        overwrite = False
+        if Path(target).exists():
+            overwrite = QMessageBox.question(
+                self, "Replace calendar file",
+                "Replace this calendar file? Existing files are otherwise preserved."
+            ) == QMessageBox.Yes
+            if not overwrite:
+                return
+        try:
+            count = write_calendar(target, self.store.all_assignments(), overwrite=overwrite)
+            self.status.setText(f"Saved {count} open dated deadlines from all Study courses: {target}")
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Calendar export", str(error))
+
     def complete_assignment(self):
         assignment_id = (
             self.selected_assignment_id()
@@ -1181,7 +1257,8 @@ class StudyWindow(QMainWindow):
     def refresh_dashboard(self):
         summary = overview(self.store.all_assignments())
         text = (f"Across all courses: {summary['open']} open · {summary['complete']} complete · "
-                f"{summary['overdue']} overdue · {summary['undated']} need an ISO date")
+                f"{summary['overdue']} overdue · {summary['today']} due today · "
+                f"{summary['next_7_days']} due in 7 days · {summary['undated']} need an ISO date")
         if summary['upcoming']:
             next_due = summary['upcoming'][0]
             text += f"\nNext outstanding: {next_due['course']} / {next_due['title']} / {next_due['due']}"
