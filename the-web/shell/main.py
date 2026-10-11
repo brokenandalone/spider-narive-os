@@ -477,8 +477,17 @@ class TheWeb(QMainWindow):
                 summary = str(native.webbie_context())[:600]
             except Exception:
                 summary = ''
+        # Give Webbie the currently OPEN workspace names, not document
+        # contents, titles from other windows, or privileged screen data.
+        open_names = [
+            WORKSPACES.get(self.tabs.widget(index).property('workspace'), 'Workspace')
+            for index in range(self.tabs.count())
+            if self.tabs.widget(index) is not None
+        ]
+        tabs_context = 'Open workspace tabs: ' + ', '.join(open_names)
+        summary = tabs_context + ('. Selected: ' + summary if summary else '')
         self.webbie_assistant.set_workspace_context(
-            label, mode=self.WEBBIE_MODES.get(name, 'Normal'), summary=summary
+            label, mode=self.WEBBIE_MODES.get(name, 'Normal'), summary=summary[:600]
         )
         self.webbie_dock.setWindowTitle('WEBBIE | ' + label)
 
