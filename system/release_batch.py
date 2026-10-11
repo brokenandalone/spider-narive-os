@@ -63,6 +63,7 @@ APP_FILES = (
     'the-web/overlay/webbie_face.py',
     'the-web/overlay/webbie-face-autostart.desktop',
     'webbie/agent/webbie.py', 'webbie/agent/vision_query.py',
+    'webbie/agent/author_voice_bridge.py',
     'webbie/agent/night_mode.py', 'webbie/agent/workspace_names.py',
     'webbie/brain/brain.py', 'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png',
