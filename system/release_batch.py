@@ -87,6 +87,8 @@ APP_FILES = (
     'forage/research_archive.py',
     'forage/research_quality.py',
     'forage/forage_cli.py',
+    'forage/document_text.py',
+    'forage/local_index.py',
     'forage/workspace_export.py',
     'webbie/agent/forage_research_bridge.py',
     'kali-bay/bin/kali-bay',
