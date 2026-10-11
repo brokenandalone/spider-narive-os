@@ -80,6 +80,32 @@ class StudyStore:
                     REFERENCES courses(id)
                     ON DELETE CASCADE
             );
+
+            -- Additive storage. No existing coursework is changed or migrated.
+            CREATE TABLE IF NOT EXISTS assignment_workspaces (
+                assignment_id INTEGER PRIMARY KEY,
+                instructions TEXT NOT NULL DEFAULT '',
+                rubric TEXT NOT NULL DEFAULT '',
+                research TEXT NOT NULL DEFAULT '',
+                outline TEXT NOT NULL DEFAULT '',
+                draft TEXT NOT NULL DEFAULT '',
+                "references" TEXT NOT NULL DEFAULT '',
+                feedback TEXT NOT NULL DEFAULT '',
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS flashcards (
+                id INTEGER PRIMARY KEY,
+                course_id INTEGER NOT NULL,
+                front TEXT NOT NULL,
+                back TEXT NOT NULL,
+                correct INTEGER NOT NULL DEFAULT 0,
+                incorrect INTEGER NOT NULL DEFAULT 0,
+                last_review TEXT NOT NULL DEFAULT '',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE,
+                UNIQUE(course_id, front, back)
+            );
             """
         )
 
@@ -339,6 +365,90 @@ class StudyStore:
         )
 
         self.db.commit()
+
+    def assignment_record(self, assignment_id):
+        return self.db.execute(
+            "SELECT a.id, a.course_id, a.title, a.due, a.status, c.name AS course "
+            "FROM assignments a JOIN courses c ON c.id=a.course_id "
+            "WHERE a.id = ?", (assignment_id,),
+        ).fetchone()
+
+    def get_assignment_workspace(self, assignment_id):
+        fields = ("instructions", "rubric", "research", "outline", "draft",
+                  "references", "feedback")
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment does not exist.")
+        record = self.db.execute(
+            'SELECT instructions, rubric, research, outline, draft, "references", '
+            'feedback FROM assignment_workspaces WHERE assignment_id=?',
+            (assignment_id,),
+        ).fetchone()
+        return {name: record[name] if record else "" for name in fields}
+
+    def save_assignment_workspace(self, assignment_id, values):
+        fields = ("instructions", "rubric", "research", "outline", "draft",
+                  "references", "feedback")
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment was deleted before saving.")
+        if set(values) != set(fields):
+            raise ValueError("The assignment workspace fields are incomplete.")
+        for name in fields:
+            value = values[name]
+            if (not isinstance(value, str) or len(value) > 120000
+                    or "\x00" in value):
+                raise ValueError("Invalid assignment section: " + name)
+        with self.db:
+            self.db.execute(
+                'INSERT INTO assignment_workspaces '
+                '(assignment_id, instructions, rubric, research, outline, draft, '
+                '"references", feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?) '
+                'ON CONFLICT(assignment_id) DO UPDATE SET '
+                'instructions=excluded.instructions, rubric=excluded.rubric, '
+                'research=excluded.research, outline=excluded.outline, '
+                'draft=excluded.draft, "references"=excluded."references", '
+                'feedback=excluded.feedback, updated_at=CURRENT_TIMESTAMP',
+                (assignment_id,) + tuple(values[name] for name in fields),
+            )
+
+    def flashcards(self, course_id):
+        return self.db.execute(
+            "SELECT id, course_id, front, back, correct, incorrect, last_review "
+            "FROM flashcards WHERE course_id=? ORDER BY id", (course_id,),
+        ).fetchall()
+
+    def add_flashcards(self, course_id, cards):
+        if not self.course(course_id):
+            raise ValueError("Course does not exist.")
+        checked = []
+        for front, back in cards:
+            if (not isinstance(front, str) or not isinstance(back, str)
+                    or not front.strip() or not back.strip()
+                    or len(front) > 1500 or len(back) > 1500
+                    or "\x00" in front or "\x00" in back):
+                raise ValueError("Invalid flashcard contents.")
+            checked.append((course_id, front.strip(), back.strip()))
+        with self.db:
+            previous = self.db.total_changes
+            self.db.executemany(
+                "INSERT OR IGNORE INTO flashcards(course_id, front, back) "
+                "VALUES (?, ?, ?)", checked)
+            return self.db.total_changes - previous
+
+    def record_flashcard_review(self, card_id, correct):
+        with self.db:
+            cursor = self.db.execute(
+                "UPDATE flashcards SET correct=correct+?, incorrect=incorrect+?, "
+                "last_review=CURRENT_TIMESTAMP WHERE id=?",
+                (1 if correct else 0, 0 if correct else 1, card_id),
+            )
+            return cursor.rowcount == 1
+
+    def delete_flashcard(self, course_id, card_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM flashcards WHERE course_id=? AND id=?",
+                (course_id, card_id),
+            )
 
     def all_assignments(self):
         return self.db.execute(
