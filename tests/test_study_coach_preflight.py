@@ -28,6 +28,18 @@ class APAHelperTests(unittest.TestCase):
         self.assertEqual(result["unmatched_pairs"], [("smith", "2020")])
         self.assertIn(("jones", "2022"), result["citation_pairs"])
 
+    def test_apa_et_al_and_two_author_patterns(self):
+        result = analyze_apa_preflight(
+            draft=("Smith et al. (2021) outlined the process. "
+                   "Another view (Brown & Jones, 2020). "
+                   "Further detail (Smith et al., 2021; Brown and Jones, 2020)."),
+            references=["Smith, A. (2021). Owner's reference.",
+                        "Brown, B. (2020). Owner's reference."],
+        )
+        self.assertIn(("smith", "2021"), result["citation_pairs"])
+        self.assertIn(("brown", "2020"), result["citation_pairs"])
+        self.assertEqual(result["unmatched_pairs"], [])
+
     def test_duplicates_and_unresolved_placeholders_are_reported(self):
         result = analyze_apa_preflight(
             draft="Unverified. [SOURCE NEEDED] [VERIFY CITATION]",
