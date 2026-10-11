@@ -9,8 +9,8 @@ import threading
 
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
-    QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QMainWindow, QPushButton, QTextBrowser, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+    QListWidget, QMainWindow, QPushButton, QTextBrowser, QVBoxLayout, QWidget,
 )
 
 ROOT = str(Path(__file__).resolve().parents[1])
@@ -19,6 +19,7 @@ if ROOT not in sys.path:
 
 from engine import deep_research, ResearchCancelled, REPORT_DIR
 from research_archive import list_reports
+from workspace_export import export_report
 
 
 class ResearchWorker(QThread):
@@ -27,9 +28,11 @@ class ResearchWorker(QThread):
     failed = pyqtSignal(str)
     stopped = pyqtSignal(str)
 
-    def __init__(self, topic):
+    def __init__(self, topic, depth="standard", focus="general"):
         super().__init__()
         self.topic = topic
+        self.depth = depth
+        self.focus = focus
         self.cancel_event = threading.Event()
 
     def cancel(self):
@@ -40,6 +43,7 @@ class ResearchWorker(QThread):
             result = deep_research(
                 self.topic, progress=self.progress.emit,
                 cancel=self.cancel_event.is_set,
+                depth=self.depth, focus=self.focus,
             )
             self.completed.emit(result)
         except ResearchCancelled as error:
@@ -93,6 +97,18 @@ class DeepForageWindow(QMainWindow):
         self.topic.returnPressed.connect(self.research)
         layout.addWidget(self.topic)
 
+        options = QHBoxLayout()
+        self.depth = QComboBox()
+        self.depth.addItems(["Quick (6 sources)", "Standard (12 sources)", "Intensive (20 sources)"])
+        self.depth.setCurrentIndex(1)
+        self.depth.setAccessibleName("Research depth")
+        options.addWidget(self.depth, 1)
+        self.focus = QComboBox()
+        self.focus.addItems(["General", "Academic", "Technical", "Creative"])
+        self.focus.setAccessibleName("Research lens")
+        options.addWidget(self.focus, 1)
+        layout.addLayout(options)
+
         row = QHBoxLayout()
         self.run_button = QPushButton("BEGIN RESEARCH")
         self.run_button.clicked.connect(self.research)
@@ -130,6 +146,15 @@ class DeepForageWindow(QMainWindow):
         saved.addWidget(self.open_sources)
         layout.addLayout(saved)
 
+        handoff = QHBoxLayout()
+        study = QPushButton("EXPORT TO STUDY")
+        study.clicked.connect(lambda: self.export_to("study"))
+        handoff.addWidget(study)
+        author = QPushButton("EXPORT TO AUTHOR")
+        author.clicked.connect(lambda: self.export_to("author"))
+        handoff.addWidget(author)
+        layout.addLayout(handoff)
+
         history_row = QHBoxLayout()
         self.history = QComboBox()
         self.history.setAccessibleName("Previous research reports")
@@ -152,31 +177,36 @@ class DeepForageWindow(QMainWindow):
 
     def _refresh_queue(self):
         self.queue_view.clear()
-        self.queue_view.addItems(self.pending_topics)
+        self.queue_view.addItems([
+            f"{topic}  [{depth}, {focus}]"
+            for topic, depth, focus in self.pending_topics
+        ])
 
     def research(self):
         topic = self.topic.text().strip()
         if not topic:
             self.status.setText("Enter a research question first.")
             return
+        depth = ("quick", "standard", "intensive")[self.depth.currentIndex()]
+        focus = self.focus.currentText().lower()
         if self.worker and self.worker.isRunning():
             if len(self.pending_topics) >= 20:
                 self.status.setText("Queue full. Finish or cancel existing work first.")
                 return
-            self.pending_topics.append(topic)
+            self.pending_topics.append((topic, depth, focus))
             self._refresh_queue()
             self.status.setText(f"Queued: {topic}")
             self.topic.clear()
             return
-        self._start(topic)
+        self._start(topic, depth, focus)
 
-    def _start(self, topic):
+    def _start(self, topic, depth, focus):
         self.topic.clear()
         self.output.clear()
         self.run_button.setText("ADD TO QUEUE")
         self.stop_button.setEnabled(True)
         self.status.setText(f"Researching: {topic}")
-        self.worker = ResearchWorker(topic)
+        self.worker = ResearchWorker(topic, depth=depth, focus=focus)
         self.worker.progress.connect(self.status.setText)
         self.worker.completed.connect(self.completed)
         self.worker.failed.connect(self.failed)
@@ -197,9 +227,9 @@ class DeepForageWindow(QMainWindow):
     def _after_finished(self):
         self.stop_button.setEnabled(False)
         if self.pending_topics:
-            next_topic = self.pending_topics.pop(0)
+            next_topic, depth, focus = self.pending_topics.pop(0)
             self._refresh_queue()
-            self._start(next_topic)
+            self._start(next_topic, depth, focus)
         else:
             self.run_button.setText("BEGIN RESEARCH")
 
@@ -231,6 +261,24 @@ class DeepForageWindow(QMainWindow):
             + "<hr><p>Saved: " + html.escape(self.last_report) + "</p>"
         )
         self.refresh_history()
+
+    def export_to(self, workspace):
+        path = self.last_report or self.history.currentData()
+        if not path:
+            self.status.setText("No completed research report to export.")
+            return
+        folder = QFileDialog.getExistingDirectory(
+            self, f"Choose destination folder for {workspace.title()} report",
+            str(Path.home() / "Documents")
+        )
+        if not folder:
+            return
+        try:
+            exported = export_report(path, workspace, folder, research_root=REPORT_DIR)
+        except (OSError, ValueError) as error:
+            self.status.setText(f"Export blocked: {error}")
+            return
+        self.status.setText("Explicit export saved: " + exported)
 
     @staticmethod
     def _open(path):
