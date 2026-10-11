@@ -86,3 +86,14 @@ The restore control only populates fields. **It cannot prove the selected model 
 - [ ] Smoke test Studio AI UI, mic selection, local recording and source backup.
 - [ ] Produce and listen to **one real** local-generated song with optional AI female singer and two distinct guitar roles.
 - [ ] Pilot own singing voice conversion only after separately verified model training, dataset consent and audio quality.
+
+
+## Independent band stem mixing (October 11 source upgrade)
+
+Spider Studio AI now has an **independent eight-track offline band mixer** using locally available FFmpeg. Supported audio roles: instrumental bed, trained My Voice / lead vocal, guest or female vocalist, rhythm guitar, independent lead guitar, bass, drums and keyboards. Each selected role takes its **own real WAV** file and gain from 0.00 to 2.00; at least two different sources are required. The source files remain untouched.
+
+The existing verified vocal conversion handoff populates the lead-singer slot; verified manually selected instrumental separation populates the bed slot. Other isolated stems are chosen by the owner from local WAVs (e.g. recorded in a DAW). AI text instructions about a second guitarist or guest vocalist **do not** themselves create separate stems, and PyMSS must not be represented as reliably separating all eight instruments.
+
+The mixer runs in a background thread, offers an explicit stop control, generates a private stereo 48 kHz 24-bit WAV with limiter and a permission-restricted provenance receipt/log under **Documents/Spider Studio/Music/Band Mixes**, and lets the owner audition the output. It does not overwrite, train, upload, or delete models/audio. Inputs are checked for WAV headers, distinct files (including hard links), unsupported roles, symlinks and invalid gain. No shell commands or forced overwrites are used.
+
+**Evidence:** four local backend regression tests passed in isolated testing and FFmpeg successfully rendered a short real two-track PCM sample. New Qt behavior is regression-covered in source, but GitHub CI and the user's real Spider OS Studio launch/mixer/audio-device acceptance must still be checked. The GitHub development branch is **not** proof of installation; preserve the single backup-first combined install gate.
