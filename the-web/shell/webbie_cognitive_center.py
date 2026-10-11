@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"webbie/brain"))
 sys.path.insert(0,str(ROOT/"webbie/agent"))
+sys.path.insert(0,str(ROOT/"webbie/voice"))
 from focus_tasks import current_focus, focus_answer
 from privacy_controls import private_session_active, set_private_session, privacy_explanation
 from local_models import configured_choice
@@ -23,6 +24,7 @@ from proactive_checks import status_message
 from runtime_readiness import inspect_readiness, render_report
 from voice_trust import trust_status
 from voice_lab import inspect_voice_lab, voice_lab_report
+from hearing_test import run_hearing_test
 from webbie_focus_dialog import WebbieFocusDialog
 
 
@@ -39,6 +41,18 @@ class ModelInventoryWorker(QThread):
         except Exception:
             self.finishedReport.emit(
                 "Local model inventory is unavailable. No model was changed.")
+
+
+class HearingTestWorker(QThread):
+    heard=pyqtSignal(str)
+
+    def run(self):
+        try:
+            # GUI already obtained explicit consent before starting this thread.
+            self.heard.emit(run_hearing_test(approved=True))
+        except Exception:
+            self.heard.emit(
+                "Unable to complete local microphone test. No recording retained.")
 
 
 class WebbieCognitiveDialog(QDialog):
@@ -60,6 +74,7 @@ class WebbieCognitiveDialog(QDialog):
         self.emergency_callback=emergency_callback
         self.focus_dialog=None
         self.model_worker=None
+        self.hearing_worker=None
         root=QVBoxLayout(self)
         title=QLabel("WEBBIE · COGNITIVE CONTROL CENTER")
         title.setStyleSheet("font-size:19px; font-weight:bold; color:#c4b5fd")
@@ -87,10 +102,15 @@ class WebbieCognitiveDialog(QDialog):
         readiness.setObjectName("webbieReadinessButton")
         readiness.clicked.connect(self.inspect_readiness)
         actions.addWidget(readiness)
+        lab_row=QHBoxLayout(); root.addLayout(lab_row)
         voice_lab=QPushButton("Voice Lab diagnostics")
         voice_lab.setObjectName("webbieVoiceLabButton")
         voice_lab.clicked.connect(self.inspect_voice_lab)
-        actions.addWidget(voice_lab)
+        lab_row.addWidget(voice_lab)
+        hear=QPushButton("Test Webbie hearing (3 sec)")
+        hear.setObjectName("webbieHearingTestButton")
+        hear.clicked.connect(self.test_hearing)
+        lab_row.addWidget(hear)
         privacy=QHBoxLayout(); root.addLayout(privacy)
         self.private_button=QPushButton()
         self.private_button.setObjectName("webbiePrivateSessionButton")
@@ -143,6 +163,34 @@ class WebbieCognitiveDialog(QDialog):
         self.focus_dialog.show()
         self.focus_dialog.raise_()
         self.focus_dialog.activateWindow()
+
+    def test_hearing(self):
+        """Explicit owner's choice, not triggered by model/voice or startup."""
+        if self.hearing_worker and self.hearing_worker.isRunning():
+            self.report.setPlainText("A manual hearing test is already running.")
+            return
+        if QMessageBox.question(
+                self, "Test Webbie hearing?",
+                "Capture three seconds of microphone audio and transcribe it "
+                "using local Whisper? The sample and transcript will be erased "
+                "after testing. This does not verify who is speaking or grant "
+                "commands. If the resident listener owns the device, the test "
+                "may report the microphone is busy.",
+                QMessageBox.Yes|QMessageBox.No,
+                QMessageBox.No)!=QMessageBox.Yes:
+            return
+        self.report.setPlainText(
+            "Manual local hearing test requested. No voice control authorized.")
+        self.hearing_worker=HearingTestWorker(self)
+        self.hearing_worker.heard.connect(self.report.setPlainText)
+        self.hearing_worker.finished.connect(self.hearing_finished)
+        self.hearing_worker.start()
+
+    def hearing_finished(self):
+        done=self.hearing_worker
+        self.hearing_worker=None
+        if done is not None:
+            done.deleteLater()
 
     def inspect_voice_lab(self):
         """Owner click: static local files only, no microphone access."""
@@ -230,8 +278,9 @@ class WebbieCognitiveDialog(QDialog):
             "Sensitive controls stop was requested in the parent Webbie panel.")
 
     def closeEvent(self,event):
-        if self.model_worker and self.model_worker.isRunning():
-            # Keep the dialog alive while the short local diagnostic exits.
+        if ((self.model_worker and self.model_worker.isRunning()) or
+                (self.hearing_worker and self.hearing_worker.isRunning())):
+            # Keep Qt threads alive while their bounded checks exit.
             self.hide(); event.ignore()
         else:
             event.accept()
