@@ -34,10 +34,15 @@ def _clean_text(value, name, limit):
         raise SessionError(f"{name} must be 1 to {limit} characters.")
     if any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise SessionError(f"{name} cannot contain control characters.")
-    return value.strip()
+    cleaned = value.strip()
+    if cleaned.startswith(("=", "+", "-", "@")):
+        raise SessionError(f"{name} cannot begin with spreadsheet formula characters.")
+    return cleaned
 
 
 def _probe(path):
+    if not isinstance(path, (str, Path)) or not str(path).strip():
+        raise SessionError("Choose an existing WAV file.")
     source = Path(path).expanduser()
     if source.is_symlink() or source.suffix.lower() != ".wav" or not source.is_file():
         raise SessionError("Only regular, non-symlink WAV files can be imported.")
