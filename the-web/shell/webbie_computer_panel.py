@@ -8,11 +8,13 @@ from pathlib import Path
 import sys
 import os
 
-from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, QTimer, QUrl, pyqtSignal
+from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QHBoxLayout,
                              QLabel, QLineEdit, QMessageBox, QPushButton,
-                             QSpinBox, QTextEdit, QVBoxLayout)
+                             QSpinBox, QTextEdit, QVBoxLayout, QScrollArea,
+                             QWidget)
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'webbie/actions'))
@@ -21,6 +23,7 @@ from window_safety import ConfinedDesktopOperator
 from task_grants import TaskGrant
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
+from browser_routes import canonical_url, is_browser_app
 from screen_capture import capture_window, describe_window
 sys.path.insert(0, str(ROOT / 'webbie/brain'))
 from local_models import choose_local_model
@@ -96,15 +99,17 @@ class WebbieComputerDialog(QDialog):
     screenObserved = pyqtSignal(str)
     authorizationRevoked = pyqtSignal()
 
-    def __init__(self, parent=None, *, discover=None, run=None, launcher=None):
+    def __init__(self, parent=None, *, discover=None, run=None, launcher=None,
+                 browser_opener=None):
         super().__init__(parent)
         self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
         self.setObjectName('webbieComputerControl')
-        self.resize(510, 610)
+        self.resize(640, 730)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
         # Resolve preferences against locally INSTALLED Ollama models in the
         # background worker. Never download or switch the owner's engine.
         self.vision_model = None
+        self.browser_opener = browser_opener or QDesktopServices.openUrl
         self.grant = TaskGrant(approve_sensitive=self.approve_sensitive)
         self.operator = ConfinedDesktopOperator(
             permission=self.grant.authorize,
@@ -118,8 +123,17 @@ class WebbieComputerDialog(QDialog):
         self.pending_step_target = None
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
         self.bridge.openRequested.connect(self.handle_voice_open)
+        self.bridge.webRequested.connect(self.handle_voice_web)
 
-        layout = QVBoxLayout(self)
+        # Keep all explicit approval controls readable on smaller screens.
+        outer = QVBoxLayout(self)
+        self.controls_scroll = QScrollArea(self)
+        self.controls_scroll.setObjectName('webbieControlsScrollable')
+        self.controls_scroll.setWidgetResizable(True)
+        body = QWidget(self.controls_scroll)
+        self.controls_scroll.setWidget(body)
+        outer.addWidget(self.controls_scroll)
+        layout = QVBoxLayout(body)
         notice = QLabel(
             'CONTROL IS OFF BY DEFAULT. Choose an installed program and a '
             'specific task. Permission lasts up to five minutes or 75 actions, '
@@ -153,6 +167,14 @@ class WebbieComputerDialog(QDialog):
         app_row = QHBoxLayout(); layout.addLayout(app_row)
         self.open_button = QPushButton('Open selected program')
         self.open_button.clicked.connect(self.open_app); app_row.addWidget(self.open_button)
+        self.browser_url = QLineEdit()
+        self.browser_url.setPlaceholderText('HTTPS website, e.g. github.com')
+        self.browser_url.setObjectName('webbieBrowserAddress')
+        layout.addWidget(self.browser_url)
+        self.open_web_button = QPushButton('Open approved website')
+        self.open_web_button.setObjectName('webbieOpenWebsite')
+        self.open_web_button.clicked.connect(self.open_website)
+        layout.addWidget(self.open_web_button)
         self.refresh_button = QPushButton('Find open windows')
         self.refresh_button.clicked.connect(self.refresh_windows); app_row.addWidget(self.refresh_button)
 
@@ -270,9 +292,15 @@ class WebbieComputerDialog(QDialog):
         self.refresh_status()
 
     def approve_sensitive(self, action, preview):
+        if action == 'browser.open.confirm':
+            title = 'Confirm website navigation'
+            body = (preview + '\n\nOpening a site may share network data with '
+                    'that site. Proceed in your system default browser?')
+        else:
+            title = 'Confirm Webbie change'
+            body = preview + '\n\nConfirm this potentially destructive computer action?'
         return QMessageBox.question(
-            self, 'Confirm Webbie change',
-            f'{preview}\n\nConfirm this potentially destructive computer action?',
+            self, title, body,
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
 
     def refresh_status(self):
@@ -291,6 +319,8 @@ class WebbieComputerDialog(QDialog):
             if active else 'OFF | Webbie cannot operate applications')
         self.autopilot_start.setEnabled(active and not self.autopilot.active)
         self.autopilot_pause.setEnabled(self.autopilot.active)
+        self.open_web_button.setEnabled(active and is_browser_app(self.selected_app())
+                                        if self.selected_app() is not None else False)
         for control in (self.open_button, self.refresh_button, self.bind_button, self.focus_button,
                         self.inspect_button, self.close_button, self.click_button,
                         self.key_button, self.type_button, self.suggest_button):
@@ -327,6 +357,72 @@ class WebbieComputerDialog(QDialog):
             self.bridge.finish(
                 peer, f'Launch requested for {app.name}.' if result else
                 'App launch denied or unsuccessful. Check the desktop panel.')
+
+    def offer_site(self, url):
+        """Fill a proposal visibly; only the user can grant browser control."""
+        try:
+            candidate = canonical_url(url)
+        except ValueError:
+            self.status('Only public HTTPS website addresses are supported.')
+            return False
+        browser_indices = [
+            number for number, app in enumerate(self.apps) if is_browser_app(app)]
+        if not browser_indices:
+            self.status('No installed WebBrowser application is available.')
+            return False
+        current = self.selected_app()
+        if current is None or not is_browser_app(current):
+            desired_id = self.apps[browser_indices[0]].desktop_id
+            for index in range(self.app_select.count()):
+                if self.app_select.itemData(index) == desired_id:
+                    self.app_select.setCurrentIndex(index)
+                    break
+        self.browser_url.setText(candidate)
+        if not self.task.text().strip():
+            self.task.setText('Open a reviewed website in my browser')
+        self.status('Review the URL and authorize this browser task before opening.')
+        return True
+
+    def open_website(self, url=None):
+        """Owner-confirmed website navigation; never starts a privileged command."""
+        app = self.selected_app()
+        status = self.grant.status()
+        if (app is None or not is_browser_app(app) or not status['active']
+                or status['selected_app_id'] != app.desktop_id
+                or self.operator.cancelled.is_set()):
+            self.status('Select a web browser and authorize the current task first.')
+            return False
+        try:
+            destination = canonical_url(
+                self.browser_url.text() if url is None else url)
+        except ValueError as error:
+            self.status(str(error))
+            return False
+        # Show the exact destination before user confirmation.
+        self.browser_url.setText(destination)
+        if not self.grant.authorize(
+                'browser.open.confirm', 'Website: ' + destination):
+            self.status('Website navigation not approved.')
+            return False
+        if not self.grant.status()['active'] or self.operator.cancelled.is_set():
+            self.status('Browser grant expired before navigation.')
+            return False
+        if not self.browser_opener(QUrl(destination)):
+            self.status('The system default browser could not handle this link.')
+            return False
+        self.browser_url.setText(destination)
+        self.status('Website open requested in the system default browser: ' +
+                    destination[:300])
+        self.refresh_status()
+        return True
+
+    def handle_voice_web(self, url):
+        opened = self.open_website(url)
+        if self.bridge.pending is not None:
+            self.bridge.finish(
+                self.bridge.pending,
+                'Website navigation requested in your default browser.' if opened
+                else 'Website not opened. Review the Computer Control panel.')
 
     def open_app(self):
         app = self.selected_app()

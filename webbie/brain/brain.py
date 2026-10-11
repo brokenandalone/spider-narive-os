@@ -596,12 +596,16 @@ def long_term_memory_response(
     return None
 
 
-def ask_ollama(message, context_name="Cory", model=None):
+def ask_ollama(message, context_name="Cory", model=None, advisory_context=None):
     prompt = (
         SYSTEM_PROMPT
         + "\n\nCurrent user name: "
         + context_name
     )
+
+    if isinstance(advisory_context, str) and advisory_context:
+        # Never store temporary window/task context in conversation history.
+        prompt += "\n\n" + advisory_context[:1000]
 
     relevant_memories = recall_memories(
         message,
@@ -821,7 +825,7 @@ def built_in_response(message, context_name="Cory"):
     )
 
 
-def respond(message, context_name="Cory"):
+def respond(message, context_name="Cory", advisory_context=None):
     memory_answer = long_term_memory_response(
         message,
         context_name=context_name,
@@ -850,6 +854,7 @@ def respond(message, context_name="Cory"):
     answer = ask_ollama(
         message,
         context_name=context_name,
+        advisory_context=advisory_context,
     )
 
     if answer:
