@@ -25,7 +25,7 @@ class VoiceSupervisorTests(unittest.TestCase):
             min_delay=2, max_delay=4)
         supervisor.serve()
         self.assertEqual(calls, ["listen"] * 3)
-        self.assertEqual(delays, [1, 1, 1, 1])
+        self.assertEqual(delays, [1, 1, 1, 1, 1, 1])
 
     def test_listener_failure_does_not_kill_supervisor(self):
         active = [True]
