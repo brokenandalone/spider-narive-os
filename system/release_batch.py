@@ -74,6 +74,7 @@ STUDY_STUDIO_FILES = (
     'study/assignment_review.py', 'study/draft_storage.py',
     'study/assignment_workflow.py', 'study/assignment_workspace_ui.py',
     'study/flashcards.py', 'study/flashcards_ui.py',
+    'study/study_progress.py', 'study/study_progress_ui.py',
     'study/bin/webbie-homework',
     'studio/main.py', 'studio/tools.py', 'studio/music_backend.py',
     'studio/ai_panel.py',
