@@ -72,19 +72,24 @@ def import_course_reading(store, course_id, chosen_path):
         suffix = "" if index == 1 else f"-{index}"
         candidate = root / (stem + suffix + extension)
         try:
-            # Exclusive create without following a pre-existing symlink.
-            with candidate.open("xb") as output, original.open("rb") as source:
-                while True:
-                    block = source.read(131072)
-                    if not block:
-                        break
-                    output.write(block)
-                output.flush()
-                os.fsync(output.fileno())
+            # Exclusive create, private mode and no overwrite even in a race.
+            with candidate.open("xb") as output:
+                os.fchmod(output.fileno(), 0o600)
+                with original.open("rb") as source:
+                    while True:
+                        block = source.read(131072)
+                        if not block:
+                            break
+                        output.write(block)
+                    output.flush()
+                    os.fsync(output.fileno())
             copied = candidate
             break
         except FileExistsError:
             continue
+        except Exception:
+            candidate.unlink(missing_ok=True)  # Remove incomplete new copies.
+            raise
     if copied is None:
         raise ValueError("Too many similarly named readings; choose a different filename.")
     try:
