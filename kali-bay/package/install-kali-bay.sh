@@ -26,6 +26,7 @@ declare -a relative_files=(
     kali-bay/runtime/workspace_store.py
     kali-bay/runtime/lab_reports.py
     kali-bay/runtime/evidence_fingerprint.py
+    kali-bay/runtime/evidence_ledger.py
 )
 for file in "${relative_files[@]}"; do
     [[ -f "$source_root/$file" && ! -L "$source_root/$file" ]] || {
@@ -85,6 +86,7 @@ python3 -m py_compile "$source_root/kali-bay/runtime/kali_apps.py"
 python3 -m py_compile "$source_root/kali-bay/runtime/workspace_store.py"
 python3 -m py_compile "$source_root/kali-bay/runtime/lab_reports.py"
 python3 -m py_compile "$source_root/kali-bay/runtime/evidence_fingerprint.py"
+python3 -m py_compile "$source_root/kali-bay/runtime/evidence_ledger.py"
 bash -n "$source_root/kali-bay/bin/kali-bay"
 
 stamp="$(date +%Y%m%d-%H%M%S)"
