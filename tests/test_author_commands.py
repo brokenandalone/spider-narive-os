@@ -37,6 +37,8 @@ class AuthorCommandTests(unittest.TestCase):
             "resume narration": {"action": "resume_reading"},
             "stop reading": {"action": "stop_reading"},
             "cancel review": {"action": "cancel_review"},
+            "Webbie show project map": {"action": "open_project_map"},
+            "open the chapter outline": {"action": "open_project_map"},
         }
         for spoken, intent in expected.items():
             with self.subTest(spoken=spoken):
