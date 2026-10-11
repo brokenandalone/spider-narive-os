@@ -57,9 +57,35 @@ def validate_tracks(tracks, gains=None):
     return selected, levels
 
 
-def band_mix_command(ffmpeg, tracks, gains, output):
+def validate_mix_options(tracks, pans=None, mutes=None):
+    """Validate per-track stereo balance and mute independently of file paths."""
+    if not isinstance(tracks, dict) or not tracks:
+        raise MixError('Choose band WAV tracks before setting mixer controls.')
+    pans = {} if pans is None else pans
+    mutes = {} if mutes is None else mutes
+    if not isinstance(pans, dict) or not isinstance(mutes, dict):
+        raise MixError('Pan and mute settings must be mapped to track roles.')
+    if set(pans) - set(tracks) or set(mutes) - set(tracks):
+        raise MixError('Mixer controls refer to an unknown track.')
+    balances, silenced = {}, {}
+    for role in tracks:
+        pan = pans.get(role, 0.0)
+        mute = mutes.get(role, False)
+        if (isinstance(pan, bool) or not isinstance(pan, (int, float))
+                or not math.isfinite(pan) or not -1.0 <= pan <= 1.0):
+            raise MixError('Stereo pan must be a finite number from -1 to 1.')
+        if not isinstance(mute, bool):
+            raise MixError('Mute must be enabled or disabled for each track.')
+        balances[role], silenced[role] = float(pan), mute
+    if all(silenced.values()):
+        raise MixError('Unmute at least one band track before mixing.')
+    return balances, silenced
+
+
+def band_mix_command(ffmpeg, tracks, gains, output, *, pans=None, mutes=None):
     """Non-shell FFmpeg command: unique stem pads, limiter, no overwrites."""
     selected, levels = validate_tracks(tracks, gains)
+    balances, silenced = validate_mix_options(selected, pans, mutes)
     target = Path(output).expanduser()
     if target.is_symlink() or target.exists() or target.suffix.lower() != '.wav':
         raise MixError('Output must be a new WAV file.')
@@ -67,7 +93,11 @@ def band_mix_command(ffmpeg, tracks, gains, output):
     filters, pads = [], []
     for i, (role, path) in enumerate(selected.items()):
         command.extend(('-i', str(path)))
-        filters.append(f'[{i}:a:0]volume={levels[role]:.3f}[stem{i}]')
+        effective_gain = 0.0 if silenced[role] else levels[role]
+        # Native FFmpeg stereo balance works with both mono and stereo WAVs.
+        filters.append(f'[{i}:a:0]aformat=channel_layouts=stereo,'
+                       f'stereotools=balance_out={balances[role]:.3f},'
+                       f'volume={effective_gain:.3f}[stem{i}]')
         pads.append(f'[stem{i}]')
     filters.append(''.join(pads) + f'amix=inputs={len(pads)}:duration=longest:'
                    'dropout_transition=0:normalize=0,alimiter=limit=0.95[out]')
@@ -76,9 +106,10 @@ def band_mix_command(ffmpeg, tracks, gains, output):
     return command
 
 
-def mix_band_tracks(tracks, *, gains=None, output_root=None, timeout=1200, stop=None):
+def mix_band_tracks(tracks, *, gains=None, pans=None, mutes=None, output_root=None, timeout=1200, stop=None):
     """Render stereo 48 kHz WAV; keep originals, log and receipt private."""
     selected, levels = validate_tracks(tracks, gains)
+    balances, silenced = validate_mix_options(selected, pans, mutes)
     if isinstance(timeout, bool) or not isinstance(timeout, (float, int)) or not 1 <= timeout <= 7200:
         raise MixError('Invalid mix timeout.')
     stop = stop if stop is not None else threading.Event()
@@ -95,7 +126,7 @@ def mix_band_tracks(tracks, *, gains=None, output_root=None, timeout=1200, stop=
     folder = Path(tempfile.mkdtemp(prefix='band-', dir=parent))
     os.chmod(folder, 0o700)
     output = folder / 'band-mix.wav'
-    command = band_mix_command(ffmpeg, selected, levels, output)
+    command = band_mix_command(ffmpeg, selected, levels, output, pans=balances, mutes=silenced)
     log = folder / 'band-mix.log'
     try:
         with log.open('xb') as stream:
@@ -126,7 +157,8 @@ def mix_band_tracks(tracks, *, gains=None, output_root=None, timeout=1200, stop=
         receipt = {'schema': 1, 'created_at_unix': int(time.time()),
                    'render': output.name, 'source_tracks_preserved': True,
                    'independent_tracks': [
-                       {'role': role, 'source': str(path), 'gain': levels[role]}
+                       {'role': role, 'source': str(path), 'gain': levels[role],
+                        'pan': balances[role], 'muted': silenced[role]}
                        for role, path in selected.items()]}
         manifest = folder / 'band-mix.json'
         with manifest.open('x', encoding='utf-8') as stream:
