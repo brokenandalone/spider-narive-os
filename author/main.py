@@ -91,6 +91,9 @@ class AuthorWindow(QMainWindow):
             self.toolkit.reader.resume()
         elif action == 'stop_reading':
             self.toolkit.reader.stop()
+        elif action == 'open_project_map':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.project_map)
 
     def action(self, function):
         try:
