@@ -225,6 +225,20 @@ class StudyWindow(QMainWindow):
                 background:#581c87;
                 color:white;
             }
+
+            QHeaderView::section {
+                background:#291737;
+                border:1px solid #784ba1;
+                color:#f9f0ff;
+                padding:7px;
+                font-weight:bold;
+            }
+            QMenu {
+                background:#17101e;
+                color:#f9f0ff;
+                selection-background-color:#6b21a8;
+                selection-color:#ffffff;
+            }
             """
         )
 
@@ -539,6 +553,15 @@ class StudyWindow(QMainWindow):
         self.add_action(planner_buttons, "IMPORT CSV ASSIGNMENTS", self.import_csv_assignments)
         self.add_action(planner_buttons, "EXPORT COURSE CALENDAR", self.export_course_calendar)
         assignments_layout.addLayout(planner_buttons)
+
+        workspace_buttons = QHBoxLayout()
+        self.add_action(workspace_buttons, "ASSIGNMENT WORKSPACE",
+                        self.open_assignment_workspace)
+        self.add_action(workspace_buttons, "COURSE FLASHCARDS",
+                        self.open_flashcards)
+        assignments_layout.addLayout(workspace_buttons)
+        self.assignment_table.itemDoubleClicked.connect(
+            lambda _: self.open_assignment_workspace())
 
         self.tabs.addTab(
             assignments_tab,
@@ -1059,6 +1082,41 @@ class StudyWindow(QMainWindow):
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, "Calendar export", str(error))
 
+    def open_assignment_workspace(self):
+        """Open the selected assignment's persistent local workbook."""
+        assignment_id = self.selected_assignment_id()
+        if not assignment_id:
+            self.status.setText("Select an assignment before opening its workspace.")
+            return
+        try:
+            if __package__:
+                from .assignment_workspace_ui import AssignmentWorkspaceDialog
+            else:
+                from assignment_workspace_ui import AssignmentWorkspaceDialog
+            dialog = AssignmentWorkspaceDialog(
+                self.store, assignment_id,
+                self.store.course_folder(self.current_course_id), self)
+            dialog.exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Assignment workspace", str(error))
+
+    def open_flashcards(self):
+        """Manual review deck for this course, with optional CSV import."""
+        if not self.current_course_id:
+            self.status.setText("Select a course to open flashcards.")
+            return
+        try:
+            if __package__:
+                from .flashcards_ui import FlashcardsDialog
+            else:
+                from flashcards_ui import FlashcardsDialog
+            dialog = FlashcardsDialog(
+                self.store, self.current_course_id,
+                self.store.course_folder(self.current_course_id), self)
+            dialog.exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Flashcards", str(error))
+
     def complete_assignment(self):
         assignment_id = (
             self.selected_assignment_id()
@@ -1097,10 +1155,24 @@ class StudyWindow(QMainWindow):
         if not assignment_id:
             return
 
-        self.store.delete_assignment(
-            assignment_id
-        )
-
+        record = self.store.assignment_record(assignment_id)
+        if not record:
+            return
+        sections = self.store.get_assignment_workspace(assignment_id)
+        if any(text.strip() for text in sections.values()):
+            warning = ("This assignment contains saved coursework. Deleting "
+                       "removes its local Study notebook and drafts from the "
+                       "Study database. Documents already saved in the course "
+                       "folder are not deleted.")
+        else:
+            warning = ("Delete this assignment from Study? Existing course "
+                       "files are preserved.")
+        if QMessageBox.question(
+            self, "Confirm assignment deletion",
+            f"{record['title']}\n\n{warning}"
+        ) != QMessageBox.Yes:
+            return
+        self.store.delete_assignment(assignment_id)
         self.load_assignments()
 
     # --------------------------------------------------------
