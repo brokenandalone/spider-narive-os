@@ -189,8 +189,8 @@ class BandMixTests(unittest.TestCase):
                       'lead_guitar': root / 'lead.wav'}
             for source in tracks.values(): wav(source)
             before = {k: v.read_bytes() for k, v in tracks.items()}
-            with patch.object(band_mix.shutil, 'which', return_value='/usr/bin/ffmpeg'), \\
-                 patch.object(band_mix.subprocess, 'Popen', side_effect=FakeProcess):
+            with (patch.object(band_mix.shutil, 'which', return_value='/usr/bin/ffmpeg'),
+                  patch.object(band_mix.subprocess, 'Popen', side_effect=FakeProcess)):
                 out = band_mix.mix_band_tracks(
                     tracks, output_root=root / 'mixes',
                     offsets_ms={'lead_guitar': 120})
