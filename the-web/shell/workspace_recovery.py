@@ -1,11 +1,12 @@
 """User-initiated recovery window for The Web's native workspace UI."""
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
-    QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
+    QApplication, QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QMessageBox, QPushButton, QVBoxLayout)
 
 from workspaces import NATIVE
 from workspace_health import check_workspaces
+from desktop_diagnostics import build_safe_report, report_text
 
 class WorkspaceRecovery(QDialog):
     def __init__(self, shell):
@@ -68,6 +69,10 @@ class WorkspaceRecovery(QDialog):
         self.saved_restore = QPushButton('Resume last saved session (safe-start)')
         self.saved_restore.clicked.connect(self.resume_saved_session)
         layout.addWidget(self.saved_restore)
+        copy_diagnostics = QPushButton('Copy safe diagnostic report')
+        copy_diagnostics.setToolTip('Copy workspace names, status and timings only. No private files, windows or clipboard history are read.')
+        copy_diagnostics.clicked.connect(self.copy_safe_diagnostics)
+        layout.addWidget(copy_diagnostics)
         foot = QLabel('Safe-start from terminal: python3 the-web/shell/main.py --safe-workspaces')
         foot.setWordWrap(True)
         layout.addWidget(foot)
@@ -175,6 +180,27 @@ class WorkspaceRecovery(QDialog):
         if answer == QMessageBox.Yes and self.shell.adopt_current_layout():
             self.status.setText('Current tabs are now the saved startup layout.')
         self.update_restore_controls()
+
+    def copy_safe_diagnostics(self):
+        """Never send/upload diagnostics; clipboard copy requires a click."""
+        rows = check_workspaces(
+            self.shell.spider_root(), self.shell.workspaces_for_navigation(),
+            NATIVE, loaded=self.shell.workspace_widgets,
+            failures=self.shell.workspace_load_errors)
+        report = build_safe_report(
+            self.shell.workspaces_for_navigation(),
+            [self.shell.tabs.widget(i).property('workspace')
+             for i in range(self.shell.tabs.count())],
+            self.shell.current_workspace, health=rows,
+            load_seconds=self.shell.workspace_load_seconds,
+            restore=self.shell.staged_restore_status(),
+            applications=len(self.shell.installed_apps),
+            open_windows=len(self.shell.visible_launcher_windows()),
+            safe_mode=self.shell.safe_mode)
+        QApplication.clipboard().setText(report_text(report))
+        self.status.setText(
+            'Safe diagnostics copied locally. The report contains workspace '
+            'identifiers, status, counts and load timings only. Review before sharing.')
 
     def retry_selected(self):
         item = self.list.currentItem()
