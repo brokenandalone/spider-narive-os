@@ -232,6 +232,7 @@ class Taskbar(QWidget):
         self.window_scan_worker = worker
         worker.found.connect(self.render_tasks)
         worker.finished.connect(self.window_scan_finished)
+        worker.finished.connect(worker.deleteLater)
         worker.start()
 
     def window_scan_finished(self):
@@ -523,6 +524,7 @@ class TheWeb(QMainWindow):
         worker.failed.connect(lambda detail: self.status.setText(
             'Application discovery failed: ' + detail))
         worker.finished.connect(self.app_scan_finished)
+        worker.finished.connect(worker.deleteLater)
         worker.start()
 
     def apps_discovered(self, applications):
