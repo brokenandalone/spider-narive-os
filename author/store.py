@@ -30,7 +30,75 @@ class AuthorStore:
             CREATE INDEX IF NOT EXISTS idx_story_bible_book ON story_bible(book_id);
             CREATE INDEX IF NOT EXISTS idx_companion_book ON companion_references(book_id);
         """)
+        self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS chapter_plans(
+                chapter_id INTEGER PRIMARY KEY REFERENCES chapters(id) ON DELETE CASCADE,
+                status TEXT NOT NULL DEFAULT 'draft',
+                target_words INTEGER NOT NULL DEFAULT 0,
+                notes TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK(status IN ('draft','revising','ready')),
+                CHECK(target_words BETWEEN 0 AND 200000)
+            );
+        """)
         self.db.commit()
+
+    PLAN_STATUSES = ('draft', 'revising', 'ready')
+
+    def chapter_plan(self, chapter_id):
+        """Return optional editorial metadata; never mutate manuscript content."""
+        self.chapter(chapter_id)
+        plan = self.db.execute(
+            'SELECT status,target_words,notes,updated_at FROM chapter_plans '
+            'WHERE chapter_id=?', (chapter_id,)
+        ).fetchone()
+        return dict(plan) if plan else {
+            'status': 'draft', 'target_words': 0,
+            'notes': '', 'updated_at': None
+        }
+
+    def save_chapter_plan(self, chapter_id, *, status='draft', target_words=0, notes=''):
+        if status not in self.PLAN_STATUSES:
+            raise ValueError('Invalid chapter status.')
+        if (isinstance(target_words, bool) or not isinstance(target_words, int)
+                or not 0 <= target_words <= 200000):
+            raise ValueError('Target words must be between 0 and 200000.')
+        if not isinstance(notes, str) or len(notes) > 20000:
+            raise ValueError('Chapter notes must contain at most 20000 characters.')
+        self.chapter(chapter_id)
+        with self.db:
+            self.db.execute("""
+                INSERT INTO chapter_plans(chapter_id,status,target_words,notes)
+                VALUES(?,?,?,?)
+                ON CONFLICT(chapter_id) DO UPDATE SET
+                    status=excluded.status,
+                    target_words=excluded.target_words,
+                    notes=excluded.notes,
+                    updated_at=CURRENT_TIMESTAMP
+            """, (chapter_id, status, target_words, notes))
+
+    def project_outline(self, book_id):
+        """Ordered chapter summary for a book, including real word counts."""
+        if not self.db.execute('SELECT 1 FROM books WHERE id=?', (book_id,)).fetchone():
+            raise ValueError('Book does not exist.')
+        rows = self.db.execute("""
+            SELECT c.id,c.title,c.content,
+                   COALESCE(p.status,'draft') AS status,
+                   COALESCE(p.target_words,0) AS target_words,
+                   COALESCE(p.notes,'') AS notes
+              FROM chapters c
+              LEFT JOIN chapter_plans p ON p.chapter_id=c.id
+             WHERE c.book_id=? ORDER BY c.id
+        """, (book_id,)).fetchall()
+        return [
+            {
+                'id': row['id'], 'title': row['title'],
+                'words': len(row['content'].split()),
+                'status': row['status'],
+                'target_words': row['target_words'],
+                'notes': row['notes'],
+            } for row in rows
+        ]
 
     def books(self):
         return self.db.execute('SELECT * FROM books ORDER BY id').fetchall()
