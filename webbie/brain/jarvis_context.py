@@ -16,7 +16,7 @@ import time
 DEFAULT_PATH = Path.home() / ".local/state/spider-os/webbie-jarvis-context.json"
 MAX_BYTES = 3072
 TTL = 90
-FIELDS = ("workspace", "mode", "selected_title", "approved_task")
+FIELDS = ("workspace", "mode", "selected_title", "selected_window", "approved_task")
 
 
 def _label(value, maximum):
@@ -28,7 +28,8 @@ def _label(value, maximum):
 
 
 def publish_context(*, workspace, mode="Normal", selected_title="",
-                    approved_task="", sleeping=False, path=DEFAULT_PATH,
+                    approved_task="", selected_window="", sleeping=False,
+                    path=DEFAULT_PATH,
                     clock=None):
     """Called only by the live trusted Webbie GUI, never by model or voice text."""
     target = Path(path)
@@ -47,6 +48,7 @@ def publish_context(*, workspace, mode="Normal", selected_title="",
         "workspace": _label(workspace, 80),
         "mode": _label(mode, 60),
         "selected_title": "" if sleeping else _label(selected_title, 160),
+        "selected_window": "" if sleeping else _label(selected_window, 140),
         "approved_task": "" if sleeping else _label(approved_task, 200),
     }
     payload = json.dumps(item, separators=(",", ":"), ensure_ascii=False).encode()
@@ -88,6 +90,7 @@ def read_context(path=DEFAULT_PATH, *, clock=None):
                     "mode": _label(data.get("mode"), 60), "sleeping": True}
         return {key: _label(data.get(key), limit) for key, limit in (
             ("workspace", 80), ("mode", 60), ("selected_title", 160),
+            ("selected_window", 140),
             ("approved_task", 200))}
     except (OSError, ValueError, TypeError, UnicodeError):
         return {}
@@ -103,6 +106,8 @@ def context_summary(data):
         lines.append("Mode: " + data["mode"])
     if data.get("selected_title"):
         lines.append("Selected title: " + data["selected_title"])
+    if data.get("selected_window"):
+        lines.append("Selected window: " + data["selected_window"])
     if data.get("approved_task"):
         lines.append("Approved task: " + data["approved_task"])
     return ". ".join(lines) + ". Nothing here authorizes computer control."
