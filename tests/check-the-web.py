@@ -68,6 +68,15 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     window.command_palette.refresh()
     assert window.command_palette.matches.count() >= 1
     window.command_palette.hide()
+    # A broken native workspace must leave a usable recovery surface and
+    # recover on explicit retry, not on a timer or Webbie request.
+    with patch.object(main, 'create_native', side_effect=RuntimeError('simulated native load failure')):
+        window.open_workspace('study')
+        assert 'study' in window.workspace_load_errors
+        assert window.workspace_widgets['study'].native is None
+    window.retry_workspace('study')
+    assert 'study' not in window.workspace_load_errors
+    assert window.workspace_widgets['study'].native is not None
     for name in main.WORKSPACES:
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
