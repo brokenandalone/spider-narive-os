@@ -83,7 +83,7 @@ class SessionTests(unittest.TestCase):
             plan = [{"path": str(source), "role": "lead_vocal", "label": "Owner"}]
             with self.assertRaisesRegex(SessionError, "cancelled"):
                 export_session(plan, title="Stopped", output_root=root / "out",
-                               stop=threading.Event() if False else _stopped())
+                               stop=_stopped())
             self.assertFalse((root / "out").exists())
             one = export_session(plan, title="Song", output_root=root / "out")
             two = export_session(plan, title="Song", output_root=root / "out")
@@ -95,7 +95,8 @@ class SessionTests(unittest.TestCase):
             root = Path(workspace)
             source = root / "lead.wav"
             make_wav(source)
-            for role, label in (("fake_guitar_ai", "lead"), ("lead_vocal", "=dangerous\ncell")):
+            for role, label in (("fake_guitar_ai", "lead"), ("lead_vocal", "=1+1"),
+                                ("lead_vocal", "=dangerous\ncell")):
                 with self.assertRaises(SessionError):
                     export_session([{"path": str(source), "role": role, "label": label}],
                                    title="Invalid", output_root=root / "out")
