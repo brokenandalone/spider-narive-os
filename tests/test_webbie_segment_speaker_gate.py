@@ -80,7 +80,8 @@ class VoiceSegmentTests(unittest.TestCase):
             {"speaker_verification":{"enabled":True}},
             voice_root=self.root,
             clock=lambda:100,
-            importer=lambda name:type("Fake",(),{"verify_audio_segment":lambda path:self.evidence()})())
+            importer=lambda name:__import__("types").SimpleNamespace(
+                verify_audio_segment=lambda path:self.evidence()))
         self.assertTrue(gate.configured)
         self.assertEqual(gate.verify_file(self.audio).name,"cory")
 
