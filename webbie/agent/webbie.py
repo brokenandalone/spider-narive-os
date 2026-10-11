@@ -119,6 +119,8 @@ def load_config():
             "wake_words": [
                 "hey webbie",
                 "webbie",
+                "hey webby",
+                "webby",
                 "hey web",
                 "web",
             ],
