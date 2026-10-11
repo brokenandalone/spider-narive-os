@@ -93,12 +93,12 @@ class NativeReconciliationTests(unittest.TestCase):
         )
         note = helper.STUDIO_OLD_NOTE.replace(
             'content.addSpacing(20)', 'content.addSpacing(8)'
-        ).replace('        content.addStretch()\\n', '')
-        marker = '        self.refresh_tools()\\n\\n        footer = QLabel('
+        ).replace('        content.addStretch()\n', '')
+        marker = '        self.refresh_tools()\n\n        footer = QLabel('
         self.assertEqual(owner.count(marker), 1)
         owner = owner.replace(
             marker,
-            '        self.refresh_tools()\\n\\n' + note + '        footer = QLabel(',
+            '        self.refresh_tools()\n\n' + note + '        footer = QLabel(',
             1,
         ).replace(
             "self.status.setText('Application opened.')",
