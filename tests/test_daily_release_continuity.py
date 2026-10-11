@@ -132,8 +132,10 @@ class DailyContinuityTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Combined daily release BLOCKED"):
             module.require_daily_continuity(self.backups, ROOT)
         content = script.read_text()
-        self.assertIn("if args.action == 'apply':\\n            require_daily_continuity(backup_root)",
-                      content.replace("\\n", "\n"))
+        self.assertIn(
+            "if args.action == 'apply':\n            require_daily_continuity(backup_root)",
+            content,
+        )
 
     def test_wrong_date_or_missing_verified_installer_hook_blocks(self):
         self.ready_plan()
