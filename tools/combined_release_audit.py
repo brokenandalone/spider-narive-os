@@ -29,6 +29,7 @@ COMPONENTS = {
         "the-web/shell/webbie_reminders_dialog.py",
         "the-web/shell/main.py", "webbie/actions/autopilot_policy.py",
         "webbie/actions/navigation_missions.py", "webbie/actions/action_journal.py",
+        "webbie/agent/workspace_launchers.py",
         "the-web/package/reconcile-native.py",
     ),
     "Study and school OneDrive": (
