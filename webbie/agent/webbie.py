@@ -322,7 +322,7 @@ def set_workspace(name):
 def handle_builtin(command):
     lower = command.lower().strip()
     stripped = re.sub(
-        r"^(?:hey )?(?:webbie|webby|web)[\\s,.:]+", "", lower).strip(" ?.!")
+        r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
     if stripped in ("private session status", "is private session on",
                     "is privacy mode on", "what is your privacy status"):
         return privacy_explanation()
@@ -638,7 +638,7 @@ def handle_command(command, voice=False, expected_turn=None,
                     focus_workspace = "default"
                 extra_context = advisory_context(read_context())
                 if not private_session_active():
-                    extra_context += "\\n" + advisory_focus(focus_workspace)
+                    extra_context += "\n" + advisory_focus(focus_workspace)
                 reply = (app_reply if app_reply is not None else
                          respond(
                              command, context_name=current_name(),
