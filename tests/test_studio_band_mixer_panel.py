@@ -92,5 +92,91 @@ class BandMixerPanelTests(unittest.TestCase):
             panel.close()
 
 
+    def test_solo_only_renders_selected_role_without_changing_user_mutes(self):
+        panel = BandMixerPanel()
+        for role in ('lead_vocal', 'rhythm_guitar', 'lead_guitar'):
+            panel.track_fields[role].setText('/tmp/' + role + '.wav')
+        panel.solos['lead_guitar'].setChecked(True)
+        panel.mutes['lead_guitar'].setChecked(True)
+        _, _, effective_mutes, _ = panel.render_options(panel.current_tracks())
+        self.assertEqual(effective_mutes, {
+            'lead_vocal': True, 'rhythm_guitar': True, 'lead_guitar': False,
+        })
+        self.assertTrue(panel.mutes['lead_guitar'].isChecked())
+        panel.close()
+
+    def test_ui_passes_alignment_offsets_to_worker(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            panel = BandMixerPanel()
+            for role in ('rhythm_guitar', 'lead_guitar'):
+                wav_file = root / (role + '.wav')
+                make_wav(wav_file)
+                panel.track_fields[role].setText(str(wav_file))
+            panel.offsets['lead_guitar'].setValue(320)
+            with patch('studio.band_mixer_panel.BandMixerWorker') as worker:
+                panel.start_mix()
+                self.assertEqual(worker.call_args.args[4]['lead_guitar'], 320)
+                panel.cancel_mix()
+                panel.mix_finished()
+            panel.close()
+
+    def test_save_project_is_explicit_and_includes_all_ui_settings(self):
+        panel = BandMixerPanel()
+        panel.project_title.setText('New Song Chapter')
+        panel.track_fields['lead_vocal'].setText('/tmp/private-owner.wav')
+        panel.gains['lead_vocal'].setValue(.8)
+        panel.pans['lead_vocal'].setValue(-.1)
+        panel.solos['lead_vocal'].setChecked(True)
+        panel.offsets['lead_vocal'].setValue(260)
+        with patch('studio.band_mixer_panel.save_project', return_value=Path('/tmp/private/project-xyz/project.json')) as saver:
+            panel.save_current_project()
+            self.assertEqual(saver.call_args.args[0], 'New Song Chapter')
+            track = saver.call_args.args[1]['lead_vocal']
+            self.assertEqual(track['gain'], .8)
+            self.assertEqual(track['pan'], -.1)
+            self.assertEqual(track['offset_ms'], 260)
+            self.assertTrue(track['solo'])
+        panel.close()
+
+    def test_load_project_replaces_previous_role_settings_and_displays_missing_stems(self):
+        panel = BandMixerPanel()
+        panel.project_library.addItem('Saved version', '/tmp/project-xyz/project.json')
+        panel.project_library.setCurrentIndex(panel.project_library.count() - 1)
+        state = {
+            'title': 'Broken City: Take 4',
+            'tracks': {'lead_guitar': {'path': '/tmp/lead.wav', 'gain': .5,
+                      'pan': .4, 'muted': True, 'solo': False, 'offset_ms': 170}},
+            'missing_sources': ['lead_guitar'],
+        }
+        with patch('studio.band_mixer_panel.load_project', return_value=state):
+            panel.load_selected_project()
+        self.assertEqual(panel.project_title.text(), 'Broken City: Take 4')
+        self.assertEqual(panel.track_fields['lead_guitar'].text(), '/tmp/lead.wav')
+        self.assertEqual(panel.gains['lead_guitar'].value(), .5)
+        self.assertEqual(panel.offsets['lead_guitar'].value(), 170)
+        self.assertTrue(panel.mutes['lead_guitar'].isChecked())
+        self.assertEqual(panel.track_fields['rhythm_guitar'].text(), '')
+        self.assertIn('Missing WAV stems', panel.status.text())
+        panel.close()
+
+    def test_history_and_daw_handoff_are_explicit_non_generating_actions(self):
+        panel = BandMixerPanel()
+        panel.track_fields['rhythm_guitar'].setText('/tmp/rhythm.wav')
+        panel.track_fields['guest_vocal'].setText('/tmp/guest.wav')
+        with patch('studio.band_mixer_panel.MultitrackDialog') as dialog:
+            panel.open_daw_session()
+            entries = dialog.call_args.args[0]
+            self.assertEqual([r['role'] for r in entries], ['backing_vocal', 'rhythm_guitar'])
+            dialog.return_value.exec_.assert_called_once()
+        with patch('studio.band_mixer_panel.recent_mixes', return_value=[
+            {'file': '/tmp/previous.wav', 'created_at_unix': 123456,
+             'track_count': 2}]):
+            panel.refresh_history()
+        self.assertEqual(panel.mix_history.count(), 1)
+        self.assertEqual(panel.mix_history.currentData(), '/tmp/previous.wav')
+        panel.close()
+
+
 if __name__ == '__main__':
     unittest.main()

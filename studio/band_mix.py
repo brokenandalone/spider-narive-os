@@ -82,10 +82,47 @@ def validate_mix_options(tracks, pans=None, mutes=None):
     return balances, silenced
 
 
-def band_mix_command(ffmpeg, tracks, gains, output, *, pans=None, mutes=None):
+def validate_offsets(tracks, offsets_ms=None):
+    """Allow precise positive per-stem start delay in milliseconds."""
+    offsets_ms = {} if offsets_ms is None else offsets_ms
+    if not isinstance(offsets_ms, dict) or set(offsets_ms) - set(tracks):
+        raise MixError('Offsets must refer only to selected tracks.')
+    checked = {}
+    for role in tracks:
+        amount = offsets_ms.get(role, 0)
+        if isinstance(amount, bool) or not isinstance(amount, int) or not 0 <= amount <= 60000:
+            raise MixError('Start offsets must be whole milliseconds from 0 to 60000.')
+        checked[role] = amount
+    return checked
+
+
+def inspect_tracks(tracks):
+    """Read source metadata only. Differences are warnings, not automatic fixes."""
+    selected, _ = validate_tracks(tracks)
+    report = {}
+    for role, source in selected.items():
+        with wave.open(str(source), 'rb') as wav:
+            rate = wav.getframerate()
+            report[role] = {
+                'sample_rate': rate, 'channels': wav.getnchannels(),
+                'duration_seconds': round(wav.getnframes() / rate, 3),
+                'sample_width_bytes': wav.getsampwidth(),
+                'file_bytes': source.stat().st_size,
+            }
+    durations = [row['duration_seconds'] for row in report.values()]
+    warnings = []
+    if max(durations) - min(durations) > 0.5:
+        warnings.append('Track durations differ by over 0.5 seconds; check alignment in your DAW.')
+    if len({row['sample_rate'] for row in report.values()}) > 1:
+        warnings.append('Sample rates differ; FFmpeg will resample them in the final mix.')
+    return {'tracks': report, 'warnings': warnings}
+
+
+def band_mix_command(ffmpeg, tracks, gains, output, *, pans=None, mutes=None, offsets_ms=None):
     """Non-shell FFmpeg command: unique stem pads, limiter, no overwrites."""
     selected, levels = validate_tracks(tracks, gains)
     balances, silenced = validate_mix_options(selected, pans, mutes)
+    offsets = validate_offsets(selected, offsets_ms)
     target = Path(output).expanduser()
     if target.is_symlink() or target.exists() or target.suffix.lower() != '.wav':
         raise MixError('Output must be a new WAV file.')
@@ -96,6 +133,7 @@ def band_mix_command(ffmpeg, tracks, gains, output, *, pans=None, mutes=None):
         effective_gain = 0.0 if silenced[role] else levels[role]
         # Native FFmpeg stereo balance works with both mono and stereo WAVs.
         filters.append(f'[{i}:a:0]aformat=channel_layouts=stereo,'
+                       f'adelay={offsets[role]}:all=1,'
                        f'stereotools=balance_out={balances[role]:.3f},'
                        f'volume={effective_gain:.3f}[stem{i}]')
         pads.append(f'[stem{i}]')
@@ -106,10 +144,11 @@ def band_mix_command(ffmpeg, tracks, gains, output, *, pans=None, mutes=None):
     return command
 
 
-def mix_band_tracks(tracks, *, gains=None, pans=None, mutes=None, output_root=None, timeout=1200, stop=None):
+def mix_band_tracks(tracks, *, gains=None, pans=None, mutes=None, offsets_ms=None, output_root=None, timeout=1200, stop=None):
     """Render stereo 48 kHz WAV; keep originals, log and receipt private."""
     selected, levels = validate_tracks(tracks, gains)
     balances, silenced = validate_mix_options(selected, pans, mutes)
+    offsets = validate_offsets(selected, offsets_ms)
     if isinstance(timeout, bool) or not isinstance(timeout, (float, int)) or not 1 <= timeout <= 7200:
         raise MixError('Invalid mix timeout.')
     stop = stop if stop is not None else threading.Event()
@@ -126,7 +165,7 @@ def mix_band_tracks(tracks, *, gains=None, pans=None, mutes=None, output_root=No
     folder = Path(tempfile.mkdtemp(prefix='band-', dir=parent))
     os.chmod(folder, 0o700)
     output = folder / 'band-mix.wav'
-    command = band_mix_command(ffmpeg, selected, levels, output, pans=balances, mutes=silenced)
+    command = band_mix_command(ffmpeg, selected, levels, output, pans=balances, mutes=silenced, offsets_ms=offsets)
     log = folder / 'band-mix.log'
     try:
         with log.open('xb') as stream:
@@ -158,7 +197,8 @@ def mix_band_tracks(tracks, *, gains=None, pans=None, mutes=None, output_root=No
                    'render': output.name, 'source_tracks_preserved': True,
                    'independent_tracks': [
                        {'role': role, 'source': str(path), 'gain': levels[role],
-                        'pan': balances[role], 'muted': silenced[role]}
+                        'pan': balances[role], 'muted': silenced[role],
+                        'offset_ms': offsets[role]}
                        for role, path in selected.items()]}
         manifest = folder / 'band-mix.json'
         with manifest.open('x', encoding='utf-8') as stream:

@@ -150,6 +150,62 @@ class BandMixTests(unittest.TestCase):
             self.assertEqual(by_role['lead_guitar']['pan'], .4)
             self.assertFalse(by_role['lead_guitar']['muted'])
 
+    def test_audio_offsets_encoded_in_ffmpeg_with_exact_millisecond_values(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tracks = {'rhythm_guitar': root / 'rhythm.wav',
+                      'lead_guitar': root / 'lead.wav'}
+            for path in tracks.values(): wav(path)
+            command = band_mix.band_mix_command(
+                'ffmpeg', tracks, {}, root / 'fresh.wav',
+                offsets_ms={'rhythm_guitar': 450, 'lead_guitar': 5})
+            graph = command[command.index('-filter_complex') + 1]
+            self.assertIn('adelay=450:all=1', graph)
+            self.assertIn('adelay=5:all=1', graph)
+            self.assertEqual(command.count('-i'), 2)
+            self.assertIn('-n', command)
+            for invalid in (-1, 60001, False, 2.5, '100'):
+                with self.assertRaises(MixError):
+                    band_mix.validate_offsets(tracks, {'lead_guitar': invalid})
+            with self.assertRaises(MixError):
+                band_mix.validate_offsets(tracks, {'unknown': 250})
+
+    def test_inspect_tracks_reports_duration_and_sample_rate_mismatch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            a, b = root / 'one.wav', root / 'two.wav'
+            wav(a, rate=8000)
+            wav(b, rate=44100)
+            # Produce a genuine >0.5s duration difference, not just rate drift.
+            with wave.open(str(a), 'wb') as long_audio:
+                long_audio.setnchannels(1)
+                long_audio.setsampwidth(2)
+                long_audio.setframerate(8000)
+                long_audio.writeframes(bytes(16000))
+            inspection = band_mix.inspect_tracks({'drums': a, 'bass': b})
+            self.assertEqual(inspection['tracks']['drums']['sample_rate'], 8000)
+            self.assertEqual(inspection['tracks']['bass']['sample_rate'], 44100)
+            self.assertTrue(any('Sample rates differ' in note for note in inspection['warnings']))
+            self.assertTrue(any('durations differ' in note for note in inspection['warnings']))
+
+    def test_receipt_records_offset_without_changing_input_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tracks = {'rhythm_guitar': root / 'rhythm.wav',
+                      'lead_guitar': root / 'lead.wav'}
+            for source in tracks.values(): wav(source)
+            before = {k: v.read_bytes() for k, v in tracks.items()}
+            with (patch.object(band_mix.shutil, 'which', return_value='/usr/bin/ffmpeg'),
+                  patch.object(band_mix.subprocess, 'Popen', side_effect=FakeProcess)):
+                out = band_mix.mix_band_tracks(
+                    tracks, output_root=root / 'mixes',
+                    offsets_ms={'lead_guitar': 120})
+            data = json.loads((out.parent / 'band-mix.json').read_text())
+            roles = {row['role']: row for row in data['independent_tracks']}
+            self.assertEqual(roles['lead_guitar']['offset_ms'], 120)
+            self.assertEqual(roles['rhythm_guitar']['offset_ms'], 0)
+            self.assertEqual(before, {k: v.read_bytes() for k, v in tracks.items()})
+
     def test_cancel_before_output_and_refuse_existing_target(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
