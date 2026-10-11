@@ -496,6 +496,44 @@ readiness_json() {
         "$catalog_source" "$next_step"
 }
 
+# Kali Purple defensive tooling: read-only executable inventory.
+# Reports binary presence, NOT active services or configured sensors.
+purple_status_json() {
+    if ! command -v podman >/dev/null 2>&1; then
+        printf '{"state":"unavailable","tools":{},"detail":"Podman unavailable"}\n'
+        return 0
+    fi
+    if ! container_exists; then
+        printf '{"state":"missing","tools":{},"detail":"Existing Kali container not found"}\n'
+        return 0
+    fi
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || { printf '{"state":"unknown","tools":{},"detail":"Container inspection failed"}\n'; return 0; }
+    if [[ "${running}" != true ]]; then
+        printf '{"state":"stopped","tools":{},"detail":"Existing Kali container is stopped"}\n'
+        return 0
+    fi
+
+    # Fixed identifiers inside a fixed guest script, never a user/LLM command.
+    podman exec --user 0 --tty=false "${NAME}" sh -c '
+        printf "{\\"state\\":\\"running\\",\\"tools\\":{"
+        first=1
+        for executable in suricata zeek yara lynis clamscan wireshark tcpdump tshark auditctl; do
+            if command -v "$executable" >/dev/null 2>&1; then
+                installed=true
+            else
+                installed=false
+            fi
+            if [ "$first" -eq 0 ]; then printf ","; fi
+            first=0
+            printf "\\"%s\\":%s" "$executable" "$installed"
+        done
+        printf "},\\"detail\\":\\"Binary presence only. No sensors or scans started.\\"}\n"
+    '
+}
+
+
 info() {
     echo "Name: Kali Bay"
     echo "Container: ${NAME}"
@@ -575,6 +613,9 @@ case "${1:-ui}" in
     readiness-json)
         readiness_json
         ;;
+    purple-json)
+        purple_status_json
+        ;;
     doctor)
         doctor
         ;;
@@ -595,6 +636,7 @@ Usage:
   kali-bay update
   kali-bay status
   kali-bay readiness-json # read-only Kali/GUI readiness
+  kali-bay purple-json # read-only installed defensive binaries
   kali-bay doctor
   kali-bay apps-json   # read-only installed Kali desktop applications
   kali-bay app-check <system.desktop>
