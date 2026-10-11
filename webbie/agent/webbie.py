@@ -36,10 +36,12 @@ sys.path.insert(
 
 
 from brain import respond
+from jarvis_context import read_context, context_summary, advisory_context
 from interruptible_speech import InterruptibleSpeech
 from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
-from app_open_route import installed_app_request
+from app_open_route import installed_app_request, request_approved_website
+from browser_routes import parse_browser_command
 from voice_turns import VoiceTurnTracker
 from voice_queue import VoiceTurnCoordinator
 from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
@@ -576,9 +578,21 @@ def handle_command(command, voice=False, expected_turn=None,
         last_input="voice" if voice else "text",
     )
 
+    # Jarvis browser actions never execute in the agent. A literal user
+    # request may propose a URL to the existing GUI, which confirms it.
+    browser = parse_browser_command(command) if voice else None
+    if browser is not None:
+        reply = (request_approved_website(browser.url) if browser.url else
+                 "That website address is blocked. Use a public HTTPS address.")
+    elif re.fullmatch(
+        r"(?:hey )?(?:webbie|webby|web)[ ,]+"
+        r"(?:what am i working on|what is my current task|what workspace am i in|"
+        r"what is on my screen|what are we doing)", command, re.I,
+    ):
+        reply = context_summary(read_context())
     # Speech-triggered camera questions work only with consent granted in
     # The Web GUI. They cannot enable the webcam or bypass quiet sleep.
-    if voice and visual_question(command):
+    elif voice and visual_question(command):
         reply = ask_vision(command)
     else:
         verified_reply = (
@@ -597,7 +611,9 @@ def handle_command(command, voice=False, expected_turn=None,
                 # owner's GUI grant; they cannot create one or run commands.
                 app_reply = installed_app_request(command) if voice else None
                 reply = (app_reply if app_reply is not None else
-                         respond(command, context_name=current_name()))
+                         respond(
+                             command, context_name=current_name(),
+                             advisory_context=advisory_context(read_context())))
 
     if voice:
         # A completed model request cannot resume speaking after STOP.
