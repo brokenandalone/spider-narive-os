@@ -47,6 +47,11 @@ class AuthorStore:
         else:
             from story_atlas import StoryAtlas
         self.atlas = StoryAtlas(self)
+        if __package__:
+            from .master_canon import MasterCanon
+        else:
+            from master_canon import MasterCanon
+        self.master_canon = MasterCanon(self)
 
     PLAN_STATUSES = ('draft', 'revising', 'ready')
 
