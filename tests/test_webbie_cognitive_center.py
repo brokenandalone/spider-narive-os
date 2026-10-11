@@ -29,6 +29,7 @@ class CognitiveCenterTests(unittest.TestCase):
         try:
             for identifier in (
                 "webbieFocusTaskButton","webbieInspectModelsButton",
+                "webbieReadinessButton",
                 "webbiePrivateSessionButton","webbieClearRecentChatButton",
                 "webbieSensitiveStopButton"):
                 button=center.findChild(QPushButton,identifier)
@@ -66,6 +67,19 @@ class CognitiveCenterTests(unittest.TestCase):
                        return_value=QMessageBox.Yes):
                 center.stop_sensitive()
             callback.assert_called_once()
+        finally:
+            center.close()
+
+    def test_readiness_display_is_readonly(self):
+        center=WebbieCognitiveDialog(workspace_callback=lambda:"studio")
+        try:
+            from runtime_readiness import Observation
+            with patch("webbie_cognitive_center.inspect_readiness",
+                       return_value=(Observation(
+                           "agent","unknown","No recent heartbeat"),)):
+                center.inspect_readiness()
+            self.assertIn("No recent heartbeat",center.report.toPlainText())
+            self.assertIn("No hardware was activated",center.report.toPlainText())
         finally:
             center.close()
 
