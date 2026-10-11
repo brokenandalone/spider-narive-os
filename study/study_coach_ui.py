@@ -66,13 +66,21 @@ class StudyCoachDialog(QDialog):
         self.materials.setPlaceholderText("Paste verified excerpts or your own notes. Review everything selected.")
         self.notes_checkbox = QCheckBox("Include selected course notes (currently off)")
         self.notes_checkbox.setChecked(False)
+        self.notes_preview = QTextEdit()
+        self.notes_preview.setReadOnly(True)
+        self.notes_preview.setPlainText(self.selected_notes[:9000])
+        self.notes_preview.setMaximumHeight(110)
+        self.notes_preview.setVisible(False)
+        self.notes_checkbox.toggled.connect(self.notes_preview.setVisible)
         self.question = QLineEdit()
         self.question.setMaxLength(2000)
         self.question.setPlaceholderText("A question or follow-up, optional if material is supplied")
         for label, widget in [
             ("Course", self.course), ("Topic", self.topic),
             ("Learning mode", self.mode), ("Selected study material", self.materials),
-            ("Notes option", self.notes_checkbox), ("Your question", self.question),
+            ("Notes option", self.notes_checkbox),
+            ("Course notes preview (when selected)", self.notes_preview),
+            ("Your question", self.question),
         ]:
             form.addRow(label, widget)
         layout.addLayout(form)
