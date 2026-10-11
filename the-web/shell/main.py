@@ -151,6 +151,7 @@ class StartMenu(QDialog):
         actions.addWidget(button('Quick Launch', shell.toggle_command_palette))
         actions.addWidget(button('Refresh apps', shell.refresh_apps))
         actions.addWidget(button('Windows', shell.toggle_window_overview))
+        actions.addWidget(button('Recovery', shell.toggle_workspace_recovery))
         actions.addWidget(button('Lock', shell.lock_session))
         actions.addWidget(button('Log out', shell.logout))
         self.populate()
@@ -320,6 +321,8 @@ class TheWeb(QMainWindow):
         self._previous_tab_shortcut.activated.connect(lambda: self.cycle_tab(-1))
         self._home_shortcut = QShortcut(QKeySequence('Ctrl+Alt+Home'), self)
         self._home_shortcut.activated.connect(self.show_desktop)
+        self._recovery_shortcut = QShortcut(QKeySequence('Ctrl+Alt+R'), self)
+        self._recovery_shortcut.activated.connect(self.toggle_workspace_recovery)
         self._pinned_shortcuts = []
         for number in range(1, 9):
             shortcut = QShortcut(QKeySequence(f'Ctrl+Alt+{number}'), self)
@@ -714,6 +717,69 @@ class TheWeb(QMainWindow):
         if action is not None and ident in {key for key, _, _ in INTERNAL_ACTIONS}:
             action()
 
+    def spider_root(self):
+        return SPIDER_ROOT
+
+    def toggle_workspace_recovery(self):
+        panel = getattr(self, 'workspace_recovery', None)
+        if panel is None:
+            panel = WorkspaceRecovery(self)
+            self.workspace_recovery = panel
+        if panel.isVisible():
+            panel.hide()
+        else:
+            panel.setStyleSheet(self._appearance_style())
+            panel.refresh()
+            panel.show()
+            panel.raise_()
+            panel.activateWindow()
+
+    def retry_workspace(self, name):
+        if name not in WORKSPACES or name == 'default':
+            return
+        # The original placeholder can be safely removed because no native
+        # editor was constructed. Normal editors use their existing close guard.
+        if name in self.workspace_load_errors and name in self.workspace_widgets:
+            previous = self.workspace_widgets[name]
+            if getattr(previous, 'native', None) is not None:
+                return
+            self.close_named_tab(name)
+            if name in self.workspace_widgets:
+                return
+        self.open_workspace(name)
+
+    def save_layout_checkpoint(self):
+        session = {'open': [self.tabs.widget(i).property('workspace')
+                            for i in range(self.tabs.count())],
+                   'active': self.current_workspace}
+        return save_checkpoint(checkpoint_path(), session, WORKSPACES)
+
+    def restore_layout_checkpoint(self):
+        session = read_checkpoint(checkpoint_path(), WORKSPACES)
+        if session is None:
+            return False
+        # An explicit restore after safe-start allows a new saved layout.
+        self.safe_mode = False
+        self._restoring = True
+        try:
+            for name in session['open']:
+                if name != 'default':
+                    self.open_workspace(name)
+            for destination, name in enumerate(session['open']):
+                page = self.workspace_widgets.get(name)
+                if page is not None:
+                    origin = self.tabs.indexOf(page)
+                    if origin >= 0 and origin != destination:
+                        self.tabs.tabBar().moveTab(origin, destination)
+            target = session['active']
+            if target in self.workspace_widgets:
+                self.tabs.setCurrentWidget(self.workspace_widgets[target])
+        finally:
+            self._restoring = False
+        self.save_state()
+        self.update_webbie_context()
+        return True
+
     def open_workspace(self, name):
         if name not in WORKSPACES: return
         if name not in self.workspace_widgets:
@@ -978,7 +1044,7 @@ class TheWeb(QMainWindow):
         self.setStyleSheet(sheet)
         self.start_menu.setStyleSheet(sheet)
         self.taskbar.setStyleSheet(sheet)
-        for panel_name in ('command_palette', 'quick_settings_panel', 'window_overview',
+        for panel_name in ('command_palette', 'workspace_recovery', 'quick_settings_panel', 'window_overview',
                            'notification_center', 'tray_panel', 'quick_volume'):
             panel = getattr(self, panel_name, None)
             if panel is not None:
