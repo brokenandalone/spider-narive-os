@@ -75,9 +75,13 @@ class StudyPlannerQtTests(unittest.TestCase):
     def test_parent_notebook_contains_research_and_checklist_buttons(self):
         dialog = AssignmentWorkspaceDialog(
             self.store, self.assignment, self.store.course_folder(self.course))
-        # New dialogs must open even without Webbie, Microsoft or network services.
-        dialog.open_steps()
-        dialog.open_sources = lambda: None  # avoid a second modal in offscreen mode
+        # Avoid entering the real modal event loop on an offscreen CI runner.
+        with patch.object(MilestonesDialog, "exec_", return_value=0) as opened:
+            dialog.open_steps()
+            opened.assert_called_once()
+        with patch.object(AssignmentSourcesDialog, "exec_", return_value=0) as opened:
+            dialog.open_sources()
+            opened.assert_called_once()
         dialog.close()
 
 
