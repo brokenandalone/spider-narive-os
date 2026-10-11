@@ -599,10 +599,13 @@ class WebbiePanel(QWidget):
         """Short-lived metadata only. Camera/screen pixels never written here."""
         authorized = ''
         selected_window = ''
+        mission_status = ''
         if self.computer_dialog is not None:
             approval = self.computer_dialog.grant.status()
             if approval['active']:
                 authorized = approval['task']
+                if self.computer_dialog.nav_mission.plan is not None:
+                    mission_status = self.computer_dialog.nav_mission.progress()
                 chosen = self.computer_dialog.selected_window()
                 if (chosen is not None and
                         chosen == self.computer_dialog.operator.target_window):
@@ -613,6 +616,7 @@ class WebbiePanel(QWidget):
                 selected_title=self.workspace_summary,
                 approved_task=authorized,
                 selected_window=selected_window,
+                mission_status=mission_status,
                 sleeping=self.face_sleeping,
             )
         except (OSError, PermissionError, ValueError):
