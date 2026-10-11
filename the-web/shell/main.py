@@ -690,7 +690,7 @@ class TheWeb(QMainWindow):
                 elif name == 'media': native = MediaPanel(self.launch_media)
                 else: native = create_native(name, SPIDER_ROOT)
             except Exception as error:
-                native = None; self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
+                native = None; page.native_error = str(error); self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
             page.native = native
             if name == 'author' and native is not None and hasattr(native, 'show_webbie_review') is False:
                 native.show_webbie_review = self.show_author_review
