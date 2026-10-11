@@ -289,6 +289,28 @@ def atomic_copy(src, dest, uid=0, gid=0, mode=0o644):
 
 def apply(items, backup_root, project_root=PROJECT_ROOT,
           refs=BASELINES, known_checker=known_baseline):
+    """One reviewed batch per Indianapolis calendar day, never per workspace.
+
+    Perform the ordinary non-mutating preflight BEFORE creating any lock
+    or backup directory. Lock and re-check inside the original transaction.
+    """
+    checks = inspect(items, project_root, refs, known_checker)
+    if not report(checks):
+        raise RuntimeError('No files were changed. Review blocked paths first.')
+    if not any(state in ('ADD', 'UPGRADE') for _, state, _ in checks):
+        print('Already current; no installation necessary.')
+        return None
+    import importlib.util
+    source = Path(__file__).with_name('daily_install_policy.py')
+    spec = importlib.util.spec_from_file_location('spider_daily_install_policy', source)
+    policy = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(policy)
+    with policy.daily_install_guard(backup_root):
+        return _apply_transaction(items, backup_root, project_root, refs, known_checker)
+
+
+def _apply_transaction(items, backup_root, project_root=PROJECT_ROOT,
+                       refs=BASELINES, known_checker=known_baseline):
     checks = inspect(items, project_root, refs, known_checker)
     if not report(checks):
         raise RuntimeError('No files were changed. Review blocked paths first.')
