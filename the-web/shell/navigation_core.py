@@ -10,6 +10,7 @@ import unicodedata
 
 INTERNAL_ACTIONS = (
     ('windows', 'Open Windows', 'Switch, minimize, or close a running window'),
+    ('home', 'Workspace Home', 'Return to The Web without closing open tabs'),
     ('webbie', 'Ask Webbie', 'Open your existing Webbie assistant'),
     ('quick-settings', 'Quick Settings', 'Network, appearance, and desktop controls'),
     ('notifications', 'Notifications', 'Review recent desktop alerts'),
@@ -62,7 +63,7 @@ def _score(query, label, detail):
     return score
 
 
-def find_items(query, workspaces, applications=(), favorites=(), recents=(), limit=60):
+def find_items(query, workspaces, applications=(), favorites=(), recents=(), limit=60, windows=()):
     """Rank known choices, never arbitrary user-supplied executable strings."""
     text = str(query or '').strip()[:120]
     favorite_keys = set(favorites)
@@ -89,12 +90,27 @@ def find_items(query, workspaces, applications=(), favorites=(), recents=(), lim
                                   'Installed app · ' + workspaces.get(app.workspace, app.workspace),
                                   score + bonus))
 
+    for task in windows:
+        ident = getattr(task, 'ident', None)
+        title = str(getattr(task, 'title', '') or '')[:180]
+        if not valid_window_id(ident) or not title:
+            continue
+        score = _score(text, title, 'open window running program')
+        if score:
+            results.append(Result('window', ident.lower(), title, 'Open window', score + 12))
+
     for key, label, detail in INTERNAL_ACTIONS:
         score = _score(text, label, detail + ' ' + key.replace('-', ' '))
         if score:
             results.append(Result('action', key, label, detail, score - (15 if not text else 0)))
 
     return sorted(results, key=lambda item: (-item.score, item.label.casefold(), item.ident))[:max(0, min(int(limit), 120))]
+
+
+def valid_window_id(ident):
+    return (isinstance(ident, str) and
+            re.fullmatch(r'0x[0-9a-fA-F]{1,16}', ident) is not None and
+            int(ident, 16) != 0)
 
 
 def display_text(result, is_favorite=False):
