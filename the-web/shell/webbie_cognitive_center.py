@@ -140,8 +140,15 @@ class WebbieCognitiveDialog(QDialog):
             "Checking Ollama on this PC only. No model downloads or changes.")
         self.model_worker=ModelInventoryWorker(self)
         self.model_worker.finishedReport.connect(self.report.setPlainText)
-        self.model_worker.finished.connect(self.model_worker.deleteLater)
+        self.model_worker.finished.connect(self.model_finished)
         self.model_worker.start()
+
+    def model_finished(self):
+        # Dispose of the old Qt worker before another inventory request.
+        done=self.model_worker
+        self.model_worker=None
+        if done is not None:
+            done.deleteLater()
 
     def toggle_private(self):
         wanted=not private_session_active()
