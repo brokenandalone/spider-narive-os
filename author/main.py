@@ -99,6 +99,9 @@ class AuthorWindow(QMainWindow):
         elif action == 'open_project_map':
             if self.flush():
                 self.editor_tabs.setCurrentWidget(self.project_map)
+        elif action == 'open_story_atlas':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.atlas_widget)
 
     def action(self, function):
         try:
