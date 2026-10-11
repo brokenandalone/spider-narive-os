@@ -15,6 +15,7 @@ from PyQt5.QtCore import Qt
 
 if __package__:
     from .music_backend import LocalMusicClient, SongRequest, MusicError
+    from .music_resume import discover_resumable, resume_music_job
     from .tools import TOOLS, resolve_tool
     from .arrangement import VOICE_OPTIONS
     from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
@@ -31,6 +32,7 @@ if __package__:
     from .mastering_dialog import MasteringDialog
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
+    from music_resume import discover_resumable, resume_music_job
     from tools import TOOLS, resolve_tool
     from arrangement import VOICE_OPTIONS
     from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
@@ -77,6 +79,27 @@ class MusicWorker(QThread):
         except Exception as error:
             self.result.emit('', str(error) if isinstance(error, (MusicError, ValueError))
                              else 'Music operation failed. Check the local engine and saved job status.')
+
+
+class MusicResumeWorker(QThread):
+    result = pyqtSignal(str, str)
+
+    def __init__(self, client, job, root):
+        super().__init__(QApplication.instance())
+        self.client, self.job, self.root = client, job, root
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            folder = resume_music_job(self.client, self.job, self.root, stop=self.stop)
+            self.result.emit(str(folder), "Existing local render recovered. Saved takes refreshed.")
+        except (MusicError, OSError, ValueError) as error:
+            self.result.emit("", str(error))
 
 
 class VoiceConvertWorker(QThread):
@@ -267,6 +290,7 @@ class StudioAIPanel(QWidget):
         super().__init__()
         self.output_root = Path(output_root) if output_root else Path.home() / 'Documents/Spider Studio/Music/AI Songs'
         self.worker = None
+        self.resume_worker = None
         self.rvc_worker = None
         self.dataset_worker = None
         self.voice_quality_worker = None
@@ -675,6 +699,19 @@ class StudioAIPanel(QWidget):
                               ('Refresh takes', self.refresh)):
             button = QPushButton(label); button.clicked.connect(action); actions.addWidget(button)
         layout.addLayout(actions)
+        layout.addWidget(QLabel("Unfinished local song jobs"))
+        self.pending_song_jobs = QListWidget()
+        self.pending_song_jobs.setMaximumHeight(120)
+        layout.addWidget(self.pending_song_jobs)
+        resume_actions = QHBoxLayout()
+        self.resume_song_button = QPushButton("Resume selected existing render")
+        self.resume_song_button.clicked.connect(self.resume_song)
+        self.stop_resume_button = QPushButton("Stop waiting on resumed render")
+        self.stop_resume_button.setEnabled(False)
+        self.stop_resume_button.clicked.connect(self.stop_resumed_job)
+        resume_actions.addWidget(self.resume_song_button)
+        resume_actions.addWidget(self.stop_resume_button)
+        layout.addLayout(resume_actions)
         self.refresh()
 
     def pick_conversion_file(self, field, pattern):
@@ -1331,6 +1368,14 @@ class StudioAIPanel(QWidget):
 
     def refresh(self):
         self.library.clear()
+        if hasattr(self, "pending_song_jobs"):
+            self.pending_song_jobs.clear()
+            for task in discover_resumable(self.output_root):
+                item = QListWidgetItem(
+                    f"{task['title']} | {task['status']} | {Path(task['directory']).name}"
+                )
+                item.setData(Qt.UserRole, task["directory"])
+                self.pending_song_jobs.addItem(item)
         if not self.output_root.exists():
             return
         for path in sorted(self.output_root.glob('song-*/job.json'), reverse=True):
@@ -1346,6 +1391,50 @@ class StudioAIPanel(QWidget):
                     item.setData(Qt.UserRole, str(take)); self.library.addItem(item)
             except (OSError, ValueError, KeyError, TypeError):
                 continue
+
+    def resume_song(self):
+        """Resume only a saved task ID; never submit a duplicate song request."""
+        if self.resume_worker is not None or self.worker is not None:
+            return
+        selected = self.pending_song_jobs.currentItem()
+        if selected is None:
+            self.status.setText("Select one of the saved unfinished song jobs first.")
+            return
+        try:
+            client = LocalMusicClient(
+                os.environ.get("SPIDER_MUSIC_URL", "http://127.0.0.1:8001"),
+                os.environ.get("ACESTEP_API_KEY"))
+        except (ValueError, TypeError) as error:
+            self.status.setText(str(error))
+            return
+        self.resume_worker = MusicResumeWorker(
+            client, selected.data(Qt.UserRole), self.output_root)
+        self.resume_worker.result.connect(self.resumed_song_done)
+        self.resume_worker.finished.connect(self.resumed_song_finished)
+        self.resume_song_button.setEnabled(False)
+        self.generate.setEnabled(False)
+        self.stop_resume_button.setEnabled(True)
+        self.status.setText("Checking existing song task ID; not submitting another render.")
+        self.resume_worker.start()
+
+    def resumed_song_done(self, path, status):
+        self.status.setText(status)
+        self.refresh()
+
+    def resumed_song_finished(self):
+        worker, self.resume_worker = self.resume_worker, None
+        self.resume_song_button.setEnabled(True)
+        self.generate.setEnabled(self.worker is None)
+        self.stop_resume_button.setEnabled(False)
+        if worker is not None:
+            worker.deleteLater()
+
+    def stop_resumed_job(self):
+        if self.resume_worker is not None:
+            self.resume_worker.stop.set()
+            self.stop_resume_button.setEnabled(False)
+            self.status.setText(
+                "Stopped waiting on existing task; local generator may continue.")
 
     def use_take_for_separation(self):
         source = self.selected()
