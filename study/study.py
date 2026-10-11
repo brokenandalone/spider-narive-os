@@ -1010,15 +1010,15 @@ class StudyWindow(QMainWindow):
                     f"No new open assignments. {result['skipped']} duplicates; "
                     f"{result['completed']} completed rows skipped.")
                 return
-            names = "\\n".join(
+            names = "\n".join(
                 f"• {title} ({due or 'date not specified'})"
                 for title, due in rows[:8])
-            more = f"\\n...and {len(rows) - 8} more." if len(rows) > 8 else ""
+            more = f"\n...and {len(rows) - 8} more." if len(rows) > 8 else ""
             answer = QMessageBox.question(
                 self, "Import assignment preview",
-                f"Add {len(rows)} open assignments to this course?\\n"
-                f"{result['skipped']} duplicates; {result['completed']} completed rows skipped.\\n\\n"
-                + names + more + "\\n\\nNo school files will be uploaded.")
+                f"Add {len(rows)} open assignments to this course?\n"
+                f"{result['skipped']} duplicates; {result['completed']} completed rows skipped.\n\n"
+                + names + more + "\n\nNo school files will be uploaded.")
             if answer != QMessageBox.Yes:
                 self.status.setText("Assignment import cancelled; no changes made.")
                 return
