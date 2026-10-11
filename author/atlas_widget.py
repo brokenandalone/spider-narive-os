@@ -7,7 +7,7 @@ import math
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QPen
 from PyQt5.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGraphicsScene,
+    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGraphicsItem, QGraphicsScene,
     QGraphicsView, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
     QMessageBox, QPushButton, QSpinBox, QTabWidget, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QInputDialog
@@ -116,6 +116,13 @@ class AtlasWidget(QWidget):
             button.clicked.connect(callback)
             bar.addWidget(button)
         layout.addLayout(bar)
+        self.timeline_view = QGraphicsView()
+        self.timeline_view.setMinimumHeight(170)
+        self.timeline_view.setMaximumHeight(230)
+        self.timeline_scene = QGraphicsScene(self.timeline_view)
+        self.timeline_view.setScene(self.timeline_scene)
+        self.timeline_scene.selectionChanged.connect(self.select_timeline_event)
+        layout.addWidget(self.timeline_view)
         self.event_table = QTableWidget(0, 6)
         self.event_table.setHorizontalHeaderLabels(
             ['Order', 'When', 'Event', 'Book', 'Chapter', 'Evidence']
@@ -185,6 +192,7 @@ class AtlasWidget(QWidget):
     def refresh(self, *_):
         self._events = {}
         self.event_table.setRowCount(0)
+        self.timeline_scene.clear()
         self.link_list.clear()
         self.graph_scene.clear()
         if self.book_id is None:
@@ -213,7 +221,69 @@ class AtlasWidget(QWidget):
                 if status in ('outdated', 'missing'):
                     item.setForeground(QBrush(QColor('#ffb4a2')))
                 self.event_table.setItem(row, col, item)
+        self._render_timeline(events)
         self._render_graph()
+
+    def _render_timeline(self, events):
+        """Horizontal, selectable overview; full event list remains in the table."""
+        self.timeline_scene.clear()
+        if not events:
+            item = self.timeline_scene.addText('Add an event to begin the timeline.')
+            item.setDefaultTextColor(QColor('#e9dcff'))
+            return
+        # Limit rendered graphics for very long series; the table always lists
+        # every event, with no truncation of the stored chronology.
+        visible = events[:160]
+        width = max(700, len(visible) * 180 + 100)
+        center_y = 86
+        self.timeline_scene.addLine(
+            30, center_y, width - 35, center_y,
+            QPen(QColor('#8753bc'), 3)
+        )
+        for index, event in enumerate(visible):
+            x = index * 180 + 72
+            status = self.store.atlas.evidence_status(event)
+            color = ('#b34b69' if status in ('outdated', 'missing')
+                     else '#7a42d5' if status == 'verified' else '#664785')
+            marker = self.timeline_scene.addEllipse(
+                x - 11, center_y - 11, 22, 22,
+                QPen(QColor('#f2dfff'), 2), QBrush(QColor(color))
+            )
+            marker.setFlag(QGraphicsItem.ItemIsSelectable, True)
+            marker.setData(0, event['id'])
+            marker.setToolTip(
+                f"{event['title']}\n{event['when_label']}\n"
+                f"Evidence: {status}"
+            )
+            title = self.timeline_scene.addText(event['title'][:26])
+            title.setDefaultTextColor(QColor('#f0e4ff'))
+            title.setPos(x - 52, center_y - 62)
+            when = self.timeline_scene.addText(
+                event['when_label'][:25] or ('Order ' + str(event['story_order']))
+            )
+            when.setDefaultTextColor(QColor('#d2b5ff'))
+            when.setPos(x - 52, center_y + 11)
+        if len(events) > len(visible):
+            info = self.timeline_scene.addText(
+                f"Displaying first {len(visible)} events visually; "
+                f"all {len(events)} remain in the table below."
+            )
+            info.setDefaultTextColor(QColor('#f0e4ff'))
+            info.setPos(30, 140)
+        self.timeline_scene.setSceneRect(0, 0, width, 175)
+
+    def select_timeline_event(self):
+        """Selecting a visual marker highlights its source table row."""
+        selected = self.timeline_scene.selectedItems()
+        if not selected:
+            return
+        event_id = selected[0].data(0)
+        for index in range(self.event_table.rowCount()):
+            cell = self.event_table.item(index, 0)
+            if cell is not None and cell.data(Qt.UserRole) == event_id:
+                self.event_table.selectRow(index)
+                self.event_table.scrollToItem(cell)
+                break
 
     def _selected_event(self):
         selection = self.event_table.selectedItems()
