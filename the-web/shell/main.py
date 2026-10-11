@@ -742,6 +742,19 @@ class TheWeb(QMainWindow):
             panel.raise_()
             panel.activateWindow()
 
+    def restore_last_saved_session(self):
+        """Opt-in continuation after --safe-workspaces; user controls it."""
+        if self._restore_plan is not None:
+            return False
+        if not self.safe_mode:
+            return False
+        self.safe_mode = False
+        self.begin_staged_restore()
+        return True
+
+    def is_staged_restoring(self):
+        return self._restore_plan is not None
+
     def retry_workspace(self, name):
         if name not in WORKSPACES or name == 'default':
             return
