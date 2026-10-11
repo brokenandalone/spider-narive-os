@@ -27,6 +27,16 @@ Installed PC baseline: **user says the October 10 AI batch is already installed.
 
 The project saver is *not* a native Ardour project with plugins/faders/time line; it stores Spider's mix settings and selected WAV paths. Independent stems still require real recordings or user-reviewed separation. Neither a trained personal singing voice nor Suno-quality generation is proven by these changes. The DAW exporter copies sources at zero offset and does not automatically translate Spider mixing instructions.
 
+## Read-only installed PC comparison
+
+Run from this checked-out GitHub feature branch on the owner PC:
+
+```bash
+python3 studio/package/inspect-studio-install.py
+```
+
+The report lists which selected Studio source files are missing, different or identical to the installed `/usr/local/lib/spider-os` copy, probes Qt availability and checks FFmpeg's required audio filters. It prints only; it never installs packages, changes services, edits voice models, scans personal audio or overwrites the existing October 10 Studio AI. **Different is not an instruction to overwrite.** Review such files manually first.
+
 ## Installation release gates
 
 Before installing onto Spider OS, reconcile these stacked source changes with the **already installed October 10 Studio AI**. Take a backup of the current `/usr/local/lib/spider-os/studio` source and *preserve* all user music, local AI models, training data, Webbie customizations and school files. Run full source/Qt tests and a live PC audio audition; check input/output devices and FFmpeg supported filters; deploy only a reviewed reversible change. Unrecognized PC-local changes block automated replacement.
