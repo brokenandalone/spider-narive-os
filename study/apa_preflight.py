@@ -85,7 +85,7 @@ def analyze_apa_preflight(*, draft, references, instructions=""):
     if duplicate_count:
         warnings.append(f"{duplicate_count} identical reference-line duplicate(s) detected.")
     if markers:
-        warnings.append(f"{markers} source/citation verification placeholder(s) remain.")
+        warnings.append(f"{markers} unresolved source/citation verification placeholder(s) remain.")
     for surname, year in missing[:20]:
         warnings.append(
             f"Possible unmatched in-text author-date citation: {surname.title()} ({year}).")
