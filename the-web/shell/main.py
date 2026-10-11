@@ -79,6 +79,21 @@ class AppCatalogWorker(QThread):
             self.failed.emit(str(error)[:160])
 
 
+class WindowScanWorker(QThread):
+    """Fetch wmctrl window titles without stalling the desktop taskbar."""
+    found = pyqtSignal(object)
+
+    def __init__(self, excluded, parent=None):
+        super().__init__(parent)
+        self.excluded = tuple(excluded)
+
+    def run(self):
+        try:
+            self.found.emit(list_tasks(self.excluded))
+        except (OSError, RuntimeError, ValueError):
+            self.found.emit([])
+
+
 class WallpaperWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -196,7 +211,8 @@ class Taskbar(QWidget):
         layout.addWidget(button('Audio', shell.open_audio))
         layout.addWidget(button('Lock', shell.lock_session))
         self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
-        self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(2000)
+        self.window_scan_worker = None
+        self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(3000)
         self.last_tasks = None; self.refresh()
 
     def position(self):
@@ -206,10 +222,24 @@ class Taskbar(QWidget):
 
     def refresh(self):
         self.clock.setText(QDateTime.currentDateTime().toString('ddd d MMM  HH:mm'))
+        if not self.shell.desktop_mode:
+            self.render_tasks([])
+            return
+        if self.window_scan_worker is not None and self.window_scan_worker.isRunning():
+            return
         excluded = {f'0x{int(self.winId()):08x}', f'0x{int(self.shell.winId()):08x}'}
-        tasks = list_tasks(excluded) if self.shell.desktop_mode else []
+        worker = WindowScanWorker(excluded, self)
+        self.window_scan_worker = worker
+        worker.found.connect(self.render_tasks)
+        worker.finished.connect(self.window_scan_finished)
+        worker.start()
+
+    def window_scan_finished(self):
+        self.window_scan_worker = None
+
+    def render_tasks(self, tasks):
         screen_width = QApplication.primaryScreen().geometry().width()
-        visible_count = max(0, min(2, (screen_width - 800) // 210))
+        visible_count = max(0, min(5, (screen_width - 870) // 185))
         signature = (screen_width, tuple((task.ident, task.title) for task in tasks))
         if signature == self.last_tasks: return
         self.last_tasks = signature
@@ -881,7 +911,18 @@ class TheWeb(QMainWindow):
         if bridge is not None and bridge.poll() is None:
             bridge.terminate()
         if self.notification_toast is not None: self.notification_toast.close()
-        self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
+        task_worker = getattr(self.taskbar, 'window_scan_worker', None)
+        app_worker = getattr(self, 'app_scan_worker', None)
+        if (task_worker is not None and task_worker.isRunning()) or (
+                app_worker is not None and app_worker.isRunning()):
+            self.status.setText('A short desktop refresh is still finishing. Close again afterward.')
+            event.ignore()
+            return
+        self.taskbar.timer.stop()
+        self.command_palette.close()
+        self.taskbar.close()
+        self.start_menu.close()
+        event.accept()
 
 
 def main():
