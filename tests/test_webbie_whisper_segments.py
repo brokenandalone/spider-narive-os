@@ -39,6 +39,7 @@ class WhisperSegmentTests(unittest.TestCase):
         with patch.object(m,"ready",return_value=True),patch.object(
                 m,"RUNTIME_DIR",self.tmp),patch.object(
                 m,"SPEAKING_MARKER",self.tmp/"webbie-speaking"),patch.object(
+                m,"LISTENING_MARKER",self.tmp/"webbie-listening"),patch.object(
                 m,"record_chunk",side_effect=record),patch.object(
                 m,"transcribe",return_value="Webbie open Studio"):
             def should_continue(): return len(seen)<2
@@ -47,6 +48,7 @@ class WhisperSegmentTests(unittest.TestCase):
         self.assertEqual(seen,["verified","callback"])
         self.assertTrue(audio_seen)
         self.assertFalse(Path(audio_seen[0]).exists())
+        self.assertFalse((self.tmp/"webbie-listening").exists())
 
     def test_missing_verifier_preserves_original_one_arg_callback(self):
         seen=[]
@@ -56,6 +58,7 @@ class WhisperSegmentTests(unittest.TestCase):
         with patch.object(m,"ready",return_value=True),patch.object(
                 m,"RUNTIME_DIR",self.tmp),patch.object(
                 m,"SPEAKING_MARKER",self.tmp/"webbie-speaking"),patch.object(
+                m,"LISTENING_MARKER",self.tmp/"webbie-listening"),patch.object(
                 m,"record_chunk",side_effect=record),patch.object(
                 m,"transcribe",return_value="hello"):
             m.listen_forever(seen.append,lambda:not seen)
@@ -71,6 +74,7 @@ class WhisperSegmentTests(unittest.TestCase):
         with patch.object(m,"ready",return_value=True),patch.object(
                 m,"RUNTIME_DIR",self.tmp),patch.object(
                 m,"SPEAKING_MARKER",self.tmp/"webbie-speaking"),patch.object(
+                m,"LISTENING_MARKER",self.tmp/"webbie-listening"),patch.object(
                 m,"record_chunk",side_effect=record),patch.object(
                 m,"transcribe",return_value="Webbie stop"):
             m.listen_forever(
@@ -88,6 +92,7 @@ class WhisperSegmentTests(unittest.TestCase):
         with patch.object(m,"ready",return_value=True),patch.object(
                 m,"RUNTIME_DIR",self.tmp),patch.object(
                 m,"SPEAKING_MARKER",self.tmp/"webbie-speaking"),patch.object(
+                m,"LISTENING_MARKER",self.tmp/"webbie-listening"),patch.object(
                 m,"record_chunk",side_effect=record),patch.object(
                 m,"transcribe",return_value="Webbie next tab"):
             m.listen_forever(
