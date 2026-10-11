@@ -2,6 +2,8 @@
 """Selected-source, replaceable local text index. Original files are never modified."""
 import argparse
 from contextlib import closing
+from functools import lru_cache
+import importlib.util
 import hashlib
 import json
 import os
@@ -15,7 +17,7 @@ import time
 CONFIG = Path.home() / '.config/spider-os/forage-index.json'
 DEFAULT_DB = Path.home() / '.local/share/spider-os/forage/local-index.sqlite'
 EXTENSIONS = {'.txt', '.md', '.markdown', '.rst', '.py', '.js', '.ts', '.tsx', '.jsx',
-              '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.csv', '.html', '.htm', '.css', '.sh'}
+              '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.csv', '.html', '.htm', '.css', '.sh', '.pdf', '.docx'}
 DENIED = {'node_modules', '__pycache__', 'venv', 'rclone', 'rclone.conf', 'credentials',
           'credentials.json', 'secrets.json', 'token.json', 'tokens.json', 'id_rsa', 'id_ed25519'}
 LIMIT = 2 * 1024 * 1024
@@ -55,6 +57,18 @@ def validate_roots(roots, database):
     return selected
 
 
+@lru_cache(maxsize=1)
+def _document_reader():
+    spec = importlib.util.spec_from_file_location(
+        "spider_forage_document_text", Path(__file__).with_name("document_text.py")
+    )
+    if spec is None or spec.loader is None:
+        raise ValueError("Document extractor unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def read_document(path, root):
     if not path.resolve().is_relative_to(root):
         raise ValueError('File escaped selected root')
@@ -70,10 +84,15 @@ def read_document(path, root):
         raise ValueError('Selected file changed while indexing; retry when idle')
     if len(data) > LIMIT or b'\x00' in data:
         return None
-    try:
-        text = data.decode('utf-8')
-    except UnicodeDecodeError:
-        return None
+    if path.suffix.lower() in {'.pdf', '.docx'}:
+        text = _document_reader().extract_text(data, path.suffix.lower())
+        if not text:
+            return None
+    else:
+        try:
+            text = data.decode('utf-8')
+        except UnicodeDecodeError:
+            return None
     if not text.strip():
         return None
     return text, hashlib.sha256(data).hexdigest(), before.st_mtime_ns, before.st_size
