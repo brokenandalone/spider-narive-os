@@ -116,14 +116,19 @@ def _validate_chain(data, identifier):
             raise store.StorageError("Evidence ledger event fields differ.")
         if type(event["number"]) is not int or event["number"] != expected_sequence:
             raise store.StorageError("Evidence ledger event ordering changed.")
-        if event["kind"] not in KINDS:
+        if not isinstance(event["kind"], str) or event["kind"] not in KINDS:
             raise store.StorageError("Unknown evidence ledger action.")
         _sha(event["fingerprint"])
-        _text(event["name"], "Evidence name", 180)
-        if type(event["size_bytes"]) is not int or event["size_bytes"] < 0:
+        checked_name = _text(event["name"], "Evidence name", 180)
+        if "\n" in checked_name or "\t" in checked_name:
+            raise store.StorageError("Evidence name must be one line.")
+        if (type(event["size_bytes"]) is not int or
+                not 0 <= event["size_bytes"] <= 256 * 1024 * 1024):
             raise store.StorageError("Evidence size is invalid.")
-        _text(event["checked_utc"], "Timestamp", 45)
-        _text(event["time_utc"], "Timestamp", 45)
+        checked_time = _text(event["checked_utc"], "Timestamp", 45)
+        event_time = _text(event["time_utc"], "Timestamp", 45)
+        if not checked_time.endswith("+00:00") or not event_time.endswith("+00:00"):
+            raise store.StorageError("Ledger timestamps must be UTC.")
         _text(event["note"], "Ledger entry note", MAX_NOTE)
         if event["previous_hash"] != previous:
             raise store.StorageError("Evidence ledger chain has been altered.")
