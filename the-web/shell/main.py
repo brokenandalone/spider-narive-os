@@ -109,6 +109,8 @@ class StartMenu(QDialog):
         self.search = QLineEdit(); self.search.setPlaceholderText('Find a workspace or installed app'); layout.addWidget(self.search)
         self.results = QListWidget(); self.results.setIconSize(QSize(28, 28)); layout.addWidget(self.results, 1)
         self.search.textChanged.connect(self.populate); self.results.itemActivated.connect(self.activate)
+        self.search.returnPressed.connect(self.activate_first)
+        self.search.setToolTip('Type a workspace or application name, then press Enter to open the first result.')
         actions = QHBoxLayout(); layout.addLayout(actions)
         actions.addWidget(button('Refresh apps', shell.refresh_apps))
         actions.addWidget(button('Windows', shell.toggle_window_overview))
@@ -127,6 +129,15 @@ class StartMenu(QDialog):
                 item.setData(Qt.UserRole, ('app', app.desktop_id)); self.results.addItem(item)
         if self.results.count():
             self.results.setCurrentRow(0)
+        else:
+            empty = QListWidgetItem('No matching workspaces or installed apps.')
+            empty.setFlags(Qt.NoItemFlags)
+            self.results.addItem(empty)
+
+    def activate_first(self):
+        item = self.results.currentItem()
+        if item is not None and item.flags() & Qt.ItemIsEnabled:
+            self.activate(item)
 
     def activate(self, item):
         kind, ident = item.data(Qt.UserRole); self.hide()
