@@ -66,6 +66,7 @@ APP_FILES = (
 # No course databases, personal files, cloud credentials, or model files.
 STUDY_STUDIO_FILES = (
     'study/study.py', 'study/store.py', 'study/dashboard.py',
+    'study/assignment_planner.py',
     'study/apa.py', 'study/paper_dialog.py', 'study/school_portal.py',
     'study/course_materials.py', 'study/school_onedrive.py',
     'study/school_material_picker.py', 'study/school_upload.py',
@@ -82,8 +83,12 @@ KNOWN_STUDY_BLOBS = {
     'study/study.py': {
         '456f0279b397f7776b8ba9c6d970d493a9a8ccaf',
         '422029cbc30b462d87ff52eaa6c608b63f9ce499',
+        'eb9831270d4a173b4df2ddc85c117d1d81f84d2',  # PR #34 before planner
     },
-    'study/store.py': {'c7fa2cef87f66f187e6253a7059f7a5d335703f0'},
+    'study/store.py': {
+        'c7fa2cef87f66f187e6253a7059f7a5d335703f0',
+        '68cfde02c3e8757afd0d8172c43b6371670f5dcf',  # PR #34 before planner
+    },
 }
 
 UNITS = ('webbie-onedrive.service', 'webbie-onedrive.timer')
