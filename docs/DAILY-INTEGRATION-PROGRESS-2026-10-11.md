@@ -44,3 +44,27 @@ The live PC's customized scripts and service versions are **not available to thi
 - Forage source foundation: [PR #55](https://github.com/brokenandalone/spider-narive-os/pull/55)
 
 **No live installation was performed by these GitHub commits.**
+
+
+## October 11, later combined-source acceptance
+
+The previously failing desktop smoke was resolved by retaining `TheWeb.clear_recent_navigation()` when reconciling the updated desktop launcher. This function clears recent shortcut history only, persists it privately, and does not clear the user's pinned workspaces. GitHub source checks for `8c163b94fc5ac2c975dbe0fe4e3bfc0fa61977f9` completed successfully, including its desktop smoke path and Python suite.
+
+**New private, read-only PC acceptance CLI:** `tools/daily_pc_acceptance.py`. It checks exactly nine fixed Spider OS application entrypoints against staged source by SHA-256, two installed user-service states (Webbie and Spider AI DJ), and Nova's existing loopback-only `/health` endpoint. It does not read any HOME files, capture sound, query the internet, start services or install anything.
+
+Examples, after checking out the staged candidate source on the PC:
+
+```bash
+# Pre-install review: different fixed app versions are expected; local changes
+# still need the actual guarded installer and owner review.
+python3 tools/daily_pc_acceptance.py --phase before
+
+# After the one approved system-wide installation; match candidate exact sources.
+python3 tools/daily_pc_acceptance.py --phase after --json
+
+# On a disposable CI tree without user services / a local Nova backend:
+python3 tools/daily_pc_acceptance.py --phase after --skip-services \
+  --installed-root /path/to/staged-test-install
+```
+
+The acceptance report deliberately does **not** claim to validate actual sound, GPU generation, webcam/microphone speaker identity, encryption, recovery, Distrobox/Kali packages, school OneDrive consent or GUI usability. Those remain manual PC-side checks after one approved daily transaction. Do not claim these were performed from GitHub. Any unknown installed source should remain blocked until reviewed.
