@@ -208,5 +208,48 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     app.processEvents()
     assert safe.close()
     assert main.read_desktop_state(window.state_path, main.WORKSPACES) == stored
+    # Real desktop sessions reopen saved tabs in UI-event turns rather than
+    # constructing every heavyweight native workspace in the constructor.
+    import time
+    main.write_desktop_state(window.state_path, {
+        'open': ['default', 'studio', 'author', 'study'], 'active': 'study'},
+        main.WORKSPACES)
+    staged = main.TheWeb(desktop_mode=True)
+    assert staged.tabs.count() == 1
+    assert staged.is_staged_restoring()
+    staged.show()
+    began = time.monotonic()
+    while staged.is_staged_restoring() and time.monotonic() - began < 20:
+        app.processEvents()
+        time.sleep(.025)
+    assert not staged.is_staged_restoring()
+    assert staged.tabs.count() == 4
+    assert staged.current_workspace == 'study'
+    assert set(staged.workspace_load_seconds) >= {'studio', 'author', 'study'}
+    assert len(staged.workspace_load_seconds) == 3
     app.processEvents()
-print('DESKTOP INTEGRATION PASSED: 15 tabs, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')
+    for active in (staged.app_scan_worker, staged.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
+    assert staged.close()
+    # Safe-start can explicitly resume the previous session on the owner's
+    # command, but never auto-opens the workspaces during initialization.
+    safe_again = main.TheWeb(restore=True, safe_mode=True)
+    assert safe_again.tabs.count() == 1
+    assert safe_again.restore_last_saved_session()
+    began = time.monotonic()
+    while safe_again.is_staged_restoring() and time.monotonic() - began < 20:
+        app.processEvents()
+        time.sleep(.025)
+    assert safe_again.tabs.count() == 4
+    assert safe_again.current_workspace == 'study'
+    assert not safe_again.safe_mode
+    app.processEvents()
+    for active in (safe_again.app_scan_worker, safe_again.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
+    assert safe_again.close()
+    app.processEvents()
+print('DESKTOP INTEGRATION PASSED: 15 tabs, staged workspace startup, safe resume, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')
