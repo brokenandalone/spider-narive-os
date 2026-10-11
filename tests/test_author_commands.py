@@ -39,6 +39,8 @@ class AuthorCommandTests(unittest.TestCase):
             "cancel review": {"action": "cancel_review"},
             "Webbie show project map": {"action": "open_project_map"},
             "open the chapter outline": {"action": "open_project_map"},
+            "Webbie, show story atlas": {"action": "open_story_atlas"},
+            "open the character network": {"action": "open_story_atlas"},
         }
         for spoken, intent in expected.items():
             with self.subTest(spoken=spoken):
@@ -116,6 +118,8 @@ class AuthorCommandTests(unittest.TestCase):
                         narrate.assert_called_once()
                         win.handle_author_intent({"action": "open_project_map"})
                         self.assertIs(win.editor_tabs.currentWidget(), win.project_map)
+                        win.handle_author_intent({"action": "open_story_atlas"})
+                        self.assertIs(win.editor_tabs.currentWidget(), win.atlas_widget)
             finally:
                 win.close()
                 APP.processEvents()

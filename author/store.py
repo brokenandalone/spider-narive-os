@@ -42,6 +42,11 @@ class AuthorStore:
             );
         """)
         self.db.commit()
+        if __package__:
+            from .story_atlas import StoryAtlas
+        else:
+            from story_atlas import StoryAtlas
+        self.atlas = StoryAtlas(self)
 
     PLAN_STATUSES = ('draft', 'revising', 'ready')
 

@@ -13,7 +13,8 @@ AUTHOR_MODULES = {
     'author/narration_bookmarks.py', 'author/voice_reader.py',
     'author/commands.py', 'author/commands_client.py',
     'author/control_socket.py', 'author/manuscript_import.py',
-    'author/project_map.py',
+    'author/project_map.py', 'author/story_atlas.py',
+    'author/atlas_widget.py',
 }
 WEBBIE_BRIDGE = 'webbie/agent/author_voice_bridge.py'
 
