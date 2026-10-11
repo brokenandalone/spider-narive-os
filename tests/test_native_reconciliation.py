@@ -53,18 +53,13 @@ class NativeReconciliationTests(unittest.TestCase):
 
     def test_already_customized_pc_studio_still_reconciles_known_tabs(self):
         upstream = (ROOT / 'studio/main.py').read_text()
-        owner_visual = upstream.replace(
-            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
-            "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))",
-        ).replace(
-            'content.setContentsMargins(24, 24, 24, 24)',
-            'content.setContentsMargins(50, 48, 50, 48)',
-        )
-        self.assertNotEqual(owner_visual, upstream)
+        owner_visual = helper.recognized_studio_visual_preferences(upstream)
         self.assertEqual(
             helper.recognized_studio_visual_preferences(owner_visual),
             owner_visual,
         )
+        self.assertIn("QFont('Sans Serif', 22, QFont.Bold)", owner_visual)
+        self.assertIn('content.setContentsMargins(50, 48, 50, 48)', owner_visual)
         previous = helper.legacy_studio(owner_visual)
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / 'upstream.py'
@@ -84,29 +79,14 @@ class NativeReconciliationTests(unittest.TestCase):
 
     def test_preintegrated_owner_studio_does_not_duplicate_note_or_status(self):
         upstream = (ROOT / 'studio/main.py').read_text()
-        owner = upstream.replace(
-            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
-            "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))",
-        ).replace(
-            'content.setContentsMargins(24, 24, 24, 24)',
-            'content.setContentsMargins(50, 48, 50, 48)',
-        )
-        note = helper.STUDIO_OLD_NOTE.replace(
-            'content.addSpacing(20)', 'content.addSpacing(8)'
-        ).replace('        content.addStretch()\n', '')
-        marker = '        self.refresh_tools()\n\n        footer = QLabel('
-        self.assertEqual(owner.count(marker), 1)
-        owner = owner.replace(
-            marker,
-            '        self.refresh_tools()\n\n' + note + '        footer = QLabel(',
-            1,
-        ).replace(
-            "self.status.setText('Application opened.')",
-            "self.status.setText('Launched: ' + ' '.join(command))",
-            1,
-        )
+        # Works with fresh GitHub Studio and the fully integrated PC Studio.
+        owner = helper.enhanced_studio(upstream)
         self.assertEqual(helper.enhanced_studio(owner), owner)
         self.assertEqual(owner.count('Webbie remains the resident AI service'), 1)
+        self.assertEqual(
+            owner.count("self.status.setText('Launched: ' + ' '.join(command))"),
+            1,
+        )
         previous = helper.legacy_studio(owner)
         self.assertNotIn('self.tool_tabs = QTabWidget()', previous)
         with tempfile.TemporaryDirectory() as folder:
@@ -134,14 +114,19 @@ class NativeReconciliationTests(unittest.TestCase):
 
     def test_mixed_or_unknown_studio_layout_still_fails_closed(self):
         upstream = (ROOT / 'studio/main.py').read_text()
-        mixed = upstream.replace(
-            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
+        owner = helper.recognized_studio_visual_preferences(upstream)
+        mixed = owner.replace(
+            'content.setContentsMargins(50, 48, 50, 48)',
+            'content.setContentsMargins(24, 24, 24, 24)',
+            1,
+        )
+        unknown = owner.replace(
             "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))",
-        )
-        unknown = upstream.replace(
-            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
             "logo.setFont(QFont('Sans Serif', 23, QFont.Bold))",
+            1,
         )
+        self.assertNotEqual(mixed, owner)
+        self.assertNotEqual(unknown, owner)
         for variant in (mixed, unknown):
             with self.subTest(variant=variant[:100]):
                 with self.assertRaisesRegex(ValueError,
