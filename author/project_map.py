@@ -207,7 +207,7 @@ class ProjectMap(QWidget):
                 self.selected_id, status=status,
                 target_words=target, notes=notes
             )
-        except (OSError, ValueError, Exception) as exc:
+        except Exception as exc:
             # Never claim saving succeeded. Do not clear pending edits.
             self.statusChanged.emit('Chapter plan save failed: ' + str(exc))
             return False
