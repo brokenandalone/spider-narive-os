@@ -33,6 +33,18 @@ APPROVED_TOOLS = {
     "lynis": ("lynis", "Lynis workbench"),
 }
 ID_TO_NAME = {tool_id: name for tool_id, name in APPROVED_TOOLS.values()}
+TOOL_EXPLANATIONS = {
+    "wireshark": "Wireshark helps inspect packet captures and understand traffic.",
+    "nmap": "Nmap identifies services and devices on networks you may assess.",
+    "burpsuite": "Burp Suite supports authorized web request and response analysis.",
+    "zaproxy": "OWASP ZAP supports web application security review in your lab.",
+    "ghidra": "Ghidra lets you study executable binaries and reverse engineering.",
+    "msfconsole": "Metasploit is an assessment framework. Kali Bay opens an idle workbench, not an attack.",
+    "suricata": "Suricata is for network threat detection and rules investigation.",
+    "yara": "YARA matches patterns in files to help classify suspicious samples.",
+    "lynis": "Lynis reviews local security hardening and audit recommendations.",
+    "clamtk": "ClamTK provides a graphical antivirus interface for file inspection.",
+}
 
 # Deliberately no general-purpose subprocess, shell, package manager,
 # "run scan", attack, or dynamic target arguments.
@@ -79,6 +91,21 @@ def parse_request(message: str):
     if not phrase or len(phrase) > 180:
         return None
     direct = phrase.casefold().strip()
+    if direct in (
+        "show kali readiness", "check kali readiness",
+        "show kali bay readiness", "check kali bay readiness",
+        "is kali ready", "is kali bay ready",
+    ):
+        return ("readiness", None)
+    help_match = re.fullmatch(
+        r"(?:explain|what does|tell me about) (?:the )?(?:kali )?"
+        r"([A-Za-z0-9 ]{2,40})(?: do)?",
+        direct,
+    )
+    if help_match:
+        key = help_match.group(1).strip()
+        if key in APPROVED_TOOLS:
+            return ("describe_tool", APPROVED_TOOLS[key][0])
     if direct in ("open kali terminal", "open kali linux terminal",
                   "launch kali terminal", "open kali shell"):
         return ("shell", None)
@@ -144,6 +171,8 @@ def handle_kali_request(message: str, manager=None):
     if intent is None:
         return None
     operation, value = intent
+    if operation == "describe_tool":
+        return TOOL_EXPLANATIONS.get(value, "Kali Bay has no tool description.")
     if operation == "list":
         return (
             "I can check Kali Bay status and open Wireshark, Burp Suite, "
@@ -159,6 +188,30 @@ def handle_kali_request(message: str, manager=None):
         return (
             "The Kali Bay manager isn't available here. "
             "I haven't started or changed anything."
+        )
+    if operation == "readiness":
+        import json
+        try:
+            checked = subprocess.run(
+                [str(command), "readiness-json"], capture_output=True,
+                text=True, timeout=15, check=False,
+            )
+            if checked.returncode:
+                return "Kali Bay readiness check failed. Nothing was changed."
+            report = json.loads(checked.stdout)
+            if not isinstance(report, dict):
+                raise ValueError("Unexpected readiness data")
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return "The read-only Kali readiness report is unavailable."
+        state = report.get("container_state", "unknown")
+        if state not in ("running", "stopped", "missing", "unknown"):
+            state = "unknown"
+        installed = "verified" if report.get("toolkit_ready") is True else "not verified"
+        gui = "available" if report.get("gui_session") is True else "not detected"
+        return (
+            f"Kali Bay container: {state}. Full toolkit: {installed}. "
+            f"Graphical session: {gui}. "
+            "I did not start a container, install packages or run a scan."
         )
     if operation in ("apps", "search_apps"):
         # Fixed read-only query against real Kali package .desktop inventory.
