@@ -605,7 +605,7 @@ def ask_ollama(message, context_name="Cory", model=None, advisory_context=None):
 
     if isinstance(advisory_context, str) and advisory_context:
         # Never store temporary window/task context in conversation history.
-        prompt += "\\n\\n" + advisory_context[:1000]
+        prompt += "\n\n" + advisory_context[:1000]
 
     relevant_memories = recall_memories(
         message,
