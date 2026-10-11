@@ -7,7 +7,7 @@ from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QApplication, QAbstractItemView, QCheckBox, QComboBox, QDialog,
     QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
-    QLineEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout,
 )
 
 if __package__:
@@ -15,11 +15,33 @@ if __package__:
     from .session_mix import render_session
     from .multitrack import SessionError
     from .session_presets import save_preset, load_preset, list_presets
+    from .session_qc import audit_session_audio
 else:
     from session_project import inspect_session
     from session_mix import render_session
     from multitrack import SessionError
     from session_presets import save_preset, load_preset, list_presets
+    from session_qc import audit_session_audio
+
+
+class SessionAudioQcWorker(QThread):
+    result = pyqtSignal(object, str)
+
+    def __init__(self, folder):
+        super().__init__(QApplication.instance())
+        self.folder = folder
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            self.result.emit(audit_session_audio(self.folder, stop=self.stop), "")
+        except (SessionError, OSError, ValueError) as error:
+            self.result.emit(None, str(error))
 
 
 class SessionAuditWorker(QThread):
@@ -76,6 +98,7 @@ class SessionMixDialog(QDialog):
         self.session = None
         self.checker = None
         self.worker = None
+        self.quality_worker = None
         self.rendered = None
         layout = QVBoxLayout(self)
         note = QLabel(
@@ -99,6 +122,19 @@ class SessionMixDialog(QDialog):
         self.meta = QLabel("Track verification checks the original recorded WAVs and SHA-256 hashes.")
         self.meta.setWordWrap(True)
         layout.addWidget(self.meta)
+        quality_row = QHBoxLayout()
+        self.quality_button = QPushButton("Check sampled audio quality")
+        self.quality_button.setEnabled(False)
+        self.quality_button.clicked.connect(self.start_quality_check)
+        note = QLabel("Checks the first and last five seconds only; not full mastering analysis.")
+        note.setWordWrap(True)
+        quality_row.addWidget(self.quality_button)
+        quality_row.addWidget(note)
+        layout.addLayout(quality_row)
+        self.quality_report = QPlainTextEdit()
+        self.quality_report.setReadOnly(True)
+        self.quality_report.setMaximumHeight(110)
+        layout.addWidget(self.quality_report)
         self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
             ["File", "Role", "Gain", "Pan", "Mute", "Solo", "Start delay (ms)", "Label"]
@@ -162,9 +198,12 @@ class SessionMixDialog(QDialog):
             self.load_session()
 
     def load_session(self):
-        if self.worker is not None or self.checker is not None:
+        if (self.worker is not None or self.checker is not None
+                or self.quality_worker is not None):
             return
         self.session = None
+        self.quality_button.setEnabled(False)
+        self.quality_report.clear()
         self.table.setRowCount(0)
         self.mix_button.setEnabled(False)
         self.save_preset_button.setEnabled(False)
@@ -219,11 +258,51 @@ class SessionMixDialog(QDialog):
             "All tracks begin at their saved zero offset, plus optional per-track delay."
         )
         self.mix_button.setEnabled(True)
+        self.quality_button.setEnabled(True)
         self.save_preset_button.setEnabled(True)
         self.refresh_presets()
 
     def audit_finished(self):
         worker, self.checker = self.checker, None
+        self.check_button.setEnabled(True)
+        self.choose_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def start_quality_check(self):
+        if (self.session is None or self.worker is not None
+                or self.checker is not None or self.quality_worker is not None):
+            return
+        self.quality_button.setEnabled(False)
+        self.mix_button.setEnabled(False)
+        self.check_button.setEnabled(False)
+        self.choose_button.setEnabled(False)
+        self.quality_report.setPlainText("Verifying track hashes and sampling audio...")
+        self.quality_worker = SessionAudioQcWorker(str(self.session["directory"]))
+        self.quality_worker.result.connect(self.quality_done)
+        self.quality_worker.finished.connect(self.quality_finished)
+        self.quality_worker.start()
+
+    def quality_done(self, report, error):
+        if report is None:
+            self.quality_report.setPlainText(error or "Could not inspect audio samples.")
+            return
+        rows = [
+            f"{track['filename']}: RMS {track['rms_dbfs']:.1f} dBFS | "
+            f"peak {track['peak_dbfs']:.1f} dBFS | "
+            f"{track['sampled_seconds']:.1f}s sampled"
+            for track in report["tracks"]
+        ]
+        rows.extend("WARNING: " + warning for warning in report["warnings"])
+        if not report["warnings"]:
+            rows.append("No obvious issue found in sampled windows; listen to full tracks.")
+        rows.append("This checks only the first and last five seconds of each WAV.")
+        self.quality_report.setPlainText("\n".join(rows))
+
+    def quality_finished(self):
+        worker, self.quality_worker = self.quality_worker, None
+        self.quality_button.setEnabled(self.session is not None)
+        self.mix_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
         self.choose_button.setEnabled(True)
         if worker is not None:
@@ -296,9 +375,11 @@ class SessionMixDialog(QDialog):
             self.status.setText(str(error))
 
     def start_mix(self):
-        if self.worker is not None or self.checker is not None or self.session is None:
+        if (self.worker is not None or self.checker is not None
+                or self.quality_worker is not None or self.session is None):
             return
         self.mix_button.setEnabled(False)
+        self.quality_button.setEnabled(False)
         self.check_button.setEnabled(False)
         self.choose_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -320,6 +401,7 @@ class SessionMixDialog(QDialog):
 
     def mix_finished(self):
         worker, self.worker = self.worker, None
+        self.quality_button.setEnabled(self.session is not None)
         self.mix_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
         self.choose_button.setEnabled(True)
@@ -345,6 +427,8 @@ class SessionMixDialog(QDialog):
     def closeEvent(self, event):
         if self.checker is not None:
             self.checker.shutdown()
+        if self.quality_worker is not None:
+            self.quality_worker.shutdown()
         if self.worker is not None:
             self.worker.shutdown()
         super().closeEvent(event)
