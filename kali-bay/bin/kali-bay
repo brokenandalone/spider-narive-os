@@ -19,10 +19,13 @@ KALI_ROOT="$(
     pwd
 )"
 
-mkdir -p \
-    "${STATE_DIR}" \
-    "${DATA_DIR}" \
-    "${KALI_HOME}"
+# A readiness query must not create any host directories.
+if [[ "${1:-ui}" != "readiness-json" ]]; then
+    mkdir -p \
+        "${STATE_DIR}" \
+        "${DATA_DIR}" \
+        "${KALI_HOME}"
+fi
 
 
 die() {
@@ -445,6 +448,58 @@ status() {
 }
 
 
+# Read-only readiness snapshot for the Kali Bay desktop.
+# No distrobox enter, container start/create, apt, scans or privilege changes.
+readiness_json() {
+    local podman_available=false distrobox_available=false
+    local container_present=false container_running=false
+    local gui_available=false toolkit_ready=false catalog_source=false
+    local state=missing running=unknown next_step
+
+    command -v podman >/dev/null 2>&1 && podman_available=true
+    command -v distrobox >/dev/null 2>&1 && distrobox_available=true
+    if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        gui_available=true
+    fi
+    [[ -f "$KALI_ROOT/runtime/kali_apps.py" ]] && catalog_source=true
+
+    if [[ "$podman_available" == true ]] && container_exists; then
+        container_present=true
+        running="$(podman inspect --format '{{.State.Running}}' "$NAME" 2>/dev/null)" || running=unknown
+        case "$running" in
+            true)
+                container_running=true
+                state=running
+                if full_toolset_installed; then toolkit_ready=true; fi
+                ;;
+            false) state=stopped ;;
+            *) state=unknown ;;
+        esac
+    fi
+    if [[ "$podman_available" != true ]]; then
+        next_step="Podman is missing. Review host prerequisites before installing anything."
+    elif [[ "$distrobox_available" != true ]]; then
+        next_step="Distrobox is missing. Review host prerequisites; your Kali data has not been changed."
+    elif [[ "$container_present" != true ]]; then
+        next_step="No existing Kali Bay container found. Do not run a reinstall until backups are checked."
+    elif [[ "$state" == stopped ]]; then
+        next_step="Existing Kali is stopped. Use START EXISTING KALI with explicit confirmation."
+    elif [[ "$state" == unknown ]]; then
+        next_step="Podman could not confirm the container state. Inspect manually before proceeding."
+    elif [[ "$toolkit_ready" != true ]]; then
+        next_step="Kali is running, but the full metapackage was not verified. Run KALI HEALTH CHECK."
+    elif [[ "$gui_available" != true ]]; then
+        next_step="Kali is ready. Open this workspace from a KDE desktop session for GUI applications."
+    else
+        next_step="Kali toolset is ready. Select an installed app, or ask Webbie for guidance."
+    fi
+
+    printf '{"podman":%s,"distrobox":%s,"container_exists":%s,"container_running":%s,"container_state":"%s","toolkit_ready":%s,"gui_session":%s,"catalog_source":%s,"next_step":"%s"}\n' \
+        "$podman_available" "$distrobox_available" "$container_present" \
+        "$container_running" "$state" "$toolkit_ready" "$gui_available" \
+        "$catalog_source" "$next_step"
+}
+
 info() {
     echo "Name: Kali Bay"
     echo "Container: ${NAME}"
@@ -521,6 +576,9 @@ case "${1:-ui}" in
     status)
         status
         ;;
+    readiness-json)
+        readiness_json
+        ;;
     doctor)
         doctor
         ;;
@@ -540,6 +598,7 @@ Usage:
   kali-bay inventory # read-only Kali package inventory
   kali-bay update
   kali-bay status
+  kali-bay readiness-json # read-only Kali/GUI readiness
   kali-bay doctor
   kali-bay apps-json   # read-only installed Kali desktop applications
   kali-bay app-check <system.desktop>
