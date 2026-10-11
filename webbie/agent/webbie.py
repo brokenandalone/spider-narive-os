@@ -47,6 +47,7 @@ from voice_queue import VoiceTurnCoordinator
 from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
 from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
+from workspace_launchers import workspace_command
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -433,18 +434,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("media")
-
-        if launch(
-            [
-                "/usr/local/bin/spider-media-player"
-            ]
-        ):
-            return "Opening Media."
-
-        return (
-            "Spider Media Player is not installed yet."
-        )
+        command_line = workspace_command("media")
+        if command_line and launch(command_line):
+            set_workspace("media")
+            return "Spider Media Center launch requested."
+        return ("Spider Media Center launcher was not found. "
+                "No application was started.")
 
     if (
         "study" in lower
@@ -482,12 +477,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("studio")
-
-        return (
-            "Studio selected. "
-            "I'll call you Justin here."
-        )
+        command_line = workspace_command("studio")
+        if command_line and launch(command_line):
+            set_workspace("studio")
+            return "Spider Studio launch requested."
+        return ("Spider Studio launcher was not found. "
+                "No application was started.")
 
     if "terminal" in lower and any(
         word in lower
