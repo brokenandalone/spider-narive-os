@@ -13,10 +13,12 @@ if __package__:
     from .store import AuthorStore
     from .web_features import AuthorToolkit
     from .control_socket import AuthorCommandServer
+    from .project_map import ProjectMap
 else:
     from store import AuthorStore
     from web_features import AuthorToolkit
     from control_socket import AuthorCommandServer
+    from project_map import ProjectMap
 
 
 class AuthorWindow(QMainWindow):
@@ -51,6 +53,11 @@ class AuthorWindow(QMainWindow):
         self.toolkit.reviewRequested.connect(self.author_review_requested)
         self.toolkit.editRequested.connect(self.apply_revised_passage)
         tabs.addTab(self.toolkit, 'Writing Studio')
+        self.project_map = ProjectMap(self.store)
+        self.project_map.chapterRequested.connect(self.jump_to_chapter_id)
+        self.project_map.statusChanged.connect(self.project_map_status)
+        tabs.addTab(self.project_map, 'Project Map')
+        tabs.currentChanged.connect(self.on_tab_changed)
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
         self.books.currentItemChanged.connect(self.select_book)
@@ -84,6 +91,9 @@ class AuthorWindow(QMainWindow):
             self.toolkit.reader.resume()
         elif action == 'stop_reading':
             self.toolkit.reader.stop()
+        elif action == 'open_project_map':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.project_map)
 
     def action(self, function):
         try:
@@ -106,6 +116,8 @@ class AuthorWindow(QMainWindow):
             if self.book_id is not None:
                 self.store.save_canon(self.book_id, self.canon.toPlainText())
             self.toolkit.save_current()
+            if not self.project_map.save_pending():
+                return False
             self.status.setText('Saved locally. ' + str(len(self.editor.toPlainText().split())) + ' words.')
             return True
         return self.action(save)
@@ -124,6 +136,7 @@ class AuthorWindow(QMainWindow):
         self.canon.setPlainText(self.store.canon(self.book_id) if item else '')
         self.load_chapters()
         self.toolkit.set_book(self.book_id)
+        self.project_map.set_book(self.book_id)
 
     def load_chapters(self):
         self.chapters.blockSignals(True); self.chapters.clear()
@@ -140,6 +153,27 @@ class AuthorWindow(QMainWindow):
         self.editor.setEnabled(item is not None)
         self.editor.setPlainText(self.store.chapter(self.chapter_id)['content'] if item else '')
 
+    def project_map_status(self, message):
+        if message.startswith('Chapter plan save failed:'):
+            self.status.setText(message)
+
+    def on_tab_changed(self, index):
+        if (self.editor_tabs.widget(index) is self.project_map
+                and self.book_id is not None and self.flush()):
+            self.project_map.refresh()
+
+    def jump_to_chapter_id(self, chapter_id):
+        """Navigate only within the selected book; never open unrelated books."""
+        if not self.flush():
+            return
+        for index in range(self.chapters.count()):
+            if self.chapters.item(index).data(Qt.UserRole) == chapter_id:
+                self.chapters.setCurrentRow(index)
+                self.editor_tabs.setCurrentWidget(self.editor)
+                self.editor.setFocus()
+                return
+        self.status.setText('Chapter is no longer in the selected book.')
+
     def new_book(self):
         title, ok = QInputDialog.getText(self, 'New book', 'Title:')
         if ok and title.strip() and self.flush():
@@ -153,6 +187,7 @@ class AuthorWindow(QMainWindow):
         if ok and title.strip() and self.flush():
             if self.action(lambda: self.store.create_chapter(self.book_id, title)) is not False:
                 self.load_chapters(); self.chapters.setCurrentRow(self.chapters.count() - 1)
+                self.project_map.refresh()
 
     def import_text(self):
         if self.book_id is None or not self.flush():
@@ -160,6 +195,7 @@ class AuthorWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, 'Import as a new chapter', '', 'Text (*.txt *.md *.markdown)')
         if path and self.action(lambda: self.store.import_text(self.book_id, path)) is not False:
             self.load_chapters(); self.chapters.setCurrentRow(self.chapters.count() - 1)
+            self.project_map.refresh()
 
     def import_docx(self):
         """Confirm a read-only preview before creating a separate new book."""

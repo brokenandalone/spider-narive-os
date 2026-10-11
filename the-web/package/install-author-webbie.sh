@@ -30,6 +30,8 @@ managed=(
   author/commands.py
   author/commands_client.py
   author/control_socket.py
+  author/manuscript_import.py
+  author/project_map.py
   the-web/shell/main.py
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py

@@ -37,6 +37,8 @@ class AuthorCommandTests(unittest.TestCase):
             "resume narration": {"action": "resume_reading"},
             "stop reading": {"action": "stop_reading"},
             "cancel review": {"action": "cancel_review"},
+            "Webbie show project map": {"action": "open_project_map"},
+            "open the chapter outline": {"action": "open_project_map"},
         }
         for spoken, intent in expected.items():
             with self.subTest(spoken=spoken):
@@ -112,6 +114,8 @@ class AuthorCommandTests(unittest.TestCase):
                         self.assertEqual(win.toolkit.review_depth.currentIndex(), 1)
                         win.handle_author_intent({"action": "read", "scope": "book"})
                         narrate.assert_called_once()
+                        win.handle_author_intent({"action": "open_project_map"})
+                        self.assertIs(win.editor_tabs.currentWidget(), win.project_map)
             finally:
                 win.close()
                 APP.processEvents()
