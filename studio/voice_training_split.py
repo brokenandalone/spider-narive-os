@@ -44,6 +44,9 @@ def _read_dataset(folder):
             or data.get("owner_consent") is not True
             or data.get("speaker") != "owner"):
         raise VoiceSampleError("A documented owner-consented dataset is required.")
+    source_audio = root / "audio"
+    if source_audio.is_symlink() or not source_audio.is_dir():
+        raise VoiceSampleError("Voice dataset audio folder must not be a symlink.")
     recordings = data.get("samples")
     if not isinstance(recordings, list) or not 3 <= len(recordings) <= MAX_FILES:
         raise VoiceSampleError("Collect at least three separate training clips first.")
@@ -60,8 +63,9 @@ def _read_dataset(folder):
             raise VoiceSampleError("Invalid dataset clip name, hash, or duration.")
         seen.add(name)
         source = root / name
-        if source.is_symlink() or not source.is_file():
-            raise VoiceSampleError("Missing or linked original voice dataset clip.")
+        if (source.is_symlink() or not source.is_file()
+                or source.resolve().parent != source_audio.resolve()):
+            raise VoiceSampleError("Missing, external or linked voice dataset clip.")
         info = source.stat()
         if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= 64 * 1024 * 1024:
             raise VoiceSampleError("Unexpected voice dataset audio size.")
