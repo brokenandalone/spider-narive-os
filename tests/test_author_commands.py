@@ -114,6 +114,8 @@ class AuthorCommandTests(unittest.TestCase):
                         self.assertEqual(win.toolkit.review_depth.currentIndex(), 1)
                         win.handle_author_intent({"action": "read", "scope": "book"})
                         narrate.assert_called_once()
+                        win.handle_author_intent({"action": "open_project_map"})
+                        self.assertIs(win.editor_tabs.currentWidget(), win.project_map)
             finally:
                 win.close()
                 APP.processEvents()
