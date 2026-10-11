@@ -110,3 +110,20 @@ The original audio is NEVER modified. On explicit export, Spider Studio copies t
 Regression coverage checks genuine two-guitar plus guest vocal session structure, input integrity, no-overwrite copies, private file permissions, missing or invalid audio, symlink rejection, deliberate stop, duplicate source refusal, CSV formula safety and a native editor handoff. This is **GitHub source only** until exact-head CI and PC tests pass; no local Studio files or previously recorded songs have been changed.
 
 Remaining next steps: qualify a locally trained My Voice identity model, create a real distinct AI vocal stem and two actual isolated guitar performances, confirm latency and sample-rate import on the user's Linux DAW, and audition the full arrangement before claiming Suno-like track independence.
+
+
+## October 11 major production session: reusable mix console
+
+New stacked Studio source branch introduces an end-to-end **existing-WAV production session** workflow:
+
+1. Export a private multi-WAV project with source hashes using the October 11 multitrack exporter.
+2. Open **Reopen, audition and mix saved session** from Studio AI, or use **Reopen saved session and mix** from the multitrack dialog.
+3. Studio checks every expected numbered WAV, PCM properties and the recorded SHA-256 values before accepting the project. The original source paths in the JSON are informational and are not accessed.
+4. Adjust up to 24 saved WAV parts with individual gain (0–2), stereo pan (-1 to +1), mute, solo and positive start delay (0–20 seconds). Full-song reference mixes are excluded by default, and must be explicitly enabled to avoid doubling the same instruments.
+5. Save multiple private named **mix presets** in the verified session. Restore them only while the original track fingerprint still matches, with no audio rendering on restore.
+6. Render a new 48 kHz, 24-bit stereo WAV using local FFmpeg, preserving every original project and input recording. Fresh render receipts include the exact input hashes and chosen controls. Both verification and rendering use nonblocking, stoppable background workers.
+7. Use **Check sampled audio quality** for a quick, explicitly **noncomprehensive** scan of up to the first and last five seconds of each track. It shows peak/RMS and flags sampled silent/clipped regions, DC offset, and sample-rate mismatches. It is not a full-track mastering, phase or vocal fidelity analysis.
+
+Source regressions cover tampered WAVs, path confinement, safe non-overwriting export, independent guitar/vocal controls, pan/delay filtering, actual FFmpeg render, native Qt mixing, persistent presets, and sampled audio-quality checks. **Source CI is not proof that full-song AI stems have been created or that a singer model is trained.** It does not modify the owner's PC or Webbie until a separate backup-first release gate passes.
+
+Pending: the user's live PC hardware and audio-engine check; training and listening to a genuine authorized Justin Therapy vocal model; isolated per-instrument AI generation or verified separation; GUI accessibility scaling for small screens; validating real recordings and audition quality in Ardour or Qtractor; reconciling stacked Studio PRs and customized installed files before any installation.
