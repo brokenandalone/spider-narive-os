@@ -98,7 +98,7 @@ def ffmpeg_command(ffmpeg, plan, output):
             f"[{index}:a:0]aresample=48000,"
             "aformat=sample_fmts=fltp:channel_layouts=stereo,"
             f"volume={entry['gain']:.4f},"
-            f"pan=stereo|c0={left:.4f}*c0|c1={right:.4f}"
+            f"pan=stereo|c0={left:.4f}*c0|c1={right:.4f}*c1"
             f"{delay}[track{index}]"
         )
         pads.append(f"[track{index}]")
