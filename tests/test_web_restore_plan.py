@@ -36,7 +36,7 @@ class RestorePlanTests(unittest.TestCase):
         plan.cancel()
         self.assertTrue(plan.done())
         self.assertEqual(plan.pop(),None)
-        self.assertEqual(plan.progress(),(3,3))
+        self.assertEqual(plan.progress(),(1,3))
 
     def test_user_opened_tab_preserved_in_order(self):
         plan=RestorePlan({'open':['studio','author','study'],
@@ -49,6 +49,58 @@ class RestorePlanTests(unittest.TestCase):
         self.assertTrue(plan.done())
         self.assertEqual(plan.progress(),(0,0))
         self.assertEqual(desired_tab_order(plan,['default']),['default'])
+
+
+    def test_pause_resume_preserves_queue_without_loss(self):
+        plan=RestorePlan({'open':['default','studio','author','study'],
+                          'active':'study'}, WORKSPACES)
+        self.assertTrue(plan.pause())
+        self.assertEqual(plan.pop(),None)
+        self.assertEqual(plan.progress(),(0,3))
+        self.assertTrue(plan.report()['paused'])
+        self.assertTrue(plan.resume())
+        self.assertEqual(plan.pop(),'studio')
+        self.assertEqual(plan.report()['remaining'],2)
+
+    def test_prioritize_keeps_saved_order_separate(self):
+        plan=RestorePlan({'open':['default','studio','author','study'],
+                          'active':'author'}, WORKSPACES)
+        self.assertTrue(plan.prioritize('study'))
+        self.assertEqual(plan.pending,['study','studio','author'])
+        self.assertEqual(plan.order,['default','studio','author','study'])
+        self.assertFalse(plan.prioritize('unknown'))
+        self.assertEqual(plan.pop(),'study')
+
+    def test_skip_tracks_intent_without_modifying_saved_session(self):
+        plan=RestorePlan({'open':['default','studio','author','study'],
+                          'active':'author'},WORKSPACES)
+        self.assertTrue(plan.skip('author'))
+        self.assertFalse(plan.skip('author'))
+        self.assertEqual(plan.report()['skipped'],('author',))
+        self.assertEqual(plan.progress(),(1,3))
+        self.assertEqual(plan.order,['default','studio','author','study'])
+        self.assertEqual(plan.pop(),'studio')
+        self.assertEqual(plan.pop(),'study')
+        self.assertTrue(plan.done())
+
+    def test_manual_open_is_not_reloaded_later(self):
+        plan=RestorePlan({'open':['default','studio','author'], 'active':'studio'},
+                         WORKSPACES)
+        self.assertTrue(plan.acknowledge('author'))
+        self.assertFalse(plan.acknowledge('author'))
+        self.assertEqual(plan.pop(),'studio')
+        self.assertEqual(plan.pop(),None)
+        self.assertEqual(plan.progress(),(2,2))
+
+    def test_cancel_does_not_make_resume_possible(self):
+        plan=RestorePlan({'open':['default','studio','study']},WORKSPACES)
+        self.assertTrue(plan.pause())
+        plan.cancel()
+        self.assertFalse(plan.resume())
+        self.assertFalse(plan.prioritize('study'))
+        self.assertFalse(plan.skip('study'))
+        self.assertEqual(plan.report()['remaining'],0)
+        self.assertTrue(plan.done())
 
 
 if __name__ == '__main__':
