@@ -347,6 +347,7 @@ class StudyWindow(QMainWindow):
         self.add_action(school_actions, "MY SNHU", self.open_snhu)
         self.add_action(school_actions, "SCHOOL ONEDRIVE", self.open_school_onedrive)
         self.add_action(school_actions, "APA GUIDE", self.open_apa_guide)
+        self.add_action(school_actions, "WEEKLY PLAN", self.open_weekly_planner)
         outer.addLayout(school_actions)
         self.dashboard = QLabel()
         self.dashboard.setWordWrap(True)
@@ -552,6 +553,7 @@ class StudyWindow(QMainWindow):
         planner_buttons = QHBoxLayout()
         self.add_action(planner_buttons, "IMPORT CSV ASSIGNMENTS", self.import_csv_assignments)
         self.add_action(planner_buttons, "EXPORT COURSE CALENDAR", self.export_course_calendar)
+        self.add_action(planner_buttons, "PRIVATE STUDY BACKUP", self.open_study_backup)
         assignments_layout.addLayout(planner_buttons)
 
         workspace_buttons = QHBoxLayout()
@@ -1119,6 +1121,30 @@ class StudyWindow(QMainWindow):
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, "Flashcards", str(error))
 
+    def open_study_backup(self):
+        """Manually archive a consistent database copy and private course files."""
+        try:
+            if __package__:
+                from .study_backup_ui import StudyBackupDialog
+            else:
+                from study_backup_ui import StudyBackupDialog
+            StudyBackupDialog(self).exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Study backup", str(error))
+
+    def open_weekly_planner(self):
+        """Open a user-triggered overview of dates and milestones across courses."""
+        try:
+            if __package__:
+                from .weekly_planner_ui import WeeklyPlannerDialog
+            else:
+                from weekly_planner_ui import WeeklyPlannerDialog
+            WeeklyPlannerDialog(self.store, self).exec_()
+            self.refresh_dashboard()
+            self.load_assignments()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Weekly planner", str(error))
+
     def open_study_progress(self):
         """Private, manually entered scores and logged study sessions."""
         if not self.current_course_id:
@@ -1176,9 +1202,11 @@ class StudyWindow(QMainWindow):
         if not record:
             return
         sections = self.store.get_assignment_workspace(assignment_id)
-        if any(text.strip() for text in sections.values()):
+        has_related = bool(self.store.assignment_steps(assignment_id) or
+                           self.store.assignment_sources(assignment_id))
+        if any(text.strip() for text in sections.values()) or has_related:
             warning = ("This assignment contains saved coursework. Deleting "
-                       "removes its local Study notebook and drafts from the "
+                       "removes its local Study notebook, saved sources, checklist steps and drafts from the "
                        "Study database. Documents already saved in the course "
                        "folder are not deleted.")
         else:
