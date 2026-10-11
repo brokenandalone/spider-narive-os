@@ -183,6 +183,8 @@ def master_wav(path, *, preset="balanced_stream", integrated_lufs=None,
     if type(timeout) not in (int, float) or not 1 <= timeout <= 7200:
         raise MasterError("Mastering timeout must be between 1 and 7200 seconds.")
     stop = stop if stop is not None else threading.Event()
+    if stop.is_set():
+        raise MasterError("Mastering cancelled; source mix left untouched.")
     source = source_wav(path)
     opts = settings(preset=preset, integrated_lufs=integrated_lufs,
                     true_peak_dbtp=true_peak_dbtp, lra=lra)
