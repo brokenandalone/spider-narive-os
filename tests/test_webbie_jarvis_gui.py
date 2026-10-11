@@ -24,7 +24,7 @@ class JarvisBrowserGuiTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def make(self, folder, browser=True):
+    def make(self, folder, browser=True, opener=None):
         entry = Path(folder) / "app.desktop"
         entry.write_text("[Desktop Entry]\nName=Test app\nCategories=" +
                          ("Network;WebBrowser;" if browser else "Office;") + "\n")
@@ -32,16 +32,16 @@ class JarvisBrowserGuiTests(unittest.TestCase):
             name="Test app", desktop_id="test.desktop", workspace="forage",
             path=entry)
         panel = WebbieComputerDialog(discover=lambda: [app], run=Mock(),
-                                    launcher=Mock())
+                                    launcher=Mock(), browser_opener=opener)
         return panel
 
     def test_voice_proposal_never_grants_or_launches(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(
                 os.environ, {"DISPLAY": ":0"}), patch(
                 "webbie_operator_bridge.private_socket_directory",
-                return_value=Path(temp)), patch(
-                "webbie_computer_panel.QDesktopServices.openUrl") as open_url:
-            panel = self.make(temp)
+                return_value=Path(temp)):
+            open_url = Mock(return_value=True)
+            panel = self.make(temp, opener=open_url)
             try:
                 self.assertTrue(panel.offer_site("https://github.com/"))
                 self.assertEqual(panel.browser_url.text(), "https://github.com/")
@@ -55,10 +55,9 @@ class JarvisBrowserGuiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, patch.dict(
                 os.environ, {"DISPLAY": ":0"}), patch(
                 "webbie_operator_bridge.private_socket_directory",
-                return_value=Path(temp)), patch(
-                "webbie_computer_panel.QDesktopServices.openUrl",
-                return_value=True) as open_url:
-            panel = self.make(temp)
+                return_value=Path(temp)):
+            open_url = Mock(return_value=True)
+            panel = self.make(temp, opener=open_url)
             try:
                 self.assertTrue(panel.offer_site("github.com"))
                 panel.grant.activate("Open one website", "test.desktop")
@@ -83,9 +82,9 @@ class JarvisBrowserGuiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, patch.dict(
                 os.environ, {"DISPLAY": ":0"}), patch(
                 "webbie_operator_bridge.private_socket_directory",
-                return_value=Path(temp)), patch(
-                "webbie_computer_panel.QDesktopServices.openUrl") as open_url:
-            panel = self.make(temp, browser=False)
+                return_value=Path(temp)):
+            open_url = Mock(return_value=True)
+            panel = self.make(temp, browser=False, opener=open_url)
             try:
                 self.assertFalse(panel.offer_site("github.com"))
                 panel.grant.activate("edit a document", "test.desktop")
