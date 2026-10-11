@@ -104,6 +104,8 @@ class ProductionBoardPanel(QWidget):
                 checked = QCheckBox('I reviewed this isolated WAV')
                 checked.setObjectName('production_verified_' + role)
                 self.reviewed[role] = checked
+                # Editing an approved source revokes approval until it is auditioned again.
+                field.textChanged.connect(lambda _text, key=role: self.reviewed[key].setChecked(False))
                 row.addWidget(checked)
             layout.addLayout(row)
             self.sources[role] = field
