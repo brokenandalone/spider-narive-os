@@ -22,6 +22,10 @@ FILES = {
     "Author": "author/main.py",
     "Studio": "studio/main.py",
     "Kali Bay": "kali-bay/ui/kali_bay.py",
+    "Kali manager": "kali-bay/bin/kali-bay",
+    "Kali evidence chain": "kali-bay/runtime/evidence_ledger.py",
+    "Kali report engine": "kali-bay/runtime/lab_reports.py",
+    "Kali upgrade audit": "kali-bay/package/audit-upgrade.py",
     "Forage": "forage/forage.py",
     "Deep Forage": "forage/deep-forage/deep_forage.py",
     "Nova": "media/ai-dj/nova_host.py",
@@ -139,6 +143,7 @@ def inspect(source_root, install_root, *, phase="before", check_services=True):
             "A different installed file must be reconciled with the owner's real local customizations; do not overwrite it blindly.",
             "No personal documents, credentials, models, manuscripts or school folders were examined.",
             "This tool does not reserve the daily install slot, run the installer or validate recovery.",
+            "Kali source match does not establish a running Distrobox container, sensor health or authorized speaker control; verify these manually.",
         ],
     }
 
