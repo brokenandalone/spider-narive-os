@@ -283,7 +283,7 @@ class WebbieComputerDialog(QDialog):
     def approve_sensitive(self, action, preview):
         if action == 'browser.open.confirm':
             title = 'Confirm website navigation'
-            body = (preview + '\\n\\nOpening a site may share network data with '
+            body = (preview + '\n\nOpening a site may share network data with '
                     'that site. Proceed in your system default browser?')
         else:
             title = 'Confirm Webbie change'
