@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import socket
 import stat
+import time
 
 from PyQt5.QtCore import Qt, QRectF, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
@@ -46,6 +47,15 @@ def observed_state(runtime, pending=False):
             return 'speaking', 'Speaking'
         if pending:
             return 'thinking', 'Waiting for Webbie’s reply'
+        # A fresh recorder-owned marker indicates ACTIVE audio capture,
+        # not microphone calibration, a trusted speaker or permission.
+        listening = runtime / 'webbie-listening'
+        if not listening.is_symlink():
+            marker = listening.stat()
+            if (stat.S_ISREG(marker.st_mode)
+                    and marker.st_uid == os.getuid()
+                    and 0 <= time.time() - marker.st_mtime < 12):
+                return 'listening', 'Listening through the configured microphone'
         if stat.S_ISSOCK((runtime / 'webbie.sock').stat().st_mode):
             return 'available', 'Webbie service detected'
     except OSError:
