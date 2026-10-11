@@ -25,3 +25,8 @@ own pull request and should be merged in dependency order. The first PC install
 should back up Documents/Spider OS/Author/library.sqlite3 before source changes.
 
 The Project Map is deliberately local-only and makes no network requests.
+
+Webbie can open it with explicit instructions such as **Webbie, show project map**
+or **open the chapter outline**. Those commands must pass the existing
+trusted-speaker gate if spoken. They only open this read-only overview while
+Author is visible, and do not change chapters or manuscript text.
