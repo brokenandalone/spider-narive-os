@@ -563,6 +563,8 @@ class StudyWindow(QMainWindow):
                         self.open_flashcards)
         self.add_action(workspace_buttons, "MY PROGRESS",
                         self.open_study_progress)
+        self.add_action(workspace_buttons, "WEBBIE STUDY COACH",
+                        self.open_study_coach)
         assignments_layout.addLayout(workspace_buttons)
         self.assignment_table.itemDoubleClicked.connect(
             lambda _: self.open_assignment_workspace())
@@ -1144,6 +1146,32 @@ class StudyWindow(QMainWindow):
             self.load_assignments()
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, "Weekly planner", str(error))
+
+    def open_study_coach(self):
+        """Study Coach only sees explicitly previewed and selected materials."""
+        try:
+            if __package__:
+                from .study_coach_ui import StudyCoachDialog
+            else:
+                from study_coach_ui import StudyCoachDialog
+            course = self.store.course(self.current_course_id) if self.current_course_id else None
+            assignment_id = self.selected_assignment_id() if course else None
+            row = self.store.assignment_record(assignment_id) if assignment_id else None
+            fields = self.store.get_assignment_workspace(assignment_id) if row else None
+            preview = "\n\n".join(
+                f"{name.upper()}:\n{fields[name]}"
+                for name in ("instructions", "rubric", "research")
+                if fields and fields[name].strip())
+            dialog = StudyCoachDialog(
+                self, course=course["name"] if course else "General Study",
+                topic=row["title"] if row else "",
+                materials=preview,
+                notes=self.store.get_notes(self.current_course_id) if course else "",
+                store=self.store if course else None,
+                course_id=self.current_course_id if course else None)
+            dialog.exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Study Coach", str(error))
 
     def open_study_progress(self):
         """Private, manually entered scores and logged study sessions."""
