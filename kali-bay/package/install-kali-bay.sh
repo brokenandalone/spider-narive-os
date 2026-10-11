@@ -17,6 +17,11 @@ if [[ "$mode" != "--check" && "$mode" != "--install" ]]; then
     usage >&2
     exit 2
 fi
+if [[ "$mode" == "--install" ]]; then
+    echo 'BLOCKED: Daily Spider OS release policy forbids separate Kali Bay source installation.' >&2
+    echo 'Use one reconciled system-wide Spider OS batch after continuity approval.' >&2
+    exit 3
+fi
 source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 installed_root=/usr/local/lib/spider-os
 declare -a relative_files=(
