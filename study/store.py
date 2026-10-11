@@ -246,6 +246,18 @@ class StudyStore:
 
         self.db.commit()
 
+    def add_assignments_bulk(self, course_id, rows):
+        """Insert a confirmed batch atomically with no schema or folder changes."""
+        if not self.course(course_id):
+            raise ValueError("Selected course does not exist.")
+        values = [(course_id, title, due) for title, due in rows]
+        with self.db:
+            self.db.executemany(
+                "INSERT INTO assignments(course_id, title, due) VALUES (?, ?, ?)",
+                values,
+            )
+        return len(values)
+
     def set_assignment_status(
         self,
         assignment_id,

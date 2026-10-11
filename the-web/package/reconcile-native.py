@@ -58,9 +58,11 @@ STUDY_KNOWN_BLOBS = {
     'Study workspace': {
         '456f0279b397f7776b8ba9c6d970d493a9a8ccaf',  # original main
         '422029cbc30b462d87ff52eaa6c608b63f9ce499',  # School PR #8
+        'eb9831270d4a173b4df2ddc85c117d1d81f84d2',  # PR #34 before planner
     },
     'Study course store': {
         'c7fa2cef87f66f187e6253a7059f7a5d335703f0',  # original main
+        '68cfde02c3e8757afd0d8172c43b6371670f5dcf',  # PR #34 before planner
     },
 }
 
