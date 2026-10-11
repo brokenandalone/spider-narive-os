@@ -144,3 +144,40 @@ The offscreen test now verifies saved tab ordering, the permanent home tab,
 keyboard cycling, scoped Webbie labels, verified X11 activation, and clearing
 recent history. These automated checks are not a substitute for live X11
 interaction testing (including input focus and multi-monitor popup placement).
+
+## Round 4: desktop recovery and session reliability
+
+The Web now includes a **Recovery** control in the header, Start menu, and
+Ctrl+K Quick Launch. Use Ctrl+Alt+R while The Web has keyboard focus.
+
+- **Native workspace diagnostics:** inspect source presence and currently
+  loaded workspaces without running missing modules or reading private project
+  files. A failed workspace is marked "needs attention" and offers Retry.
+- **Error fallback:** if a native module raises an exception during loading,
+  a usable workspace shell remains open with a Retry option rather than an
+  unexplained empty screen. Module exception types are not forwarded to the
+  AI assistant or broadcast to other applications.
+- **Explicit layout checkpoint:** Recovery can save and restore workspace
+  *tab order and the active tab*. Existing open editors stay open. These
+  checkpoints contain workspace IDs only and do not back up documents.
+- **Private checkpoint file:** `~/.config/spider-os/desktop-checkpoint.json`
+  uses bounded JSON, restrictive file permissions, atomic replacement, and
+  symlink refusal.
+- **Safe-start:** launching `python3 the-web/shell/main.py --safe-workspaces`
+  skips automatic workspace restoration. Safe-start preserves the previous
+  desktop tab state rather than replacing it with a one-tab home session.
+  Restoring a checkpoint explicitly exits safe-start for that session.
+- **Safety:** The Recovery Center does not edit KDE/SDDM, auto-install
+  packages, repair code or replace previously saved manuscripts. Workspace
+  retry is requested by the user, not Webbie autonomous control.
+
+### New tests
+```bash
+python3 -m unittest discover -s tests -p 'test_web_recovery.py' -v
+QT_QPA_PLATFORM=offscreen dbus-run-session -- python3 -u tests/check-the-web.py .
+```
+The Qt smoke test covers the Recovery dialog, checkpoint round trip, safe
+starting with the home tab and preservation of the existing desktop state.
+Actual PC startup and recovery need a real Spider OS X11 session test before
+merging or installing. Use the preexisting full-system daily installation
+and reconciliation process, not a direct `main.py` overwrite.
