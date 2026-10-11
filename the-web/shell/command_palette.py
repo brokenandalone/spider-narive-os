@@ -97,7 +97,8 @@ class CommandPalette(QDialog):
         recents = [tuple(row) for row in nav.get('recent', ())]
         results = find_items(self.search.text(),
                              self.shell.workspaces_for_navigation(),
-                             self.shell.installed_apps, favorites, recents)
+                             self.shell.installed_apps, favorites, recents,
+                             windows=self.shell.visible_launcher_windows())
         for result in results:
             entry = QListWidgetItem(display_text(
                 result, (result.kind, result.ident) in favorites))
@@ -149,5 +150,7 @@ class CommandPalette(QDialog):
             self.shell.open_workspace(ident)
         elif kind == 'app':
             self.shell.open_installed(ident)
+        elif kind == 'window':
+            self.shell.activate_launcher_window(ident)
         elif kind == 'action':
             self.shell.execute_palette_action(ident)
