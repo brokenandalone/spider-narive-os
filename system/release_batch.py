@@ -40,6 +40,12 @@ BASELINES = (
 APP_FILES = (
     'author/main.py', 'author/store.py', 'author/web_features.py',
     'author/speech.py', 'author/publishing.py',
+    'author/review_engine.py', 'author/review_cache.py',
+    'author/review_history.py', 'author/continuity_engine.py',
+    'author/narration_bookmarks.py', 'author/voice_reader.py',
+    'author/commands.py', 'author/commands_client.py',
+    'author/control_socket.py', 'author/manuscript_import.py',
+    'author/project_map.py',
     'the-web/shell/main.py', 'the-web/shell/volume_panel.py',
     'the-web/shell/quick_settings.py',
     'the-web/shell/appearance.py',
