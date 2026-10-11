@@ -206,9 +206,16 @@ class MasterCanonGuiTests(unittest.TestCase):
                 'Source clue', 'Clue text.', book_id=book,
                 chapter_id=ch, source_quote='The clock struck 3:13.'
             )
+            store.save_canon(book, 'Legacy city notebook text.')
+            store.add_story_entry(book, 'Rule', 'Old 3:13 clue', 'Older story notes.')
             widget = MasterCanonWidget(store)
             try:
                 widget.set_book(book)
+                widget.show_legacy_notes()
+                self.assertIn('UNREVIEWED', widget.details.toPlainText())
+                self.assertIn('Legacy city notebook text.', widget.details.toPlainText())
+                self.assertIn('Older story notes.', widget.details.toPlainText())
+                self.assertEqual(store.master_canon.audit()['total'], 2)
                 self.assertEqual(widget.table.rowCount(), 2)
                 self.assertIn('1 established', widget.summary.text())
                 row = next(i for i in range(widget.table.rowCount())
