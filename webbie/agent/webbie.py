@@ -435,6 +435,32 @@ def handle_builtin(command):
 
         return "Opening Study."
 
+    # Studio v10 exposes a small, read-only status from owner-selected
+    # production checkpoints. Never put lyrics, notes, voice recordings
+    # or absolute file paths into a spoken status response.
+    if lower in (
+        "studio progress", "studio status", "spider studio status",
+        "studio production status", "how is my studio song",
+        "what is next in studio",
+    ):
+        summary_script = workspace_path("studio", "production_board.py")
+        try:
+            result = subprocess.run(
+                ["python3", summary_script, "--summary"],
+                capture_output=True, text=True, timeout=4, check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()[:240]
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return "I cannot read Studio's local production status right now."
+
+    if re.fullmatch(r"(?:open|launch|start) (?:spider )?studio", lower):
+        set_workspace("studio")
+        if launch(["python3", workspace_path("studio", "main.py")]):
+            return "Opening Spider Studio."
+        return "Spider Studio could not open. Check the installed Studio launcher."
+
     if (
         "studio" in lower
         and any(
