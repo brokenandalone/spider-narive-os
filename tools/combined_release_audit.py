@@ -18,6 +18,8 @@ COMPONENTS = {
         "webbie/agent/kali_assistant.py", "webbie/agent/vision_query.py",
         "webbie/brain/brain.py", "webbie/brain/context_awareness.py",
         "webbie/brain/local_models.py", "webbie/voice/whisper_listener.py",
+        "webbie/agent/voice_trust.py", "webbie/agent/runtime_readiness.py",
+        "webbie/actions/action_receipts.py",
     ),
     "Webbie vision and desktop": (
         "the-web/shell/webbie_camera.py", "the-web/shell/webbie_panel.py",
@@ -32,6 +34,9 @@ COMPONENTS = {
         "study/course_materials.py", "study/draft_storage.py",
         "study/school_onedrive.py", "study/school_upload.py",
         "study/school_material_picker.py", "study/bin/webbie-homework",
+        "study/milestones.py", "study/study_backup.py",
+        "study/study_coach.py", "study/apa_preflight.py",
+        "study/reading_library.py", "study/reading_library_ui.py",
     ),
     "Studio music and vocals": (
         "studio/__init__.py", "studio/main.py", "studio/ai_panel.py", "studio/music_backend.py",
@@ -41,6 +46,8 @@ COMPONENTS = {
         "studio/ai_controls.py", "studio/rvc_loopback.py",
         "studio/voice_profile.py", "studio/package/music-engine.sh",
         "studio/package/voice-engine.sh",
+        "studio/mix_presets.py", "studio/release_export.py",
+        "studio/release_panel.py",
     ),
     "Author library and continuity": (
         "author/main.py", "author/web_features.py",
@@ -49,6 +56,7 @@ COMPONENTS = {
         "author/commands_client.py", "author/continuity_engine.py",
         "author/control_socket.py", "author/review_cache.py",
         "author/narration_bookmarks.py",
+        "author/story_atlas.py", "author/atlas_widget.py",
     ),
     "Kali Bay": (
         "kali-bay/ui/kali_bay.py", "kali-bay/bin/kali-bay",
@@ -73,10 +81,12 @@ COMPONENTS = {
 WIRING = {
     "webbie/agent/webbie.py": (
         "author_voice_bridge", "kali_assistant", "ask_vision",
+        "voice_permission", "inspect_readiness",
     ),
-    "study/study.py": ("open_homework", "open_school_onedrive"),
-    "studio/main.py": ("StudioAIPanel",),
-    "author/main.py": ("AuthorToolkit", "AuthorCommandServer"),
+    "study/study.py": ("open_homework", "open_school_onedrive",
+                       "open_weekly_planner", "open_study_coach", "open_course_readings"),
+    "studio/main.py": ("StudioAIPanel", "ReleasePanel"),
+    "author/main.py": ("AuthorToolkit", "AuthorCommandServer", "StoryAtlas"),
     "the-web/shell/webbie_camera.py": ("qwen3-vl:2b-instruct", "mjpeg", "640x480"),
 }
 SENSITIVE_PC_FILES = (
