@@ -57,6 +57,28 @@ def one_replace(text, old, new):
     return text.replace(old, new, 1)
 
 
+def recognized_studio_visual_preferences(source):
+    """Normalize either audited Studio visual variant.
+
+    The PC was already at the 22-point/50px layout when the October 10
+    Studio AI tabs were merged. Strictly allow only the original 18/24
+    or the owner's reviewed 22/50 values; reject unknown custom layouts.
+    """
+    for old, new in (
+        ("logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
+         "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))"),
+        ("content.setContentsMargins(24, 24, 24, 24)",
+         "content.setContentsMargins(50, 48, 50, 48)"),
+    ):
+        if source.count(old) == 1 and source.count(new) == 0:
+            source = one_replace(source, old, new)
+        elif source.count(new) == 1 and source.count(old) == 0:
+            continue  # The reviewed visual customization is already applied.
+        else:
+            raise ValueError('Unrecognized Studio visual layout; preserving installed code.')
+    return source
+
+
 def legacy_studio(upstream):
     """Reconstruct exactly the locally customized older Studio seen on the PC."""
     result = upstream
@@ -77,12 +99,7 @@ def legacy_studio(upstream):
         "            QPushButton:disabled { background:#17121d; color:#93869e; border-color:#352543; }\n"
     )
     result = one_replace(result, style, '')
-    result = one_replace(result,
-        "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
-        "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))")
-    result = one_replace(result,
-        'content.setContentsMargins(24, 24, 24, 24)',
-        'content.setContentsMargins(50, 48, 50, 48)')
+    result = recognized_studio_visual_preferences(result)
     start, end = '        self.tool_tabs = QTabWidget()\n', '        footer = QLabel('
     if result.count(start) != 1 or result.count(end) != 1:
         raise ValueError('Upstream Studio tab layout changed.')
@@ -96,12 +113,7 @@ def legacy_studio(upstream):
 
 
 def enhanced_studio(upstream):
-    result = one_replace(upstream,
-        "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
-        "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))")
-    result = one_replace(result,
-        'content.setContentsMargins(24, 24, 24, 24)',
-        'content.setContentsMargins(50, 48, 50, 48)')
+    result = recognized_studio_visual_preferences(upstream)
     result = one_replace(result,
         '        self.refresh_tools()\n\n        footer = QLabel(',
         '        self.refresh_tools()\n\n' + STUDIO_OLD_NOTE.replace('content.addSpacing(20)', 'content.addSpacing(8)').replace('        content.addStretch()\n', '') + '        footer = QLabel(')
