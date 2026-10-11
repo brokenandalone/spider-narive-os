@@ -153,6 +153,44 @@ class WebbieBridgeTests(unittest.TestCase):
                 "show deep forage research history", speaker_verified=True, root=root))
 
 
+class DocumentIndexTests(unittest.TestCase):
+    def test_explicitly_selected_docx_is_searchable_without_modifying_source(self):
+        from zipfile import ZipFile
+        local = load("selected_local_documents_v3", "forage/local_index.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            selection = base / "study"; selection.mkdir()
+            document = selection / "Week 6 Notes.docx"
+            xml = (
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                '<w:body><w:p><w:r><w:t>Recovery sociology citations</w:t></w:r></w:p></w:body>'
+                '</w:document>'
+            )
+            with ZipFile(document, "w") as z:
+                z.writestr("word/document.xml", xml)
+            before = document.read_bytes()
+            index = local.LocalIndex(base / "private/local.sqlite")
+            index.rebuild([selection])
+            matches = index.search("sociology")
+            self.assertEqual(len(matches), 1)
+            self.assertEqual(matches[0]["path"], str(document))
+            self.assertEqual(before, document.read_bytes())
+            self.assertEqual(index.path.stat().st_mode & 0o777, 0o600)
+
+    def test_invalid_documents_and_unselected_files_do_not_get_indexed(self):
+        local = load("selected_local_documents_invalid_v3", "forage/local_index.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            selected = base / "approved"; selected.mkdir()
+            (selected / "broken.docx").write_bytes(b"not actually a zip")
+            (selected / "broken.pdf").write_bytes(b"%PDF-not real")
+            outside = base / "private.docx"; outside.write_text("secretneverindexed")
+            index = local.LocalIndex(base / "index/search.sqlite")
+            index.rebuild([selected])
+            self.assertEqual(index.search("secretneverindexed"), [])
+            self.assertEqual(index.search("broken"), [])
+
+
 class ManualExportTests(unittest.TestCase):
     def test_explicit_workspaces_no_overwrite_or_outside_source(self):
         with tempfile.TemporaryDirectory() as tmp:
