@@ -1372,6 +1372,52 @@ class KaliBayWindow(QMainWindow):
             "Notes prepared in Webbie's message box. Review and send manually."
         )
 
+    def check_purple_defense_tools(self):
+        """Show installed defensive binaries, never assume services are running."""
+        try:
+            import json
+            result = subprocess.run(
+                [str(MANAGER), "purple-json"], text=True,
+                capture_output=True, check=False, timeout=18,
+            )
+            if result.returncode:
+                raise ValueError(
+                    (result.stderr or result.stdout).strip()[:220]
+                    or "Kali Purple tools could not be checked."
+                )
+            report = json.loads(result.stdout)
+            if not isinstance(report, dict):
+                raise ValueError("Invalid Kali Purple inventory.")
+            state = report.get("state")
+            if state != "running":
+                if state not in ("stopped", "missing", "unavailable", "unknown"):
+                    state = "unknown"
+                self.purple_status.setText(
+                    f"Kali container: {state.upper()}. "
+                    "No defensive services or tools were started."
+                )
+                return
+            found = report.get("tools", {})
+            if not isinstance(found, dict):
+                raise ValueError("Invalid tool inventory.")
+            names = (
+                "suricata", "zeek", "yara", "lynis", "clamscan",
+                "wireshark", "tcpdump", "tshark", "auditctl",
+            )
+            installed = [name for name in names if found.get(name) is True]
+            absent = [name for name in names if found.get(name) is not True]
+            self.purple_status.setText(
+                "Available: " + (", ".join(installed) or "none detected")
+                + "\nNot detected: " + (", ".join(absent) or "none")
+                + "\nThis checks installed commands only. "
+                  "Sensors and security services were NOT started."
+            )
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            self.purple_status.setText(
+                f"Purple tool check unavailable: {str(error)[:180]}. "
+                "No container or service was started."
+            )
+
     def build_category_page(self, categories, description):
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -1381,6 +1427,22 @@ class KaliBayWindow(QMainWindow):
         note.setWordWrap(True)
         note.setStyleSheet("color:#c7b9d2;padding:5px 0 12px;")
         layout.addWidget(note)
+        if categories is PURPLE_CATEGORIES:
+            self.purple_status = QLabel(
+                "Detection tools have not been checked. "
+                "A tool being installed does not mean its sensor is running."
+            )
+            self.purple_status.setObjectName("kaliPurpleInventory")
+            self.purple_status.setWordWrap(True)
+            self.purple_status.setStyleSheet(
+                "background:#160d27;color:#ffffff;border:1px solid #a78bfa;"
+                "border-radius:8px;padding:12px;"
+            )
+            layout.addWidget(self.purple_status)
+            check = QPushButton("CHECK PURPLE DEFENSE TOOLS (READ ONLY)")
+            check.setObjectName("kaliPurpleCheck")
+            check.clicked.connect(self.check_purple_defense_tools)
+            layout.addWidget(check)
 
         # Explicit, allowlisted tools only. Buttons never scan a network,
         # install packages, start monitoring, or elevate permissions.
