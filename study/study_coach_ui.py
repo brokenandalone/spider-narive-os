@@ -1,14 +1,15 @@
 """Explicit opt-in Webbie tutoring through the existing local Ollama backend."""
+from pathlib import Path
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit, QTextEdit,
-    QPushButton, QComboBox, QMessageBox, QCheckBox, QApplication,
+    QPushButton, QComboBox, QMessageBox, QCheckBox, QApplication, QFileDialog,
 )
 try:
-    from .study_coach import build_coach_prompt, parse_generated_flashcards
+    from .study_coach import build_coach_prompt, parse_generated_flashcards, save_coach_transcript
     from .homework import webbie_draft
 except ImportError:
-    from study_coach import build_coach_prompt, parse_generated_flashcards
+    from study_coach import build_coach_prompt, parse_generated_flashcards, save_coach_transcript
     from homework import webbie_draft
 
 
@@ -102,6 +103,9 @@ class StudyCoachDialog(QDialog):
         self.cards_button = QPushButton("Preview and save flashcards")
         self.cards_button.clicked.connect(self.save_flashcards)
         actions.addWidget(self.cards_button)
+        self.transcript_button = QPushButton("Save session locally")
+        self.transcript_button.clicked.connect(self.save_transcript)
+        actions.addWidget(self.transcript_button)
         self.clear_button = QPushButton("Clear tutoring history")
         self.clear_button.clicked.connect(self.clear_history)
         actions.addWidget(self.clear_button)
@@ -188,6 +192,32 @@ class StudyCoachDialog(QDialog):
                 f"{len(cards)-count} duplicate cards skipped.")
         except ValueError as error:
             QMessageBox.warning(self, "Flashcards", str(error))
+
+    def save_transcript(self):
+        """Never save generated conversations without a clear owner action."""
+        if self.worker is not None:
+            self.status.setText("Complete the tutoring request before saving.")
+            return
+        if not self.session:
+            QMessageBox.information(self, "Tutor session", "There is no response to save.")
+            return
+        parent = Path.home() / "Documents"
+        destination, _ = QFileDialog.getSaveFileName(
+            self, "Save private tutoring notes",
+            str((parent if parent.is_dir() else Path.home()) /
+                "webbie-study-session.txt"), "Text (*.txt)")
+        if not destination:
+            return
+        if not destination.lower().endswith(".txt"):
+            destination += ".txt"
+        try:
+            written = save_coach_transcript(
+                destination, course=self.course.text(), topic=self.topic.text(),
+                session=self.session)
+            self.status.setText("Saved private session to " + str(written) +
+                                ". Review AI content before relying on it.")
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Save tutor session", str(error))
 
     def clear_history(self):
         self.session.clear()
