@@ -40,3 +40,7 @@ From the repository root, run:
     QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests -p 'test_author_install_manifests.py'
     QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests -p 'test_author_commands.py'
 
+
+## Existing Author notebooks
+
+The **Read legacy canon notes** action displays original per-book Canon notebook text and Story Bible entries for the currently selected scope. It is strictly read-only, labelled **UNREVIEWED**, and never promotes those notes into the structured established-claim ledger. This avoids an empty-dashboard migration silently rewriting the writer's prior canon decisions.
