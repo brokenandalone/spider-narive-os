@@ -26,9 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .tools import TOOLS, resolve_tool
     from .ai_panel import StudioAIPanel
+    from .band_mixer_panel import BandMixerPanel
 else:
     from tools import TOOLS, resolve_tool
     from ai_panel import StudioAIPanel
+    from band_mixer_panel import BandMixerPanel
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 
@@ -138,6 +140,11 @@ class SpiderStudio(QMainWindow):
         ai_scroll.setWidgetResizable(True)
         ai_scroll.setWidget(self.ai_panel)
         self.tool_tabs.addTab(ai_scroll, 'Studio AI')
+        self.band_mixer_panel = BandMixerPanel(ai_panel=self.ai_panel)
+        band_scroll = QScrollArea()
+        band_scroll.setWidgetResizable(True)
+        band_scroll.setWidget(self.band_mixer_panel)
+        self.tool_tabs.addTab(band_scroll, 'Band Mixer')
         self.tool_buttons = []
         for category, tools in TOOLS.items():
             page = QWidget(); grid = QGridLayout(page)
