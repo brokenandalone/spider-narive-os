@@ -14,7 +14,6 @@ from PyQt5.QtGui import (
     QPainter,
     QPixmap,
     QKeySequence,
-    QShortcut,
 )
 from PyQt5.QtWidgets import (
     QApplication,
@@ -33,6 +32,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QShortcut,
     QTabWidget,
     QVBoxLayout,
     QWidget,
