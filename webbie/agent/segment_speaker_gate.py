@@ -9,6 +9,7 @@ Until such a provider exists, all normal spoken requests remain blocked.
 from __future__ import annotations
 
 import hashlib
+import math
 from pathlib import Path
 import os
 import stat
@@ -16,6 +17,7 @@ import stat
 from voice_trust import SpeakerEvidence, verify_speaker_evidence
 
 MAX_AUDIO_BYTES=2_000_000
+MIN_CONFIDENCE=0.88  # conservative provisional floor; calibrate in PC acceptance
 
 
 def recording_fingerprint(path):
@@ -72,6 +74,9 @@ class SegmentSpeakerGate:
             raw=self.provider(str(path))
             if (not isinstance(raw,SpeakerEvidence)
                     or raw.audio_digest!=fingerprint
+                    or type(raw.confidence) not in (int,float)
+                    or not math.isfinite(raw.confidence)
+                    or not MIN_CONFIDENCE <= raw.confidence <= 1.0
                     or not verify_speaker_evidence(raw,now=self.clock() if self.clock else None)):
                 return None
             return raw
