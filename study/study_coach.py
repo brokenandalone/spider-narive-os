@@ -79,3 +79,40 @@ def parse_generated_flashcards(text, limit=12):
                         break
             front = None
     return cards
+
+
+def save_coach_transcript(path, *, course, topic, session):
+    """Save only an explicitly selected tutoring session as a private TXT file."""
+    import os
+    from pathlib import Path
+    import tempfile
+    destination = Path(path)
+    if destination.suffix.lower() != ".txt":
+        raise ValueError("Save a .txt tutoring transcript.")
+    if not destination.parent.is_dir():
+        raise ValueError("Choose an existing destination directory.")
+    if destination.is_symlink() or destination.exists():
+        raise FileExistsError("The tutoring transcript filename already exists.")
+    if not isinstance(session, (tuple, list)) or not session:
+        raise ValueError("There is no tutoring session to save.")
+    if any(not isinstance(entry, str) for entry in session):
+        raise ValueError("Tutoring history must contain plain text.")
+    contents = ("SPIDER OS STUDY | WEBBIE TUTORING SESSION\n"
+                "AI responses are practice material, not verified school facts.\n"
+                "Course: " + str(course)[:180] + "\n"
+                "Topic: " + str(topic)[:350] + "\n\n"
+                + "\n\n".join(session) + "\n")
+    if len(contents.encode("utf-8")) > 250_000:
+        raise ValueError("The tutoring transcript exceeds 250 KB.")
+    handle, temporary = tempfile.mkstemp(
+        prefix=".study-session-", suffix=".txt", dir=destination.parent)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(contents)
+            stream.flush()
+            os.fsync(stream.fileno())
+        # Atomic no-overwrite publish, including another process racing us.
+        os.link(temporary, destination)
+        return destination
+    finally:
+        Path(temporary).unlink(missing_ok=True)
