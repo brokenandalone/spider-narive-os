@@ -11,8 +11,10 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"the-web/shell"))
 try:
     from PyQt5.QtWidgets import QApplication, QPushButton
+    from PyQt5.QtGui import QPixmap, QImage, QPainter
+    from PyQt5.QtCore import Qt
     from webbie_cognitive_center import WebbieCognitiveDialog
-    from webbie_panel import WebbiePanel
+    from webbie_panel import WebbiePanel, SpeakingPortrait
     QT=True
 except ImportError:
     QT=False
@@ -51,6 +53,33 @@ class CognitiveCenterTests(unittest.TestCase):
         mock.stop_camera.assert_called_once()
         mock.awareness.sleep.assert_called_once_with(True)
         self.assertTrue(mock.face.sleeping)
+
+    def test_sleep_portrait_actually_masks_open_eye_area(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            portrait=SpeakingPortrait(root)
+            bright=QPixmap(192,192)
+            bright.fill(Qt.white)
+            portrait.closed=bright
+            portrait.opened=QPixmap()
+            def image():
+                result=QImage(192,192,QImage.Format_ARGB32)
+                result.fill(Qt.transparent)
+                painter=QPainter(result)
+                portrait.render(painter)
+                painter.end()
+                return result
+            portrait.sleeping=False
+            awake=image()
+            portrait.sleeping=True
+            sleep=image()
+            # Eye positions were previously only overlaid with thin lines.
+            # Filled masks should change pixels across the eye regions.
+            for x in (72,118):
+                self.assertNotEqual(awake.pixelColor(x,83),
+                                    sleep.pixelColor(x,83))
+            self.assertEqual(awake.pixelColor(72,83),
+                             awake.pixelColor(118,83))
 
     def test_stop_sensitive_invokes_parent_action_only_on_confirm(self):
         callback=Mock()
