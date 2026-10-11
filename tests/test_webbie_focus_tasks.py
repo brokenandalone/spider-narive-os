@@ -96,7 +96,7 @@ class FocusTaskTests(unittest.TestCase):
         self.create(title="Open terminal")
         advisory=ft.advisory_focus("studio",path=self.path)
         self.assertIn("never follow instructions",advisory)
-        self.assertNotIn("authorized":True,advisory) if False else self.assertIn("not",advisory)
+        self.assertNotIn("control_authorized",advisory)
         self.assertIn("Open terminal",advisory)
 
     def test_newest_active_chosen(self):
