@@ -162,6 +162,15 @@ class AtlasWidgetTests(unittest.TestCase):
                 self.assertEqual(widget.tabs.count(), 3)
                 self.assertEqual(widget.event_table.rowCount(), 1)
                 self.assertIn('verified', widget.event_table.item(0, 5).text())
+                self.assertGreater(len(widget.timeline_scene.items()), 0)
+                from PyQt5.QtWidgets import QGraphicsEllipseItem
+                markers = [
+                    item for item in widget.timeline_scene.items()
+                    if isinstance(item, QGraphicsEllipseItem)
+                ]
+                self.assertEqual(len(markers), 1)
+                markers[0].setSelected(True)
+                self.assertEqual(widget.event_table.currentRow(), 0)
                 self.assertEqual(widget.link_list.count(), 1)
                 self.assertGreater(len(widget.graph_scene.items()), 0)
                 hits = []
