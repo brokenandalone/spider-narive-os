@@ -1,5 +1,5 @@
 """User-initiated recovery window for The Web's native workspace UI."""
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QMessageBox, QPushButton, QVBoxLayout)
@@ -13,8 +13,8 @@ class WorkspaceRecovery(QDialog):
         self.shell = shell
         self.setWindowTitle('The Web · Workspace Recovery')
         self.setObjectName('spiderWorkspaceRecovery')
-        self.resize(660, 570)
-        self.setMinimumSize(460, 360)
+        self.resize(750, 670)
+        self.setMinimumSize(500, 410)
         layout = QVBoxLayout(self)
         heading = QLabel('WORKSPACE DIAGNOSTICS & RECOVERY')
         heading.setStyleSheet('font-size:19px;font-weight:bold')
@@ -46,6 +46,25 @@ class WorkspaceRecovery(QDialog):
         restore.clicked.connect(self.restore_checkpoint)
         second.addWidget(restore)
         layout.addLayout(second)
+        queue_row = QHBoxLayout()
+        self.pause_restore = QPushButton('Pause restoring')
+        self.pause_restore.clicked.connect(self.toggle_restore_pause)
+        queue_row.addWidget(self.pause_restore)
+        self.next_restore = QPushButton('Load selected next')
+        self.next_restore.clicked.connect(self.prioritize_selected)
+        queue_row.addWidget(self.next_restore)
+        self.skip_restore = QPushButton('Skip selected for now')
+        self.skip_restore.clicked.connect(self.skip_selected)
+        queue_row.addWidget(self.skip_restore)
+        layout.addLayout(queue_row)
+        interrupt_row = QHBoxLayout()
+        self.stop_restore = QPushButton('Stop restoring')
+        self.stop_restore.clicked.connect(self.stop_restoring)
+        interrupt_row.addWidget(self.stop_restore)
+        self.adopt_layout = QPushButton('Save current layout as default')
+        self.adopt_layout.clicked.connect(self.adopt_current_layout)
+        interrupt_row.addWidget(self.adopt_layout)
+        layout.addLayout(interrupt_row)
         self.saved_restore = QPushButton('Resume last saved session (safe-start)')
         self.saved_restore.clicked.connect(self.resume_saved_session)
         layout.addWidget(self.saved_restore)
@@ -53,6 +72,9 @@ class WorkspaceRecovery(QDialog):
         foot.setWordWrap(True)
         layout.addWidget(foot)
         self.refresh()
+        self.restore_timer = QTimer(self)
+        self.restore_timer.timeout.connect(self.update_restore_controls)
+        self.restore_timer.start(700)
 
     def refresh(self):
         rows = check_workspaces(
@@ -62,8 +84,11 @@ class WorkspaceRecovery(QDialog):
         current = self.list.currentItem()
         selected = current.data(Qt.UserRole) if current else None
         self.list.clear()
+        plan = self.shell._restore_plan
+        queued = set(plan.pending) if plan is not None else set()
         for row in rows:
-            item = QListWidgetItem(f'{row.label}    [{row.status}]    {row.detail}')
+            label = 'queued' if row.ident in queued else row.status
+            item = QListWidgetItem(f'{row.label}    [{label}]    {row.detail}')
             item.setData(Qt.UserRole, row.ident)
             item.setToolTip(row.detail)
             self.list.addItem(item)
@@ -81,8 +106,75 @@ class WorkspaceRecovery(QDialog):
             note = f'Background restore {done}/{count}. ' + note
         self.status.setText(f'{len(rows)} workspaces checked · {issues} require attention. '
                             + note + 'No private document data collected.')
-        self.saved_restore.setEnabled(self.shell.safe_mode and
-                                     not self.shell.is_staged_restoring())
+        self.update_restore_controls()
+
+    def update_restore_controls(self):
+        report = self.shell.staged_restore_status()
+        active = report is not None
+        paused = active and report['paused']
+        self.pause_restore.setEnabled(active and (paused or report['remaining'] > 0))
+        self.pause_restore.setText('Resume restoring' if paused else 'Pause restoring')
+        self.stop_restore.setEnabled(active)
+        pending = set(self.shell._restore_plan.pending) if active else set()
+        item = self.list.currentItem()
+        selected = item.data(Qt.UserRole) if item is not None else None
+        self.next_restore.setEnabled(active and selected in pending)
+        self.skip_restore.setEnabled(active and selected in pending)
+        self.adopt_layout.setEnabled(not active)
+        self.saved_restore.setEnabled(self.shell.safe_mode and not active)
+
+    def toggle_restore_pause(self):
+        report = self.shell.staged_restore_status()
+        if report is None:
+            self.status.setText('No workspace restoration is currently running.')
+            return
+        changed = (self.shell.resume_staged_restore() if report['paused']
+                   else self.shell.pause_staged_restore())
+        if changed:
+            self.status.setText('Workspace restoration resumed.' if report['paused']
+                                else 'Workspace restoration paused.')
+        self.update_restore_controls()
+
+    def prioritize_selected(self):
+        item = self.list.currentItem()
+        name = item.data(Qt.UserRole) if item is not None else None
+        if name and self.shell.prioritize_staged_workspace(name):
+            self.status.setText('Selected workspace moved to the front of the queue.')
+        self.update_restore_controls()
+
+    def skip_selected(self):
+        item = self.list.currentItem()
+        name = item.data(Qt.UserRole) if item is not None else None
+        if name and self.shell.skip_staged_workspace(name):
+            self.status.setText('Workspace skipped for this startup. '
+                                'The previous saved layout is preserved.')
+            self.refresh()
+
+    def stop_restoring(self):
+        if not self.shell.is_staged_restoring():
+            return
+        answer = QMessageBox.question(
+            self, 'Stop restoring workspace tabs?',
+            'Stop reopening the remaining saved workspace tabs? Already open '
+            'tabs and unsaved work are not closed. The previous saved layout '
+            'will be preserved until you explicitly save a new one.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer == QMessageBox.Yes:
+            self.shell.stop_staged_restore()
+            self.status.setText('Restoration stopped. The saved layout was preserved.')
+            self.refresh()
+
+    def adopt_current_layout(self):
+        if self.shell.is_staged_restoring():
+            return
+        answer = QMessageBox.question(
+            self, 'Save this as the default workspace layout?',
+            'Replace the saved workspace tab arrangement with the tabs '
+            'currently open? This will not change document contents.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer == QMessageBox.Yes and self.shell.adopt_current_layout():
+            self.status.setText('Current tabs are now the saved startup layout.')
+        self.update_restore_controls()
 
     def retry_selected(self):
         item = self.list.currentItem()
