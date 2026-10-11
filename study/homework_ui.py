@@ -337,26 +337,6 @@ class HomeworkDialog(QDialog):
         except ValueError as error:
             QMessageBox.warning(self, "Homework review", str(error))
             return
-        # This extra APA heuristic can only examine owner-entered reference lines,
-        # never verify a source or issue an academic grade.
-        try:
-            if __package__:
-                from .apa_preflight import analyze_apa_preflight, format_apa_preflight
-            else:
-                from apa_preflight import analyze_apa_preflight, format_apa_preflight
-            references = []
-            for line in self.draft.toPlainText().splitlines():
-                # No inferred reference-section extraction: student should enter
-                # references explicitly in the per-assignment workspace.
-                if line.strip() == "[SOURCE NEEDED]":
-                    references.append(line.strip())
-            source_report = analyze_apa_preflight(
-                draft=self.draft.toPlainText(),
-                references=[],
-                instructions=self.directions.toPlainText())
-            report += "\n\n" + format_apa_preflight(source_report)
-        except ValueError:
-            pass
         self.review_source_draft = self.draft.toPlainText()
         self.review_is_stale = False
         self.review_notes.setPlainText(report)
