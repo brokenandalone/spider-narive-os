@@ -33,5 +33,15 @@
     "language": "en",
     "chunk_seconds": 4,
     "offline": true
+  },
+  "proactive": {
+    "enabled": true,
+    "check_in_minutes": 45,
+    "alert_cooldown_minutes": 180,
+    "quiet_start": "22:00",
+    "quiet_end": "08:00",
+    "disk_warning_free_gib": 5,
+    "watch_ai_dj": false,
+    "notify_recovery": true
   }
 }
