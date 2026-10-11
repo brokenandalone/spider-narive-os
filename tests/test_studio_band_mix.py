@@ -181,7 +181,7 @@ class BandMixTests(unittest.TestCase):
                 long_audio.setnchannels(1)
                 long_audio.setsampwidth(2)
                 long_audio.setframerate(8000)
-                long_audio.writeframes(b'\\x00\\x00' * 8000)
+                long_audio.writeframes(bytes(16000))
             inspection = band_mix.inspect_tracks({'drums': a, 'bass': b})
             self.assertEqual(inspection['tracks']['drums']['sample_rate'], 8000)
             self.assertEqual(inspection['tracks']['bass']['sample_rate'], 44100)
