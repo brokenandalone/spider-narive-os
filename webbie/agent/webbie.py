@@ -735,6 +735,7 @@ def voice_listener():
         can_run=lambda: not quiet_asleep(),
         on_error=lambda error: write_state(
             voice_turn_error=type(error).__name__),
+        on_supersede=speech_playback.stop,
     )
 
     def start_voice_turn(command):
