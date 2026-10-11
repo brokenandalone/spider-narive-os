@@ -143,6 +143,7 @@ def listen_forever(
     on_text,
     should_continue,
     on_interrupt=None,
+    verifier=None,
 ):
     if not ready():
         raise RuntimeError(
@@ -190,7 +191,19 @@ def listen_forever(
                     # Never treat a TTS echo as a normal assistant command.
                     on_interrupt(phrase)
                 else:
-                    on_text(phrase)
+                    # The optional voiceprint provider receives the exact
+                    # short WAV used for THIS transcription, not the words.
+                    # A missing provider gives no trusted speaker evidence.
+                    if verifier is None:
+                        on_text(phrase)
+                    else:
+                        evidence=None
+                        try:
+                            evidence=verifier(audio_path)
+                        except Exception:
+                            # Do not leak audio metadata or provider errors.
+                            pass
+                        on_text(phrase, evidence)
 
         finally:
             if audio_path:
