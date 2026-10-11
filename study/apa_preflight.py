@@ -40,26 +40,25 @@ def _reference_keys(reference):
 
 
 def _body_citations(body):
-    """Only likely author-date citations: (Surname, 2021) / Surname (2021)."""
+    """Find common surname/year citations without claiming complete APA parsing."""
     citations = set()
     author = r"([A-Z][A-Za-z'’\-]{1,49})"
-    for match in re.finditer(r"\b" + author + r"\s*\(\s*(" + YEAR + r")\s*\)", body):
+    coauthor = r"(?:\s+(?:&|and)\s+[A-Z][A-Za-z'’\-]+|\s+et al\.)?"
+    # Narrative: Smith (2021), Smith and Jones (2021), Smith et al. (2021).
+    narrative = r"\b" + author + coauthor + r"\s*\(\s*(" + YEAR + r")\s*\)"
+    for match in re.finditer(narrative, body):
         citations.add((match.group(1).casefold(), match.group(2).casefold()))
-    for match in re.finditer(r"\(\s*" + author +
-                             r"(?:\s+(?:&|and|et al\.)\s+[A-Z][A-Za-z'’\-]+)?"
-                             r"\s*,\s*(" + YEAR + r")\s*(?:[,;)]|$)", body):
-        citations.add((match.group(1).casefold(), match.group(2).casefold()))
-    # Multiple-parenthetical citations, e.g. (Smith, 2021; Jones, 2022).
+    # Parenthetical: (Smith, 2021), (Smith & Jones, 2021),
+    # (Smith et al., 2021) and (Smith, 2021; Brown, 2022).
     for parenthetical in re.findall(r"\([^()]{1,450}\)", body):
         for fragment in parenthetical[1:-1].split(";"):
             match = re.match(
-                r"\s*" + author +
-                r"(?:\s+(?:&|and|et al\.)\s+[A-Z][A-Za-z'’\-]+)?"
-                r"\s*,\s*(" + YEAR + r")\b", fragment)
+                r"\s*" + author + coauthor + r"\s*,\s*(" + YEAR + r")\b",
+                fragment.strip(),
+            )
             if match:
                 citations.add((match.group(1).casefold(), match.group(2).casefold()))
     return sorted(citations)
-
 
 def analyze_apa_preflight(*, draft, references, instructions=""):
     """Return observed signals and warnings, not a judgment of validity."""
