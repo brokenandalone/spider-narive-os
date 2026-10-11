@@ -112,7 +112,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     window.open_author();window.open_author();assert window.workspace_widgets['author'].native is author
     assert window.tabs.count()==15
     for name in ['author','study','studio','forage','deep-forage','webbie','kali-bay']:
-        assert window.workspace_widgets[name].native is not None,name
+        assert window.workspace_widgets[name].native is not None, (name, window.status.text())
     book=author.store.create_book('Desktop test');chapter=author.store.create_chapter(book,'One','Original')
     author.load_books();author.books.setCurrentRow(0);author.chapters.setCurrentRow(0)
     author.editor.setPlainText('Edited inside the workspace tab');assert author.flush()
