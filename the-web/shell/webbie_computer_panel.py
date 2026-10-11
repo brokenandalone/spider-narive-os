@@ -369,6 +369,10 @@ class WebbieComputerDialog(QDialog):
         return approved
 
     def refresh_status(self):
+        # Do not leave a stale result displayed after its 90-second receipt TTL.
+        if hasattr(self, 'receipt_label'):
+            self.receipt_label.setText(
+                'Last action: ' + self.action_receipts.summary())
         # A deliberate voice/GUI "Webby stop" revokes desktop task grants.
         # Consume only a stop-only marker, never instructions or approvals.
         if consume_stop():
