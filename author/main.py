@@ -33,7 +33,8 @@ class AuthorWindow(QMainWindow):
         layout = QVBoxLayout(root_widget)
         bar = QHBoxLayout(); layout.addLayout(bar)
         for label, action in [('New book', self.new_book), ('New chapter', self.new_chapter),
-                ('Import text', self.import_text), ('Import library', self.import_bundle), ('Save', self.flush),
+                ('Import text', self.import_text), ('Import DOCX', self.import_docx),
+                ('Import library', self.import_bundle), ('Save', self.flush),
                 ('Restore snapshot', self.restore), ('Backup library', self.backup), ('Focus', self.toggle_focus)]:
             button = QPushButton(label); button.clicked.connect(action); bar.addWidget(button)
             if label == 'Focus': self.focus_button = button
@@ -159,6 +160,57 @@ class AuthorWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, 'Import as a new chapter', '', 'Text (*.txt *.md *.markdown)')
         if path and self.action(lambda: self.store.import_text(self.book_id, path)) is not False:
             self.load_chapters(); self.chapters.setCurrentRow(self.chapters.count() - 1)
+
+    def import_docx(self):
+        """Confirm a read-only preview before creating a separate new book."""
+        if not self.flush():
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, 'Import Word manuscript as a new book', '',
+            'Word manuscripts (*.docx)'
+        )
+        if not path:
+            return
+        try:
+            if __package__:
+                from .manuscript_import import parse_docx
+            else:
+                from manuscript_import import parse_docx
+            preview = parse_docx(path)
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, 'DOCX preview', str(error))
+            return
+        headings = ', '.join(title for title, _ in preview.chapters[:5])
+        if len(preview.chapters) > 5:
+            headings += ', ...'
+        message = (
+            f"Book: {preview.title}\n"
+            f"Chapters: {len(preview.chapters)} | Words: {preview.word_count}\n"
+            f"Detected: {headings}\n\n"
+            "Import text only. Word formatting, pictures, annotations, and "
+            "tracked changes are not imported. Chapter breaks use Heading 1; "
+            "without them the entire document becomes one chapter.\n\n"
+            "Create a NEW book? Your current manuscripts will not be overwritten."
+        )
+        if QMessageBox.question(
+            self, 'Preview Word manuscript', message,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        ) != QMessageBox.Yes:
+            return
+        book_id = self.action(
+            lambda: self.store.import_docx(path, preview.fingerprint)
+        )
+        if book_id is False:
+            return
+        self.load_books()
+        for index in range(self.books.count()):
+            if self.books.item(index).data(Qt.UserRole) == book_id:
+                self.books.setCurrentRow(index)
+                break
+        self.status.setText(
+            f"Imported {len(preview.chapters)} chapters into a new book. "
+            "Your previous library is unchanged."
+        )
 
     def import_bundle(self):
         if not self.flush():
