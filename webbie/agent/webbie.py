@@ -40,6 +40,7 @@ from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
 from app_open_route import installed_app_request
 from voice_turns import VoiceTurnTracker
+from voice_queue import VoiceTurnCoordinator
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -92,7 +93,6 @@ STATE_FILE = (
 
 running = True
 speech_lock = threading.Lock()
-voice_turn_lock = threading.Lock()
 speech_playback = InterruptibleSpeech()
 voice_turns = VoiceTurnTracker()
 awaiting_command_until = 0.0
@@ -223,11 +223,15 @@ def notify(title, message):
         pass
 
 
-def say(text):
+def say(text, *, expected_turn=None):
     text = str(text or "").strip()
 
-    if not text:
+    if not text or (expected_turn is not None and
+                    not voice_turns.current(expected_turn)):
         return
+
+    def may_start():
+        return expected_turn is None or voice_turns.current(expected_turn)
 
     write_state(
         last_reply=text,
@@ -250,7 +254,7 @@ def say(text):
                 encoding="utf-8",
             )
 
-            speech_playback.speak(text)
+            speech_playback.speak(text, may_start=may_start)
 
         finally:
             try:
@@ -579,7 +583,7 @@ def handle_command(command, voice=False, expected_turn=None,
         # A completed model request cannot resume speaking after STOP.
         if expected_turn is not None and not voice_turns.current(expected_turn):
             return 'Stopped.'
-        say(reply)
+        say(reply, expected_turn=expected_turn)
 
     else:
         write_state(
@@ -668,18 +672,22 @@ def voice_listener():
         voice_error=None,
     )
 
+    # Single running model worker, plus one short-lived latest correction.
+    # This queue NEVER asserts a speaker identity. The owner-local verified
+    # speaker adapter remains a separate, fail-closed integration gate.
+    coordinator = VoiceTurnCoordinator(
+        lambda command, expected_turn, speaker_verified: handle_command(
+            command, voice=True, expected_turn=expected_turn,
+            speaker_verified=speaker_verified),
+        voice_turns,
+        can_run=lambda: not quiet_asleep(),
+        on_error=lambda error: write_state(
+            voice_turn_error=type(error).__name__),
+    )
+
     def start_voice_turn(command):
-        # Keep the microphone listener unblocked while speech and inference
-        # run on the reply thread. An overlap is ignored, not queued.
-        if not voice_turn_lock.acquire(blocking=False):
-            return
-        expected_turn = voice_turns.start()
-        def worker():
-            try:
-                handle_command(command, voice=True, expected_turn=expected_turn)
-            finally:
-                voice_turn_lock.release()
-        threading.Thread(target=worker, name='webbie-voice-turn', daemon=True).start()
+        result = coordinator.submit(command)
+        write_state(voice_turn_status=result)
 
     def on_interrupt(phrase):
         global awaiting_command_until
@@ -687,13 +695,14 @@ def voice_listener():
             return
         awaiting_command_until = next_window(
             awaiting_command_until, 'stop', time.time())
-        voice_turns.interrupted()
+        coordinator.cancel()
         speech_playback.stop()
         try:
             request_stop()
         except (OSError, PermissionError):
             pass
-        write_state(last_reply='Voice interruption requested')
+        write_state(last_reply='Voice interruption requested',
+                    voice_turn_status='interrupted')
 
     def on_text(phrase):
         global awaiting_command_until
@@ -717,6 +726,8 @@ def voice_listener():
             return
         if mode == 'sleep':
             awaiting_command_until = 0
+            coordinator.cancel()
+            speech_playback.stop()
             say("Goodnight. I'll keep everything running quietly.")
             set_quiet_mode('sleep')
             return
@@ -728,6 +739,8 @@ def voice_listener():
             on_interrupt(phrase)
             return
         if is_end_conversation(phrase):
+            coordinator.cancel()
+            speech_playback.stop()
             awaiting_command_until = next_window(
                 awaiting_command_until, 'end', now)
             return
