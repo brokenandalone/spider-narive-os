@@ -98,7 +98,8 @@ class WebbieComputerDialog(QDialog):
     screenObserved = pyqtSignal(str)
     authorizationRevoked = pyqtSignal()
 
-    def __init__(self, parent=None, *, discover=None, run=None, launcher=None):
+    def __init__(self, parent=None, *, discover=None, run=None, launcher=None,
+                 browser_opener=None):
         super().__init__(parent)
         self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
         self.setObjectName('webbieComputerControl')
@@ -107,6 +108,7 @@ class WebbieComputerDialog(QDialog):
         # Resolve preferences against locally INSTALLED Ollama models in the
         # background worker. Never download or switch the owner's engine.
         self.vision_model = None
+        self.browser_opener = browser_opener or QDesktopServices.openUrl
         self.grant = TaskGrant(approve_sensitive=self.approve_sensitive)
         self.operator = ConfinedDesktopOperator(
             permission=self.grant.authorize,
@@ -396,7 +398,7 @@ class WebbieComputerDialog(QDialog):
         if not self.grant.status()['active'] or self.operator.cancelled.is_set():
             self.status('Browser grant expired before navigation.')
             return False
-        if not QDesktopServices.openUrl(QUrl(destination)):
+        if not self.browser_opener(QUrl(destination)):
             self.status('The system default browser could not handle this link.')
             return False
         self.browser_url.setText(destination)
