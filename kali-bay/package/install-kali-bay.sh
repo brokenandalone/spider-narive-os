@@ -17,12 +17,20 @@ if [[ "$mode" != "--check" && "$mode" != "--install" ]]; then
     usage >&2
     exit 2
 fi
+if [[ "$mode" == "--install" ]]; then
+    echo 'BLOCKED: Daily Spider OS release policy forbids separate Kali Bay source installation.' >&2
+    echo 'Use one reconciled system-wide Spider OS batch after continuity approval.' >&2
+    exit 3
+fi
 source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 installed_root=/usr/local/lib/spider-os
 declare -a relative_files=(
     kali-bay/bin/kali-bay
     kali-bay/ui/kali_bay.py
     kali-bay/runtime/kali_apps.py
+    kali-bay/runtime/workspace_store.py
+    kali-bay/runtime/lab_reports.py
+    kali-bay/runtime/evidence_fingerprint.py
 )
 for file in "${relative_files[@]}"; do
     [[ -f "$source_root/$file" && ! -L "$source_root/$file" ]] || {
@@ -62,7 +70,7 @@ for relative in "${relative_files[@]}"; do
         printf 'Refusing symlink: %s\n' "$target" >&2
         exit 1
     fi
-    if [[ "$relative" == kali-bay/runtime/kali_apps.py ]]; then
+    if [[ "$relative" == kali-bay/runtime/*.py ]]; then
         if [[ -e "$target" && ! -f "$target" ]]; then
             printf 'Unrecognized Kali catalog target: %s\n' "$target" >&2
             exit 1
@@ -79,6 +87,9 @@ done
 command -v python3 >/dev/null || { echo 'Python 3 missing.' >&2; exit 1; }
 python3 -m py_compile "$source_root/kali-bay/ui/kali_bay.py"
 python3 -m py_compile "$source_root/kali-bay/runtime/kali_apps.py"
+python3 -m py_compile "$source_root/kali-bay/runtime/workspace_store.py"
+python3 -m py_compile "$source_root/kali-bay/runtime/lab_reports.py"
+python3 -m py_compile "$source_root/kali-bay/runtime/evidence_fingerprint.py"
 bash -n "$source_root/kali-bay/bin/kali-bay"
 
 stamp="$(date +%Y%m%d-%H%M%S)"
@@ -94,7 +105,7 @@ done
 for relative in "${relative_files[@]}"; do
     mode_bits=0644
     [[ "$relative" == kali-bay/bin/kali-bay ]] && mode_bits=0755
-    if [[ "$relative" == kali-bay/runtime/kali_apps.py ]]; then
+    if [[ "$relative" == kali-bay/runtime/*.py ]]; then
         [[ ! -L "$installed_root/kali-bay/runtime" ]] || {
             echo 'Refusing symlinked Kali runtime directory' >&2; exit 1;
         }

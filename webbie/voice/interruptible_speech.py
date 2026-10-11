@@ -26,8 +26,10 @@ class InterruptibleSpeech:
         self._active = None
 
     def stop(self):
-        self.cancelled.set()
+        # Use the same lock as speak() so a late STOP cannot be cleared by
+        # a not-yet-started playback. No requirement to hold it during wait().
         with self._lock:
+            self.cancelled.set()
             current = self._active
         if current is not None and current.poll() is None:
             try:
@@ -63,11 +65,17 @@ class InterruptibleSpeech:
                 if self._active is proc:
                     self._active = None
 
-    def speak(self, message):
+    def speak(self, message, *, may_start=None):
         text = str(message or '').strip()
         if not text:
             return False
-        self.cancelled.clear()
+        # Revalidate the originating voice generation while holding the
+        # playback lock. STOP invalidates that generation before stop().
+        # This eliminates the window where cancelled.clear() could undo STOP.
+        with self._lock:
+            if may_start is not None and not may_start():
+                return False
+            self.cancelled.clear()
         path = None
         try:
             edge = self.edge_tts

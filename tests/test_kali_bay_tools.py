@@ -199,10 +199,12 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 app = QApplication([])
 window = module.KaliBayWindow()
-assert window.security_tabs.count() == 3
+assert window.security_tabs.count() == 5
 assert window.security_tabs.tabText(0) == 'DESKTOP HUB'
 assert window.security_tabs.tabText(1) == 'OFFENSIVE'
 assert window.security_tabs.tabText(2) == 'PURPLE DEFENSE'
+assert window.security_tabs.tabText(3) == 'LAB NOTES'
+assert window.security_tabs.tabText(4) == 'LAB GUIDES'
 assert window.webbie_dock.objectName() == 'kaliWebbieAssistantDock'
 assert window.webbie_chat_entry.objectName() == 'kaliWebbieEntry'
 assert window.webbie_worker is None

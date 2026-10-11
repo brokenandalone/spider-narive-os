@@ -2,11 +2,13 @@
 
 import json
 import os
+import pwd
 import re
 import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -35,11 +37,21 @@ sys.path.insert(
 
 
 from brain import respond
+from jarvis_context import read_context, context_summary, advisory_context
+from focus_tasks import focus_answer, advisory_focus, WORKSPACES
+from privacy_controls import private_session_active, privacy_explanation
 from interruptible_speech import InterruptibleSpeech
 from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
-from app_open_route import installed_app_request
+from app_open_route import installed_app_request, request_approved_website, request_navigation_preview
+from browser_routes import parse_browser_command
 from voice_turns import VoiceTurnTracker
+from voice_queue import VoiceTurnCoordinator
+from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
+from local_reminders import ReminderScheduler
+from voice_supervisor import VoiceSupervisor
+from workspace_launchers import workspace_command
+from jarvis_commands import is_capability_question, voice_guide
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -92,7 +104,7 @@ STATE_FILE = (
 
 running = True
 speech_lock = threading.Lock()
-voice_turn_lock = threading.Lock()
+state_lock = threading.RLock()
 speech_playback = InterruptibleSpeech()
 voice_turns = VoiceTurnTracker()
 awaiting_command_until = 0.0
@@ -112,6 +124,8 @@ def load_config():
             "wake_words": [
                 "hey webbie",
                 "webbie",
+                "hey webby",
+                "webby",
                 "hey web",
                 "web",
             ],
@@ -164,47 +178,56 @@ def current_name():
 
 
 def write_state(**updates):
-    state = {
-        "online": True,
-        "pid": os.getpid(),
-        "workspace": current_workspace(),
-        "user_name": current_name(),
-        "updated": datetime.now().isoformat(),
-    }
-
-    try:
-        if STATE_FILE.exists():
-            old = json.loads(
-                STATE_FILE.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-            if isinstance(old, dict):
-                state.update(old)
-
-    except Exception:
-        pass
-
-    state.update(updates)
-
-    state["online"] = True
-    state["pid"] = os.getpid()
-    state["workspace"] = current_workspace()
-    state["user_name"] = current_name()
-    state["updated"] = datetime.now().isoformat()
-
-    try:
-        STATE_FILE.write_text(
-            json.dumps(
-                state,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-    except Exception:
-        pass
+    """Persist small status snapshots atomically, with owner-only permissions."""
+    with state_lock:
+        state = {
+            "online": True,
+            "pid": os.getpid(),
+            "workspace": current_workspace(),
+            "user_name": current_name(),
+            "updated": datetime.now().isoformat(),
+        }
+        try:
+            if STATE_FILE.exists() and not STATE_FILE.is_symlink():
+                old = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+                if isinstance(old, dict):
+                    state.update(old)
+        except (OSError, ValueError, TypeError):
+            pass
+        state.update(updates)
+        if private_session_active():
+            # The resident status file must not persist new private exchanges.
+            state.pop("last_heard", None)
+            state.pop("last_reply", None)
+            state.pop("last_input", None)
+        state["online"] = updates.get("online", True)
+        state["pid"] = os.getpid()
+        state["workspace"] = current_workspace()
+        state["user_name"] = current_name()
+        state["updated"] = datetime.now().isoformat()
+        temporary = None
+        try:
+            STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if (STATE_DIR.is_symlink() or STATE_FILE.is_symlink()
+                    or STATE_DIR.stat().st_uid != os.getuid()):
+                raise PermissionError("Unsafe Webbie status path")
+            fd, temporary = tempfile.mkstemp(prefix=".webbie-state-", dir=STATE_DIR)
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, STATE_FILE)
+            temporary = None
+        except (OSError, TypeError, ValueError):
+            pass
+        finally:
+            if temporary is not None:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
 
 
 def notify(title, message):
@@ -223,11 +246,15 @@ def notify(title, message):
         pass
 
 
-def say(text):
+def say(text, *, expected_turn=None):
     text = str(text or "").strip()
 
-    if not text:
+    if not text or (expected_turn is not None and
+                    not voice_turns.current(expected_turn)):
         return
+
+    def may_start():
+        return expected_turn is None or voice_turns.current(expected_turn)
 
     write_state(
         last_reply=text,
@@ -250,7 +277,7 @@ def say(text):
                 encoding="utf-8",
             )
 
-            speech_playback.speak(text)
+            speech_playback.speak(text, may_start=may_start)
 
         finally:
             try:
@@ -295,6 +322,29 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    stripped = re.sub(
+        r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
+    if stripped in ("private session status", "is private session on",
+                    "is privacy mode on", "what is your privacy status"):
+        return privacy_explanation()
+    if stripped in ("what is my focus", "what am i focused on",
+                    "what should i work on next", "what is my next task",
+                    "what is my next focus step"):
+        workspace = current_workspace()
+        return focus_answer(workspace if workspace in WORKSPACES else "default")
+    if is_capability_question(command):
+        return voice_guide()
+    # Read-only live snapshot. Status text never authorizes a desktop action.
+    check_phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", lower)).strip()
+    if re.fullmatch(
+        r"(?:hey )?(?:webbie|webby|web) "
+        r"(?:proactive status|check status|system check status|system health|"
+        r"what have you checked|what did you check|how are your checks|"
+        r"what are you checking|are your checks working)",
+        check_phrase,
+    ):
+        return status_message()
+
 
     if re.search(
         r"\b(open|launch|start)\b.*\bthe web\b",
@@ -405,18 +455,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("media")
-
-        if launch(
-            [
-                "/usr/local/bin/spider-media-player"
-            ]
-        ):
-            return "Opening Media."
-
-        return (
-            "Spider Media Player is not installed yet."
-        )
+        command_line = workspace_command("media")
+        if command_line and launch(command_line):
+            set_workspace("media")
+            return "Spider Media Center launch requested."
+        return ("Spider Media Center launcher was not found. "
+                "No application was started.")
 
     if (
         "study" in lower
@@ -454,12 +498,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("studio")
-
-        return (
-            "Studio selected. "
-            "I'll call you Justin here."
-        )
+        command_line = workspace_command("studio")
+        if command_line and launch(command_line):
+            set_workspace("studio")
+            return "Spider Studio launch requested."
+        return ("Spider Studio launcher was not found. "
+                "No application was started.")
 
     if "terminal" in lower and any(
         word in lower
@@ -518,12 +562,13 @@ def verified_workspace_voice_action(command, *, speaker_verified=False,
     """
     if speaker_verified is not True or quiet_asleep():
         return None
+    # A verified external identity may request research UI/history, but this
+    # bridge never launches a background action or bypasses the GUI owner gate.
     lower = str(command or "").lower()
-    # Lazy route: leave established Author/Kali voice actions untouched.
     if "deep forage" in lower or "forage research history" in lower:
         from forage_research_bridge import handle_verified_research
         research_reply = handle_verified_research(
-            command, speaker_verified=True, asleep=False,
+            command, speaker_verified=True, asleep=False
         )
         if research_reply is not None:
             return research_reply
@@ -561,9 +606,27 @@ def handle_command(command, voice=False, expected_turn=None,
         last_input="voice" if voice else "text",
     )
 
+    # Natural navigation phrases can stage an owner-reviewed mission.
+    # This callback cannot send keys or create a desktop task grant.
+    navigation_reply = request_navigation_preview(command) if voice else None
+    # Jarvis browser actions never execute in the agent. A literal user
+    # request may propose a URL to the existing GUI, which confirms it.
+    browser = parse_browser_command(command) if voice else None
+    if navigation_reply is not None:
+        reply = navigation_reply
+    elif browser is not None:
+        reply = (request_approved_website(browser.url) if browser.url else
+                 "That website address is blocked. Use a public HTTPS address.")
+    elif re.fullmatch(
+        r"(?:(?:hey )?(?:webbie|webby|web)[ ,]+)?"
+        r"(?:what am i working on|what is my current task|what workspace am i in|"
+        r"what is on my screen|what are we doing|what step are we on|"
+        r"what is the next step|what is our navigation status)", command, re.I,
+    ):
+        reply = context_summary(read_context())
     # Speech-triggered camera questions work only with consent granted in
     # The Web GUI. They cannot enable the webcam or bypass quiet sleep.
-    if voice and visual_question(command):
+    elif voice and visual_question(command):
         reply = ask_vision(command)
     else:
         verified_reply = (
@@ -581,14 +644,22 @@ def handle_command(command, voice=False, expected_turn=None,
                 # Spoken installed-app launches only request the existing
                 # owner's GUI grant; they cannot create one or run commands.
                 app_reply = installed_app_request(command) if voice else None
+                focus_workspace = current_workspace()
+                if focus_workspace not in WORKSPACES:
+                    focus_workspace = "default"
+                extra_context = advisory_context(read_context())
+                if not private_session_active():
+                    extra_context += "\n" + advisory_focus(focus_workspace)
                 reply = (app_reply if app_reply is not None else
-                         respond(command, context_name=current_name()))
+                         respond(
+                             command, context_name=current_name(),
+                             advisory_context=extra_context))
 
     if voice:
         # A completed model request cannot resume speaking after STOP.
         if expected_turn is not None and not voice_turns.current(expected_turn):
             return 'Stopped.'
-        say(reply)
+        say(reply, expected_turn=expected_turn)
 
     else:
         write_state(
@@ -614,33 +685,20 @@ def clean_phrase(text):
 
 
 def remove_wake_word(phrase):
-    phrase = clean_phrase(phrase)
-
+    """Keep URL punctuation intact after an explicitly addressed wake word."""
+    original = str(phrase or "").strip()
     wake_words = sorted(
-        CONFIG.get(
-            "wake_words",
-            [],
-        ),
-        key=len,
-        reverse=True,
-    )
-
+        CONFIG.get("wake_words", []), key=len, reverse=True)
     for wake in wake_words:
-        wake = clean_phrase(wake)
-
-        index = phrase.find(wake)
-
-        if index >= 0:
-            remainder = (
-                phrase[
-                    index + len(wake):
-                ]
-                .strip()
-            )
-
-            return True, remainder
-
-    return False, phrase
+        word = clean_phrase(wake)
+        if not word:
+            continue
+        parts = [re.escape(token) for token in word.split()]
+        pattern = r"^\s*" + r"\s+".join(parts) + r"\b[\s,:.!?]*"
+        match = re.match(pattern, original, flags=re.I)
+        if match:
+            return True, original[match.end():].strip()
+    return False, original
 
 
 def voice_listener():
@@ -677,18 +735,23 @@ def voice_listener():
         voice_error=None,
     )
 
+    # Single running model worker, plus one short-lived latest correction.
+    # This queue NEVER asserts a speaker identity. The owner-local verified
+    # speaker adapter remains a separate, fail-closed integration gate.
+    coordinator = VoiceTurnCoordinator(
+        lambda command, expected_turn, speaker_verified: handle_command(
+            command, voice=True, expected_turn=expected_turn,
+            speaker_verified=speaker_verified),
+        voice_turns,
+        can_run=lambda: not quiet_asleep(),
+        on_error=lambda error: write_state(
+            voice_turn_error=type(error).__name__),
+        on_supersede=speech_playback.stop,
+    )
+
     def start_voice_turn(command):
-        # Keep the microphone listener unblocked while speech and inference
-        # run on the reply thread. An overlap is ignored, not queued.
-        if not voice_turn_lock.acquire(blocking=False):
-            return
-        expected_turn = voice_turns.start()
-        def worker():
-            try:
-                handle_command(command, voice=True, expected_turn=expected_turn)
-            finally:
-                voice_turn_lock.release()
-        threading.Thread(target=worker, name='webbie-voice-turn', daemon=True).start()
+        result = coordinator.submit(command)
+        write_state(voice_turn_status=result)
 
     def on_interrupt(phrase):
         global awaiting_command_until
@@ -696,21 +759,20 @@ def voice_listener():
             return
         awaiting_command_until = next_window(
             awaiting_command_until, 'stop', time.time())
-        voice_turns.interrupted()
+        coordinator.cancel()
         speech_playback.stop()
         try:
             request_stop()
         except (OSError, PermissionError):
             pass
-        write_state(last_reply='Voice interruption requested')
+        write_state(last_reply='Voice interruption requested',
+                    voice_turn_status='interrupted')
 
     def on_text(phrase):
         global awaiting_command_until
 
-        phrase = clean_phrase(
-            phrase
-        )
-
+        original_phrase = str(phrase or "").strip()
+        phrase = clean_phrase(original_phrase)
         if not phrase:
             return
 
@@ -726,6 +788,8 @@ def voice_listener():
             return
         if mode == 'sleep':
             awaiting_command_until = 0
+            coordinator.cancel()
+            speech_playback.stop()
             say("Goodnight. I'll keep everything running quietly.")
             set_quiet_mode('sleep')
             return
@@ -737,20 +801,22 @@ def voice_listener():
             on_interrupt(phrase)
             return
         if is_end_conversation(phrase):
+            coordinator.cancel()
+            speech_playback.stop()
             awaiting_command_until = next_window(
                 awaiting_command_until, 'end', now)
             return
 
         if now < awaiting_command_until:
-            woke, command = remove_wake_word(phrase)
+            woke, command = remove_wake_word(original_phrase)
             awaiting_command_until = next_window(
                 awaiting_command_until, 'command', now)
-            start_voice_turn(command if woke and command else phrase)
+            start_voice_turn(command if woke and command else original_phrase)
             return
 
         woke, command = (
             remove_wake_word(
-                phrase
+                original_phrase
             )
         )
 
@@ -786,128 +852,135 @@ def voice_listener():
         )
 
 
-def session_is_active():
-    try:
-        output = subprocess.check_output(
-            [
-                "loginctl",
-                "list-sessions",
-                "--no-legend",
-            ],
-            text=True,
-            stderr=subprocess.DEVNULL,
-        )
+def supervised_voice_listener():
+    """Keep the speech recognizer alive with bounded retries, not a service restart."""
+    supervisor = VoiceSupervisor(
+        voice_listener,
+        lambda: running,
+        notify=lambda reason, delay: write_state(
+            voice_listener=False, voice_retry_in_seconds=delay,
+            voice_retry_reason=reason),
+    )
+    supervisor.serve()
 
+
+def session_activity():
+    """Find an unlocked, active local graphical session belonging to this user.
+
+    Check ALL sessions rather than stopping on the first inactive TTY.
+    Loginctl failure is inactivity, never permission to interrupt the user.
+    """
+    try:
+        owner = pwd.getpwuid(os.getuid()).pw_name
+        output = subprocess.check_output(
+            ["loginctl", "list-sessions", "--no-legend", "--no-pager"],
+            text=True, stderr=subprocess.DEVNULL, timeout=4,
+        )
         for line in output.splitlines():
             parts = line.split()
-
-            if len(parts) < 3:
+            if len(parts) < 3 or parts[2] != owner:
                 continue
-
-            session_id = parts[0]
-            username = parts[2]
-
-            if username != os.environ.get(
-                "USER",
-                "",
-            ):
-                continue
-
-            active = subprocess.check_output(
-                [
-                    "loginctl",
-                    "show-session",
-                    session_id,
-                    "-p",
-                    "Active",
-                    "--value",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-
-            idle = subprocess.check_output(
-                [
-                    "loginctl",
-                    "show-session",
-                    session_id,
-                    "-p",
-                    "IdleHint",
-                    "--value",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-
-            return (
-                active == "yes"
-                and idle != "yes"
+            identifier = parts[0]
+            details = subprocess.check_output(
+                ["loginctl", "show-session", identifier,
+                 "-p", "Active", "-p", "IdleHint", "-p", "LockedHint",
+                 "-p", "Remote", "-p", "Type", "--no-pager"],
+                text=True, stderr=subprocess.DEVNULL, timeout=4,
             )
+            flags = dict(row.split("=", 1) for row in details.splitlines()
+                         if "=" in row)
+            if (flags.get("Active") == "yes"
+                    and flags.get("IdleHint") != "yes"
+                    and flags.get("LockedHint") != "yes"
+                    and flags.get("Remote") != "yes"
+                    and flags.get("Type") in ("x11", "wayland")):
+                return True, "active session " + identifier
+        return False, "no active, unlocked, non-idle local graphical session"
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        return False, "session lookup failed: " + type(error).__name__
 
-    except Exception:
-        pass
 
-    return False
+def session_is_active():
+    """Backward-compatible boolean for Webbie proactive monitor."""
+    return session_activity()[0]
 
 
 def proactive_loop():
-    if CONFIG.get(
-        "greet_on_login",
-        True,
-    ):
-        time.sleep(8)
+    """Run real, local health checks even when Webbie is sleeping.
 
-        hour = datetime.now().hour
-
-        if hour < 12:
-            greeting = "Good morning"
-
-        elif hour < 18:
-            greeting = "Good afternoon"
-
-        else:
-            greeting = "Good evening"
-
-        if not quiet_asleep():
-            say(
-                f"{greeting}, {current_name()}. "
-                "Webbie is online."
-            )
-
-    minutes = max(
-        15,
-        int(
-            CONFIG.get(
-                "check_in_minutes",
-                45,
-            )
+    The desktop stays in control of user-facing notifications. No model calls,
+    browser queries, raw audio, camera capture, or automatic desktop actions.
+    """
+    raw = CONFIG.get("proactive", {})
+    if not isinstance(raw, dict):
+        raw = {}
+    settings = dict(raw)
+    settings.setdefault("check_in_minutes", CONFIG.get("check_in_minutes", 45))
+    monitor = ProactiveMonitor(
+        settings=settings,
+        on_alert=lambda message: subprocess.run(
+            ["notify-send", "Webbie system check", message],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4, check=True,
         ),
     )
-
-    next_check = (
-        time.time()
-        + minutes * 60
+    config = configure(settings)
+    reminders = ReminderScheduler(
+        on_alert=lambda message: subprocess.run(
+            ["notify-send", "Webbie reminder", message],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4, check=True,
+        ),
     )
+    # Start after the microphone listener has had a chance to report status.
+    time.sleep(8)
+    if (CONFIG.get("greet_on_login", True) and not quiet_asleep()
+            and session_is_active()
+            and not quiet_now(time.time(), config["quiet_start"],
+                              config["quiet_end"])):
+        hour = datetime.now().hour
+        greeting = ("Good morning" if hour < 12 else
+                    "Good afternoon" if hour < 18 else "Good evening")
+        say(f"{greeting}, {current_name()}. Webbie is online.")
 
     while running:
-        time.sleep(30)
-
-        if time.time() < next_check:
-            continue
-
-        next_check = (
-            time.time()
-            + minutes * 60
-        )
-
-        if not session_is_active() or quiet_asleep():
-            # Postpone conversation, not the background service loop.
-            continue
-
-        say(
-            f"{current_name()}, "
-            "do you need anything?"
-        )
+        desktop_active = session_is_active()
+        sleeping = quiet_asleep()
+        try:
+            report = monitor.tick(
+                session_active=desktop_active,
+                sleeping=sleeping,
+            )
+            statuses = {key: entry["status"]
+                        for key, entry in report["checks"].items()}
+            write_state(
+                proactive_enabled=report["enabled"],
+                proactive_last_run=report["last_run"],
+                proactive_pending_alerts=report["pending_count"],
+                proactive_check_statuses=statuses,
+                proactive_error=None,
+            )
+        except Exception as error:
+            # Keep Webbie's core chat and wake-word loop alive if a local
+            # monitor or desktop notification service fails.
+            write_state(proactive_error=type(error).__name__)
+        try:
+            scheduled = reminders.tick(
+                session_active=desktop_active, sleeping=sleeping,
+                quiet_start=config["quiet_start"],
+                quiet_end=config["quiet_end"],
+            )
+            write_state(
+                local_reminders_scheduled=scheduled["scheduled"],
+                local_reminders_due=scheduled["due"],
+                local_reminder_error=None,
+            )
+        except Exception as error:
+            write_state(local_reminder_error=type(error).__name__)
+        for _ in range(15):
+            if not running:
+                break
+            time.sleep(2)
 
 
 def socket_server():
@@ -1018,7 +1091,7 @@ def main():
             daemon=True,
         ),
         threading.Thread(
-            target=voice_listener,
+            target=supervised_voice_listener,
             name="webbie-voice",
             daemon=True,
         ),

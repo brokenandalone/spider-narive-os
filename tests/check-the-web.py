@@ -37,7 +37,18 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert (Path(folder)/'spider-os/appearance.json').is_file()
     with patch.object(main, 'list_tasks', return_value=[Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]), patch.object(main, 'close_window') as close, patch.object(main.QApplication, 'primaryScreen') as screen, patch.object(main, 'minimize_window', return_value=True) as minimize, patch.object(main, 'maximize_window') as maximize:
         screen.return_value.geometry.return_value.width.return_value = 1280
-        window.desktop_mode = True; window.taskbar.refresh()
+        window.desktop_mode = True
+        window.taskbar.render_tasks([Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')])
+        # Quick Launch may activate only IDs in the current scanned X11 list.
+        window.command_palette.search.setText('Movie')
+        assert any(window.command_palette.matches.item(i).data(Qt.UserRole)
+                   == ('window', '0x00000101')
+                   for i in range(window.command_palette.matches.count()))
+        with patch.object(main, 'wm_command') as requested:
+            window.activate_launcher_window('0x00000101')
+            requested.assert_called_once_with('-i', '-a', '0x00000101')
+            window.activate_launcher_window('0xDEADBEEF')
+            requested.assert_called_once()
         group = window.taskbar.tasks.itemAt(0).widget()
         close_button = next(item for item in group.findChildren(QPushButton) if item.text() == '×')
         close_button.click(); close.assert_called_with('0x00000101')
@@ -47,12 +58,32 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         overflow.actions()[0].menu().actions()[2].trigger(); minimize.assert_called_with('0x00000103')
         overflow.actions()[0].menu().actions()[3].trigger(); maximize.assert_called_with('0x00000103')
         screen.return_value.geometry.return_value.width.return_value = 900
-        window.taskbar.refresh(); assert window.taskbar.tasks.itemAt(0).widget().menu() is not None
-        window.desktop_mode = False; window.taskbar.refresh()
+        window.taskbar.render_tasks([Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]); assert window.taskbar.tasks.itemAt(0).widget().menu() is not None
+        window.desktop_mode = False; window.taskbar.render_tasks([])
+    # Launcher search is a visible, fixed-target UI, never a shell interpreter.
+    window.command_palette.search.setText('Webbie')
+    assert any(window.command_palette.matches.item(i).data(Qt.UserRole) == ('workspace', 'webbie')
+               for i in range(window.command_palette.matches.count()))
+    window.command_palette.search.setText('Studio')
+    window.command_palette.refresh()
+    assert window.command_palette.matches.count() >= 1
+    window.command_palette.hide()
     for name in main.WORKSPACES:
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
     assert window.tabs.count()==15
+    # Workspace tabs can be reordered without displacing the permanent home.
+    window.tabs.tabBar().moveTab(0, 3)
+    assert window.tabs.indexOf(window.workspace_widgets['default']) == 0
+    study_index = window.tabs.indexOf(window.workspace_widgets['study'])
+    window.tabs.tabBar().moveTab(study_index, 1)
+    assert window.tabs.indexOf(window.workspace_widgets['study']) == 1
+    window.tabs.setCurrentIndex(0)
+    window.cycle_tab(1)
+    assert window.tabs.currentWidget() is window.workspace_widgets['study']
+    window.cycle_tab(-1)
+    assert window.tabs.currentWidget() is window.workspace_widgets['default']
+    assert 'Open workspace tabs:' in window.webbie_assistant.workspace_summary
     for name in ['system', 'recovery']:
         panel = window.workspace_widgets[name].native
         assert panel is not None and panel.tables['storage'].rowCount() > 0
@@ -81,7 +112,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     window.open_author();window.open_author();assert window.workspace_widgets['author'].native is author
     assert window.tabs.count()==15
     for name in ['author','study','studio','forage','deep-forage','webbie','kali-bay']:
-        assert window.workspace_widgets[name].native is not None,name
+        assert window.workspace_widgets[name].native is not None, (name, getattr(window.workspace_widgets[name], 'native_error', 'not recorded'))
     book=author.store.create_book('Desktop test');chapter=author.store.create_chapter(book,'One','Original')
     author.load_books();author.books.setCurrentRow(0);author.chapters.setCurrentRow(0)
     author.editor.setPlainText('Edited inside the workspace tab');assert author.flush()
@@ -115,15 +146,32 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         window.open_workspace_folder('/home/test/Documents/Spider Studio', 'studio')
         assert folder_open.call_args.args[0] == ['xdg-open', '/home/test/Documents/Spider Studio']
         assert window.current_workspace == 'studio'
+    assert window.navigation_state['recent']
+    window.clear_recent_navigation()
+    assert not window.navigation_state['recent']
+    assert not main.load_navigation(window.navigation_path, main.WORKSPACES)['recent']
     window.open_workspace('deep-forage')
     wallpaper_id=window.wallpaper_catalog.defaults['deep-forage']
     window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))
+    # Off-thread app and wmctrl discovery must finish before tearing down Qt.
+    app.processEvents()
+    for active in (window.app_scan_worker, window.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
     window.open_author();assert window.close()
     reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
+    assert reopened.tabs.indexOf(reopened.workspace_widgets['default']) == 0
+    assert reopened.tabs.indexOf(reopened.workspace_widgets['study']) == 1
     assert reopened.appearance=='light'
     assert reopened.background_surface.appearance=='light'
     assert reopened.taskbar.styleSheet()==reopened.styleSheet()
     assert reopened.workspace_widgets['author'].native.store.chapter(chapter)['content']=='Edited inside the workspace tab'
     assert reopened.wallpaper_catalog.selected_id('deep-forage')==wallpaper_id
+    app.processEvents()
+    for active in (reopened.app_scan_worker, reopened.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
     assert reopened.close();app.processEvents()
 print('DESKTOP INTEGRATION PASSED: 15 tabs, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')

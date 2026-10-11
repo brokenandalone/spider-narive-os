@@ -130,6 +130,54 @@ APP_FILES = (
     'studio/rvc_loopback.py',
     'studio/voice_profile.py',
     'the-web/package/reconcile-native.py',
+    # Candidate-only additive components from today's workspace branches.
+    'author/manuscript_import.py',
+    'author/project_map.py',
+    'kali-bay/runtime/evidence_fingerprint.py',
+    'kali-bay/runtime/lab_reports.py',
+    'kali-bay/runtime/workspace_store.py',
+    'studio/band_mix.py',
+    'studio/band_mixer_panel.py',
+    'studio/band_projects.py',
+    'studio/click_track.py',
+    'studio/mastering_dialog.py',
+    'studio/multitrack.py',
+    'studio/multitrack_dialog.py',
+    'studio/package/inspect-studio-install.py',
+    'studio/session_master.py',
+    'studio/session_mix.py',
+    'studio/session_mix_dialog.py',
+    'studio/session_presets.py',
+    'studio/session_project.py',
+    'studio/session_qc.py',
+    'study/assignment_planner.py',
+    'study/assignment_workflow.py',
+    'study/assignment_workspace_ui.py',
+    'study/flashcards.py',
+    'study/flashcards_ui.py',
+    'study/study_progress.py',
+    'study/study_progress_ui.py',
+    'the-web/shell/command_palette.py',
+    'the-web/shell/desktop_state.py',
+    'the-web/shell/navigation_core.py',
+    'the-web/shell/navigation_state.py',
+    'the-web/shell/readability.py',
+    'the-web/shell/webbie_cognitive_center.py',
+    'the-web/shell/webbie_focus_dialog.py',
+    'the-web/shell/webbie_reminders_dialog.py',
+    'webbie/actions/action_journal.py',
+    'webbie/actions/navigation_missions.py',
+    'webbie/agent/browser_routes.py',
+    'webbie/agent/jarvis_commands.py',
+    'webbie/agent/local_reminders.py',
+    'webbie/agent/proactive_checks.py',
+    'webbie/agent/voice_queue.py',
+    'webbie/agent/voice_supervisor.py',
+    'webbie/agent/workspace_launchers.py',
+    'webbie/brain/focus_tasks.py',
+    'webbie/brain/jarvis_context.py',
+    'webbie/brain/local_model_inventory.py',
+    'webbie/brain/privacy_controls.py',
     'kali-bay/package/install-kali-bay.sh',
 )
 # Exact recognized historical Study source blobs from the prior guarded
@@ -289,6 +337,28 @@ def atomic_copy(src, dest, uid=0, gid=0, mode=0o644):
 
 def apply(items, backup_root, project_root=PROJECT_ROOT,
           refs=BASELINES, known_checker=known_baseline):
+    """One reviewed batch per Indianapolis calendar day, never per workspace.
+
+    Perform the ordinary non-mutating preflight BEFORE creating any lock
+    or backup directory. Lock and re-check inside the original transaction.
+    """
+    checks = inspect(items, project_root, refs, known_checker)
+    if not report(checks):
+        raise RuntimeError('No files were changed. Review blocked paths first.')
+    if not any(state in ('ADD', 'UPGRADE') for _, state, _ in checks):
+        print('Already current; no installation necessary.')
+        return None
+    import importlib.util
+    source = Path(__file__).with_name('daily_install_policy.py')
+    spec = importlib.util.spec_from_file_location('spider_daily_install_policy', source)
+    policy = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(policy)
+    with policy.daily_install_guard(backup_root):
+        return _apply_transaction(items, backup_root, project_root, refs, known_checker)
+
+
+def _apply_transaction(items, backup_root, project_root=PROJECT_ROOT,
+                       refs=BASELINES, known_checker=known_baseline):
     checks = inspect(items, project_root, refs, known_checker)
     if not report(checks):
         raise RuntimeError('No files were changed. Review blocked paths first.')
@@ -428,6 +498,33 @@ def user_info(for_apply=False):
     return Path(user.pw_dir), user.pw_uid, user.pw_gid
 
 
+def require_daily_continuity(backup_root, source_root=PROJECT_ROOT):
+    """Fail closed unless the exact combined daily release is approved.
+
+    This is intentionally not used for --check or rollback. It is read-only:
+    source/PC gate decisions occur before any installer writes.
+    """
+    import importlib.util
+    source_root = Path(source_root)
+    audit_script = source_root / 'tools/daily_release_continuity.py'
+    manifest = source_root / 'system/daily_release_plan_20261011.json'
+    if not audit_script.is_file() or not manifest.is_file():
+        raise RuntimeError('Daily combined release audit or plan is missing')
+    spec = importlib.util.spec_from_file_location(
+        'spider_daily_continuity_installer', audit_script
+    )
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+    plan = json.loads(manifest.read_text(encoding='utf-8'))
+    blockers, _ = checker.audit(plan, source_root, backup_root)
+    if blockers:
+        raise RuntimeError(
+            'Combined daily release BLOCKED (' + str(len(blockers))
+            + ' continuity checks). Run tools/daily_release_continuity.py'
+            + ' and reconcile every issue before the single installation.'
+        )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('check', 'apply', 'rollback-check', 'rollback'))
@@ -446,6 +543,7 @@ def main(argv=None):
         if args.action == 'check':
             return 0 if report(inspect(items)) else 3
         if args.action == 'apply':
+            require_daily_continuity(backup_root)
             apply(items, backup_root)
             return 0
         if not args.backup:

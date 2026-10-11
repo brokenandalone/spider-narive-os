@@ -16,6 +16,13 @@ def parse_author_command(value):
     text = text.rstrip("!.?")
     if not text:
         return None
+    # Project navigation is read-only and only acts on the already-open Author.
+    if re.fullmatch(
+        r"(?:please\s+)?(?:show|open)(?:\s+(?:me|the|my))?\s+"
+        r"(?:(?:author|the author)\s+)?"
+        r"(?:project map|chapter outline|manuscript outline)", text
+    ):
+        return {"action": "open_project_map"}
     # Commands target only the active selection. No guessed book/chapter.
     if re.fullmatch(r"(?:please\s+)?(?:stop|cancel)(?:\s+(?:the|my))?\s+(?:review|reviewing)", text):
         return {"action": "cancel_review"}
