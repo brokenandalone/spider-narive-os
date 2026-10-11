@@ -62,7 +62,7 @@ def _score(query, label, detail):
     return score
 
 
-def find_items(query, workspaces, applications=(), favorites=(), recents=(), limit=60):
+def find_items(query, workspaces, applications=(), favorites=(), recents=(), limit=60, windows=()):
     """Rank known choices, never arbitrary user-supplied executable strings."""
     text = str(query or '').strip()[:120]
     favorite_keys = set(favorites)
@@ -88,6 +88,19 @@ def find_items(query, workspaces, applications=(), favorites=(), recents=(), lim
             results.append(Result('app', app.desktop_id, app.name,
                                   'Installed app · ' + workspaces.get(app.workspace, app.workspace),
                                   score + bonus))
+
+    # The palette may display X11 windows, but the GUI revalidates the
+    # current window list before activating anything. No arbitrary shell text.
+    for task in tuple(windows)[:80]:
+        ident = str(getattr(task, 'ident', ''))
+        title = str(getattr(task, 'title', '')).strip()[:160]
+        if not re.fullmatch(r'0x[0-9a-fA-F]{1,16}', ident) or int(ident, 16) == 0:
+            continue
+        if not title:
+            continue
+        score = _score(text, title, 'running window')
+        if score:
+            results.append(Result('window', ident, title, 'Running X11 window', score + 12))
 
     for key, label, detail in INTERNAL_ACTIONS:
         score = _score(text, label, detail + ' ' + key.replace('-', ' '))
