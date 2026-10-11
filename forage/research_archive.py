@@ -6,7 +6,9 @@ import re
 from uuid import uuid4
 
 
-def save_research(topic, report_lines, sources, directory):
+def save_research(topic, report_lines, sources, directory, *,
+                  audit=None, citation_report=None, depth="standard",
+                  focus="general", queries=None):
     folder = Path(directory).expanduser()
     if folder.is_symlink():
         raise ValueError("The research destination cannot be a symlink")
@@ -18,6 +20,11 @@ def save_research(topic, report_lines, sources, directory):
     export = folder / (stem + ".sources.json")
     payload = {
         "topic": topic,
+        "research_depth": depth,
+        "research_lens": focus,
+        "queries": list(queries or []),
+        "quality_audit": audit,
+        "citation_audit": citation_report,
         "sources": [{
             "number": number,
             "title": str(source.get("title", "")),
