@@ -592,9 +592,10 @@ def handle_command(command, voice=False, expected_turn=None,
         reply = (request_approved_website(browser.url) if browser.url else
                  "That website address is blocked. Use a public HTTPS address.")
     elif re.fullmatch(
-        r"(?:hey )?(?:webbie|webby|web)[ ,]+"
+        r"(?:(?:hey )?(?:webbie|webby|web)[ ,]+)?"
         r"(?:what am i working on|what is my current task|what workspace am i in|"
-        r"what is on my screen|what are we doing)", command, re.I,
+        r"what is on my screen|what are we doing|what step are we on|"
+        r"what is the next step|what is our navigation status)", command, re.I,
     ):
         reply = context_summary(read_context())
     # Speech-triggered camera questions work only with consent granted in
