@@ -583,7 +583,7 @@ def verified_workspace_voice_action(command, *, speaker_verified=False,
 
 
 def handle_command(command, voice=False, expected_turn=None,
-                   speaker_verified=False, speaker_evidence=None):
+                   speaker_evidence=None, speaker_verified=False):
     command = str(command or "").strip()
 
     if not command:
