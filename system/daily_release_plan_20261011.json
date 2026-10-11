@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "release_date": "2026-10-11",
+  "timezone": "America/Indiana/Indianapolis",
+  "max_system_installs_per_local_day": 1,
+  "policy": "Stage all Spider OS upgrades throughout the day. Combine into one reviewed candidate, test cross-workspace continuity, back up once, apply once, then verify and retain rollback. No isolated workspace installs.",
+  "candidate_commit": null,
+  "source_ci_verified": false,
+  "installed_pc_reconciled": false,
+  "rollback_validated": false,
+  "owner_approved_install": false,
+  "installer_daily_guard_connected": false,
+  "workspaces": [
+    {
+      "name": "System/Recovery",
+      "pull_requests": [
+        49
+      ],
+      "required_files": [
+        "system/release_batch.py",
+        "tools/combined_release_audit.py"
+      ]
+    },
+    {
+      "name": "The Web",
+      "pull_requests": [
+        52
+      ],
+      "required_files": [
+        "the-web/shell/main.py",
+        "the-web/shell/navigation_core.py"
+      ]
+    },
+    {
+      "name": "Webbie",
+      "pull_requests": [
+        54,
+        58,
+        61
+      ],
+      "required_files": [
+        "webbie/agent/webbie.py",
+        "webbie/agent/proactive_checks.py",
+        "webbie/agent/voice_queue.py"
+      ]
+    },
+    {
+      "name": "Study",
+      "pull_requests": [
+        53,
+        64
+      ],
+      "required_files": [
+        "study/study.py",
+        "study/flashcards.py"
+      ]
+    },
+    {
+      "name": "Studio",
+      "pull_requests": [
+        59,
+        62
+      ],
+      "required_files": [
+        "studio/main.py",
+        "studio/session_mix.py",
+        "studio/band_mix.py"
+      ]
+    },
+    {
+      "name": "Author",
+      "pull_requests": [
+        56
+      ],
+      "required_files": [
+        "author/main.py",
+        "author/project_map.py"
+      ]
+    },
+    {
+      "name": "Kali Bay",
+      "pull_requests": [
+        60
+      ],
+      "required_files": [
+        "kali-bay/ui/kali_bay.py",
+        "kali-bay/runtime/workspace_store.py"
+      ]
+    },
+    {
+      "name": "Forage/Deep Forage",
+      "pull_requests": [
+        55
+      ],
+      "required_files": [
+        "forage/engine.py",
+        "forage/document_text.py",
+        "forage/research_quality.py"
+      ]
+    },
+    {
+      "name": "Media Center/Nova Radio",
+      "pull_requests": [
+        49
+      ],
+      "required_files": [
+        "media/ai-dj/service.py",
+        "media/ai-dj/nova_host.py"
+      ],
+      "pc_runtime_verification_required": true
+    }
+  ],
+  "pull_requests": [
+    {
+      "pr": 49,
+      "workspace": "System/Recovery",
+      "branch": "release/combined-20261010-audit-gate",
+      "observed_sha": "07ea3f54aa86b7525019413211dfcd5c183da8d6",
+      "integrated": true,
+      "paths": []
+    },
+    {
+      "pr": 52,
+      "workspace": "The Web",
+      "branch": "upgrades/the-web-menu-readability-20261011",
+      "observed_sha": "f09376efe2e82e288a7c1058ff19d28c4fefa980",
+      "integrated": false,
+      "paths": [
+        "the-web/shell/main.py",
+        "the-web/shell/quick_settings.py",
+        "the-web/shell/command_palette.py",
+        "the-web/shell/navigation_core.py",
+        "the-web/shell/readability.py"
+      ]
+    },
+    {
+      "pr": 54,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-voice-corrections-20261011",
+      "observed_sha": "7d2201a5fe5a04438b0bc641c34a462f30c2bcb3",
+      "integrated": false,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/agent/voice_queue.py",
+        "webbie/voice/interruptible_speech.py"
+      ]
+    },
+    {
+      "pr": 58,
+      "workspace": "Webbie",
+      "branch": "fix/webbie-proactive-checkins-20261011",
+      "observed_sha": "4612d5f19470419fee0909bcc96d667458b2587a",
+      "integrated": false,
+      "paths": [
+        "webbie/agent/webbie.py"
+      ]
+    },
+    {
+      "pr": 61,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-proactive-reliability-20261011",
+      "observed_sha": "23f061a8d8e5e5358b5f48f6a4cfb252df98b5c4",
+      "integrated": false,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/agent/local_reminders.py",
+        "webbie/agent/proactive_checks.py",
+        "webbie/agent/voice_supervisor.py",
+        "the-web/shell/webbie_panel.py",
+        "system/release_batch.py",
+        "tools/combined_release_audit.py"
+      ]
+    },
+    {
+      "pr": 53,
+      "workspace": "Study",
+      "branch": "feature/study-school-planner-20261011",
+      "observed_sha": "02cdb9fc6b97560b5e4b2eac33e214fa85cb9195",
+      "integrated": false,
+      "paths": [
+        "study/study.py",
+        "study/assignment_workflow.py"
+      ]
+    },
+    {
+      "pr": 64,
+      "workspace": "Study",
+      "branch": "feature/study-assignment-workspaces-20261011",
+      "observed_sha": "7ebf6d388efe933f1c5ef595cbc907cbdfd4ce85",
+      "integrated": false,
+      "paths": [
+        "study/study.py",
+        "study/store.py",
+        "study/assignment_workflow.py",
+        "study/flashcards.py",
+        "study/assignment_workspace_ui.py",
+        "system/release_batch.py",
+        "the-web/package/install-desktop.sh"
+      ]
+    },
+    {
+      "pr": 59,
+      "workspace": "Studio",
+      "branch": "feature/studio-session-mixing-20261011",
+      "observed_sha": "e4b31933277c7cfba64210c3c106211f009d3101",
+      "integrated": false,
+      "paths": [
+        "studio/ai_panel.py",
+        "studio/session_mix.py",
+        "studio/session_project.py",
+        "studio/session_qc.py"
+      ]
+    },
+    {
+      "pr": 62,
+      "workspace": "Studio",
+      "branch": "feature/studio-production-workflow-v8-20261011",
+      "observed_sha": "2beef60d667d6093370703b30f8336dc144c1d6f",
+      "integrated": false,
+      "paths": [
+        "studio/band_mix.py",
+        "studio/band_mixer_panel.py",
+        "studio/band_projects.py",
+        "studio/package/inspect-studio-install.py"
+      ]
+    },
+    {
+      "pr": 56,
+      "workspace": "Author",
+      "branch": "feature/author-project-map-progress-20261011",
+      "observed_sha": "78cf3b530c7c5fc95b55229a100a92e30f33936d",
+      "integrated": false,
+      "paths": [
+        "author/main.py",
+        "author/store.py",
+        "author/commands.py",
+        "author/control_socket.py",
+        "author/project_map.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 60,
+      "workspace": "Kali Bay",
+      "branch": "upgrades/kali-bay-command-center-20261011",
+      "observed_sha": "b2bda51c4ce5c99b3276d3c5c6c9b1f80d92bdf7",
+      "integrated": false,
+      "paths": [
+        "kali-bay/ui/kali_bay.py",
+        "kali-bay/bin/kali-bay",
+        "kali-bay/runtime/workspace_store.py",
+        "webbie/agent/kali_assistant.py"
+      ]
+    },
+    {
+      "pr": 55,
+      "workspace": "Forage/Deep Forage",
+      "branch": "feature/forage-deep-research-20261011",
+      "observed_sha": "60bdc96c4dad4c812b11c4087514d74838aacc16",
+      "integrated": true,
+      "paths": [
+        "forage/engine.py",
+        "forage/local_index.py",
+        "forage/research_quality.py",
+        "forage/document_text.py",
+        "forage/deep-forage/deep_forage.py",
+        "webbie/agent/webbie.py",
+        "system/release_batch.py"
+      ]
+    }
+  ],
+  "resolved_shared_paths": [],
+  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations."
+}
