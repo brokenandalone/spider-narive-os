@@ -7,6 +7,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -94,6 +95,7 @@ STATE_FILE = (
 
 running = True
 speech_lock = threading.Lock()
+state_lock = threading.RLock()
 speech_playback = InterruptibleSpeech()
 voice_turns = VoiceTurnTracker()
 awaiting_command_until = 0.0
@@ -165,47 +167,51 @@ def current_name():
 
 
 def write_state(**updates):
-    state = {
-        "online": True,
-        "pid": os.getpid(),
-        "workspace": current_workspace(),
-        "user_name": current_name(),
-        "updated": datetime.now().isoformat(),
-    }
-
-    try:
-        if STATE_FILE.exists():
-            old = json.loads(
-                STATE_FILE.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-            if isinstance(old, dict):
-                state.update(old)
-
-    except Exception:
-        pass
-
-    state.update(updates)
-
-    state["online"] = True
-    state["pid"] = os.getpid()
-    state["workspace"] = current_workspace()
-    state["user_name"] = current_name()
-    state["updated"] = datetime.now().isoformat()
-
-    try:
-        STATE_FILE.write_text(
-            json.dumps(
-                state,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-    except Exception:
-        pass
+    """Persist small status snapshots atomically, with owner-only permissions."""
+    with state_lock:
+        state = {
+            "online": True,
+            "pid": os.getpid(),
+            "workspace": current_workspace(),
+            "user_name": current_name(),
+            "updated": datetime.now().isoformat(),
+        }
+        try:
+            if STATE_FILE.exists() and not STATE_FILE.is_symlink():
+                old = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+                if isinstance(old, dict):
+                    state.update(old)
+        except (OSError, ValueError, TypeError):
+            pass
+        state.update(updates)
+        state["online"] = updates.get("online", True)
+        state["pid"] = os.getpid()
+        state["workspace"] = current_workspace()
+        state["user_name"] = current_name()
+        state["updated"] = datetime.now().isoformat()
+        temporary = None
+        try:
+            STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if (STATE_DIR.is_symlink() or STATE_FILE.is_symlink()
+                    or STATE_DIR.stat().st_uid != os.getuid()):
+                raise PermissionError("Unsafe Webbie status path")
+            fd, temporary = tempfile.mkstemp(prefix=".webbie-state-", dir=STATE_DIR)
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, STATE_FILE)
+            temporary = None
+        except (OSError, TypeError, ValueError):
+            pass
+        finally:
+            if temporary is not None:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
 
 
 def notify(title, message):
@@ -812,6 +818,7 @@ def session_is_active():
             ],
             text=True,
             stderr=subprocess.DEVNULL,
+            timeout=4,
         )
 
         for line in output.splitlines():
@@ -855,10 +862,8 @@ def session_is_active():
                 stderr=subprocess.DEVNULL,
             ).strip()
 
-            return (
-                active == "yes"
-                and idle != "yes"
-            )
+            if active == "yes" and idle != "yes":
+                return True
 
     except Exception:
         pass
