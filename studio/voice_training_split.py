@@ -17,8 +17,10 @@ import threading
 
 try:
     from .voice_profile import VoiceSampleError
+    from .voice_dataset import duration_seconds
 except ImportError:
     from voice_profile import VoiceSampleError
+    from voice_dataset import duration_seconds
 
 MAX_FILES = 256
 MAX_BYTES = 2 * 1024 ** 3
@@ -99,6 +101,9 @@ def training_split_plan(dataset, *, stop=None):
     for clip in clips:
         if _hash(clip["path"], stop) != clip["sha256"]:
             raise VoiceSampleError("Voice training dataset checksum mismatch.")
+        measured = duration_seconds(clip["path"])
+        if abs(measured - clip["seconds"]) > 0.02:
+            raise VoiceSampleError("Voice dataset duration metadata does not match actual audio.")
         if clip["sha256"] in hashes:
             raise VoiceSampleError("Duplicate voice clips must not appear in a training split.")
         hashes.add(clip["sha256"])
