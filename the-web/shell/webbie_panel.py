@@ -50,7 +50,7 @@ def observed_state(runtime, pending=False):
         # A fresh recorder-owned marker indicates ACTIVE audio capture,
         # not microphone calibration, a trusted speaker or permission.
         listening = runtime / 'webbie-listening'
-        if not listening.is_symlink():
+        if listening.exists() and not listening.is_symlink():
             marker = listening.stat()
             if (stat.S_ISREG(marker.st_mode)
                     and marker.st_uid == os.getuid()
