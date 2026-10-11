@@ -105,3 +105,42 @@ keyboard/mouse login fault is **out of scope** for this change.
 Webbie's separate permission-gated computer operator remains untouched.
 Quick Launch is user-driven and does not independently grant Webbie control
 over arbitrary windows, apps or the terminal.
+
+## Further desktop upgrade: workspace control and Quick Launch
+
+The second October 11 round extends the same GitHub PR and keeps the current
+combined-release baseline.
+
+- **Reorder tabs:** drag workspace tabs to rearrange them. The Web home is
+  automatically restored to position zero. Saved session order follows the
+  actual visible tabs and is restored at the next normal session launch.
+- **Cycle tabs:** Ctrl+PageDown and Ctrl+PageUp switch to the next/previous
+  workspace tab. Ctrl+Alt+Home returns to The Web home without closing work.
+- **Tab context menus:** right-click a tab for Open, Pin/Unpin, Close, Close
+  Other Workspace Tabs, and Home. Closing tabs still invokes each native
+  workspace's existing save and pending-worker checks. A rejected close stops
+  the Close Other operation.
+- **Quick Launch window search:** while the X11 desktop session is active,
+  recently enumerated open-window titles appear as search results. A selected
+  window is activated only if its X11 ID matches the shell's fresh, bounded
+  taskbar snapshot. Search text never executes commands.
+- **Clear recent history:** Quick Launch has a confirmation-protected
+  Clear Recent action that clears recent launcher history without touching
+  favorites, files, windows, or open tabs.
+- **Webbie workspace context:** the assistant's existing advisory workspace
+  context now lists the current workspace and other open workspace **labels**.
+  The shell does not automatically add window titles, URLs, document contents,
+  clipboard text, or arbitrary X11 observations. Webbie's computer-operator
+  authorization flow remains unchanged.
+
+### Additional tests
+
+```bash
+python3 -m unittest discover -s tests -p 'test_web_navigation_round2.py' -v
+QT_QPA_PLATFORM=offscreen dbus-run-session -- python3 -u tests/check-the-web.py .
+```
+
+The offscreen test now verifies saved tab ordering, the permanent home tab,
+keyboard cycling, scoped Webbie labels, verified X11 activation, and clearing
+recent history. These automated checks are not a substitute for live X11
+interaction testing (including input focus and multi-monitor popup placement).
