@@ -176,6 +176,12 @@ class BandMixTests(unittest.TestCase):
             a, b = root / 'one.wav', root / 'two.wav'
             wav(a, rate=8000)
             wav(b, rate=44100)
+            # Produce a genuine >0.5s duration difference, not just rate drift.
+            with wave.open(str(a), 'wb') as long_audio:
+                long_audio.setnchannels(1)
+                long_audio.setsampwidth(2)
+                long_audio.setframerate(8000)
+                long_audio.writeframes(b'\\x00\\x00' * 8000)
             inspection = band_mix.inspect_tracks({'drums': a, 'bass': b})
             self.assertEqual(inspection['tracks']['drums']['sample_rate'], 8000)
             self.assertEqual(inspection['tracks']['bass']['sample_rate'], 44100)
