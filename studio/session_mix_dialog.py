@@ -16,6 +16,7 @@ if __package__:
     from .multitrack import SessionError
     from .session_presets import save_preset, load_preset, list_presets
     from .session_qc import audit_session_audio
+    from .session_stem_audit import assess_stem_independence
     from .mastering_dialog import MasteringDialog
 else:
     from session_project import inspect_session
@@ -23,6 +24,7 @@ else:
     from multitrack import SessionError
     from session_presets import save_preset, load_preset, list_presets
     from session_qc import audit_session_audio
+    from session_stem_audit import assess_stem_independence
     from mastering_dialog import MasteringDialog
 
 
@@ -42,6 +44,26 @@ class SessionAudioQcWorker(QThread):
     def run(self):
         try:
             self.result.emit(audit_session_audio(self.folder, stop=self.stop), "")
+        except (SessionError, OSError, ValueError) as error:
+            self.result.emit(None, str(error))
+
+
+class SessionStemWorker(QThread):
+    result = pyqtSignal(object, str)
+
+    def __init__(self, folder):
+        super().__init__(QApplication.instance())
+        self.folder = folder
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            self.result.emit(assess_stem_independence(self.folder, stop=self.stop), "")
         except (SessionError, OSError, ValueError) as error:
             self.result.emit(None, str(error))
 
@@ -101,6 +123,7 @@ class SessionMixDialog(QDialog):
         self.checker = None
         self.worker = None
         self.quality_worker = None
+        self.stem_worker = None
         self.rendered = None
         layout = QVBoxLayout(self)
         note = QLabel(
@@ -131,6 +154,10 @@ class SessionMixDialog(QDialog):
         note = QLabel("Checks the first and last five seconds only; not full mastering analysis.")
         note.setWordWrap(True)
         quality_row.addWidget(self.quality_button)
+        self.stem_button = QPushButton("Check stem duplication / independence")
+        self.stem_button.setEnabled(False)
+        self.stem_button.clicked.connect(self.start_stem_check)
+        quality_row.addWidget(self.stem_button)
         quality_row.addWidget(note)
         layout.addLayout(quality_row)
         self.quality_report = QPlainTextEdit()
@@ -209,6 +236,7 @@ class SessionMixDialog(QDialog):
             return
         self.session = None
         self.quality_button.setEnabled(False)
+        self.stem_button.setEnabled(False)
         self.quality_report.clear()
         self.table.setRowCount(0)
         self.mix_button.setEnabled(False)
@@ -272,11 +300,51 @@ class SessionMixDialog(QDialog):
         )
         self.mix_button.setEnabled(True)
         self.quality_button.setEnabled(True)
+        self.stem_button.setEnabled(True)
         self.save_preset_button.setEnabled(True)
         self.refresh_presets()
 
     def audit_finished(self):
         worker, self.checker = self.checker, None
+        self.check_button.setEnabled(True)
+        self.choose_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def start_stem_check(self):
+        if (self.session is None or self.worker is not None
+                or self.checker is not None or self.quality_worker is not None
+                or self.stem_worker is not None):
+            return
+        self.stem_button.setEnabled(False)
+        self.quality_button.setEnabled(False)
+        self.mix_button.setEnabled(False)
+        self.check_button.setEnabled(False)
+        self.choose_button.setEnabled(False)
+        self.quality_report.setPlainText("Checking track SHA-256 and sampled PCM similarities...")
+        self.stem_worker = SessionStemWorker(str(self.session["directory"]))
+        self.stem_worker.result.connect(self.stem_done)
+        self.stem_worker.finished.connect(self.stem_finished)
+        self.stem_worker.start()
+
+    def stem_done(self, report, error):
+        if report is None:
+            self.quality_report.setPlainText(error or "Stem content review unavailable.")
+            return
+        rows = [f"Inspected {report['track_count']} WAVs; roles still require human review."]
+        for hit in report["identical_or_sampled_pcm_collisions"]:
+            rows.append("WARNING: " + hit["type"].replace("_", " ") + ": "
+                        + " / ".join(hit["tracks"]))
+        rows.extend("NOTICE: " + note for note in report["notices"])
+        if not report["identical_or_sampled_pcm_collisions"]:
+            rows.append("No matching audio found in checked windows; independence is not proven.")
+        self.quality_report.setPlainText("\n".join(rows))
+
+    def stem_finished(self):
+        worker, self.stem_worker = self.stem_worker, None
+        self.stem_button.setEnabled(self.session is not None)
+        self.quality_button.setEnabled(self.session is not None)
+        self.mix_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
         self.choose_button.setEnabled(True)
         if worker is not None:
@@ -314,6 +382,7 @@ class SessionMixDialog(QDialog):
 
     def quality_finished(self):
         worker, self.quality_worker = self.quality_worker, None
+        self.stem_button.setEnabled(self.session is not None)
         self.quality_button.setEnabled(self.session is not None)
         self.mix_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
@@ -415,6 +484,7 @@ class SessionMixDialog(QDialog):
 
     def mix_finished(self):
         worker, self.worker = self.worker, None
+        self.stem_button.setEnabled(self.session is not None)
         self.quality_button.setEnabled(self.session is not None)
         self.mix_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
@@ -453,6 +523,8 @@ class SessionMixDialog(QDialog):
             self.checker.shutdown()
         if self.quality_worker is not None:
             self.quality_worker.shutdown()
+        if self.stem_worker is not None:
+            self.stem_worker.shutdown()
         if self.worker is not None:
             self.worker.shutdown()
         super().closeEvent(event)
