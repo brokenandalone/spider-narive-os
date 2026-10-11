@@ -24,3 +24,15 @@ bash kali-bay/package/install-kali-bay.sh --check
 ```
 
 **Draft source only. Do not install on the owner's Spider OS machine yet.** The actual on-PC Kali UI is customized and differs from GitHub; perform the guarded source audit, avoid overwriting unfamiliar changes, and integrate the entire branch chain with the combined daily installer and rollback plan. GitHub source checks cannot prove PC desktop/KDE, Distrobox container or audio/Webbie behavior.
+
+## One-batch installation continuity audit
+The upgrade also adds `kali-bay/package/audit-upgrade.py`, an entirely read-only on-PC source audit. It checks the Kali manager, Kali UI, five bundled runtime modules and Webbie's dedicated Kali assistant bridge against the GitHub source, reporting the SHA-256 of existing matching/diverging source files. Existing owner-modified files are **blocked**, not replaced, and missing core Kali files are blocked. Missing new runtime components are identified as additive candidates, but no installation takes place.
+
+Preview on the PC **only when the full source is downloaded**:
+```bash
+python3 kali-bay/package/audit-upgrade.py
+python3 kali-bay/package/audit-upgrade.py --json
+```
+The selective `--install` path now runs this same continuity gate before any backups or writes. If any existing Kali/Webbie source differs, it refuses changes and requires human reconciliation through the daily combined-release workflow. Passing this comparison does not itself authorize installation or guarantee hardware compatibility. The full combined installer still needs to be updated and tested separately to include this branch.
+
+Test: `python3 -m unittest discover -s tests -p 'test_kali_upgrade_audit.py' -v`.
