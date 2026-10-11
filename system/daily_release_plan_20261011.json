@@ -39,23 +39,35 @@
         61,
         67,
         68,
-        69
+        69,
+        76
       ],
       "required_files": [
         "webbie/agent/webbie.py",
         "webbie/agent/proactive_checks.py",
-        "webbie/agent/voice_queue.py"
+        "webbie/agent/voice_queue.py",
+        "webbie/agent/voice_trust.py",
+        "webbie/agent/runtime_readiness.py"
       ]
     },
     {
       "name": "Study",
       "pull_requests": [
         53,
-        64
+        64,
+        71,
+        73,
+        77
       ],
       "required_files": [
         "study/study.py",
-        "study/flashcards.py"
+        "study/flashcards.py",
+        "study/milestones.py",
+        "study/study_backup.py",
+        "study/study_coach.py",
+        "study/apa_preflight.py",
+        "study/reading_library.py",
+        "study/reading_library_ui.py"
       ]
     },
     {
@@ -63,23 +75,29 @@
       "pull_requests": [
         57,
         59,
-        62
+        62,
+        74
       ],
       "required_files": [
         "studio/main.py",
         "studio/session_mix.py",
-        "studio/band_mix.py"
+        "studio/band_mix.py",
+        "studio/release_export.py",
+        "studio/release_panel.py"
       ]
     },
     {
       "name": "Author",
       "pull_requests": [
         51,
-        56
+        56,
+        75
       ],
       "required_files": [
         "author/main.py",
-        "author/project_map.py"
+        "author/project_map.py",
+        "author/story_atlas.py",
+        "author/atlas_widget.py"
       ]
     },
     {
@@ -375,10 +393,104 @@
         "kali-bay/package/install-kali-bay.sh",
         "system/release_batch.py"
       ]
+    },
+    {
+      "pr": 71,
+      "workspace": "Study",
+      "branch": "feature/study-milestones-sources-weekly-20261011",
+      "observed_sha": "83478fac46955e8afb957ea903c8ad13e0ccf75c",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "study/study.py",
+        "study/store.py",
+        "study/assignment_workspace_ui.py",
+        "study/study_backup.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 73,
+      "workspace": "Study",
+      "branch": "feature/study-webbie-coach-apa-preflight-20261011",
+      "observed_sha": "96ee475055adbce08647b0f6f862c4661d7d808f",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "study/study.py",
+        "study/assignment_workspace_ui.py",
+        "study/study_coach_ui.py",
+        "study/apa_preflight.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 74,
+      "workspace": "Studio",
+      "branch": "feature/studio-release-export-v9-20261011",
+      "observed_sha": "a4f8bf8d5d30bf1801461237e2d4597fb5896d67",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "studio/main.py",
+        "studio/band_mixer_panel.py",
+        "studio/release_panel.py",
+        "the-web/package/reconcile-native.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 75,
+      "workspace": "Author",
+      "branch": "feature/author-story-atlas-timeline-20261011",
+      "observed_sha": "70a106d58342941b260cad8cb84932e1450729db",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "author/main.py",
+        "author/store.py",
+        "author/commands.py",
+        "author/control_socket.py",
+        "author/story_atlas.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 76,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-jarvis-trust-readiness-receipts-20261011",
+      "observed_sha": "e3422ea9d48472a769430a0dce42dc6396c59dc9",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/brain/jarvis_context.py",
+        "the-web/shell/webbie_panel.py",
+        "the-web/shell/webbie_computer_panel.py",
+        "webbie/agent/voice_trust.py",
+        "system/release_batch.py",
+        "tools/combined_release_audit.py"
+      ]
+    },
+    {
+      "pr": 77,
+      "workspace": "Study",
+      "branch": "feature/study-course-reading-library-20261011",
+      "observed_sha": "9c4ad00b0ec2045b16bbe7e7747a59291d98d5c9",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "study/study.py",
+        "study/store.py",
+        "study/assignment_workspace_ui.py",
+        "study/homework_ui.py",
+        "study/reading_library.py",
+        "system/release_batch.py"
+      ]
     }
   ],
   "resolved_shared_paths": [],
-  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations. Kali Evidence Ledger PR #70 is additionally staged for integration review in the downstream release candidate; its source checks do not replace installed-PC audit or owner approval. Candidate remains intentionally BLOCKED.",
+  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations. Kali Evidence Ledger PR #70 is additionally staged for integration review in the downstream release candidate; its source checks do not replace installed-PC audit or owner approval. Candidate remains intentionally BLOCKED. October 11 evening: PRs #71, #73, #74, #75, #76, #77 have source features staged in the downstream candidate after exact-base or unique-hunk reconciliation; do not confuse source-staged with approved integration. Owner PC acceptance, overlapping shared entrypoint reviews and daily final install approval still pending.",
   "additive_source_stage": {
     "commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
     "total_files": 107,

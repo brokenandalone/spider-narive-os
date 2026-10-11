@@ -71,6 +71,8 @@ class AssignmentWorkspaceDialog(QDialog):
         for caption, callback in [
             ("Save workspace", self.save),
             ("Check draft", self.check),
+            ("Plan steps", self.open_steps),
+            ("Research sources", self.open_sources),
             ("Work with Webbie", self.use_webbie),
             ("Export APA Word", self.export_apa),
             ("Open course folder", self.open_folder),
@@ -79,6 +81,14 @@ class AssignmentWorkspaceDialog(QDialog):
             button.clicked.connect(callback)
             top.addWidget(button)
         layout.addLayout(top)
+        study_actions = QHBoxLayout()
+        apa_check = QPushButton("APA and source preflight")
+        apa_check.clicked.connect(self.apa_preflight)
+        study_actions.addWidget(apa_check)
+        tutor = QPushButton("Learn with Webbie")
+        tutor.clicked.connect(self.study_with_webbie)
+        study_actions.addWidget(tutor)
+        layout.addLayout(study_actions)
         close = QPushButton("Close workspace")
         close.clicked.connect(self.accept)
         layout.addWidget(close)
@@ -123,6 +133,92 @@ class AssignmentWorkspaceDialog(QDialog):
             f"{notes}\n\nThis check does not verify references, APA accuracy, "
             "academic integrity, rubric satisfaction or grade.")
 
+    def apa_preflight(self):
+        """Review heuristics, not remote verification or an academic grade."""
+        try:
+            if __package__:
+                from .apa_preflight import analyze_apa_preflight, format_apa_preflight
+            else:
+                from apa_preflight import analyze_apa_preflight, format_apa_preflight
+            values = self.values()
+            result = analyze_apa_preflight(
+                draft=values["draft"], references=values["references"],
+                instructions=values["instructions"] + "\n" + values["rubric"])
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Study | APA and source preflight")
+            dialog.resize(700, 520)
+            layout = QVBoxLayout(dialog)
+            text = QTextEdit()
+            text.setReadOnly(True)
+            text.setPlainText(format_apa_preflight(result))
+            layout.addWidget(text)
+            close = QPushButton("Return to assignment")
+            close.clicked.connect(dialog.accept)
+            layout.addWidget(close)
+            dialog.exec_()
+        except ValueError as error:
+            QMessageBox.warning(self, "APA preflight", str(error))
+
+    def study_with_webbie(self):
+        """Open a local tutor with owner-visible, explicitly selected material."""
+        if not self.save():
+            QMessageBox.warning(self, "Study Coach", "Save your assignment before tutoring.")
+            return
+        try:
+            if __package__:
+                from .study_coach_ui import StudyCoachDialog
+            else:
+                from study_coach_ui import StudyCoachDialog
+            fields = self.values()
+            selected = "\n\n".join(
+                f"{name.upper()}:\n{fields[name]}"
+                for name in ("instructions", "rubric", "research")
+                if fields[name].strip()
+            )
+            coach = StudyCoachDialog(
+                self, course=self.assignment["course"],
+                topic=self.assignment["title"], materials=selected,
+                notes=self.store.get_notes(self.assignment["course_id"]),
+                store=self.store, course_id=self.assignment["course_id"])
+            coach.exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Study Coach", str(error))
+
+    def open_steps(self):
+        """Manage optional owner-entered steps without calling an AI or website."""
+        try:
+            if __package__:
+                from .milestones_ui import MilestonesDialog
+            else:
+                from milestones_ui import MilestonesDialog
+            MilestonesDialog(self.store, self.assignment_id, self).exec_()
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Checklist", str(error))
+
+    def open_sources(self):
+        """Append owner-entered reference text only if explicitly selected."""
+        try:
+            if __package__:
+                from .source_library_ui import AssignmentSourcesDialog
+            else:
+                from source_library_ui import AssignmentSourcesDialog
+            dialog = AssignmentSourcesDialog(self.store, self.assignment_id, self)
+            if dialog.exec_() != QDialog.Accepted or not dialog.selected_reference:
+                return
+            reference = dialog.selected_reference
+            editor = self.editors["references"]
+            prior = editor.toPlainText()
+            entries = [line.strip() for line in prior.splitlines() if line.strip()]
+            if reference in entries:
+                self.status.setText("Reference already appears in this assignment.")
+                return
+            editor.setPlainText(prior.rstrip() + ("\n" if prior.strip() else "") + reference)
+            self.tabs.setCurrentWidget(editor)
+            if not self.save():
+                QMessageBox.warning(self, "References", "Reference copy could not be saved.")
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Research sources", str(error))
+
     def use_webbie(self):
         try:
             directions = webbie_directions(self.values())
@@ -145,6 +241,8 @@ class AssignmentWorkspaceDialog(QDialog):
                 assignment=self.assignment["title"],
                 notes=self.store.get_notes(self.assignment["course_id"]),
                 folder=self.folder,
+                store=self.store,
+                course_id=self.assignment["course_id"],
             )
             assistant.directions.setPlainText(directions)
             assistant.materials.setPlainText(webbie_materials(self.values()))
@@ -172,6 +270,28 @@ class AssignmentWorkspaceDialog(QDialog):
             return
         if not self.values()["draft"].strip():
             QMessageBox.warning(self, "APA export", "Write or import a draft first.")
+            return
+        try:
+            if __package__:
+                from .apa_preflight import analyze_apa_preflight
+            else:
+                from apa_preflight import analyze_apa_preflight
+            scan = analyze_apa_preflight(
+                draft=self.values()["draft"],
+                references=self.values()["references"],
+                instructions=self.values()["instructions"])
+            if (scan["unmatched_pairs"] or scan["markers"] or not scan["reference_lines"]):
+                answer = QMessageBox.question(
+                    self, "Review references before APA export",
+                    f"Offline source preflight found {len(scan['unmatched_pairs'])} "
+                    f"possible citation mismatches, {scan['markers']} unresolved "
+                    f"placeholders, and {scan['reference_lines']} reference lines.\n\n"
+                    "You can continue making a DRAFT, but you must check actual "
+                    "sources and APA format before submission. Export anyway?")
+                if answer != QMessageBox.Yes:
+                    return
+        except ValueError as error:
+            QMessageBox.warning(self, "APA export", str(error))
             return
         try:
             if __package__:

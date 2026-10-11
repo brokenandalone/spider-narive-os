@@ -12,7 +12,7 @@ REQUIRED_WIRING = {
     "webbie/agent/webbie.py": (
         "handle_verified_research", "verified_workspace_voice_action",
         "speaker_verified", "is_direct_stop", "quiet_asleep",
-        "request_navigation_preview",
+        "request_navigation_preview", "voice_permission", "inspect_readiness",
     ),
     "webbie/brain/brain.py": ("private_session_active", "ask_ollama", "remember_turn"),
     "the-web/shell/webbie_computer_panel.py": (
@@ -21,17 +21,22 @@ REQUIRED_WIRING = {
     "the-web/shell/webbie_panel.py": ("open_cognitive_center", "show_proactive_checks"),
     "study/study.py": (
         "open_assignment_workspace", "open_flashcards", "open_study_progress",
-        "open_deep_forage",
+        "open_deep_forage", "open_weekly_planner",
+        "open_study_coach", "open_course_readings",
     ),
     "study/store.py": (
         "assignment_record", "add_flashcards", "set_assignment_score",
     ),
-    "author/main.py": ("project_map_status", "import_docx", "AuthorWindow"),
+    "author/main.py": ("project_map_status", "import_docx", "AuthorWindow", "AtlasWidget"),
     "author/store.py": ("chapter_plan", "import_docx", "AuthorStore"),
     "studio/ai_panel.py": (
         "open_multitrack_session", "open_saved_session_mix", "open_mastering_desk",
     ),
-    "studio/main.py": ("BandMixerPanel", "StudioAIPanel"),
+    "studio/main.py": ("BandMixerPanel", "StudioAIPanel", "ReleasePanel"),
+    "study/reading_library.py": ("search", "MAX_",),
+    "webbie/agent/voice_trust.py": ("voice_permission",),
+    "studio/release_export.py": ("export",),
+    "author/story_atlas.py": ("timeline",),
     "kali-bay/ui/kali_bay.py": (
         "build_lab_page", "build_guides_page", "start_catalog_load",
         "build_ledger_page", "refresh_evidence_ledger",

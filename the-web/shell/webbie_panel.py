@@ -615,7 +615,9 @@ class WebbiePanel(QWidget):
         authorized = ''
         selected_window = ''
         mission_status = ''
+        last_action = ''
         if self.computer_dialog is not None:
+            last_action = self.computer_dialog.action_receipts.advisory_summary()
             approval = self.computer_dialog.grant.status()
             if approval['active']:
                 authorized = approval['task']
@@ -632,6 +634,7 @@ class WebbiePanel(QWidget):
                 approved_task=authorized,
                 selected_window=selected_window,
                 mission_status=mission_status,
+                last_action=last_action,
                 sleeping=self.face_sleeping,
             )
         except (OSError, PermissionError, ValueError):
