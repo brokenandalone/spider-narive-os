@@ -301,6 +301,12 @@ class TheWeb(QMainWindow):
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         self._palette_shortcut = QShortcut(QKeySequence('Ctrl+K'), self)
         self._palette_shortcut.activated.connect(self.toggle_command_palette)
+        self._pinned_shortcuts = []
+        for number in range(1, 9):
+            shortcut = QShortcut(QKeySequence(f'Ctrl+Alt+{number}'), self)
+            shortcut.activated.connect(
+                lambda slot=number - 1: self.open_pinned_slot(slot))
+            self._pinned_shortcuts.append(shortcut)
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
         self.set_workspace('default')
         if restore: self.restore_state()
@@ -335,6 +341,11 @@ class TheWeb(QMainWindow):
         self.pinned_row = QGridLayout()
         home_layout.addLayout(self.pinned_row)
         self.render_pinned_workspaces()
+        self.recent_title = QLabel('Recent workspaces and applications')
+        home_layout.addWidget(self.recent_title)
+        self.recent_grid = QGridLayout()
+        home_layout.addLayout(self.recent_grid)
+        self.render_recent_shortcuts()
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
         content = QWidget(); content.setObjectName('root'); scroll.setWidget(content); grid = QGridLayout(content); grid.setAlignment(Qt.AlignTop | Qt.AlignLeft); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(14)
         for index, (workspace, label) in enumerate((k, v) for k, v in WORKSPACES.items() if k != 'default'):
@@ -520,6 +531,7 @@ class TheWeb(QMainWindow):
             self.populate_app_list(name)
         self.start_menu.populate()
         self.command_palette.refresh()
+        self.render_recent_shortcuts()
         self.status.setText(f'{len(applications)} installed applications found.')
 
     def app_scan_finished(self):
@@ -543,6 +555,9 @@ class TheWeb(QMainWindow):
                 continue
             shortcut = button('★ ' + WORKSPACES[ident],
                               lambda checked=False, name=ident: self.open_workspace(name))
+            shortcut.setAccessibleName('Pinned workspace ' + WORKSPACES[ident])
+            shortcut.setToolTip('Ctrl+Alt+' + str(shown + 1) +
+                                ' while The Web is focused, or click to open.')
             shortcut.setToolTip('Pinned workspace · use Quick Launch to unpin')
             row.addWidget(shortcut, shown // 4, shown % 4)
             shown += 1
@@ -550,6 +565,42 @@ class TheWeb(QMainWindow):
                 break
         if not shown:
             row.addWidget(QLabel('No pinned workspaces. Ctrl+K opens Quick Launch.'), 0, 0)
+
+    def render_recent_shortcuts(self):
+        grid = getattr(self, 'recent_grid', None)
+        if grid is None:
+            return
+        while grid.count():
+            item = grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        added = 0
+        for kind, ident in self.navigation_state.get('recent', []):
+            if kind == 'workspace' and ident in WORKSPACES:
+                label = WORKSPACES[ident]
+                callback = lambda checked=False, name=ident: self.open_workspace(name)
+            elif kind == 'app':
+                app = next((a for a in self.installed_apps if a.desktop_id == ident), None)
+                if app is None:
+                    continue
+                label = app.name
+                callback = lambda checked=False, name=ident: self.open_installed(name)
+            else:
+                continue
+            shortcut = button(label, callback)
+            shortcut.setToolTip(('App' if kind == 'app' else 'Workspace') + ' · ' + label)
+            grid.addWidget(shortcut, added // 4, added % 4)
+            added += 1
+            if added >= 8:
+                break
+        if not added:
+            grid.addWidget(QLabel('Open a workspace to build your recent list.'), 0, 0)
+
+    def open_pinned_slot(self, slot):
+        pinned = [ident for kind, ident in self.navigation_state.get('favorites', [])
+                  if kind == 'workspace' and ident in WORKSPACES]
+        if 0 <= slot < min(len(pinned), 8):
+            self.open_workspace(pinned[slot])
 
     def toggle_navigation_pin(self, kind, ident):
         if not toggle_favorite(self.navigation_state, kind, ident, WORKSPACES):
@@ -565,6 +616,7 @@ class TheWeb(QMainWindow):
         if getattr(self, '_restoring', False):
             return
         if record_recent(self.navigation_state, kind, ident, WORKSPACES):
+            self.render_recent_shortcuts()
             try:
                 save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
             except OSError:
