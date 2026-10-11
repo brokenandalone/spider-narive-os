@@ -19,6 +19,7 @@ from webbie_camera import camera_devices, capture_jpeg, describe_frame
 from webbie_face_profiles_ui import FaceProfileControls
 from webbie_vision_bridge import VisionBridge
 from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_catalog
+from webbie_reminders_dialog import WebbieRemindersDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
 from context_awareness import AwarenessState
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
@@ -202,6 +203,7 @@ class WebbiePanel(QWidget):
         self.camera_worker = None
         self.vision_bridge = None
         self.computer_dialog = None
+        self.reminders_dialog = None
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
         self.awareness.sleep(self.face_sleeping)
@@ -247,6 +249,11 @@ class WebbiePanel(QWidget):
         proactive_run_button.setToolTip('Ask the resident agent to rerun local read-only checks; no system changes.')
         proactive_run_button.clicked.connect(self.request_proactive_checks)
         layout.addWidget(proactive_run_button)
+        reminders_button = QPushButton('My local reminders')
+        reminders_button.setObjectName('webbieLocalRemindersButton')
+        reminders_button.setToolTip('Create and remove on-device reminders with explicit clicks.')
+        reminders_button.clicked.connect(self.open_reminders_dialog)
+        layout.addWidget(reminders_button)
         self.proactive_timer = QTimer(self)
         self.proactive_timer.timeout.connect(self.refresh_proactive_status)
         self.proactive_timer.start(10000)
@@ -598,6 +605,14 @@ class WebbiePanel(QWidget):
         if not self.face_sleeping:
             self.awareness.observation(
                 'screen', description, consent=True, ttl=45)
+
+    def open_reminders_dialog(self):
+        if self.reminders_dialog is None:
+            self.reminders_dialog = WebbieRemindersDialog(self)
+        self.reminders_dialog.refresh()
+        self.reminders_dialog.show()
+        self.reminders_dialog.raise_()
+        self.reminders_dialog.activateWindow()
 
     def refresh_proactive_status(self):
         state = proactive_snapshot()
