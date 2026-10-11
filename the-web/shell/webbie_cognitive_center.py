@@ -22,6 +22,7 @@ from local_model_inventory import inspect_local_models, report_lines
 from proactive_checks import status_message
 from runtime_readiness import inspect_readiness, render_report
 from voice_trust import trust_status
+from voice_lab import inspect_voice_lab, voice_lab_report
 from webbie_focus_dialog import WebbieFocusDialog
 
 
@@ -86,6 +87,10 @@ class WebbieCognitiveDialog(QDialog):
         readiness.setObjectName("webbieReadinessButton")
         readiness.clicked.connect(self.inspect_readiness)
         actions.addWidget(readiness)
+        voice_lab=QPushButton("Voice Lab diagnostics")
+        voice_lab.setObjectName("webbieVoiceLabButton")
+        voice_lab.clicked.connect(self.inspect_voice_lab)
+        actions.addWidget(voice_lab)
         privacy=QHBoxLayout(); root.addLayout(privacy)
         self.private_button=QPushButton()
         self.private_button.setObjectName("webbiePrivateSessionButton")
@@ -138,6 +143,14 @@ class WebbieCognitiveDialog(QDialog):
         self.focus_dialog.show()
         self.focus_dialog.raise_()
         self.focus_dialog.activateWindow()
+
+    def inspect_voice_lab(self):
+        """Owner click: static local files only, no microphone access."""
+        try:
+            self.report.setPlainText(voice_lab_report(inspect_voice_lab()))
+        except (OSError, ValueError):
+            self.report.setPlainText(
+                "Voice Lab unavailable. No microphone or model was changed.")
 
     def inspect_readiness(self):
         """Read owner-local status files; never start a service/device."""
