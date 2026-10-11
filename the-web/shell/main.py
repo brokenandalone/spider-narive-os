@@ -334,7 +334,7 @@ class TheWeb(QMainWindow):
         header.addWidget(self.face_display_button)
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
         header.addWidget(button('Quick Launch', self.toggle_command_palette))
-        self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
+        self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(True); outer.addWidget(self.tabs, 1)
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
         welcome = QLabel('Your workspaces'); welcome.setFont(QFont('Sans Serif', 22, QFont.Bold)); home_layout.addWidget(welcome)
         self.pinned_title = QLabel('Pinned workspaces  ·  customize in Quick Launch')
@@ -355,6 +355,8 @@ class TheWeb(QMainWindow):
             grid.addWidget(shortcut, index // 4, index % 4)
         home.setProperty('workspace', 'default'); self.tabs.addTab(home, 'The Web'); self.workspace_widgets['default'] = home
         self.tabs.tabBar().setTabButton(0, self.tabs.tabBar().RightSide, None)
+        self._restoring_home_tab = False
+        self.tabs.tabBar().tabMoved.connect(self.tab_moved)
         wallpaper_row = QHBoxLayout(); outer.addLayout(wallpaper_row)
         self.background_picker = QComboBox()
         for name, label in WORKSPACES.items(): self.background_picker.addItem(label, name)
@@ -736,6 +738,30 @@ class TheWeb(QMainWindow):
             return
         if page.property('workspace') == 'default' or not self.can_close(page): return
         name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); page.deleteLater(); self.save_state()
+
+    def tab_moved(self, old_index, new_index):
+        """Allow workspace rearrangement, but always pin The Web home at zero."""
+        if self._restoring_home_tab:
+            return
+        home = self.workspace_widgets.get('default')
+        if home is None:
+            return
+        home_index = self.tabs.indexOf(home)
+        if home_index > 0:
+            self._restoring_home_tab = True
+            try:
+                # Let QTabWidget receive both Qt tabMoved signals so the tab
+                # bar and stacked widgets remain in the same order.
+                self.tabs.tabBar().moveTab(home_index, 0)
+            finally:
+                self._restoring_home_tab = False
+        self.save_state()
+
+    def cycle_tab(self, direction):
+        """Cycle through displayed workspace tabs without changing their order."""
+        count = self.tabs.count()
+        if count and direction in (-1, 1):
+            self.tabs.setCurrentIndex((self.tabs.currentIndex() + direction) % count)
 
     def tab_changed(self, index):
         if index >= 0:
