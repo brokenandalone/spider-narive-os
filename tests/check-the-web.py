@@ -178,6 +178,13 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert window.workspace_recovery.isVisible()
     window.workspace_recovery.refresh()
     assert window.workspace_recovery.list.count() == len(main.WORKSPACES) - 1
+    window.workspace_recovery.copy_safe_diagnostics()
+    import json
+    diagnostic = json.loads(QApplication.clipboard().text())
+    assert diagnostic['schema'] == 'spider-web-safe-diagnostics-v1'
+    assert diagnostic['active_workspace'] == 'author'
+    assert 'document_contents' not in diagnostic
+    assert 'window_titles' not in diagnostic
     window.workspace_recovery.hide()
     assert window.close()
     reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
