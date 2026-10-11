@@ -104,7 +104,7 @@ class BandMixTests(unittest.TestCase):
             self.assertIn('balance_out=-0.350', graph)
             self.assertIn('balance_out=0.450', graph)
             self.assertIn('volume=0.700', graph)
-            self.assertIn('volume=0.000[stem2]', graph)
+            self.assertIn('volume=0.000[stem0]', graph)
             self.assertEqual(cmd.count('-i'), 3)
 
     def test_bad_pan_mute_and_all_silent_rejected_before_export(self):
