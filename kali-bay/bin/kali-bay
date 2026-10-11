@@ -19,13 +19,16 @@ KALI_ROOT="$(
     pwd
 )"
 
-# A readiness query must not create any host directories.
-if [[ "${1:-ui}" != "readiness-json" ]]; then
-    mkdir -p \
-        "${STATE_DIR}" \
-        "${DATA_DIR}" \
-        "${KALI_HOME}"
-fi
+# Read-only JSON inventory calls must not create any host directories.
+case "${1:-ui}" in
+    readiness-json|purple-json) ;;
+    *)
+        mkdir -p \
+            "${STATE_DIR}" \
+            "${DATA_DIR}" \
+            "${KALI_HOME}"
+        ;;
+esac
 
 
 die() {
@@ -286,54 +289,50 @@ category_shell() {
     local meta="${1:-kali-linux-everything}"
     local title="${2:-Kali Bay}"
 
+    # Exact UI metapackage allowlist; do not accept arbitrary shell fragments.
+    case "${meta}" in
+        kali-linux-everything|kali-tools-information-gathering|kali-tools-vulnerability|\
+kali-tools-web|kali-tools-passwords|kali-tools-wireless|kali-tools-exploitation|\
+kali-tools-sniffing-spoofing|kali-tools-post-exploitation|kali-tools-forensics|\
+kali-tools-reverse-engineering|kali-tools-reporting|kali-tools-social-engineering|\
+kali-tools-identify|kali-tools-protect|kali-tools-detect|\
+kali-tools-respond|kali-tools-recover)
+            ;;
+        *) die "Unsupported Kali category. No shell was opened." ;;
+    esac
+    [[ "${#title}" -le 80 && "${title}" =~ ^[A-Za-z0-9\ \&\_\-]+$ ]] \
+        || die "Invalid Kali category label. No shell was opened."
+
     require_host_tools
+    container_exists || die "Initialize Kali Bay first."
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || die "Cannot inspect Kali Bay."
+    [[ "${running}" == true ]] || die "Kali Bay is stopped. Start it explicitly."
 
-    container_exists \
-        || die "Initialize Kali Bay first."
-
+    # Values below are positional data, not bash program text.
+    # Workbench never installs packages or starts a scan automatically.
+    local guest_script
+    guest_script='
+        printf "\nKALI BAY\n%s\n" "$1"
+        printf "========================================\n"
+        printf "Kali metapackage: %s\n\n" "$2"
+        if dpkg-query -W -f="${Status}" "$2" 2>/dev/null |
+           grep -q "install ok installed"; then
+            printf "Category installed and ready.\n"
+        else
+            printf "Category package is not installed yet.\n"
+        fi
+        printf "\nAuthorized systems and labs only.\n"
+        exec bash
+    '
     if command -v konsole >/dev/null 2>&1; then
-        exec konsole \
-            --hold \
-            -e \
-            distrobox enter \
-            --name "${NAME}" \
-            -- \
-            bash -lc "
-                clear
-
-                printf '\n'
-                printf 'KALI BAY\n'
-                printf '%s\n' '${title}'
-                printf '========================================\n'
-                printf 'Kali metapackage: %s\n' '${meta}'
-                printf '\n'
-
-                if dpkg-query \
-                    -W \
-                    -f='\${Status}' \
-                    '${meta}' \
-                    2>/dev/null \
-                    | grep -q \
-                    'install ok installed'
-                then
-                    printf 'Category installed and ready.\n'
-                else
-                    printf 'Category package is not installed yet.\n'
-                    printf 'Run full Kali Bay setup first.\n'
-                fi
-
-                printf '\n'
-                printf 'Authorized systems and labs only.\n'
-                printf '\n'
-
-                exec bash
-            "
+        exec konsole --hold -e distrobox enter --name "${NAME}" -- \
+            bash -lc "${guest_script}" kali-bay "${title}" "${meta}"
     fi
-
-    distrobox enter \
-        --name "${NAME}"
+    exec distrobox enter --name "${NAME}" -- \
+        bash -lc "${guest_script}" kali-bay "${title}" "${meta}"
 }
-
 
 # No arbitrary executable names, shell fragments or arguments are accepted.
 # Kali GUI programs run as the existing container user, never as root.
@@ -500,6 +499,44 @@ readiness_json() {
         "$catalog_source" "$next_step"
 }
 
+# Kali Purple defensive tooling: read-only executable inventory.
+# Reports binary presence, NOT active services or configured sensors.
+purple_status_json() {
+    if ! command -v podman >/dev/null 2>&1; then
+        printf '{"state":"unavailable","tools":{},"detail":"Podman unavailable"}\n'
+        return 0
+    fi
+    if ! container_exists; then
+        printf '{"state":"missing","tools":{},"detail":"Existing Kali container not found"}\n'
+        return 0
+    fi
+    local running
+    running="$(podman inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" \
+        || { printf '{"state":"unknown","tools":{},"detail":"Container inspection failed"}\n'; return 0; }
+    if [[ "${running}" != true ]]; then
+        printf '{"state":"stopped","tools":{},"detail":"Existing Kali container is stopped"}\n'
+        return 0
+    fi
+
+    # Fixed identifiers inside a fixed guest script, never a user/LLM command.
+    podman exec --user 0 --tty=false "${NAME}" sh -c '
+        printf "{\"state\":\"running\",\"tools\":{"
+        first=1
+        for executable in suricata zeek yara lynis clamscan wireshark tcpdump tshark auditctl; do
+            if command -v "$executable" >/dev/null 2>&1; then
+                installed=true
+            else
+                installed=false
+            fi
+            if [ "$first" -eq 0 ]; then printf ","; fi
+            first=0
+            printf "\"%s\":%s" "$executable" "$installed"
+        done
+        printf "},\"detail\":\"Binary presence only. No sensors or scans started.\"}\n"
+    '
+}
+
+
 info() {
     echo "Name: Kali Bay"
     echo "Container: ${NAME}"
@@ -579,6 +616,9 @@ case "${1:-ui}" in
     readiness-json)
         readiness_json
         ;;
+    purple-json)
+        purple_status_json
+        ;;
     doctor)
         doctor
         ;;
@@ -599,6 +639,7 @@ Usage:
   kali-bay update
   kali-bay status
   kali-bay readiness-json # read-only Kali/GUI readiness
+  kali-bay purple-json # read-only installed defensive binaries
   kali-bay doctor
   kali-bay apps-json   # read-only installed Kali desktop applications
   kali-bay app-check <system.desktop>

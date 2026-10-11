@@ -13,6 +13,7 @@ from PyQt5.QtGui import (
     QFont,
     QPainter,
     QPixmap,
+    QKeySequence,
 )
 from PyQt5.QtWidgets import (
     QApplication,
@@ -25,10 +26,13 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QComboBox,
+    QCheckBox,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QShortcut,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -45,6 +49,12 @@ if not SPIDER_ROOT.exists():
         .resolve()
         .parents[2]
     )
+
+
+# Local storage is intentionally isolated from the Kali Distrobox.
+# It is only written by explicit favorite, create-lab or save-notes clicks.
+sys.path.insert(0, str(SPIDER_ROOT / "kali-bay" / "runtime"))
+import workspace_store as kali_store
 
 
 MANAGER = (
@@ -244,11 +254,42 @@ class KaliWebbieReplyWorker(QThread):
             self.failed.emit("Webbie connection: " + str(error))
 
 
+class KaliCatalogWorker(QThread):
+    """Read only the real Kali app catalog without freezing the main UI."""
+    loaded = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def run(self):
+        try:
+            result = subprocess.run(
+                [str(MANAGER), "apps-json"], text=True,
+                capture_output=True, check=False, timeout=24,
+            )
+            if result.returncode:
+                self.failed.emit(
+                    (result.stderr or result.stdout).strip()[:220]
+                    or "Kali catalog is unavailable."
+                )
+                return
+            self.loaded.emit(result.stdout)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            self.failed.emit(str(error)[:220])
+
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self._wallpaper = None
+        try:
+            self.favorites = kali_store.get_favorites()
+            self.favorites_error = ""
+        except kali_store.StorageError as error:
+            self.favorites = set()
+            self.favorites_error = str(error)
+        self.active_lab = None
+        self._switching_labs = False
+        self.catalog_worker = None
 
         self.setWindowTitle(
             "Kali Bay | Spider OS"
@@ -530,6 +571,12 @@ class KaliBayWindow(QMainWindow):
             ),
             "PURPLE DEFENSE",
         )
+        self.security_tabs.addTab(
+            self.build_lab_page(),
+            "LAB NOTES",
+        )
+        self._focus_search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self._focus_search_shortcut.activated.connect(self.focus_tool_search)
         outer.addWidget(self.security_tabs, 1)
 
         warning = QLabel(
@@ -605,6 +652,11 @@ class KaliBayWindow(QMainWindow):
             self.filter_desktop_tools
         )
         left.addWidget(self.desktop_category)
+        self.favorite_only = QCheckBox("FAVORITES ONLY")
+        self.favorite_only.setObjectName("kaliFavoritesOnly")
+        self.favorite_only.setStyleSheet("color:#ffffff;font-weight:bold;")
+        self.favorite_only.toggled.connect(self.filter_desktop_tools)
+        left.addWidget(self.favorite_only)
         self.installed_desktop_apps = []
         load_apps = QPushButton("LOAD ALL INSTALLED KALI APPS")
         load_apps.setObjectName("kaliLoadInstalledApps")
@@ -612,7 +664,7 @@ class KaliBayWindow(QMainWindow):
             "Read Kali's actual installed system .desktop menu. "
             "Does not install software, run scans or start the container."
         )
-        load_apps.clicked.connect(self.load_installed_desktop_apps)
+        load_apps.clicked.connect(self.start_catalog_load)
         left.addWidget(load_apps)
         self.desktop_apps_status = QLabel(
             "Ten featured tools. Load the installed Kali application catalog."
@@ -629,7 +681,12 @@ class KaliBayWindow(QMainWindow):
             "QListWidget::item:selected {background:#5b21b6;}"
         )
         self.desktop_list.itemDoubleClicked.connect(self.open_desktop_item)
+        self.desktop_list.currentItemChanged.connect(self.update_tool_details)
         left.addWidget(self.desktop_list, 1)
+        save_favorite = QPushButton("☆ SAVE / REMOVE FAVORITE")
+        save_favorite.setObjectName("kaliToggleFavorite")
+        save_favorite.clicked.connect(self.toggle_selected_favorite)
+        left.addWidget(save_favorite)
         launch = QPushButton("OPEN SELECTED TOOL")
         launch.setObjectName("kaliDesktopLaunchTool")
         launch.clicked.connect(self.open_selected_desktop_tool)
@@ -662,6 +719,14 @@ class KaliBayWindow(QMainWindow):
             "border-radius:8px;padding:12px;"
         )
         right.addWidget(self.readiness_summary)
+        self.tool_details = QLabel("Choose a tool to see its purpose. Only you launch it.")
+        self.tool_details.setObjectName("kaliSelectedToolDetails")
+        self.tool_details.setWordWrap(True)
+        self.tool_details.setStyleSheet(
+            "color:#ffffff;background:#1f1233;border:1px solid #6d42a1;"
+            "border-radius:7px;padding:10px;"
+        )
+        right.addWidget(self.tool_details)
         for caption, operation in (
             ("START EXISTING KALI", self.start_existing_kali),
             ("KALI HEALTH CHECK", self.open_kali_health),
@@ -698,16 +763,24 @@ class KaliBayWindow(QMainWindow):
     def filter_desktop_tools(self, *_args):
         query = self.desktop_search.text().strip().casefold()
         category = self.desktop_category.currentText()
+        favorites_only = self.favorite_only.isChecked()
         self.desktop_list.clear()
         for group, label, tool_id in DESKTOP_TOOL_MENU:
+            favorite = "builtin:" + tool_id
+            if favorites_only and favorite not in self.favorites:
+                continue
             if category != "All categories" and group != category:
                 continue
             if query and query not in (group + " " + label).casefold():
                 continue
-            item = QListWidgetItem(f"{group}  /  {label}")
+            star = "★ " if favorite in self.favorites else ""
+            item = QListWidgetItem(f"{star}{group}  /  {label}")
             item.setData(Qt.UserRole, tool_id)
             self.desktop_list.addItem(item)
         for app in self.installed_desktop_apps:
+            favorite = "app:" + app["id"]
+            if favorites_only and favorite not in self.favorites:
+                continue
             group = app["category"]
             label = app["name"]
             if category != "All categories" and group != category:
@@ -716,12 +789,78 @@ class KaliBayWindow(QMainWindow):
                 group + " " + label + " " + app["description"]
             ).casefold():
                 continue
-            item = QListWidgetItem(f"{group}  /  {label}")
+            star = "★ " if favorite in self.favorites else ""
+            item = QListWidgetItem(f"{star}{group}  /  {label}")
             item.setToolTip(app["description"])
             item.setData(Qt.UserRole, ("app", app["id"]))
             self.desktop_list.addItem(item)
         if self.desktop_list.count():
             self.desktop_list.setCurrentRow(0)
+
+    def focus_tool_search(self):
+        self.security_tabs.setCurrentIndex(0)
+        self.desktop_search.setFocus()
+        self.desktop_search.selectAll()
+
+    def selected_favorite_key(self):
+        item = self.desktop_list.currentItem()
+        if item is None:
+            return None
+        value = item.data(Qt.UserRole)
+        if isinstance(value, str):
+            if value in {row[2] for row in DESKTOP_TOOL_MENU}:
+                return "builtin:" + value
+        elif isinstance(value, (list, tuple)) and len(value) == 2:
+            if value[0] == "app" and value[1] in {
+                app["id"] for app in self.installed_desktop_apps
+            }:
+                return "app:" + value[1]
+        return None
+
+    def toggle_selected_favorite(self):
+        key = self.selected_favorite_key()
+        if key is None:
+            QMessageBox.information(self, "Kali Bay", "Select a valid Kali tool first.")
+            return
+        try:
+            self.favorites = kali_store.set_favorite(
+                key, key not in self.favorites
+            )
+            self.favorites_error = ""
+            self.filter_desktop_tools()
+        except kali_store.StorageError as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
+
+    def update_tool_details(self, item, _previous=None):
+        if item is None or not hasattr(self, "tool_details"):
+            return
+        value = item.data(Qt.UserRole)
+        explanations = {
+            "wireshark": "Inspect packet captures for traffic analysis.",
+            "nmap": "Open an interactive shell for authorized network inventory.",
+            "burpsuite": "Examine authorized web application requests.",
+            "zaproxy": "Review web application security in your own lab.",
+            "ghidra": "Reverse engineer binary files in a controlled workspace.",
+            "msfconsole": "Open a workbench for a pre-approved test lab.",
+            "suricata": "Investigate detection rules and network evidence.",
+            "yara": "Inspect files and malware signatures.",
+            "lynis": "Review system hardening and audit guidance.",
+            "clamtk": "Inspect local files using an antivirus interface.",
+        }
+        if isinstance(value, str):
+            detail = explanations.get(value, "Approved Kali tool.")
+        elif isinstance(value, (tuple, list)) and len(value) == 2:
+            matches = [
+                app for app in self.installed_desktop_apps
+                if app["id"] == value[1] and value[0] == "app"
+            ]
+            detail = matches[0]["description"] if matches else "Kali application."
+        else:
+            detail = "Select an installed Kali application."
+        self.tool_details.setText(
+            f"{item.text()}\n{detail or 'Installed Kali application.'}\n"
+            "Opening a tool does not run a scan automatically."
+        )
 
     def open_selected_desktop_tool(self):
         item = self.desktop_list.currentItem()
@@ -739,20 +878,51 @@ class KaliBayWindow(QMainWindow):
         # Static featured tools retain the fixed legacy approved manager IDs.
         self.open_tool(value)
 
-    def load_installed_desktop_apps(self):
+    def start_catalog_load(self):
+        if self.catalog_worker is not None:
+            return
+        self.desktop_apps_status.setText(
+            "Checking installed Kali apps in the background. No tool started."
+        )
+        worker = KaliCatalogWorker(self)
+        self.catalog_worker = worker
+        worker.loaded.connect(
+            lambda result: self.load_installed_desktop_apps(payload=result)
+        )
+        worker.failed.connect(self.catalog_load_error)
+        worker.finished.connect(self.catalog_load_finished)
+        worker.start()
+
+    def catalog_load_error(self, message):
+        self.desktop_apps_status.setText(
+            "Kali app discovery unavailable: " + str(message)[:180]
+        )
+
+    def catalog_load_finished(self):
+        worker = self.catalog_worker
+        self.catalog_worker = None
+        if worker is not None:
+            worker.deleteLater()
+
+    def load_installed_desktop_apps(self, payload=None):
         """Inventory only. Never initialize/start Kali or run app Exec lines."""
         try:
             import json
-            result = subprocess.run(
-                [str(MANAGER), "apps-json"],
-                capture_output=True, text=True, timeout=24, check=False,
-            )
-            if result.returncode:
-                raise ValueError(
-                    (result.stderr or result.stdout).strip()[:220]
-                    or "Kali isn't running or desktop apps are unavailable."
+            if payload is None:
+                result = subprocess.run(
+                    [str(MANAGER), "apps-json"],
+                    capture_output=True, text=True, timeout=24, check=False,
                 )
-            apps = json.loads(result.stdout).get("applications", [])
+                if result.returncode:
+                    raise ValueError(
+                        (result.stderr or result.stdout).strip()[:220]
+                        or "Kali isn't running or desktop apps are unavailable."
+                    )
+                payload = result.stdout
+            document = json.loads(payload)
+            if not isinstance(document, dict):
+                raise ValueError("Unexpected Kali application inventory.")
+            apps = document.get("applications", [])
             if not isinstance(apps, list):
                 raise ValueError("Unexpected Kali application inventory.")
             import re
@@ -1033,6 +1203,12 @@ class KaliBayWindow(QMainWindow):
         self.webbie_chat_entry.setFocus()
 
     def closeEvent(self, event):
+        if self.catalog_worker and self.catalog_worker.isRunning():
+            event.ignore()
+            self.desktop_apps_status.setText(
+                "Catalog lookup is finishing; no Kali app was launched."
+            )
+            return
         if self.webbie_worker and self.webbie_worker.isRunning():
             event.ignore()
             self.webbie_chat_log.appendPlainText(
@@ -1041,6 +1217,266 @@ class KaliBayWindow(QMainWindow):
             self.webbie_dock.show()
             return
         super().closeEvent(event)
+
+    def build_lab_page(self):
+        """Private lab notebook. No scans, network connections or auto-sharing."""
+        page = QWidget()
+        page.setObjectName("kaliLabWorkspace")
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(14)
+
+        sidebar = QWidget()
+        sidebar.setMinimumWidth(245)
+        left = QVBoxLayout(sidebar)
+        heading = QLabel("MY AUTHORIZED LABS")
+        heading.setStyleSheet("color:#e9d5ff;font-size:18px;font-weight:bold;")
+        left.addWidget(heading)
+        explanation = QLabel(
+            "Keep local investigation notes and authorized lab plans. "
+            "Nothing runs or gets sent to Webbie automatically."
+        )
+        explanation.setWordWrap(True)
+        left.addWidget(explanation)
+        self.lab_list = QListWidget()
+        self.lab_list.setObjectName("kaliLabNotebookList")
+        self.lab_list.setStyleSheet(
+            "QListWidget {background:#160d27;color:#ffffff;"
+            "border:1px solid #a78bfa;border-radius:7px;}"
+            "QListWidget::item {padding:10px;}"
+            "QListWidget::item:selected {background:#6b21a8;}"
+        )
+        self.lab_list.currentItemChanged.connect(self.load_selected_lab)
+        left.addWidget(self.lab_list, 1)
+        create = QPushButton("NEW LAB NOTEBOOK")
+        create.setObjectName("kaliCreateLab")
+        create.clicked.connect(self.create_new_lab)
+        left.addWidget(create)
+        refresh = QPushButton("REFRESH MY LABS")
+        refresh.clicked.connect(self.refresh_labs)
+        left.addWidget(refresh)
+        layout.addWidget(sidebar, 1)
+
+        editor_area = QWidget()
+        right = QVBoxLayout(editor_area)
+        self.lab_title = QLabel("Select a lab or create one.")
+        self.lab_title.setObjectName("kaliLabTitle")
+        self.lab_title.setStyleSheet(
+            "color:#f5e9ff;font-size:20px;font-weight:bold;"
+        )
+        right.addWidget(self.lab_title)
+        self.lab_editor = QPlainTextEdit()
+        self.lab_editor.setObjectName("kaliLabNotesEditor")
+        self.lab_editor.setPlaceholderText(
+            "Scope and authorization\nObservation\nEvidence references\n"
+            "Assessment notes\nNext steps\n\n"
+            "Notes stay on this PC until you explicitly choose to share."
+        )
+        self.lab_editor.setEnabled(False)
+        right.addWidget(self.lab_editor, 1)
+        controls = QHBoxLayout()
+        save = QPushButton("SAVE LOCAL NOTES")
+        save.setObjectName("kaliSaveLabNotes")
+        save.clicked.connect(self.save_active_lab)
+        controls.addWidget(save)
+        share = QPushButton("PREPARE NOTES FOR WEBBIE")
+        share.setObjectName("kaliPrepareLabWebbie")
+        share.clicked.connect(self.prepare_lab_for_webbie)
+        controls.addWidget(share)
+        right.addLayout(controls)
+        self.lab_status = QLabel("Locally stored in your private Spider OS home.")
+        self.lab_status.setObjectName("kaliLabStatus")
+        self.lab_status.setWordWrap(True)
+        self.lab_status.setStyleSheet("color:#ddd6fe;")
+        right.addWidget(self.lab_status)
+        layout.addWidget(editor_area, 2)
+        self.refresh_labs()
+        return page
+
+    def _lab_has_unsaved_changes(self):
+        return bool(
+            self.active_lab is not None
+            and self.lab_editor.toPlainText() != self.active_lab["notes"]
+        )
+
+    def _confirm_discard_lab(self):
+        if not self._lab_has_unsaved_changes():
+            return True
+        response = QMessageBox.question(
+            self, "Unsaved Kali Bay notes",
+            "Discard the unsaved edits in the current local lab notebook?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        return response == QMessageBox.Yes
+
+    def refresh_labs(self, select_id=None):
+        if not self._confirm_discard_lab():
+            return
+        try:
+            labs = kali_store.list_labs()
+        except (kali_store.StorageError, OSError) as error:
+            self.lab_status.setText("Could not list local labs: " + str(error))
+            return
+        self._switching_labs = True
+        self.lab_list.blockSignals(True)
+        self.lab_list.clear()
+        for lab in labs:
+            item = QListWidgetItem(lab["title"])
+            item.setData(Qt.UserRole, lab["id"])
+            self.lab_list.addItem(item)
+        self.lab_list.blockSignals(False)
+        self._switching_labs = False
+        self.active_lab = None
+        self.lab_editor.setEnabled(False)
+        self.lab_editor.clear()
+        self.lab_title.setText("Select a lab or create one.")
+        self.lab_status.setText(
+            f"{len(labs)} private lab notebooks. "
+            "Only explicit Save writes notes to your computer."
+        )
+        if select_id:
+            for i in range(self.lab_list.count()):
+                item = self.lab_list.item(i)
+                if item.data(Qt.UserRole) == select_id:
+                    self.lab_list.setCurrentRow(i)
+                    break
+
+    def load_selected_lab(self, item, previous=None):
+        if self._switching_labs:
+            return
+        if not self._confirm_discard_lab():
+            self.lab_list.blockSignals(True)
+            if previous is not None:
+                self.lab_list.setCurrentItem(previous)
+            else:
+                self.lab_list.setCurrentRow(-1)
+            self.lab_list.blockSignals(False)
+            return
+        self.active_lab = None
+        self.lab_editor.clear()
+        self.lab_editor.setEnabled(False)
+        if item is None:
+            self.lab_title.setText("Select a lab or create one.")
+            return
+        try:
+            lab = kali_store.get_lab(item.data(Qt.UserRole))
+        except (kali_store.StorageError, OSError) as error:
+            self.lab_status.setText("Lab is unavailable: " + str(error))
+            return
+        self.active_lab = lab
+        self.lab_title.setText(lab["title"])
+        self.lab_editor.setPlainText(lab["notes"])
+        self.lab_editor.setEnabled(True)
+        self.lab_status.setText(
+            f"Private local notebook · revision {lab['revision']} · "
+            "No automatic scanning or sharing."
+        )
+
+    def create_new_lab(self):
+        if not self._confirm_discard_lab():
+            return
+        title, accepted = QInputDialog.getText(
+            self, "New Kali Bay lab", "Lab or investigation name:"
+        )
+        if not accepted:
+            return
+        try:
+            lab = kali_store.create_lab(title)
+            self.active_lab = None
+            self.refresh_labs(select_id=lab["id"])
+        except (kali_store.StorageError, OSError) as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
+
+    def save_active_lab(self):
+        if not self.active_lab:
+            QMessageBox.information(self, "Kali Bay", "Choose a lab notebook first.")
+            return
+        try:
+            lab = kali_store.save_lab(
+                self.active_lab["id"], self.lab_editor.toPlainText(),
+                expected_revision=self.active_lab["revision"],
+            )
+            self.active_lab = lab
+            self.lab_status.setText(
+                f"Saved locally · revision {lab['revision']} · no data shared."
+            )
+        except (kali_store.StorageError, OSError) as error:
+            QMessageBox.warning(
+                self, "Kali Bay",
+                f"Notes were not overwritten: {error}"
+            )
+
+    def prepare_lab_for_webbie(self):
+        if not self.active_lab:
+            QMessageBox.information(self, "Kali Bay", "Choose a lab notebook first.")
+            return
+        confirm = QMessageBox.question(
+            self, "Review before sharing",
+            "Prepare up to 5,000 characters of these notes in Webbie's chat? "
+            "Nothing is sent until you press SEND TO WEBBIE. "
+            "Review sensitive details first.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        notes = self.lab_editor.toPlainText()[:5000]
+        text = (
+            "Help me review this authorized security lab. Offer defensive "
+            "investigation guidance; do not run commands. "
+            f"Lab: {self.active_lab['title']}\nNotes:\n{notes}"
+        )
+        self.open_webbie_security()
+        self.webbie_chat_entry.setText(text)
+        self.webbie_chat_entry.setFocus()
+        self.lab_status.setText(
+            "Notes prepared in Webbie's message box. Review and send manually."
+        )
+
+    def check_purple_defense_tools(self):
+        """Show installed defensive binaries, never assume services are running."""
+        try:
+            import json
+            result = subprocess.run(
+                [str(MANAGER), "purple-json"], text=True,
+                capture_output=True, check=False, timeout=18,
+            )
+            if result.returncode:
+                raise ValueError(
+                    (result.stderr or result.stdout).strip()[:220]
+                    or "Kali Purple tools could not be checked."
+                )
+            report = json.loads(result.stdout)
+            if not isinstance(report, dict):
+                raise ValueError("Invalid Kali Purple inventory.")
+            state = report.get("state")
+            if state != "running":
+                if state not in ("stopped", "missing", "unavailable", "unknown"):
+                    state = "unknown"
+                self.purple_status.setText(
+                    f"Kali container: {state.upper()}. "
+                    "No defensive services or tools were started."
+                )
+                return
+            found = report.get("tools", {})
+            if not isinstance(found, dict):
+                raise ValueError("Invalid tool inventory.")
+            names = (
+                "suricata", "zeek", "yara", "lynis", "clamscan",
+                "wireshark", "tcpdump", "tshark", "auditctl",
+            )
+            installed = [name for name in names if found.get(name) is True]
+            absent = [name for name in names if found.get(name) is not True]
+            self.purple_status.setText(
+                "Available: " + (", ".join(installed) or "none detected")
+                + "\nNot detected: " + (", ".join(absent) or "none")
+                + "\nThis checks installed commands only. "
+                  "Sensors and security services were NOT started."
+            )
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            self.purple_status.setText(
+                f"Purple tool check unavailable: {str(error)[:180]}. "
+                "No container or service was started."
+            )
 
     def build_category_page(self, categories, description):
         page = QWidget()
@@ -1051,6 +1487,22 @@ class KaliBayWindow(QMainWindow):
         note.setWordWrap(True)
         note.setStyleSheet("color:#c7b9d2;padding:5px 0 12px;")
         layout.addWidget(note)
+        if categories is PURPLE_CATEGORIES:
+            self.purple_status = QLabel(
+                "Detection tools have not been checked. "
+                "A tool being installed does not mean its sensor is running."
+            )
+            self.purple_status.setObjectName("kaliPurpleInventory")
+            self.purple_status.setWordWrap(True)
+            self.purple_status.setStyleSheet(
+                "background:#160d27;color:#ffffff;border:1px solid #a78bfa;"
+                "border-radius:8px;padding:12px;"
+            )
+            layout.addWidget(self.purple_status)
+            check = QPushButton("CHECK PURPLE DEFENSE TOOLS (READ ONLY)")
+            check.setObjectName("kaliPurpleCheck")
+            check.clicked.connect(self.check_purple_defense_tools)
+            layout.addWidget(check)
 
         # Explicit, allowlisted tools only. Buttons never scan a network,
         # install packages, start monitoring, or elevate permissions.

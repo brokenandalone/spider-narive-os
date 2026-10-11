@@ -14,6 +14,56 @@ SPEC.loader.exec_module(assistant)
 
 
 class KaliIntentTests(unittest.TestCase):
+    def test_explain_tools_is_local_and_readiness_is_readonly(self):
+        for spoken in (
+            "explain wireshark",
+            "tell me about nmap",
+            "what does kali ghidra do",
+        ):
+            operation, tool = assistant.parse_request(spoken)
+            self.assertEqual(operation, "describe_tool")
+            with patch.object(assistant.subprocess, "run") as run, \
+                 patch.object(assistant.subprocess, "Popen") as popen:
+                response = assistant.handle_kali_request(spoken)
+                self.assertIsInstance(response, str)
+                self.assertGreater(len(response), 15)
+                run.assert_not_called()
+                popen.assert_not_called()
+
+        self.assertEqual(
+            assistant.parse_request("check Kali Bay readiness"),
+            ("readiness", None),
+        )
+        for malformed in (
+            "check kali readiness; rm /",
+            "explain bash",
+            "tell me about /bin/sh",
+        ):
+            self.assertIsNone(assistant.parse_request(malformed))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = Path(tmp, "kali-bay")
+            manager.write_text("#!/bin/sh\n", encoding="utf-8")
+            manager.chmod(0o700)
+            from subprocess import CompletedProcess
+            report = (
+                '{"container_state":"stopped","toolkit_ready":false,'
+                '"gui_session":true,"next_step":"Start existing Kali."}'
+            )
+            with patch.object(
+                assistant.subprocess, "run",
+                return_value=CompletedProcess([], 0, report, ""),
+            ) as run, patch.object(assistant.subprocess, "Popen") as popen:
+                response = assistant.handle_kali_request(
+                    "check Kali Bay readiness", manager=manager
+                )
+                self.assertIn("stopped", response)
+                self.assertIn("not verified", response)
+                self.assertEqual(
+                    run.call_args.args[0], [str(manager), "readiness-json"]
+                )
+                popen.assert_not_called()
+
     def test_approved_launches(self):
         for utterance, tool_id in (
             ("Webbie, open Wireshark", "wireshark"),
