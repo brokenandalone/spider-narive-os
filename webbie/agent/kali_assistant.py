@@ -99,7 +99,7 @@ def parse_request(message: str):
         return ("readiness", None)
     help_match = re.fullmatch(
         r"(?:explain|what does|tell me about) (?:the )?(?:kali )?"
-        r"([A-Za-z0-9 ]{2,40})(?: do)?",
+        r"([A-Za-z0-9 ]{2,40}?)(?: do)?",
         direct,
     )
     if help_match:
