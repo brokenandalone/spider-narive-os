@@ -181,3 +181,49 @@ starting with the home tab and preservation of the existing desktop state.
 Actual PC startup and recovery need a real Spider OS X11 session test before
 merging or installing. Use the preexisting full-system daily installation
 and reconciliation process, not a direct `main.py` overwrite.
+
+## Round 5: staged desktop startup and first-paint responsiveness
+
+When launched as a real X11 desktop session (`--desktop-session`),
+The Web now reads the previous tab layout but defers reopening heavy native
+workspaces until the Qt event loop runs. It shows Home first, then loads each
+saved workspace in a separate UI event-loop turn and shows a progress label.
+This avoids constructing every restored workspace before first paint and
+reduces the length of an entirely unresponsive startup. Native workspace
+construction still occurs on the GUI thread, because Qt widgets must not
+be built on background workers.
+
+- **Stable restoration plan:** invalid/duplicate tab identifiers are filtered
+  through the existing bounded session reader. The original user-set tab
+  order is restored when the staged operation completes.
+- **User navigation preserved:** if the owner chooses a tab during startup,
+  finishing restoration does not automatically steal focus back to the
+  previously saved active tab.
+- **Recovery timings:** the Recovery Center displays the slowest three
+  observed workspace construction times for this shell session. These
+  metrics contain workspace IDs and elapsed seconds only.
+- **Explicit safe-start resume:** Recovery offers a confirmation-protected
+  "Resume last saved session" action only after starting with
+  `--safe-workspaces`. Safe-start itself still does not reopen or overwrite
+  the saved tabs.
+- **Normal test window unchanged:** a standalone non-desktop `TheWeb()`
+  continues using immediate restoration for development and the
+  existing offscreen regression tests.
+- **Checkpoints remain user-driven:** manual restore cancels the pending
+  staged restoration plan before applying a checkpoint.
+
+### Verification
+```bash
+python3 -m unittest discover -s tests -p 'test_web_restore_plan.py' -v
+QT_QPA_PLATFORM=offscreen dbus-run-session -- python3 -u tests/check-the-web.py .
+```
+
+The integration test exercises deferred restoration with `desktop_mode=True`,
+checks the saved active tab and measured construction times, and resumes a
+minimal safe-start shell on explicit user request.
+
+**Limitations:** this change does not make heavy Qt workspace constructors
+non-blocking. Each individual workspace can still occupy the GUI thread
+during its own initialization. The first launch and subsequent event-loop
+scheduling require live visual testing on the actual Spider OS PC. No code
+in this branch is automatically installed on the device.
