@@ -20,6 +20,7 @@ from webbie_face_profiles_ui import FaceProfileControls
 from webbie_vision_bridge import VisionBridge
 from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_catalog
 from webbie_reminders_dialog import WebbieRemindersDialog
+from webbie_cognitive_center import WebbieCognitiveDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
@@ -210,6 +211,7 @@ class WebbiePanel(QWidget):
         self.vision_bridge = None
         self.computer_dialog = None
         self.reminders_dialog = None
+        self.cognitive_dialog = None
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
         self.awareness.sleep(self.face_sleeping)
@@ -244,6 +246,12 @@ class WebbiePanel(QWidget):
         jarvis_help_button.setObjectName('webbieJarvisHelp')
         jarvis_help_button.clicked.connect(self.show_jarvis_commands)
         layout.addWidget(jarvis_help_button)
+        cognitive_button = QPushButton('Jarvis cognitive control center')
+        cognitive_button.setObjectName('webbieCognitiveCenterButton')
+        cognitive_button.setToolTip(
+            'Local focus tasks, AI model health, private session and safe stop.')
+        cognitive_button.clicked.connect(self.open_cognitive_center)
+        layout.addWidget(cognitive_button)
         # Independent read-only system status, no microphone or camera access.
         self.proactive_label = QLabel('Proactive checks: awaiting first report')
         self.proactive_label.setWordWrap(True)
@@ -502,6 +510,8 @@ class WebbiePanel(QWidget):
         self.awareness.sleep(self.face_sleeping)
         if self.face_sleeping:
             self.stop_camera()
+            if self.computer_dialog is not None:
+                self.computer_dialog.stop()
         self.face.sleeping = self.face_sleeping
         self.face.update()
         self.refresh_state()
@@ -683,6 +693,27 @@ class WebbiePanel(QWidget):
         except (OSError, PermissionError, ValueError) as error:
             self.append_message('Webbie system checks',
                 'Could not request local checks: ' + str(error))
+
+    def stop_sensitive_actions(self):
+        """One owner GUI action to drop camera and all desktop grants."""
+        if self.computer_dialog is not None:
+            self.computer_dialog.stop()
+        self.stop_camera()
+        self.awareness.revoke_observation('screen')
+        self.publish_jarvis_context()
+        self.append_message(
+            'Webbie',
+            'Camera off and desktop approvals revoked. Background checks remain active.')
+
+    def open_cognitive_center(self):
+        if self.cognitive_dialog is None:
+            self.cognitive_dialog = WebbieCognitiveDialog(
+                self, workspace_callback=lambda: self.awareness.snapshot()['workspace'],
+                emergency_callback=self.stop_sensitive_actions)
+        self.cognitive_dialog.refresh()
+        self.cognitive_dialog.show()
+        self.cognitive_dialog.raise_()
+        self.cognitive_dialog.activateWindow()
 
     def show_jarvis_commands(self):
         self.append_message('Jarvis command guide', gui_guide())
