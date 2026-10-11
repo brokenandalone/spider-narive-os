@@ -20,6 +20,7 @@ class SpeakerEvidence:
     verified: bool
     source: str
     issued_at: float
+    audio_digest: str = ""  # optional backwards-compatible per-segment binding
 
 
 def verify_speaker_evidence(evidence, *, now=None):
