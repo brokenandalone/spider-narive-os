@@ -86,7 +86,7 @@ WIRING = {
     "study/study.py": ("open_homework", "open_school_onedrive",
                        "open_weekly_planner", "open_study_coach", "open_course_readings"),
     "studio/main.py": ("StudioAIPanel", "ReleasePanel"),
-    "author/main.py": ("AuthorToolkit", "AuthorCommandServer", "StoryAtlas"),
+    "author/main.py": ("AuthorToolkit", "AuthorCommandServer", "AtlasWidget"),
     "the-web/shell/webbie_camera.py": ("qwen3-vl:2b-instruct", "mjpeg", "640x480"),
 }
 SENSITIVE_PC_FILES = (
