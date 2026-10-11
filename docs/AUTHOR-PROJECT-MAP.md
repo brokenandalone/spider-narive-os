@@ -30,3 +30,13 @@ Webbie can open it with explicit instructions such as **Webbie, show project map
 or **open the chapter outline**. Those commands must pass the existing
 trusted-speaker gate if spoken. They only open this read-only overview while
 Author is visible, and do not change chapters or manuscript text.
+
+## Installation manifest coverage
+
+Both the targeted Author/Webbie installer and the combined Spider OS release
+now include the new Word-import and Project Map modules, plus the previously
+built Author review, narration, and continuity dependencies. The Webbie Author
+voice bridge is included as well. Neither manifest installs manuscript files
+or SQLite databases. All changes still require a clean preflight, preserve
+unrecognized local customizations, and generate application-code rollback
+records. **This is not an automatic installation on the PC.**
