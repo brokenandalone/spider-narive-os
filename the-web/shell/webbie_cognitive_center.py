@@ -20,6 +20,8 @@ from privacy_controls import private_session_active, set_private_session, privac
 from local_models import configured_choice
 from local_model_inventory import inspect_local_models, report_lines
 from proactive_checks import status_message
+from runtime_readiness import inspect_readiness, render_report
+from voice_trust import trust_status
 from webbie_focus_dialog import WebbieFocusDialog
 
 
@@ -80,6 +82,10 @@ class WebbieCognitiveDialog(QDialog):
         inspect.setObjectName("webbieInspectModelsButton")
         inspect.clicked.connect(self.inspect_models)
         actions.addWidget(inspect)
+        readiness=QPushButton("Inspect Webbie readiness")
+        readiness.setObjectName("webbieReadinessButton")
+        readiness.clicked.connect(self.inspect_readiness)
+        actions.addWidget(readiness)
         privacy=QHBoxLayout(); root.addLayout(privacy)
         self.private_button=QPushButton()
         self.private_button.setObjectName("webbiePrivateSessionButton")
@@ -119,6 +125,7 @@ class WebbieCognitiveDialog(QDialog):
                    if item else "No owner-created task selected"),
                "SYSTEM CHECKS",status_message(),
                "PRIVACY",privacy_explanation(),
+               "SPEAKER TRUST",trust_status(),
                "This is advisory status. No PC task has been executed."]
         self.report.setPlainText("\n".join(lines))
 
@@ -131,6 +138,15 @@ class WebbieCognitiveDialog(QDialog):
         self.focus_dialog.show()
         self.focus_dialog.raise_()
         self.focus_dialog.activateWindow()
+
+    def inspect_readiness(self):
+        """Read owner-local status files; never start a service/device."""
+        try:
+            self.report.setPlainText(render_report(inspect_readiness()))
+        except (OSError, ValueError, TypeError):
+            self.report.setPlainText(
+                "Read-only Webbie readiness report unavailable. "
+                "No service was changed.")
 
     def inspect_models(self):
         if self.model_worker and self.model_worker.isRunning():

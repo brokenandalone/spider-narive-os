@@ -51,6 +51,8 @@ from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
 from workspace_launchers import workspace_command
 from jarvis_commands import is_capability_question, voice_guide
+from voice_trust import voice_permission, trust_status
+from runtime_readiness import inspect_readiness, render_report
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -323,6 +325,13 @@ def handle_builtin(command):
     lower = command.lower().strip()
     stripped = re.sub(
         r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
+    if stripped in ("readiness status", "jarvis readiness",
+                    "what is working right now", "diagnose your systems",
+                    "diagnose webbie", "what is your health status"):
+        return render_report(inspect_readiness())
+    if stripped in ("voice trust status", "who can talk to you",
+                    "are you verifying voices"):
+        return trust_status()
     if stripped in ("private session status", "is private session on",
                     "is privacy mode on", "what is your privacy status"):
         return privacy_explanation()
@@ -574,7 +583,7 @@ def verified_workspace_voice_action(command, *, speaker_verified=False,
 
 
 def handle_command(command, voice=False, expected_turn=None,
-                   speaker_verified=False):
+                   speaker_evidence=None, speaker_verified=False):
     command = str(command or "").strip()
 
     if not command:
@@ -589,6 +598,16 @@ def handle_command(command, voice=False, expected_turn=None,
         except (OSError, PermissionError):
             pass
         return "Stopped."
+
+    # Explicit policy: only Cory/Shayna's fresh, locally verified speaker
+    # evidence may run ANY voice request, including benign chat. Whisper
+    # transcription, wake words and face similarity are not authentication.
+    # STOP above remains universally available. Until the on-PC verifier is
+    # actually connected, fail quietly. Do not record overheard speech.
+    if not voice_permission(
+            voice=voice, speaker_verified=speaker_verified,
+            evidence=speaker_evidence):
+        return ""
 
     write_state(
         last_heard=command,
@@ -610,7 +629,9 @@ def handle_command(command, voice=False, expected_turn=None,
         r"(?:(?:hey )?(?:webbie|webby|web)[ ,]+)?"
         r"(?:what am i working on|what is my current task|what workspace am i in|"
         r"what is on my screen|what are we doing|what step are we on|"
-        r"what is the next step|what is our navigation status)", command, re.I,
+        r"what is the next step|what is our navigation status|"
+        r"what did you just do|what did you open|"
+        r"what happened with the last action)", command, re.I,
     ):
         reply = context_summary(read_context())
     # Speech-triggered camera questions work only with consent granted in
