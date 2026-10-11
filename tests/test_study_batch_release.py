@@ -18,7 +18,9 @@ class StudyBatchReleaseTests(unittest.TestCase):
         for required in (
             "study/study.py", "study/store.py", "study/assignment_planner.py",
             "study/assignment_workflow.py", "study/assignment_workspace_ui.py",
-            "study/flashcards.py", "study/flashcards_ui.py", "study/homework.py",
+            "study/flashcards.py", "study/flashcards_ui.py",
+            "study/study_progress.py", "study/study_progress_ui.py",
+            "study/homework.py",
             "study/homework_ui.py", "study/assignment_review.py",
             "study/school_onedrive.py", "study/school_upload.py",
             "study/course_materials.py", "study/bin/webbie-homework",
