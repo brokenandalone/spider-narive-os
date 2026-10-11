@@ -32,7 +32,7 @@ def check_local(url):
 def status():
     return {
         "ollama_reachable": check_local("http://127.0.0.1:11434/api/tags"),
-        "searxng_reachable": check_local("http://127.0.0.1:8888/search?q=test&format=json"),
+        "searxng_reachable": check_local("http://127.0.0.1:8888/"),
         "ddgs_installed": bool(__import__("engine").enable_ddgs()),
         "reports": len(list_reports(REPORT_DIR, limit=100)),
         "spider_os_path": str(Path(__file__).resolve()),
