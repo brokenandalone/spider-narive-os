@@ -20,6 +20,8 @@ if __package__:
     from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from .voice_conversion import convert_vocal, ConversionError
     from .voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
+    from .voice_quality import audit_voice_library
+    from .voice_training_split import training_split_plan, prepare_training_split
     from .song_mix import mix_vocals, MixError, valid_wav
     from .band_mix import mix_band_tracks, validate_tracks, ROLES
     from .stem_separation import separate, SeparationError
@@ -34,6 +36,8 @@ else:
     from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from voice_conversion import convert_vocal, ConversionError
     from voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
+    from voice_quality import audit_voice_library
+    from voice_training_split import training_split_plan, prepare_training_split
     from song_mix import mix_vocals, MixError, valid_wav
     from band_mix import mix_band_tracks, validate_tracks, ROLES
     from stem_separation import separate, SeparationError
@@ -198,6 +202,51 @@ class TrainingReadinessWorker(QThread):
             self.result.emit({'error': str(error)})
 
 
+class VoiceQualityWorker(QThread):
+    result = pyqtSignal(object)
+
+    def __init__(self):
+        super().__init__(QApplication.instance())
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            self.result.emit(audit_voice_library(stop=self.stop))
+        except (VoiceSampleError, OSError) as error:
+            self.result.emit({"error": str(error)})
+
+
+class TrainingSplitWorker(QThread):
+    result = pyqtSignal(bool, str, object)
+
+    def __init__(self, dataset):
+        super().__init__(QApplication.instance())
+        self.dataset = Path(dataset)
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            plan = training_split_plan(self.dataset, stop=self.stop)
+            path = prepare_training_split(self.dataset, consent=True, stop=self.stop)
+            self.result.emit(True, str(path), {
+                "training_seconds": plan["training_seconds"],
+                "holdout_seconds": plan["holdout_seconds"],
+                "ready_for_ten_minute_training": plan["ready_for_ten_minute_training"],
+            })
+        except (VoiceSampleError, OSError) as error:
+            self.result.emit(False, str(error), {})
+
+
 class DatasetWorker(QThread):
     result = pyqtSignal(bool, str)
 
@@ -220,6 +269,9 @@ class StudioAIPanel(QWidget):
         self.worker = None
         self.rvc_worker = None
         self.dataset_worker = None
+        self.voice_quality_worker = None
+        self.training_split_worker = None
+        self.last_training_split = None
         self.readiness_worker = None
         self.engine_worker = None
         self.trainer = None
@@ -337,6 +389,15 @@ class StudioAIPanel(QWidget):
         layout.addLayout(voice_buttons)
         layout.addWidget(self.readiness_button)
         layout.addWidget(self.readiness_details)
+        self.voice_quality_button = QPushButton('Audit My Voice sample quality')
+        self.voice_quality_button.clicked.connect(self.check_voice_quality)
+        layout.addWidget(self.voice_quality_button)
+        self.voice_quality_details = QPlainTextEdit()
+        self.voice_quality_details.setReadOnly(True)
+        self.voice_quality_details.setMaximumHeight(115)
+        self.voice_quality_details.setPlainText(
+            'Review silence, clipping risk and duplicate samples. This checks a short preview, not full audio.')
+        layout.addWidget(self.voice_quality_details)
         trainer_header = QLabel('Private voice trainer')
         trainer_header.setStyleSheet('font-size:18px; color:#c4b5fd;')
         layout.addWidget(trainer_header)
@@ -367,6 +428,21 @@ class StudioAIPanel(QWidget):
         self.copy_dataset_button.clicked.connect(self.copy_dataset_path)
         training_set_actions.addWidget(self.copy_dataset_button)
         layout.addLayout(training_set_actions)
+        split_actions = QHBoxLayout()
+        self.split_button = QPushButton('Prepare separate train and holdout audio')
+        self.split_button.setEnabled(False)
+        self.split_button.clicked.connect(self.start_training_split)
+        self.open_split_button = QPushButton('Open separated training folders')
+        self.open_split_button.setEnabled(False)
+        self.open_split_button.clicked.connect(self.open_training_split)
+        split_actions.addWidget(self.split_button)
+        split_actions.addWidget(self.open_split_button)
+        layout.addLayout(split_actions)
+        self.split_status = QLabel(
+            'Evaluation audio stays physically separate from training. This does not train a model.')
+        self.split_status.setWordWrap(True)
+        self.split_status.setTextFormat(Qt.PlainText)
+        layout.addWidget(self.split_status)
         layout.addWidget(self.voice_status)
         QApplication.instance().aboutToQuit.connect(self.cancel_capture)
         self.update_voice_status()
@@ -1089,6 +1165,91 @@ class StudioAIPanel(QWidget):
             self.voice_status.setText('Training set not available: ' + str(message))
         self.open_dataset_button.setEnabled(valid)
         self.copy_dataset_button.setEnabled(valid)
+        self.split_button.setEnabled(valid)
+        self.last_training_split = None
+        self.open_split_button.setEnabled(False)
+
+    def check_voice_quality(self):
+        """Run quick local-only first-12-second sample quality inspection."""
+        if self.voice_quality_worker is not None:
+            return
+        self.voice_quality_button.setEnabled(False)
+        self.voice_quality_details.setPlainText(
+            'Checking recording previews, duplicates and sample durations locally...')
+        self.voice_quality_worker = VoiceQualityWorker()
+        self.voice_quality_worker.result.connect(self.voice_quality_done)
+        self.voice_quality_worker.finished.connect(self.voice_quality_finished)
+        self.voice_quality_worker.start()
+
+    def voice_quality_done(self, report):
+        if "error" in report:
+            self.voice_quality_details.setPlainText("Voice audit unavailable: " + report["error"])
+            return
+        rows = [f"{report['total_recordings']} original recording(s); "
+                f"{report['unique_preview_accepted_seconds'] / 60:.1f} minutes "
+                "potentially usable after preview checks."]
+        for item in report["files"]:
+            flags = "; ".join(item["warnings"]) or "No obvious preview issue detected"
+            rows.append(f"{item['filename']}: {flags}")
+        rows.append(
+            "First 12 seconds only: review every full recording yourself. "
+            "A training model has not been created.")
+        self.voice_quality_details.setPlainText("\n".join(rows))
+
+    def voice_quality_finished(self):
+        worker, self.voice_quality_worker = self.voice_quality_worker, None
+        self.voice_quality_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def start_training_split(self):
+        if self.training_split_worker is not None:
+            return
+        dataset = self.last_training_set
+        if not dataset or dataset.is_symlink() or not (dataset / "manifest.json").is_file():
+            self.split_status.setText("Prepare a consented local training dataset first.")
+            return
+        answer = QMessageBox.question(
+            self, "Separate My Voice evaluation audio",
+            "I approve copying my consented voice recordings into separate training and "
+            "holdout folders. The holdout must NEVER be included when running RVC training. "
+            "No training or internet upload will begin. Continue?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self.split_button.setEnabled(False)
+        self.open_split_button.setEnabled(False)
+        self.split_status.setText("Checking hashes and staging separate local training/evaluation copies...")
+        self.training_split_worker = TrainingSplitWorker(dataset)
+        self.training_split_worker.result.connect(self.training_split_done)
+        self.training_split_worker.finished.connect(self.training_split_finished)
+        self.training_split_worker.start()
+
+    def training_split_done(self, success, message, details):
+        if success:
+            path = Path(message)
+            self.last_training_split = path
+            self.open_split_button.setEnabled(True)
+            self.split_status.setText(
+                f"Separate data created: {details['training_seconds'] / 60:.1f} minutes train, "
+                f"{details['holdout_seconds'] / 60:.1f} minutes evaluation. "
+                + ("Training duration meets the ten-minute reference."
+                   if details["ready_for_ten_minute_training"] else
+                   "Need more recordings to have ten full training minutes after holdout.")
+                + " Select ONLY train/audio in RVC. This has not trained a model.")
+        else:
+            self.split_status.setText("Training split unavailable: " + str(message))
+
+    def training_split_finished(self):
+        worker, self.training_split_worker = self.training_split_worker, None
+        self.split_button.setEnabled(bool(self.last_training_set))
+        if worker is not None:
+            worker.deleteLater()
+
+    def open_training_split(self):
+        if (self.last_training_split and not self.last_training_split.is_symlink()
+                and self.last_training_split.is_dir()):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_training_split)))
 
     def open_dataset(self):
         if self.last_training_set and self.last_training_set.is_dir():
