@@ -59,6 +59,20 @@ fi
     echo 'Kali Bay is not installed; refusing to create a new runtime.' >&2
     exit 1
 }
+# Mandatory read-only continuity gate BEFORE any backups or changes.
+# This catches the PC's customized Kali UI and Webbie bridge, not only
+# the newly introduced runtime files. Never overwrite unknown work.
+command -v python3 >/dev/null || {
+    echo 'Python 3 missing; no changes made.' >&2
+    exit 1
+}
+python3 "$source_root/kali-bay/package/audit-upgrade.py" \
+    --source-root "$source_root" \
+    --installed-root "$installed_root" || {
+    echo 'Custom Kali/Webbie files need reconciliation in the ONE BATCH release.' >&2
+    echo 'No files were changed. Source-only development remains safe.' >&2
+    exit 2
+}
 # Refuse anything that could follow a symlink to some unrelated file.
 for relative in "${relative_files[@]}"; do
     target="$installed_root/$relative"
