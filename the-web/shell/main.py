@@ -305,6 +305,7 @@ class TheWeb(QMainWindow):
         self.safe_mode = safe_mode
         self._restore_plan = None
         self._restore_user_navigated = False
+        self._restore_arranging = False
         self._skip_final_state_save = False
         self.workspace_load_seconds = {}
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(self._appearance_style())
@@ -973,7 +974,8 @@ class TheWeb(QMainWindow):
         name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); page.deleteLater(); self.save_state()
 
     def tab_changed(self, index):
-        if self._restore_plan is not None and index >= 0:
+        if (self._restore_plan is not None and not self._restore_arranging
+                and index >= 0):
             self._restore_user_navigated = True
         if index >= 0:
             self.set_workspace(self.tabs.widget(index).property('workspace')); self.save_state()
@@ -1054,13 +1056,17 @@ class TheWeb(QMainWindow):
         ordered = desired_tab_order(
             plan, [self.tabs.widget(i).property('workspace')
                    for i in range(self.tabs.count())])
-        for target, name in enumerate(ordered):
-            page = self.workspace_widgets.get(name)
-            if page is None:
-                continue
-            start = self.tabs.indexOf(page)
-            if start >= 0 and start != target:
-                self.tabs.tabBar().moveTab(start, target)
+        self._restore_arranging = True
+        try:
+            for target, name in enumerate(ordered):
+                page = self.workspace_widgets.get(name)
+                if page is None:
+                    continue
+                start = self.tabs.indexOf(page)
+                if start >= 0 and start != target:
+                    self.tabs.tabBar().moveTab(start, target)
+        finally:
+            self._restore_arranging = False
         self._restore_plan = None
         self._restoring = False
         if not self._restore_user_navigated and plan.active in self.workspace_widgets:
