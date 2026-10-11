@@ -126,6 +126,7 @@ class WebbieComputerDialog(QDialog):
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
         self.bridge.openRequested.connect(self.handle_voice_open)
         self.bridge.webRequested.connect(self.handle_voice_web)
+        self.bridge.navigationProposed.connect(self.handle_voice_navigation)
 
         # Keep all explicit approval controls readable on smaller screens.
         outer = QVBoxLayout(self)
@@ -766,6 +767,15 @@ class WebbieComputerDialog(QDialog):
             self.status(self.report.toPlainText() +
                         '\nVerify the window before the next step.')
         self.refresh_status()
+
+    def handle_voice_navigation(self, phrase):
+        """Voice may propose, but only local clicks can authorize and execute."""
+        staged = self.offer_navigation(phrase)
+        if self.bridge.pending is not None:
+            self.bridge.finish(
+                self.bridge.pending,
+                'Navigation staged. Review the steps in Computer Control.' if staged
+                else 'Unable to stage that navigation request.')
 
     def offer_navigation(self, request):
         """Present only direct user-supplied navigation text; no auto-action."""
