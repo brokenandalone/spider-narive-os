@@ -44,6 +44,8 @@ from navigation_state import (navigation_file, load_navigation, save_navigation,
 from desktop_state import read_desktop_state, write_desktop_state
 from workspace_navigation import adjacent_index, other_tab_names, workspace_context_summary
 from command_palette import CommandPalette
+from workspace_recovery import WorkspaceRecovery
+from session_checkpoints import checkpoint_path, read_checkpoint, save_checkpoint
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
 from tray_panel import TrayPanel
@@ -285,7 +287,7 @@ class Taskbar(QWidget):
 
 
 class TheWeb(QMainWindow):
-    def __init__(self, desktop_mode=False, restore=True):
+    def __init__(self, desktop_mode=False, restore=True, safe_mode=False):
         super().__init__()
         self.desktop_mode = desktop_mode; self.current_workspace = 'default'; self.workspace_widgets = {}; self.app_lists = {}
         self.wallpaper_catalog = WallpaperCatalog(SPIDER_ROOT); self.wallpaper = None
@@ -297,6 +299,8 @@ class TheWeb(QMainWindow):
         self.navigation_state = load_navigation(self.navigation_path, WORKSPACES)
         self.installed_apps = []
         self.app_scan_worker = None
+        self.workspace_load_errors = {}
+        self.safe_mode = safe_mode
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(self._appearance_style())
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.build_ui(); self.background_surface.set_appearance(self.appearance); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
@@ -327,7 +331,10 @@ class TheWeb(QMainWindow):
         self.tabs.tabBar().tabMoved.connect(self.tab_moved)
         self.tabs.tabBar().customContextMenuRequested.connect(self.tab_context_menu)
         self.set_workspace('default')
-        if restore: self.restore_state()
+        if restore and not self.safe_mode:
+            self.restore_state()
+        elif self.safe_mode:
+            self.status.setText('SAFE WORKSPACE START: prior tab layout preserved. Open Recovery to inspect.')
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_status); self.timer.start(15000)
         QTimer.singleShot(0, self.refresh_status)
         QTimer.singleShot(0, self.refresh_apps)
@@ -350,6 +357,9 @@ class TheWeb(QMainWindow):
         header.addWidget(self.face_display_button)
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
         header.addWidget(button('Quick Launch', self.toggle_command_palette))
+        recover_button = button('Recovery', self.toggle_workspace_recovery)
+        recover_button.setToolTip('Workspace diagnostics, retry and layout checkpoints')
+        header.addWidget(recover_button)
         self.tabs = QTabWidget()
         self.tabs.setObjectName('workspaceTabs')
         self.tabs.setProperty('home', True)
@@ -690,6 +700,7 @@ class TheWeb(QMainWindow):
         """Only explicitly registered desktop actions can be dispatched."""
         actions = {
             'windows': self.toggle_window_overview,
+            'recovery-center': self.toggle_workspace_recovery,
             'webbie': self.toggle_webbie_assistant,
             'quick-settings': self.toggle_quick_settings,
             'notifications': self.toggle_notifications,
@@ -709,11 +720,15 @@ class TheWeb(QMainWindow):
             page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
             layout = QHBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8); layout.addWidget(self.application_panel(name))
             try:
+                self.workspace_load_errors.pop(name, None)
                 if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
                 elif name == 'media': native = MediaPanel(self.launch_media)
                 else: native = create_native(name, SPIDER_ROOT)
             except Exception as error:
-                native = None; self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
+                native = None
+                self.workspace_load_errors[name] = type(error).__name__[:80]
+                self.status.setText(
+                    f'Could not open {WORKSPACES[name]}. Use Recovery to retry.')
             page.native = native
             if name == 'author' and native is not None and hasattr(native, 'show_webbie_review') is False:
                 native.show_webbie_review = self.show_author_review
@@ -726,7 +741,18 @@ class TheWeb(QMainWindow):
                 else:
                     surface = QWidget(); surface.setObjectName('root'); body = QVBoxLayout(surface)
                     heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
-                    body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1)
+                    if name in self.workspace_load_errors:
+                        problem = QLabel('The native workspace could not load. '
+                                         'Your documents were not changed. '
+                                         'Open Recovery to inspect and retry.')
+                        problem.setWordWrap(True)
+                        body.addWidget(problem)
+                        body.addWidget(button('Retry workspace',
+                                              lambda checked=False, target=name:
+                                                  self.retry_workspace(target)))
+                    else:
+                        body.addWidget(QLabel('Open an installed app from this workspace.'))
+                    body.addStretch(1)
                 layout.addWidget(surface, 1)
             self.workspace_widgets[name] = page
             position = self.tabs.addTab(page, WORKSPACES[name])
@@ -867,6 +893,10 @@ class TheWeb(QMainWindow):
         except (OSError, ValueError) as error: self.status.setText('Could not save wallpaper: ' + str(error))
 
     def save_state(self):
+        # Starting with --safe-workspaces must not overwrite the last
+        # known tab layout merely because the minimal shell was opened.
+        if getattr(self, 'safe_mode', False):
+            return
         if getattr(self, '_restoring', False):
             return
         try:
@@ -1107,6 +1137,9 @@ class TheWeb(QMainWindow):
         if self.notification_toast is not None: self.notification_toast.close()
         self.taskbar.timer.stop()
         self.command_palette.close()
+        recovery = getattr(self, 'workspace_recovery', None)
+        if recovery is not None:
+            recovery.close()
         self.taskbar.close()
         self.start_menu.close()
         event.accept()
@@ -1116,7 +1149,9 @@ def main():
     app = QApplication(sys.argv); app.setApplicationName('The Web'); app.setQuitOnLastWindowClosed(True)
     splash = QSplashScreen(QPixmap(str(SPIDER_ROOT / 'branding/splash/spider-os-splash.png')).scaled(960, 540, Qt.KeepAspectRatio, Qt.SmoothTransformation))
     splash.show(); splash.showMessage('Opening The Web…', Qt.AlignBottom | Qt.AlignHCenter, QColor('#e9d5ff')); app.processEvents()
-    window = TheWeb(desktop_mode='--desktop-session' in sys.argv); window.showMaximized() if not window.desktop_mode else window.show()
+    window = TheWeb(desktop_mode='--desktop-session' in sys.argv,
+                    safe_mode='--safe-workspaces' in sys.argv)
+    window.showMaximized() if not window.desktop_mode else window.show()
     splash.finish(window); sys.exit(app.exec_())
 
 if __name__ == '__main__': main()
