@@ -48,6 +48,7 @@ from proactive_checks import ProactiveMonitor, status_message, quiet_now, config
 from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
 from workspace_launchers import workspace_command
+from jarvis_commands import is_capability_question, voice_guide
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -313,6 +314,8 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    if is_capability_question(command):
+        return voice_guide()
     # Read-only live snapshot. Status text never authorizes a desktop action.
     check_phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", lower)).strip()
     if re.fullmatch(
