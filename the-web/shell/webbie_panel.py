@@ -596,15 +596,21 @@ class WebbiePanel(QWidget):
     def publish_jarvis_context(self):
         """Short-lived metadata only. Camera/screen pixels never written here."""
         authorized = ''
+        selected_window = ''
         if self.computer_dialog is not None:
             approval = self.computer_dialog.grant.status()
             if approval['active']:
                 authorized = approval['task']
+                chosen = self.computer_dialog.selected_window()
+                if (chosen is not None and
+                        chosen == self.computer_dialog.operator.target_window):
+                    selected_window = self.computer_dialog.windows.currentText()
         try:
             publish_context(
                 workspace=self.workspace_label, mode=self.workspace_mode,
                 selected_title=self.workspace_summary,
                 approved_task=authorized,
+                selected_window=selected_window,
                 sleeping=self.face_sleeping,
             )
         except (OSError, PermissionError, ValueError):
