@@ -18,11 +18,14 @@ COMPONENTS = {
         "webbie/agent/kali_assistant.py", "webbie/agent/vision_query.py",
         "webbie/brain/brain.py", "webbie/brain/context_awareness.py",
         "webbie/brain/local_models.py", "webbie/voice/whisper_listener.py",
+        "webbie/agent/voice_queue.py", "webbie/agent/proactive_checks.py",
+        "webbie/agent/local_reminders.py", "webbie/agent/voice_supervisor.py",
     ),
     "Webbie vision and desktop": (
         "the-web/shell/webbie_camera.py", "the-web/shell/webbie_panel.py",
         "the-web/shell/webbie_vision_bridge.py",
         "the-web/shell/webbie_computer_panel.py",
+        "the-web/shell/webbie_reminders_dialog.py",
         "the-web/shell/main.py", "webbie/actions/autopilot_policy.py",
         "the-web/package/reconcile-native.py",
     ),
@@ -68,7 +71,9 @@ COMPONENTS = {
 WIRING = {
     "webbie/agent/webbie.py": (
         "author_voice_bridge", "kali_assistant", "ask_vision",
+        "ProactiveMonitor", "ReminderScheduler",
     ),
+    "the-web/shell/webbie_panel.py": ("show_proactive_checks", "open_reminders_dialog"),
     "study/study.py": ("open_homework", "open_school_onedrive"),
     "studio/main.py": ("StudioAIPanel",),
     "author/main.py": ("AuthorToolkit", "AuthorCommandServer"),

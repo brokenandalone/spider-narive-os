@@ -19,8 +19,11 @@ from webbie_camera import camera_devices, capture_jpeg, describe_frame
 from webbie_face_profiles_ui import FaceProfileControls
 from webbie_vision_bridge import VisionBridge
 from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_catalog
+from webbie_reminders_dialog import WebbieRemindersDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
 from context_awareness import AwarenessState
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
+from proactive_checks import read_status as proactive_snapshot, status_message as proactive_status_message, request_check_now
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'overlay'))
 from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 
@@ -200,6 +203,7 @@ class WebbiePanel(QWidget):
         self.camera_worker = None
         self.vision_bridge = None
         self.computer_dialog = None
+        self.reminders_dialog = None
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
         self.awareness.sleep(self.face_sleeping)
@@ -230,6 +234,30 @@ class WebbiePanel(QWidget):
         self.awareness_button = QPushButton('What Webbie knows right now')
         self.awareness_button.clicked.connect(self.show_awareness)
         layout.addWidget(self.awareness_button)
+        # Independent read-only system status, no microphone or camera access.
+        self.proactive_label = QLabel('Proactive checks: awaiting first report')
+        self.proactive_label.setWordWrap(True)
+        self.proactive_label.setAccessibleName('Webbie proactive monitoring status')
+        layout.addWidget(self.proactive_label)
+        proactive_button = QPushButton('Show Webbie system checks')
+        proactive_button.setObjectName('webbieProactiveChecksButton')
+        proactive_button.setToolTip('Read the latest local results. Does not run an OS command.')
+        proactive_button.clicked.connect(self.show_proactive_checks)
+        layout.addWidget(proactive_button)
+        proactive_run_button = QPushButton('Run system checks now')
+        proactive_run_button.setObjectName('webbieProactiveRunButton')
+        proactive_run_button.setToolTip('Ask the resident agent to rerun local read-only checks; no system changes.')
+        proactive_run_button.clicked.connect(self.request_proactive_checks)
+        layout.addWidget(proactive_run_button)
+        reminders_button = QPushButton('My local reminders')
+        reminders_button.setObjectName('webbieLocalRemindersButton')
+        reminders_button.setToolTip('Create and remove on-device reminders with explicit clicks.')
+        reminders_button.clicked.connect(self.open_reminders_dialog)
+        layout.addWidget(reminders_button)
+        self.proactive_timer = QTimer(self)
+        self.proactive_timer.timeout.connect(self.refresh_proactive_status)
+        self.proactive_timer.start(10000)
+        self.refresh_proactive_status()
         # Explicit owner consent. Camera does not start when The Web launches.
         camera_controls = QHBoxLayout(); layout.addLayout(camera_controls)
         self.camera_selector = QComboBox()
@@ -577,6 +605,42 @@ class WebbiePanel(QWidget):
         if not self.face_sleeping:
             self.awareness.observation(
                 'screen', description, consent=True, ttl=45)
+
+    def open_reminders_dialog(self):
+        if self.reminders_dialog is None:
+            self.reminders_dialog = WebbieRemindersDialog(self)
+        self.reminders_dialog.refresh()
+        self.reminders_dialog.show()
+        self.reminders_dialog.raise_()
+        self.reminders_dialog.activateWindow()
+
+    def refresh_proactive_status(self):
+        state = proactive_snapshot()
+        last = state.get('last_run')
+        if not last:
+            label = 'Proactive checks: no completed report'
+        else:
+            values = [item['status'] for item in state['checks'].values()]
+            problems = values.count('warn')
+            pending = state.get('pending_count', 0)
+            label = (f'Proactive checks: {len(values)} tested, '
+                     f'{problems} warning(s), {pending} queued alert(s)')
+            if not state.get('enabled', True):
+                label += ' · disabled'
+        self.proactive_label.setText(label)
+
+    def show_proactive_checks(self):
+        self.refresh_proactive_status()
+        self.append_message('Webbie system checks', proactive_status_message())
+
+    def request_proactive_checks(self):
+        try:
+            request_check_now()
+            self.append_message('Webbie system checks',
+                'Read-only check requested. The resident agent will run it on its next health tick (at most once every 30 seconds).')
+        except (OSError, PermissionError, ValueError) as error:
+            self.append_message('Webbie system checks',
+                'Could not request local checks: ' + str(error))
 
     def show_awareness(self):
         # Inspectable short-term context, not a long-term-memory database.

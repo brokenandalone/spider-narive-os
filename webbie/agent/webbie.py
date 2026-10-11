@@ -7,6 +7,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -41,6 +42,9 @@ from stop_signal import request_stop
 from app_open_route import installed_app_request
 from voice_turns import VoiceTurnTracker
 from voice_queue import VoiceTurnCoordinator
+from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
+from local_reminders import ReminderScheduler
+from voice_supervisor import VoiceSupervisor
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -93,6 +97,7 @@ STATE_FILE = (
 
 running = True
 speech_lock = threading.Lock()
+state_lock = threading.RLock()
 speech_playback = InterruptibleSpeech()
 voice_turns = VoiceTurnTracker()
 awaiting_command_until = 0.0
@@ -164,47 +169,51 @@ def current_name():
 
 
 def write_state(**updates):
-    state = {
-        "online": True,
-        "pid": os.getpid(),
-        "workspace": current_workspace(),
-        "user_name": current_name(),
-        "updated": datetime.now().isoformat(),
-    }
-
-    try:
-        if STATE_FILE.exists():
-            old = json.loads(
-                STATE_FILE.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-            if isinstance(old, dict):
-                state.update(old)
-
-    except Exception:
-        pass
-
-    state.update(updates)
-
-    state["online"] = True
-    state["pid"] = os.getpid()
-    state["workspace"] = current_workspace()
-    state["user_name"] = current_name()
-    state["updated"] = datetime.now().isoformat()
-
-    try:
-        STATE_FILE.write_text(
-            json.dumps(
-                state,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-    except Exception:
-        pass
+    """Persist small status snapshots atomically, with owner-only permissions."""
+    with state_lock:
+        state = {
+            "online": True,
+            "pid": os.getpid(),
+            "workspace": current_workspace(),
+            "user_name": current_name(),
+            "updated": datetime.now().isoformat(),
+        }
+        try:
+            if STATE_FILE.exists() and not STATE_FILE.is_symlink():
+                old = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+                if isinstance(old, dict):
+                    state.update(old)
+        except (OSError, ValueError, TypeError):
+            pass
+        state.update(updates)
+        state["online"] = updates.get("online", True)
+        state["pid"] = os.getpid()
+        state["workspace"] = current_workspace()
+        state["user_name"] = current_name()
+        state["updated"] = datetime.now().isoformat()
+        temporary = None
+        try:
+            STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if (STATE_DIR.is_symlink() or STATE_FILE.is_symlink()
+                    or STATE_DIR.stat().st_uid != os.getuid()):
+                raise PermissionError("Unsafe Webbie status path")
+            fd, temporary = tempfile.mkstemp(prefix=".webbie-state-", dir=STATE_DIR)
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, STATE_FILE)
+            temporary = None
+        except (OSError, TypeError, ValueError):
+            pass
+        finally:
+            if temporary is not None:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
 
 
 def notify(title, message):
@@ -299,6 +308,17 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    # Read-only live snapshot. Status text never authorizes a desktop action.
+    check_phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", lower)).strip()
+    if re.fullmatch(
+        r"(?:hey )?(?:webbie|webby|web) "
+        r"(?:proactive status|check status|system check status|system health|"
+        r"what have you checked|what did you check|how are your checks|"
+        r"what are you checking|are your checks working)",
+        check_phrase,
+    ):
+        return status_message()
+
 
     if re.search(
         r"\b(open|launch|start)\b.*\bthe web\b",
@@ -790,6 +810,18 @@ def voice_listener():
         )
 
 
+def supervised_voice_listener():
+    """Keep the speech recognizer alive with bounded retries, not a service restart."""
+    supervisor = VoiceSupervisor(
+        voice_listener,
+        lambda: running,
+        notify=lambda reason, delay: write_state(
+            voice_listener=False, voice_retry_in_seconds=delay,
+            voice_retry_reason=reason),
+    )
+    supervisor.serve()
+
+
 def session_is_active():
     try:
         output = subprocess.check_output(
@@ -800,6 +832,7 @@ def session_is_active():
             ],
             text=True,
             stderr=subprocess.DEVNULL,
+            timeout=4,
         )
 
         for line in output.splitlines():
@@ -843,10 +876,8 @@ def session_is_active():
                 stderr=subprocess.DEVNULL,
             ).strip()
 
-            return (
-                active == "yes"
-                and idle != "yes"
-            )
+            if active == "yes" and idle != "yes":
+                return True
 
     except Exception:
         pass
@@ -855,63 +886,81 @@ def session_is_active():
 
 
 def proactive_loop():
-    if CONFIG.get(
-        "greet_on_login",
-        True,
-    ):
-        time.sleep(8)
+    """Run real, local health checks even when Webbie is sleeping.
 
-        hour = datetime.now().hour
-
-        if hour < 12:
-            greeting = "Good morning"
-
-        elif hour < 18:
-            greeting = "Good afternoon"
-
-        else:
-            greeting = "Good evening"
-
-        if not quiet_asleep():
-            say(
-                f"{greeting}, {current_name()}. "
-                "Webbie is online."
-            )
-
-    minutes = max(
-        15,
-        int(
-            CONFIG.get(
-                "check_in_minutes",
-                45,
-            )
+    The desktop stays in control of user-facing notifications. No model calls,
+    browser queries, raw audio, camera capture, or automatic desktop actions.
+    """
+    raw = CONFIG.get("proactive", {})
+    if not isinstance(raw, dict):
+        raw = {}
+    settings = dict(raw)
+    settings.setdefault("check_in_minutes", CONFIG.get("check_in_minutes", 45))
+    monitor = ProactiveMonitor(
+        settings=settings,
+        on_alert=lambda message: subprocess.run(
+            ["notify-send", "Webbie system check", message],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4, check=True,
         ),
     )
-
-    next_check = (
-        time.time()
-        + minutes * 60
+    config = configure(settings)
+    reminders = ReminderScheduler(
+        on_alert=lambda message: subprocess.run(
+            ["notify-send", "Webbie reminder", message],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4, check=True,
+        ),
     )
+    # Start after the microphone listener has had a chance to report status.
+    time.sleep(8)
+    if (CONFIG.get("greet_on_login", True) and not quiet_asleep()
+            and session_is_active()
+            and not quiet_now(time.time(), config["quiet_start"],
+                              config["quiet_end"])):
+        hour = datetime.now().hour
+        greeting = ("Good morning" if hour < 12 else
+                    "Good afternoon" if hour < 18 else "Good evening")
+        say(f"{greeting}, {current_name()}. Webbie is online.")
 
     while running:
-        time.sleep(30)
-
-        if time.time() < next_check:
-            continue
-
-        next_check = (
-            time.time()
-            + minutes * 60
-        )
-
-        if not session_is_active() or quiet_asleep():
-            # Postpone conversation, not the background service loop.
-            continue
-
-        say(
-            f"{current_name()}, "
-            "do you need anything?"
-        )
+        desktop_active = session_is_active()
+        sleeping = quiet_asleep()
+        try:
+            report = monitor.tick(
+                session_active=desktop_active,
+                sleeping=sleeping,
+            )
+            statuses = {key: entry["status"]
+                        for key, entry in report["checks"].items()}
+            write_state(
+                proactive_enabled=report["enabled"],
+                proactive_last_run=report["last_run"],
+                proactive_pending_alerts=report["pending_count"],
+                proactive_check_statuses=statuses,
+                proactive_error=None,
+            )
+        except Exception as error:
+            # Keep Webbie's core chat and wake-word loop alive if a local
+            # monitor or desktop notification service fails.
+            write_state(proactive_error=type(error).__name__)
+        try:
+            scheduled = reminders.tick(
+                session_active=desktop_active, sleeping=sleeping,
+                quiet_start=config["quiet_start"],
+                quiet_end=config["quiet_end"],
+            )
+            write_state(
+                local_reminders_scheduled=scheduled["scheduled"],
+                local_reminders_due=scheduled["due"],
+                local_reminder_error=None,
+            )
+        except Exception as error:
+            write_state(local_reminder_error=type(error).__name__)
+        for _ in range(15):
+            if not running:
+                break
+            time.sleep(2)
 
 
 def socket_server():
@@ -1022,7 +1071,7 @@ def main():
             daemon=True,
         ),
         threading.Thread(
-            target=voice_listener,
+            target=supervised_voice_listener,
             name="webbie-voice",
             daemon=True,
         ),
