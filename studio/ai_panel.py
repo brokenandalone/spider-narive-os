@@ -21,6 +21,7 @@ if __package__:
     from .voice_conversion import convert_vocal, ConversionError
     from .voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
     from .song_mix import mix_vocals, MixError, valid_wav
+    from .band_mix import mix_band_tracks, validate_tracks, ROLES
     from .stem_separation import separate, SeparationError
     from .owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
     from .multitrack_dialog import MultitrackDialog
@@ -32,6 +33,7 @@ else:
     from voice_conversion import convert_vocal, ConversionError
     from voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
     from song_mix import mix_vocals, MixError, valid_wav
+    from band_mix import mix_band_tracks, validate_tracks, ROLES
     from stem_separation import separate, SeparationError
     from owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
     from multitrack_dialog import MultitrackDialog
@@ -139,6 +141,28 @@ class VoiceMixWorker(QThread):
                              else "Mix failed. Check FFmpeg and your selected audio files.")
 
 
+class BandMixWorker(QThread):
+    result = pyqtSignal(str, str)
+
+    def __init__(self, tracks, gains):
+        super().__init__(QApplication.instance())
+        self.tracks, self.gains = tracks, gains
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            output = mix_band_tracks(self.tracks, gains=self.gains, stop=self.stop)
+            self.result.emit(str(output), 'Independent band stems mixed. Original files preserved.')
+        except Exception as error:
+            self.result.emit('', str(error) if isinstance(error, MixError)
+                             else 'Band mix failed. Check local FFmpeg and your WAV tracks.')
+
+
 class EngineCheckWorker(QThread):
     result = pyqtSignal(str)
 
@@ -200,6 +224,8 @@ class StudioAIPanel(QWidget):
         self.last_converted_vocal = None
         self.last_final_mix = None
         self.mix_worker = None
+        self.band_mix_worker = None
+        self.last_band_mix = None
         self.separation_worker = None
         self.separation_directory = None
         self.separation_files = set()
@@ -487,6 +513,63 @@ class StudioAIPanel(QWidget):
         self.open_session_button = QPushButton('Build multitrack DAW session')
         self.open_session_button.clicked.connect(self.open_multitrack_session)
         layout.addWidget(self.open_session_button)
+        band_mix_heading = QLabel('Band mixer: real separate guitars, singers and instruments')
+        band_mix_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
+        layout.addWidget(band_mix_heading)
+        band_mix_note = QLabel(
+            'Mix up to eight independently recorded or verified separated WAV tracks. '
+            'Guitar and vocalist prompts in an AI full-song WAV are not separate tracks. '
+            'Empty roles are skipped; provide at least two different WAV files. '
+            'Each level is independent, and source recordings are never replaced.')
+        band_mix_note.setWordWrap(True)
+        layout.addWidget(band_mix_note)
+        self.band_track_fields = {}
+        self.band_track_gains = {}
+        band_tracks_form = QFormLayout()
+        role_labels = {
+            'backing': 'Instrumental bed',
+            'lead_vocal': 'My Voice / lead singer',
+            'guest_vocal': 'Guest / female singer',
+            'rhythm_guitar': 'Guitarist 1 / rhythm',
+            'lead_guitar': 'Guitarist 2 / lead',
+            'bass': 'Bass guitar',
+            'drums': 'Drums',
+            'keys': 'Piano / keyboards',
+        }
+        for role in ROLES:
+            row = QWidget()
+            line = QHBoxLayout(row)
+            line.setContentsMargins(0, 0, 0, 0)
+            audio = QLineEdit()
+            audio.setPlaceholderText('Optional independent WAV stem')
+            choose = QPushButton('Choose WAV')
+            choose.clicked.connect(lambda _=False, target=audio: self.pick_conversion_file(target, 'WAV (*.wav)'))
+            level = QDoubleSpinBox()
+            level.setRange(0.0, 2.0)
+            level.setSingleStep(0.05)
+            level.setValue(1.0)
+            level.setPrefix('Level ')
+            line.addWidget(audio, 1)
+            line.addWidget(choose)
+            line.addWidget(level)
+            self.band_track_fields[role] = audio
+            self.band_track_gains[role] = level
+            band_tracks_form.addRow(role_labels[role], row)
+        layout.addLayout(band_tracks_form)
+        band_mix_actions = QHBoxLayout()
+        self.band_mix_button = QPushButton('Mix independent band stems')
+        self.band_mix_button.clicked.connect(self.start_band_mix)
+        band_mix_actions.addWidget(self.band_mix_button)
+        self.band_mix_cancel_button = QPushButton('Stop band mix')
+        self.band_mix_cancel_button.setEnabled(False)
+        self.band_mix_cancel_button.clicked.connect(self.cancel_band_mix)
+        band_mix_actions.addWidget(self.band_mix_cancel_button)
+        self.band_mix_play_button = QPushButton('Listen to band mix')
+        self.band_mix_play_button.setEnabled(False)
+        self.band_mix_play_button.clicked.connect(self.play_band_mix)
+        band_mix_actions.addWidget(self.band_mix_play_button)
+        layout.addLayout(band_mix_actions)
+
         buttons = QHBoxLayout()
         self.preset = QPushButton('Broken Sorrow preset')
         self.preset.clicked.connect(lambda: self.style.setPlainText(BROKEN_SORROW))
@@ -595,6 +678,7 @@ class StudioAIPanel(QWidget):
         self.play_converted_button.setEnabled(bool(target))
         if target:
             self.mix_vocal.setText(target)
+            self.band_track_fields['lead_vocal'].setText(target)
         if self.finish_after_conversion:
             self.finish_after_conversion = False
             if target:
@@ -700,6 +784,7 @@ class StudioAIPanel(QWidget):
             self.status.setText('This is already assigned as vocal. Select a different backing WAV.')
             return
         self.mix_backing.setText(str(path))
+        self.band_track_fields['backing'].setText(str(path))
         self.status.setText('Instrumental backing selected. Your original audio stays unchanged.')
 
     def open_separated_folder(self):
@@ -761,6 +846,46 @@ class StudioAIPanel(QWidget):
         worker, self.mix_worker = self.mix_worker, None
         self.mix_button.setEnabled(True)
         self.finish_song_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def start_band_mix(self):
+        if self.band_mix_worker is not None:
+            return
+        tracks = {role: field.text().strip()
+                  for role, field in self.band_track_fields.items() if field.text().strip()}
+        gains = {role: self.band_track_gains[role].value() for role in tracks}
+        try:
+            validate_tracks(tracks, gains)
+        except (OSError, MixError) as error:
+            self.status.setText(str(error))
+            return
+        self.band_mix_worker = BandMixWorker(tracks, gains)
+        self.band_mix_worker.result.connect(self.band_mix_done)
+        self.band_mix_worker.finished.connect(self.band_mix_finished)
+        self.band_mix_button.setEnabled(False)
+        self.band_mix_cancel_button.setEnabled(True)
+        self.status.setText('Mixing independently recorded band WAV tracks locally…')
+        self.band_mix_worker.start()
+
+    def cancel_band_mix(self):
+        if self.band_mix_worker is not None:
+            self.band_mix_worker.stop.set()
+            self.band_mix_cancel_button.setEnabled(False)
+            self.status.setText('Stopping band mixing; source files remain unchanged.')
+
+    def band_mix_done(self, output, message):
+        self.status.setText(message + ((' Saved: ' + output) if output else ''))
+        self.last_band_mix = Path(output) if output else None
+        self.band_mix_play_button.setEnabled(bool(output))
+
+    def play_band_mix(self):
+        self._play_checked_wav(self.last_band_mix)
+
+    def band_mix_finished(self):
+        worker, self.band_mix_worker = self.band_mix_worker, None
+        self.band_mix_button.setEnabled(True)
+        self.band_mix_cancel_button.setEnabled(False)
         if worker is not None:
             worker.deleteLater()
 
