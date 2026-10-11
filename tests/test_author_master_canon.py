@@ -260,7 +260,8 @@ class AuthorWindowCanonTests(unittest.TestCase):
                                  'The secret is 3:13.')
                 self.assertEqual(window.store.chapter(chapter)['content'],
                                  'The secret is 3:13.')
-                window.store.save(chapter, 'New text.')
+                window.editor.setPlainText('New text.')
+                self.assertTrue(window.flush())
                 window.jump_to_canon_source(
                     chapter, source['source_quote'], source['source_digest']
                 )
