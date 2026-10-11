@@ -133,7 +133,9 @@ def list_projects(*, root=None, limit=MAX_LIST):
     if not parent.is_dir():
         return []
     items = []
-    for folder in sorted(parent.glob('project-*'), reverse=True):
+    for folder in sorted((p for p in parent.glob('project-*') if not p.is_symlink()),
+                         key=lambda p: p.stat().st_mtime_ns if p.exists() else 0,
+                         reverse=True):
         if folder.is_symlink() or not folder.is_dir():
             continue
         file = folder / 'project.json'
@@ -153,7 +155,9 @@ def recent_mixes(*, root=None, limit=30):
     if not parent.is_dir():
         return []
     results = []
-    for folder in sorted(parent.glob('band-*'), reverse=True):
+    for folder in sorted((p for p in parent.glob('band-*') if not p.is_symlink()),
+                         key=lambda p: p.stat().st_mtime_ns if p.exists() else 0,
+                         reverse=True):
         if folder.is_symlink() or not folder.is_dir():
             continue
         receipt = folder / 'band-mix.json'
