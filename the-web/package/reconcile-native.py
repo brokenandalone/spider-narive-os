@@ -64,19 +64,23 @@ def recognized_studio_visual_preferences(source):
     Studio AI tabs were merged. Strictly allow only the original 18/24
     or the owner's reviewed 22/50 values; reject unknown custom layouts.
     """
-    for old, new in (
+    pairs = (
         ("logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
          "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))"),
         ("content.setContentsMargins(24, 24, 24, 24)",
          "content.setContentsMargins(50, 48, 50, 48)"),
-    ):
-        if source.count(old) == 1 and source.count(new) == 0:
+    )
+    original = all(source.count(old) == 1 and source.count(new) == 0
+                   for old, new in pairs)
+    customized = all(source.count(new) == 1 and source.count(old) == 0
+                     for old, new in pairs)
+    if original:
+        for old, new in pairs:
             source = one_replace(source, old, new)
-        elif source.count(new) == 1 and source.count(old) == 0:
-            continue  # The reviewed visual customization is already applied.
-        else:
-            raise ValueError('Unrecognized Studio visual layout; preserving installed code.')
-    return source
+        return source
+    if customized:
+        return source  # The reviewed PC layout is already applied.
+    raise ValueError('Unrecognized Studio visual layout; preserving installed code.')
 
 
 def legacy_studio(upstream):
