@@ -22,7 +22,8 @@ class VoiceSegmentTests(unittest.TestCase):
         self.audio.write_bytes(b"RIFF" + b"\x00"*60 + b"audio-segment-no-secret")
         self.digest=hashlib.sha256(self.audio.read_bytes()).hexdigest()
     def evidence(self,digest=None,when=99,name="cory",origin="trusted.local_speaker_verifier"):
-        return Evidence(name,True,origin,when,self.digest if digest is None else digest)
+        return Evidence(name,True,origin,when,
+                        self.digest if digest is None else digest,0.96)
 
     def test_valid_local_provider_bound_to_same_wav(self):
         now=lambda:100
@@ -41,7 +42,9 @@ class VoiceSegmentTests(unittest.TestCase):
 
     def test_reject_wrong_audio_or_fake_identities(self):
         invalid=[
-            Evidence("cory",True,"trusted.local_speaker_verifier",99,"wrong"),
+            Evidence("cory",True,"trusted.local_speaker_verifier",99,"wrong",0.99),
+            Evidence("cory",True,"trusted.local_speaker_verifier",99,self.digest,0.4),
+            Evidence("cory",True,"trusted.local_speaker_verifier",99,self.digest,float("nan")),
             self.evidence(name="stranger"),
             self.evidence(when=40),
             self.evidence(origin="whisper.transcript"),
