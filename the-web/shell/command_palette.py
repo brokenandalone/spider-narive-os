@@ -2,7 +2,7 @@
 from PyQt5.QtCore import Qt, QEvent
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (QApplication, QDialog, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout)
+    QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton, QVBoxLayout)
 
 from navigation_core import display_text, find_items
 
@@ -49,11 +49,15 @@ class CommandPalette(QDialog):
         activate = QPushButton('Open selected')
         activate.clicked.connect(self.activate_first)
         controls.addWidget(activate)
+        clear_recent = QPushButton('Clear recent')
+        clear_recent.setToolTip('Clear launcher history from this user profile. Pinned items stay.')
+        clear_recent.clicked.connect(self.clear_recent)
+        controls.addWidget(clear_recent)
         close = QPushButton('Close')
         close.clicked.connect(self.hide)
         controls.addWidget(close)
         layout.addLayout(controls)
-        foot = QLabel('↑ ↓ Navigate     Enter Open     Esc Close     Pin saves locally')
+        foot = QLabel('↑ ↓ Navigate     Enter Open     Esc Close     Pin saves locally · windows from X11')
         foot.setWordWrap(True)
         layout.addWidget(foot)
         self.refresh()
@@ -97,7 +101,8 @@ class CommandPalette(QDialog):
         recents = [tuple(row) for row in nav.get('recent', ())]
         results = find_items(self.search.text(),
                              self.shell.workspaces_for_navigation(),
-                             self.shell.installed_apps, favorites, recents)
+                             self.shell.installed_apps, favorites, recents,
+                             windows=self.shell.visible_launcher_windows())
         for result in results:
             entry = QListWidgetItem(display_text(
                 result, (result.kind, result.ident) in favorites))
@@ -134,6 +139,17 @@ class CommandPalette(QDialog):
             self.shell.toggle_navigation_pin(*choice)
             self.refresh()
 
+    def clear_recent(self):
+        if not self.shell.navigation_state.get('recent'):
+            return
+        answer = QMessageBox.question(
+            self, 'Clear recent launcher history?',
+            'Clear recently opened workspaces and applications?\n'
+            'Pinned items and open tabs will stay unchanged.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer == QMessageBox.Yes:
+            self.shell.clear_recent_navigation()
+
     def activate_first(self):
         item = self.matches.currentItem()
         if item is not None:
@@ -151,3 +167,5 @@ class CommandPalette(QDialog):
             self.shell.open_installed(ident)
         elif kind == 'action':
             self.shell.execute_palette_action(ident)
+        elif kind == 'window':
+            self.shell.activate_launcher_window(ident)
