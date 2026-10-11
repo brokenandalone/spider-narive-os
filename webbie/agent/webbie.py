@@ -43,6 +43,7 @@ from app_open_route import installed_app_request
 from voice_turns import VoiceTurnTracker
 from voice_queue import VoiceTurnCoordinator
 from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
+from local_reminders import ReminderScheduler
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -891,6 +892,13 @@ def proactive_loop():
         ),
     )
     config = configure(settings)
+    reminders = ReminderScheduler(
+        on_alert=lambda message: subprocess.run(
+            ["notify-send", "Webbie reminder", message],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4, check=True,
+        ),
+    )
     # Start after the microphone listener has had a chance to report status.
     time.sleep(8)
     if (CONFIG.get("greet_on_login", True) and not quiet_asleep()
@@ -903,10 +911,12 @@ def proactive_loop():
         say(f"{greeting}, {current_name()}. Webbie is online.")
 
     while running:
+        desktop_active = session_is_active()
+        sleeping = quiet_asleep()
         try:
             report = monitor.tick(
-                session_active=session_is_active(),
-                sleeping=quiet_asleep(),
+                session_active=desktop_active,
+                sleeping=sleeping,
             )
             statuses = {key: entry["status"]
                         for key, entry in report["checks"].items()}
@@ -921,6 +931,19 @@ def proactive_loop():
             # Keep Webbie's core chat and wake-word loop alive if a local
             # monitor or desktop notification service fails.
             write_state(proactive_error=type(error).__name__)
+        try:
+            scheduled = reminders.tick(
+                session_active=desktop_active, sleeping=sleeping,
+                quiet_start=config["quiet_start"],
+                quiet_end=config["quiet_end"],
+            )
+            write_state(
+                local_reminders_scheduled=scheduled["scheduled"],
+                local_reminders_due=scheduled["due"],
+                local_reminder_error=None,
+            )
+        except Exception as error:
+            write_state(local_reminder_error=type(error).__name__)
         for _ in range(15):
             if not running:
                 break
