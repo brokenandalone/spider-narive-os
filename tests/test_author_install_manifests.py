@@ -14,7 +14,8 @@ AUTHOR_MODULES = {
     'author/commands.py', 'author/commands_client.py',
     'author/control_socket.py', 'author/manuscript_import.py',
     'author/project_map.py', 'author/story_atlas.py',
-    'author/atlas_widget.py',
+    'author/atlas_widget.py', 'author/master_canon.py',
+    'author/master_canon_widget.py',
 }
 WEBBIE_BRIDGE = 'webbie/agent/author_voice_bridge.py'
 
