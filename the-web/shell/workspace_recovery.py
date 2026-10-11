@@ -47,6 +47,10 @@ class WorkspaceRecovery(QDialog):
         restore.clicked.connect(self.restore_checkpoint)
         second.addWidget(restore)
         layout.addLayout(second)
+        self.queue_status = QLabel('No workspace restoration in progress.')
+        self.queue_status.setWordWrap(True)
+        self.queue_status.setAccessibleName('Live workspace restore progress')
+        layout.addWidget(self.queue_status)
         queue_row = QHBoxLayout()
         self.pause_restore = QPushButton('Pause restoring')
         self.pause_restore.clicked.connect(self.toggle_restore_pause)
@@ -117,6 +121,20 @@ class WorkspaceRecovery(QDialog):
         report = self.shell.staged_restore_status()
         active = report is not None
         paused = active and report['paused']
+        if active:
+            next_id = report['next']
+            next_label = self.shell.workspaces_for_navigation().get(next_id, 'None')
+            phase = 'Paused' if paused else 'Restoring'
+            self.queue_status.setText(
+                f"{phase}: {report['processed']}/{report['total']} processed; "
+                f"{report['remaining']} queued; "
+                f"{len(report['skipped'])} skipped. Next: {next_label}.")
+        elif self.shell._preserve_saved_session:
+            self.queue_status.setText(
+                'Restoration stopped or partly skipped. The saved normal '
+                'session remains unchanged until you explicitly save a new layout.')
+        else:
+            self.queue_status.setText('No workspace restoration in progress.')
         self.pause_restore.setEnabled(active and (paused or report['remaining'] > 0))
         self.pause_restore.setText('Resume restoring' if paused else 'Pause restoring')
         self.stop_restore.setEnabled(active)
