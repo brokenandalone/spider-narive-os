@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 
-from PyQt5.QtCore import Qt, QTimer, QSize, QDateTime
+from PyQt5.QtCore import Qt, QTimer, QSize, QDateTime, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGridLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
@@ -37,6 +37,11 @@ from quick_settings import QuickSettingsPanel
 from window_overview import WindowOverview
 from appearance import LIGHT_STYLE, appearance_file, load_theme, save_theme
 from readability import load_menu_size, save_menu_size, readability_css
+from navigation_core import INTERNAL_ACTIONS
+from navigation_state import (navigation_file, load_navigation, save_navigation,
+                              record_recent, toggle_favorite)
+from desktop_state import read_desktop_state, write_desktop_state
+from command_palette import CommandPalette
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
 from tray_panel import TrayPanel
@@ -60,6 +65,18 @@ QTabBar::tab { background:#17111f; padding:10px 14px; color:#c7b9d1; }
 QTabBar::tab:selected { background:#6b21a8; color:white; }
 QScrollArea { background:transparent; border:none; }
 '''
+
+
+class AppCatalogWorker(QThread):
+    """Scan user/system XDG launchers without blocking input or painting."""
+    found = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def run(self):
+        try:
+            self.found.emit(discover_apps(desktops='TheWeb:KDE'))
+        except (OSError, RuntimeError, ValueError) as error:
+            self.failed.emit(str(error)[:160])
 
 
 class WallpaperWidget(QWidget):
@@ -112,6 +129,7 @@ class StartMenu(QDialog):
         self.search.returnPressed.connect(self.activate_first)
         self.search.setToolTip('Type a workspace or application name, then press Enter to open the first result.')
         actions = QHBoxLayout(); layout.addLayout(actions)
+        actions.addWidget(button('Quick Launch', shell.toggle_command_palette))
         actions.addWidget(button('Refresh apps', shell.refresh_apps))
         actions.addWidget(button('Windows', shell.toggle_window_overview))
         actions.addWidget(button('Lock', shell.lock_session))
@@ -166,6 +184,9 @@ class Taskbar(QWidget):
         layout = QHBoxLayout(self); layout.setContentsMargins(8, 4, 8, 4)
         self.start = button('Start', lambda: shell.start_menu.show_menu(self)); self.start.setIcon(QIcon(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png'))); layout.addWidget(self.start)
         layout.addWidget(button('The Web', shell.show_desktop))
+        launch_button = button('Find', shell.toggle_command_palette)
+        launch_button.setToolTip('Quick Launch: Ctrl+K when The Web has focus')
+        layout.addWidget(launch_button)
         webbie = button('Webbie', shell.open_webbie); webbie.setIcon(QIcon(str(SPIDER_ROOT / 'branding/webbie/webbie-face-v1.png'))); layout.addWidget(webbie)
         self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
         layout.addWidget(button('Quick', shell.toggle_quick_settings))
@@ -233,22 +254,29 @@ class TheWeb(QMainWindow):
         self.appearance_path = appearance_file()
         self.appearance = load_theme(self.appearance_path)
         self.menu_text_size = load_menu_size()
-        self.installed_apps = discover_apps(desktops='TheWeb:KDE')
+        self.navigation_path = navigation_file()
+        self.navigation_state = load_navigation(self.navigation_path, WORKSPACES)
+        self.installed_apps = []
+        self.app_scan_worker = None
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(self._appearance_style())
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.build_ui(); self.background_surface.set_appearance(self.appearance); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self.start_menu.setStyleSheet(self._appearance_style())
         self.taskbar.setStyleSheet(self._appearance_style())
+        self.command_palette = CommandPalette(self)
         self.launch_webbie_floating_face()
         self.notifications_process = self.start_notification_bridge()
         self.notification_toast = NotificationToast(self) if self.desktop_mode else None
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
+        self._palette_shortcut = QShortcut(QKeySequence('Ctrl+K'), self)
+        self._palette_shortcut.activated.connect(self.toggle_command_palette)
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
         self.set_workspace('default')
         if restore: self.restore_state()
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_status); self.timer.start(15000)
         QTimer.singleShot(0, self.refresh_status)
+        QTimer.singleShot(0, self.refresh_apps)
 
     def build_ui(self):
         root = WallpaperWidget(); root.setObjectName('root'); self.background_surface = root; self.setCentralWidget(root)
@@ -267,9 +295,16 @@ class TheWeb(QMainWindow):
             self.toggle_webbie_display)
         header.addWidget(self.face_display_button)
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
+        header.addWidget(button('Quick Launch', self.toggle_command_palette))
         self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
         welcome = QLabel('Your workspaces'); welcome.setFont(QFont('Sans Serif', 22, QFont.Bold)); home_layout.addWidget(welcome)
+        self.pinned_title = QLabel('Pinned workspaces  ·  customize in Quick Launch')
+        self.pinned_title.setAccessibleName('Pinned Spider OS workspaces')
+        home_layout.addWidget(self.pinned_title)
+        self.pinned_row = QHBoxLayout()
+        home_layout.addLayout(self.pinned_row)
+        self.render_pinned_workspaces()
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
         content = QWidget(); content.setObjectName('root'); scroll.setWidget(content); grid = QGridLayout(content); grid.setAlignment(Qt.AlignTop | Qt.AlignLeft); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(14)
         for index, (workspace, label) in enumerate((k, v) for k, v in WORKSPACES.items() if k != 'default'):
