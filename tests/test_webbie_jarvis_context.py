@@ -49,6 +49,14 @@ class JarvisContextTests(unittest.TestCase):
         self.clock[0]+=91
         self.assertEqual(self.read(),{})
 
+    def test_last_action_receipt_is_advisory_and_expires(self):
+        self.publish(last_action="Website: request sent; completion not verified")
+        result=self.read()
+        self.assertIn("completion not verified",result["last_action"])
+        self.assertIn("Last desktop receipt",m.context_summary(result))
+        self.clock[0]+=91
+        self.assertEqual(self.read(),{})
+
     def test_expiration(self):
         self.publish(selected_title="Old browser")
         self.clock[0] += 91
