@@ -58,6 +58,7 @@ sys.path.insert(0, str(SPIDER_ROOT / "kali-bay" / "runtime"))
 import workspace_store as kali_store
 import lab_reports as kali_reports
 import evidence_fingerprint as kali_evidence
+import evidence_ledger as kali_ledger
 
 
 MANAGER = (
@@ -601,6 +602,10 @@ class KaliBayWindow(QMainWindow):
         self.security_tabs.addTab(
             self.build_guides_page(),
             "LAB GUIDES",
+        )
+        self.security_tabs.addTab(
+            self.build_ledger_page(),
+            "EVIDENCE LEDGER",
         )
         self._focus_search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self._focus_search_shortcut.activated.connect(self.focus_tool_search)
@@ -1385,6 +1390,10 @@ class KaliBayWindow(QMainWindow):
         self.lab_editor.setEnabled(False)
         self.lab_editor.clear()
         self.lab_title.setText("Select a lab or create one.")
+        if hasattr(self, "ledger_events"):
+            self.ledger_events = []
+            self.ledger_list.clear()
+            self.ledger_status.setText("Select a lab in LAB NOTES.")
         self.lab_status.setText(
             f"{len(labs)} private lab notebooks. "
             "Only explicit Save writes notes to your computer."
@@ -1419,9 +1428,13 @@ class KaliBayWindow(QMainWindow):
             self.lab_status.setText("Lab is unavailable: " + str(error))
             return
         self.active_lab = lab
+        if self.evidence_lab_id != lab["id"]:
+            self.evidence_result = None
         self.lab_title.setText(lab["title"])
         self.lab_editor.setPlainText(lab["notes"])
         self.lab_editor.setEnabled(True)
+        if hasattr(self, "ledger_list"):
+            self.refresh_evidence_ledger()
         self.lab_status.setText(
             f"Private local notebook · revision {lab['revision']} · "
             "No automatic scanning or sharing."
@@ -1715,6 +1728,194 @@ class KaliBayWindow(QMainWindow):
             self.security_tabs.setCurrentIndex(3)
         except (kali_store.StorageError, OSError) as error:
             QMessageBox.warning(self, "Kali Bay", str(error))
+
+    def build_ledger_page(self):
+        """Explicit local chain of custody actions, scoped to the selected lab."""
+        page = QWidget()
+        page.setObjectName("kaliEvidenceLedgerPage")
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(14, 14, 14, 14)
+        heading = QLabel("PRIVATE EVIDENCE REGISTER")
+        heading.setStyleSheet("color:#f3e8ff;font-size:19px;font-weight:bold;")
+        layout.addWidget(heading)
+        note = QLabel(
+            "Select a lab in LAB NOTES and fingerprint a file you are permitted "
+            "to handle. Record events only by clicking below. "
+            "SHA-256 chains detect edits to local records; they cannot prove "
+            "who handled evidence or whether its origin was authentic."
+        )
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        self.ledger_status = QLabel("Select a lab in LAB NOTES.")
+        self.ledger_status.setObjectName("kaliLedgerStatus")
+        self.ledger_status.setWordWrap(True)
+        self.ledger_status.setStyleSheet(
+            "background:#160d27;color:#ffffff;border:1px solid #a78bfa;"
+            "border-radius:8px;padding:10px;"
+        )
+        layout.addWidget(self.ledger_status)
+        self.ledger_events = []
+        self.ledger_list = QListWidget()
+        self.ledger_list.setObjectName("kaliLedgerEvents")
+        self.ledger_list.setStyleSheet(
+            "QListWidget {background:#160d27;color:#ffffff;"
+            "border:1px solid #a78bfa;border-radius:7px;}"
+            "QListWidget::item {padding:8px;}"
+            "QListWidget::item:selected {background:#6b21a8;}"
+        )
+        self.ledger_list.currentItemChanged.connect(self.show_ledger_event)
+        layout.addWidget(self.ledger_list, 1)
+        self.ledger_details = QLabel(
+            "Select a ledger entry to inspect its saved metadata."
+        )
+        self.ledger_details.setObjectName("kaliLedgerDetails")
+        self.ledger_details.setWordWrap(True)
+        layout.addWidget(self.ledger_details)
+        controls = QHBoxLayout()
+        self.ledger_kind = QComboBox()
+        self.ledger_kind.setObjectName("kaliLedgerEventKind")
+        self.ledger_kind.addItems(
+            ["registered", "reviewed", "transferred", "verified", "note"]
+        )
+        controls.addWidget(self.ledger_kind)
+        self.ledger_note = QLineEdit()
+        self.ledger_note.setObjectName("kaliLedgerEventNote")
+        self.ledger_note.setMaxLength(kali_ledger.MAX_NOTE)
+        self.ledger_note.setPlaceholderText(
+            "Describe authority, source, recipient or review (required)"
+        )
+        controls.addWidget(self.ledger_note, 2)
+        layout.addLayout(controls)
+        actions = QHBoxLayout()
+        record = QPushButton("RECORD EXPLICIT EVENT")
+        record.setObjectName("kaliRecordEvidenceEvent")
+        record.clicked.connect(self.record_evidence_event)
+        actions.addWidget(record)
+        verify = QPushButton("VERIFY LOCAL CHAIN")
+        verify.setObjectName("kaliVerifyEvidenceChain")
+        verify.clicked.connect(self.refresh_evidence_ledger)
+        actions.addWidget(verify)
+        layout.addLayout(actions)
+        return page
+
+    def show_ledger_event(self, item, _previous=None):
+        if item is None:
+            self.ledger_details.setText("No ledger entry selected.")
+            return
+        try:
+            idx = int(item.data(Qt.UserRole))
+            entry = self.ledger_events[idx]
+        except (TypeError, ValueError, IndexError):
+            self.ledger_details.setText("Unknown evidence record.")
+            return
+        self.ledger_details.setText(
+            f"Event #{entry['number']}  {entry['kind'].upper()}\n"
+            f"Evidence: {entry['name']}  ({entry['size_bytes']} bytes)\n"
+            f"SHA-256: {entry['fingerprint']}\n"
+            f"Recorded: {entry['time_utc']}\n"
+            f"Note: {entry['note']}"
+        )
+
+    def refresh_evidence_ledger(self):
+        if not self.active_lab:
+            self.ledger_events = []
+            self.ledger_list.clear()
+            self.ledger_status.setText("Select a lab in LAB NOTES.")
+            return
+        try:
+            ledger = kali_ledger.read_ledger(self.active_lab["id"])
+            integrity = kali_ledger.verify_ledger(self.active_lab["id"])
+        except (kali_store.StorageError, OSError) as error:
+            self.ledger_events = []
+            self.ledger_list.clear()
+            self.ledger_status.setText(
+                "WARNING: Evidence ledger could not be verified: "
+                + str(error)[:240]
+                + ". Do not use these records until reviewed."
+            )
+            return
+        self.ledger_events = ledger["events"]
+        self.ledger_list.clear()
+        for pos, event in enumerate(self.ledger_events):
+            item = QListWidgetItem(
+                f"#{event['number']}  {event['kind'].upper()}  "
+                f"{event['name']}  {event['time_utc']}"
+            )
+            item.setData(Qt.UserRole, pos)
+            self.ledger_list.addItem(item)
+        self.ledger_status.setText(
+            f"Lab: {self.active_lab['title']} | "
+            f"{integrity['count']} events | local chain VALID\n"
+            f"Latest hash: {integrity['head']}\n"
+            "This verifies local consistency, not real-world custody."
+        )
+        if self.ledger_list.count():
+            self.ledger_list.setCurrentRow(self.ledger_list.count() - 1)
+
+    def record_evidence_event(self):
+        if not self.active_lab:
+            QMessageBox.information(
+                self, "Kali Bay", "Select an authorized lab notebook first."
+            )
+            return
+        kind = self.ledger_kind.currentText()
+        content = self.ledger_note.text().strip()
+        if not content:
+            QMessageBox.information(
+                self, "Kali Bay", "Describe this evidence event first."
+            )
+            return
+        if kind == "registered":
+            if not self.evidence_result or \
+                    self.evidence_lab_id != self.active_lab["id"]:
+                QMessageBox.information(
+                    self, "Kali Bay",
+                    "In LAB NOTES, fingerprint an authorized file first."
+                )
+                return
+            metadata = self.evidence_result
+        else:
+            current = self.ledger_list.currentItem()
+            if current is None:
+                QMessageBox.information(
+                    self, "Kali Bay",
+                    "Select an existing evidence record first."
+                )
+                return
+            try:
+                row = self.ledger_events[int(current.data(Qt.UserRole))]
+                metadata = {
+                    "filename": row["name"],
+                    "sha256": row["fingerprint"],
+                    "size_bytes": row["size_bytes"],
+                    "checked_utc": row["checked_utc"],
+                }
+            except (IndexError, KeyError, TypeError, ValueError):
+                return
+        answer = QMessageBox.question(
+            self, "Confirm evidence record",
+            f"Record {kind.upper()} in lab {self.active_lab['title']}?\n"
+            "The event will be appended to the local integrity chain. "
+            "It will not be sent to Webbie.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            event = kali_ledger.append_event(
+                self.active_lab["id"], kind, metadata, content,
+            )
+            self.ledger_note.clear()
+            self.refresh_evidence_ledger()
+            self.ledger_status.setText(
+                f"Saved event #{event['number']} with local SHA-256 link. "
+                "No evidence files were copied, opened as programs or shared."
+            )
+        except (kali_store.StorageError, OSError) as error:
+            QMessageBox.warning(
+                self, "Evidence integrity",
+                "No event was saved: " + str(error)
+            )
 
     def check_purple_defense_tools(self):
         """Show installed defensive binaries, never assume services are running."""
