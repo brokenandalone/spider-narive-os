@@ -46,6 +46,9 @@ class WorkspaceRecovery(QDialog):
         restore.clicked.connect(self.restore_checkpoint)
         second.addWidget(restore)
         layout.addLayout(second)
+        self.saved_restore = QPushButton('Resume last saved session (safe-start)')
+        self.saved_restore.clicked.connect(self.resume_saved_session)
+        layout.addWidget(self.saved_restore)
         foot = QLabel('Safe-start from terminal: python3 the-web/shell/main.py --safe-workspaces')
         foot.setWordWrap(True)
         layout.addWidget(foot)
@@ -67,8 +70,19 @@ class WorkspaceRecovery(QDialog):
             if row.ident == selected:
                 self.list.setCurrentItem(item)
         issues = sum(row.status in ('needs-attention', 'missing') for row in rows)
+        timings = self.shell.workspace_load_seconds
+        measured = sorted(((elapsed, ident) for ident, elapsed in timings.items()
+                           if isinstance(elapsed, (int, float))), reverse=True)
+        slow = ', '.join(f'{self.shell.workspaces_for_navigation().get(ident, ident)} '
+                         f'{elapsed:.2f}s' for elapsed, ident in measured[:3])
+        note = 'Slowest loaded: ' + slow + '. ' if measured else ''
+        if self.shell.is_staged_restoring():
+            done, count = self.shell._restore_plan.progress()
+            note = f'Background restore {done}/{count}. ' + note
         self.status.setText(f'{len(rows)} workspaces checked · {issues} require attention. '
-                            'File contents and private settings were not read.')
+                            + note + 'No private document data collected.')
+        self.saved_restore.setEnabled(self.shell.safe_mode and
+                                     not self.shell.is_staged_restoring())
 
     def retry_selected(self):
         item = self.list.currentItem()
@@ -84,6 +98,23 @@ class WorkspaceRecovery(QDialog):
             self.status.setText('Retry failed. The workspace source may require repair.')
         else:
             self.status.setText('Workspace open request completed.')
+
+    def resume_saved_session(self):
+        if not self.shell.safe_mode or self.shell.is_staged_restoring():
+            self.status.setText('Saved session resume is available only during safe-start.')
+            return
+        answer = QMessageBox.question(
+            self, 'Resume the saved workspace session?',
+            'Resume reopening the tabs saved before safe-start? '
+            'The Web will load each workspace in turn. Your documents '
+            'will not be overwritten.',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer == QMessageBox.Yes:
+            if self.shell.restore_last_saved_session():
+                self.status.setText('Resuming saved workspace tabs. Use Recovery if one fails.')
+            else:
+                self.status.setText('No saved session was resumed.')
+        self.saved_restore.setEnabled(self.shell.safe_mode)
 
     def create_checkpoint(self):
         try:
