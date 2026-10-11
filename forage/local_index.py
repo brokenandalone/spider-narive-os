@@ -82,13 +82,15 @@ def read_document(path, root):
     current = path.stat(follow_symlinks=False)
     if (before.st_ino, before.st_dev, before.st_mtime_ns, before.st_size) != (after.st_ino, after.st_dev, after.st_mtime_ns, after.st_size) or (after.st_ino, after.st_dev) != (current.st_ino, current.st_dev):
         raise ValueError('Selected file changed while indexing; retry when idle')
-    if len(data) > LIMIT or b'\x00' in data:
+    if len(data) > LIMIT:
         return None
     if path.suffix.lower() in {'.pdf', '.docx'}:
         text = _document_reader().extract_text(data, path.suffix.lower())
         if not text:
             return None
     else:
+        if b'\x00' in data:
+            return None
         try:
             text = data.decode('utf-8')
         except UnicodeDecodeError:
