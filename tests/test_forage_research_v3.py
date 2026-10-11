@@ -46,6 +46,24 @@ class QualityTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertTrue(result["uncited_substantive_paragraphs"])
 
+    def test_mirrored_articles_flagged_as_non_independent(self):
+        article = "The local treatment center published a detailed source about recovery outcomes and careful followup. " * 5
+        sources = [
+            {"url": "https://example.org/paper", "content": article, "evidence_kind": "page_text"},
+            {"url": "https://news.example.net/reprint", "content": article, "evidence_kind": "page_text"},
+        ]
+        report = quality.source_summary(sources)
+        self.assertEqual(len(report["near_duplicate_evidence"]), 1)
+        self.assertEqual(report["near_duplicate_evidence"][0]["source_b"], 2)
+        self.assertTrue(any("mirrors" in warning for warning in report["warnings"]))
+
+    def test_different_subjects_are_not_reported_as_mirrors(self):
+        entries = [
+            {"content": "astronomy solar stars galaxy telescope planets research updated evidence"},
+            {"content": "painting canvas acrylic brushes pigment studio art exhibition classes"},
+        ]
+        self.assertEqual(quality.repeated_evidence(entries), [])
+
     def test_no_evidence_is_explicit(self):
         r = quality.source_summary([])
         self.assertEqual(r["page_text_count"], 0)
