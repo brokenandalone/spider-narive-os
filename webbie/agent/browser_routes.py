@@ -116,3 +116,15 @@ def parse_browser_command(text):
         # Explicit invalid web URLs are rejected, not treated as app names.
         return BrowserRequest("", "Blocked unsupported URL", "blocked")
     return BrowserRequest(url, "Open website: " + urlsplit(url).hostname, "website")
+
+
+def is_browser_app(application):
+    """Require an actual XDG WebBrowser category, not a vaguely named program."""
+    import configparser
+    try:
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read(application.path, encoding="utf-8")
+        categories = parser["Desktop Entry"].get("Categories", "").split(";")
+        return "WebBrowser" in categories
+    except (OSError, ValueError, KeyError, configparser.Error):
+        return False
