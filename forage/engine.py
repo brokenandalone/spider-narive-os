@@ -2,6 +2,8 @@
 
 import json
 import os
+import importlib.util
+from functools import lru_cache
 import re
 import sqlite3
 import sys
@@ -73,6 +75,25 @@ SKIP_DIRS = {
 }
 
 MAX_FILE_SIZE = 2 * 1024 * 1024
+
+
+class ResearchCancelled(RuntimeError):
+    """User cancelled research; do not publish a partial report."""
+
+
+def check_cancel(cancel):
+    if cancel is not None and cancel():
+        raise ResearchCancelled("Deep Forage stopped at your request.")
+
+
+@lru_cache(maxsize=4)
+def _peer(name):
+    """Load sibling modules even from the legacy direct-path engine import."""
+    path = Path(__file__).with_name(name + ".py")
+    spec = importlib.util.spec_from_file_location("spider_forage_" + name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def enable_ddgs():
@@ -241,65 +262,19 @@ def local_search(query, limit=30):
     return LocalIndex().search(query, limit=limit)
 
 
-def web_search(
-    query,
-    max_results=12,
-    timelimit=None,
-):
-    DDGS = enable_ddgs()
-
-    if DDGS is None:
-        raise RuntimeError(
-            "DDGS web search engine "
-            "is not installed."
-        )
-
-    engine = DDGS(
-        timeout=15
+def web_search(query, max_results=12, timelimit=None):
+    """Use existing PC SearXNG first, DDGS only as the fallback."""
+    return _peer("search_backends").search_web(
+        query, max_results=max_results, timelimit=timelimit, ddgs_factory=enable_ddgs
     )
-
-    results = engine.text(
-        query,
-        region="us-en",
-        safesearch="moderate",
-        timelimit=timelimit,
-        max_results=max_results,
-        backend="auto",
-    )
-
-    cleaned = []
-
-    for result in results or []:
-        cleaned.append(
-            {
-                "title": str(
-                    result.get(
-                        "title",
-                        "",
-                    )
-                ),
-                "url": str(
-                    result.get(
-                        "href",
-                        "",
-                    )
-                ),
-                "snippet": str(
-                    result.get(
-                        "body",
-                        "",
-                    )
-                ),
-            }
-        )
-
-    return cleaned
 
 
 def extract_url(
     url,
     max_chars=7000,
 ):
+    if not _peer("search_backends").public_url(url):
+        return ""
     DDGS = enable_ddgs()
 
     if DDGS is None:
@@ -332,6 +307,7 @@ def ollama_chat(
     prompt,
     system=None,
     timeout=180,
+    cancel=None,
 ):
     messages = []
 
@@ -350,9 +326,10 @@ def ollama_chat(
         }
     )
 
+    check_cancel(cancel)
     payload = {
         "model": OLLAMA_MODEL,
-        "stream": False,
+        "stream": cancel is not None,
         "messages": messages,
     }
 
@@ -369,34 +346,28 @@ def ollama_chat(
     )
 
     try:
-        with urllib.request.urlopen(
-            request,
-            timeout=timeout,
-        ) as response:
-            data = json.loads(
-                response.read().decode(
-                    "utf-8"
-                )
-            )
-
-        return (
-            data.get(
-                "message",
-                {},
-            )
-            .get(
-                "content",
-                "",
-            )
-            .strip()
-        )
-
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            if cancel is None:
+                data = json.loads(response.read().decode("utf-8"))
+                return data.get("message", {}).get("content", "").strip()
+            pieces = []
+            for raw in response:
+                check_cancel(cancel)
+                data = json.loads(raw.decode("utf-8"))
+                pieces.append(str(data.get("message", {}).get("content", "")))
+                if data.get("done"):
+                    break
+            check_cancel(cancel)
+            return "".join(pieces).strip()
+    except ResearchCancelled:
+        raise
     except Exception:
         return None
 
 
 def build_research_queries(
     topic,
+    cancel=None,
 ):
     prompt = f"""
 Generate four useful web-search queries
@@ -421,6 +392,7 @@ one per line.
             "research search queries."
         ),
         timeout=60,
+        cancel=cancel,
     )
 
     if response:
@@ -450,12 +422,13 @@ one per line.
 def deep_research(
     topic,
     progress=None,
+    cancel=None,
 ):
+    check_cancel(cancel)
     ensure_storage()
 
-    queries = build_research_queries(
-        topic
-    )
+    queries = build_research_queries(topic, cancel=cancel)
+    check_cancel(cancel)
 
     if progress:
         progress(
@@ -466,6 +439,7 @@ def deep_research(
     seen = set()
 
     for query in queries:
+        check_cancel(cancel)
 
         if progress:
             progress(
@@ -487,6 +461,7 @@ def deep_research(
             continue
 
         for item in found:
+            check_cancel(cancel)
             url = item.get(
                 "url",
                 "",
@@ -500,6 +475,7 @@ def deep_research(
 
             if (
                 not usable_url
+                or not _peer("search_backends").public_url(url)
                 or url in seen
             ):
                 continue
@@ -515,6 +491,7 @@ def deep_research(
         results,
         start=1,
     ):
+        check_cancel(cancel)
         if progress:
             progress(
                 f"Reading source "
@@ -599,6 +576,7 @@ SOURCE MATERIAL
             "with local Webbie AI..."
         )
 
+    check_cancel(cancel)
     synthesis = ollama_chat(
         prompt,
         system=(
@@ -608,7 +586,9 @@ SOURCE MATERIAL
             "Never invent citations."
         ),
         timeout=300,
+        cancel=cancel,
     ) if sources else None
+    check_cancel(cancel)
 
     evidence_status = "sources_available"
     if not sources:
@@ -638,25 +618,6 @@ SOURCE MATERIAL
                 "Retry synthesis before treating this run as research findings."
             )
 
-    timestamp = datetime.now().strftime(
-        "%Y-%m-%d_%H-%M-%S"
-    )
-
-    safe_topic = re.sub(
-        r"[^A-Za-z0-9_-]+",
-        "_",
-        topic,
-    ).strip("_")[:50]
-
-    report_path = (
-        REPORT_DIR
-        / (
-            f"{timestamp}_"
-            f"{safe_topic or 'research'}"
-            ".md"
-        )
-    )
-
     report_lines = [
         f"# Deep Forage: {topic}",
         "",
@@ -680,12 +641,9 @@ SOURCE MATERIAL
             f"({source['url']}) — {source['evidence_kind']}"
         )
 
-    report_path.write_text(
-        "\n".join(
-            report_lines
-        )
-        + "\n",
-        encoding="utf-8",
+    check_cancel(cancel)
+    report_path, sources_path = _peer("research_archive").save_research(
+        topic, report_lines, sources, REPORT_DIR
     )
 
     return {
@@ -694,7 +652,6 @@ SOURCE MATERIAL
         "sources": sources,
         "evidence_status": evidence_status,
         "report": synthesis,
-        "report_path": str(
-            report_path
-        ),
+        "report_path": report_path,
+        "sources_path": sources_path,
     }
