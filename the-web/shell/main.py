@@ -332,7 +332,7 @@ class TheWeb(QMainWindow):
         self.pinned_title = QLabel('Pinned workspaces  ·  customize in Quick Launch')
         self.pinned_title.setAccessibleName('Pinned Spider OS workspaces')
         home_layout.addWidget(self.pinned_title)
-        self.pinned_row = QHBoxLayout()
+        self.pinned_row = QGridLayout()
         home_layout.addLayout(self.pinned_row)
         self.render_pinned_workspaces()
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
@@ -544,13 +544,12 @@ class TheWeb(QMainWindow):
             shortcut = button('★ ' + WORKSPACES[ident],
                               lambda checked=False, name=ident: self.open_workspace(name))
             shortcut.setToolTip('Pinned workspace · use Quick Launch to unpin')
-            row.addWidget(shortcut)
+            row.addWidget(shortcut, shown // 4, shown % 4)
             shown += 1
             if shown >= 8:
                 break
         if not shown:
-            row.addWidget(QLabel('No pinned workspaces. Ctrl+K opens Quick Launch.'))
-        row.addStretch(1)
+            row.addWidget(QLabel('No pinned workspaces. Ctrl+K opens Quick Launch.'), 0, 0)
 
     def toggle_navigation_pin(self, kind, ident):
         if not toggle_favorite(self.navigation_state, kind, ident, WORKSPACES):
@@ -886,6 +885,13 @@ class TheWeb(QMainWindow):
             x11_properties(self, 'DESKTOP'); self.lower()
 
     def closeEvent(self, event):
+        task_worker = getattr(self.taskbar, 'window_scan_worker', None)
+        app_worker = getattr(self, 'app_scan_worker', None)
+        if (task_worker is not None and task_worker.isRunning()) or (
+                app_worker is not None and app_worker.isRunning()):
+            self.status.setText('A desktop refresh is still finishing. Close again afterward.')
+            event.ignore()
+            return
         assistant = getattr(self, 'webbie_assistant', None)
         if assistant is not None and ((assistant.worker and assistant.worker.isRunning()) or
                                       (assistant.camera_worker and assistant.camera_worker.isRunning()) or
@@ -911,13 +917,6 @@ class TheWeb(QMainWindow):
         if bridge is not None and bridge.poll() is None:
             bridge.terminate()
         if self.notification_toast is not None: self.notification_toast.close()
-        task_worker = getattr(self.taskbar, 'window_scan_worker', None)
-        app_worker = getattr(self, 'app_scan_worker', None)
-        if (task_worker is not None and task_worker.isRunning()) or (
-                app_worker is not None and app_worker.isRunning()):
-            self.status.setText('A short desktop refresh is still finishing. Close again afterward.')
-            event.ignore()
-            return
         self.taskbar.timer.stop()
         self.command_palette.close()
         self.taskbar.close()
