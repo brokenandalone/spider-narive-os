@@ -450,6 +450,33 @@ def user_info(for_apply=False):
     return Path(user.pw_dir), user.pw_uid, user.pw_gid
 
 
+def require_daily_continuity(backup_root, source_root=PROJECT_ROOT):
+    """Fail closed unless the exact combined daily release is approved.
+
+    This is intentionally not used for --check or rollback. It is read-only:
+    source/PC gate decisions occur before any installer writes.
+    """
+    import importlib.util
+    source_root = Path(source_root)
+    audit_script = source_root / 'tools/daily_release_continuity.py'
+    manifest = source_root / 'system/daily_release_plan_20261011.json'
+    if not audit_script.is_file() or not manifest.is_file():
+        raise RuntimeError('Daily combined release audit or plan is missing')
+    spec = importlib.util.spec_from_file_location(
+        'spider_daily_continuity_installer', audit_script
+    )
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+    plan = json.loads(manifest.read_text(encoding='utf-8'))
+    blockers, _ = checker.audit(plan, source_root, backup_root)
+    if blockers:
+        raise RuntimeError(
+            'Combined daily release BLOCKED (' + str(len(blockers))
+            + ' continuity checks). Run tools/daily_release_continuity.py'
+            + ' and reconcile every issue before the single installation.'
+        )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('check', 'apply', 'rollback-check', 'rollback'))
@@ -468,6 +495,7 @@ def main(argv=None):
         if args.action == 'check':
             return 0 if report(inspect(items)) else 3
         if args.action == 'apply':
+            require_daily_continuity(backup_root)
             apply(items, backup_root)
             return 0
         if not args.backup:
