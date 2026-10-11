@@ -25,6 +25,7 @@ if __package__:
     from .stem_separation import separate, SeparationError
     from .owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
     from .multitrack_dialog import MultitrackDialog
+    from .session_mix_dialog import SessionMixDialog
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
@@ -37,6 +38,7 @@ else:
     from stem_separation import separate, SeparationError
     from owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
     from multitrack_dialog import MultitrackDialog
+    from session_mix_dialog import SessionMixDialog
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -513,6 +515,9 @@ class StudioAIPanel(QWidget):
         self.open_session_button = QPushButton('Build multitrack DAW session')
         self.open_session_button.clicked.connect(self.open_multitrack_session)
         layout.addWidget(self.open_session_button)
+        self.session_mixing_button = QPushButton('Reopen, audition and mix saved session')
+        self.session_mixing_button.clicked.connect(self.open_saved_session_mix)
+        layout.addWidget(self.session_mixing_button)
         band_mix_heading = QLabel('Band mixer: real separate guitars, singers and instruments')
         band_mix_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
         layout.addWidget(band_mix_heading)
@@ -1238,6 +1243,11 @@ class StudioAIPanel(QWidget):
                 seen.add(resolved)
         dialog = MultitrackDialog(entries, title=self.title.text().strip(), parent=self)
         dialog.exec_()
+
+    def open_saved_session_mix(self):
+        """Open previously exported sessions without changing the active song."""
+        editor = SessionMixDialog(parent=self)
+        editor.exec_()
 
     def export(self):
         source = self.selected()
