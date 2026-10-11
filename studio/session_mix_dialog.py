@@ -232,7 +232,7 @@ class SessionMixDialog(QDialog):
 
     def load_session(self):
         if (self.worker is not None or self.checker is not None
-                or self.quality_worker is not None):
+                or self.quality_worker is not None or self.stem_worker is not None):
             return
         self.session = None
         self.quality_button.setEnabled(False)
@@ -352,8 +352,10 @@ class SessionMixDialog(QDialog):
 
     def start_quality_check(self):
         if (self.session is None or self.worker is not None
-                or self.checker is not None or self.quality_worker is not None):
+                or self.checker is not None or self.quality_worker is not None
+                or self.stem_worker is not None):
             return
+        self.stem_button.setEnabled(False)
         self.quality_button.setEnabled(False)
         self.mix_button.setEnabled(False)
         self.check_button.setEnabled(False)
@@ -458,9 +460,11 @@ class SessionMixDialog(QDialog):
 
     def start_mix(self):
         if (self.worker is not None or self.checker is not None
-                or self.quality_worker is not None or self.session is None):
+                or self.quality_worker is not None or self.stem_worker is not None
+                or self.session is None):
             return
         self.mix_button.setEnabled(False)
+        self.stem_button.setEnabled(False)
         self.quality_button.setEnabled(False)
         self.check_button.setEnabled(False)
         self.choose_button.setEnabled(False)
@@ -507,7 +511,8 @@ class SessionMixDialog(QDialog):
     def open_mastering(self):
         """Offer mastering only for an existing rendered WAV; never auto-master."""
         if (self.worker is not None or self.checker is not None or
-                self.quality_worker is not None or self.rendered is None
+                self.quality_worker is not None or self.stem_worker is not None
+                or self.rendered is None
                 or not self.rendered.is_file() or self.rendered.is_symlink()):
             self.status.setText("Render an intact session mix before mastering.")
             return
