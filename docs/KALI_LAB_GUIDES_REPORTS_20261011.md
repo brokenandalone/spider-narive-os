@@ -25,3 +25,17 @@ bash kali-bay/package/install-kali-bay.sh --check
 
 ## Installation continuity
 **Not installed, not merged.** This branch depends on PR #60 -> #50 -> #46 and must be rebased/reconciled into the current guarded Spider OS combined release source. The new `lab_reports.py` must be included in the combined manifest or native Kali Bay will fail to import it. Inspect and back up the owner-customized Kali UI before any installation. Run a complete owner-PC staged test after the GitHub source tests pass. Do not force-merge or reinstall Kali or Webbie just to apply these additions.
+
+## Explicit evidence fingerprinting
+
+The LAB NOTES page now offers **FINGERPRINT SELECTED FILE** and **ADD FINGERPRINT TO NOTES**. The owner explicitly selects a local regular file, limited to 256 MiB; a bounded background worker reads its contents for SHA-256. File symlinks and special files are rejected. The file itself is not executed, copied or uploaded. On success Kali Bay displays a concise result. Only a separate owner click appends the file name, size, timestamp and hash to *unsaved* notebook notes; SAVE LOCAL NOTES is still required to persist that record. The original path is deliberately omitted from the note and generated report. If the active lab changes, an old fingerprint cannot be appended to a different lab. The background worker must finish before the Kali window closes.
+
+SHA-256 shows byte identity at the time checked. It does **not** establish that a file is safe, genuine, properly obtained, malicious or unchanged afterward.
+
+Checks:
+```bash
+python3 -m py_compile kali-bay/runtime/evidence_fingerprint.py
+python3 -m unittest discover -s tests -p 'test_kali_evidence.py' -v
+```
+
+The selective Kali installer manifest now includes `kali-bay/runtime/evidence_fingerprint.py`. The combined system-wide installer must be reconciled separately.
