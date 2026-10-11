@@ -1158,6 +1158,220 @@ class KaliBayWindow(QMainWindow):
             return
         super().closeEvent(event)
 
+    def build_lab_page(self):
+        """Private lab notebook. No scans, network connections or auto-sharing."""
+        page = QWidget()
+        page.setObjectName("kaliLabWorkspace")
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(14)
+
+        sidebar = QWidget()
+        sidebar.setMinimumWidth(245)
+        left = QVBoxLayout(sidebar)
+        heading = QLabel("MY AUTHORIZED LABS")
+        heading.setStyleSheet("color:#e9d5ff;font-size:18px;font-weight:bold;")
+        left.addWidget(heading)
+        explanation = QLabel(
+            "Keep local investigation notes and authorized lab plans. "
+            "Nothing runs or gets sent to Webbie automatically."
+        )
+        explanation.setWordWrap(True)
+        left.addWidget(explanation)
+        self.lab_list = QListWidget()
+        self.lab_list.setObjectName("kaliLabNotebookList")
+        self.lab_list.setStyleSheet(
+            "QListWidget {background:#160d27;color:#ffffff;"
+            "border:1px solid #a78bfa;border-radius:7px;}"
+            "QListWidget::item {padding:10px;}"
+            "QListWidget::item:selected {background:#6b21a8;}"
+        )
+        self.lab_list.currentItemChanged.connect(self.load_selected_lab)
+        left.addWidget(self.lab_list, 1)
+        create = QPushButton("NEW LAB NOTEBOOK")
+        create.setObjectName("kaliCreateLab")
+        create.clicked.connect(self.create_new_lab)
+        left.addWidget(create)
+        refresh = QPushButton("REFRESH MY LABS")
+        refresh.clicked.connect(self.refresh_labs)
+        left.addWidget(refresh)
+        layout.addWidget(sidebar, 1)
+
+        editor_area = QWidget()
+        right = QVBoxLayout(editor_area)
+        self.lab_title = QLabel("Select a lab or create one.")
+        self.lab_title.setObjectName("kaliLabTitle")
+        self.lab_title.setStyleSheet(
+            "color:#f5e9ff;font-size:20px;font-weight:bold;"
+        )
+        right.addWidget(self.lab_title)
+        self.lab_editor = QPlainTextEdit()
+        self.lab_editor.setObjectName("kaliLabNotesEditor")
+        self.lab_editor.setPlaceholderText(
+            "Scope and authorization\nObservation\nEvidence references\n"
+            "Assessment notes\nNext steps\n\n"
+            "Notes stay on this PC until you explicitly choose to share."
+        )
+        self.lab_editor.setEnabled(False)
+        right.addWidget(self.lab_editor, 1)
+        controls = QHBoxLayout()
+        save = QPushButton("SAVE LOCAL NOTES")
+        save.setObjectName("kaliSaveLabNotes")
+        save.clicked.connect(self.save_active_lab)
+        controls.addWidget(save)
+        share = QPushButton("PREPARE NOTES FOR WEBBIE")
+        share.setObjectName("kaliPrepareLabWebbie")
+        share.clicked.connect(self.prepare_lab_for_webbie)
+        controls.addWidget(share)
+        right.addLayout(controls)
+        self.lab_status = QLabel("Locally stored in your private Spider OS home.")
+        self.lab_status.setObjectName("kaliLabStatus")
+        self.lab_status.setWordWrap(True)
+        self.lab_status.setStyleSheet("color:#ddd6fe;")
+        right.addWidget(self.lab_status)
+        layout.addWidget(editor_area, 2)
+        self.refresh_labs()
+        return page
+
+    def _lab_has_unsaved_changes(self):
+        return bool(
+            self.active_lab is not None
+            and self.lab_editor.toPlainText() != self.active_lab["notes"]
+        )
+
+    def _confirm_discard_lab(self):
+        if not self._lab_has_unsaved_changes():
+            return True
+        response = QMessageBox.question(
+            self, "Unsaved Kali Bay notes",
+            "Discard the unsaved edits in the current local lab notebook?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        return response == QMessageBox.Yes
+
+    def refresh_labs(self, select_id=None):
+        if not self._confirm_discard_lab():
+            return
+        try:
+            labs = kali_store.list_labs()
+        except (kali_store.StorageError, OSError) as error:
+            self.lab_status.setText("Could not list local labs: " + str(error))
+            return
+        self._switching_labs = True
+        self.lab_list.blockSignals(True)
+        self.lab_list.clear()
+        for lab in labs:
+            item = QListWidgetItem(lab["title"])
+            item.setData(Qt.UserRole, lab["id"])
+            self.lab_list.addItem(item)
+        self.lab_list.blockSignals(False)
+        self._switching_labs = False
+        self.active_lab = None
+        self.lab_editor.setEnabled(False)
+        self.lab_editor.clear()
+        self.lab_title.setText("Select a lab or create one.")
+        self.lab_status.setText(
+            f"{len(labs)} private lab notebooks. "
+            "Only explicit Save writes notes to your computer."
+        )
+        if select_id:
+            for i in range(self.lab_list.count()):
+                item = self.lab_list.item(i)
+                if item.data(Qt.UserRole) == select_id:
+                    self.lab_list.setCurrentRow(i)
+                    break
+
+    def load_selected_lab(self, item, previous=None):
+        if self._switching_labs:
+            return
+        if not self._confirm_discard_lab():
+            self.lab_list.blockSignals(True)
+            if previous is not None:
+                self.lab_list.setCurrentItem(previous)
+            else:
+                self.lab_list.setCurrentRow(-1)
+            self.lab_list.blockSignals(False)
+            return
+        self.active_lab = None
+        self.lab_editor.clear()
+        self.lab_editor.setEnabled(False)
+        if item is None:
+            self.lab_title.setText("Select a lab or create one.")
+            return
+        try:
+            lab = kali_store.get_lab(item.data(Qt.UserRole))
+        except (kali_store.StorageError, OSError) as error:
+            self.lab_status.setText("Lab is unavailable: " + str(error))
+            return
+        self.active_lab = lab
+        self.lab_title.setText(lab["title"])
+        self.lab_editor.setPlainText(lab["notes"])
+        self.lab_editor.setEnabled(True)
+        self.lab_status.setText(
+            f"Private local notebook · revision {lab['revision']} · "
+            "No automatic scanning or sharing."
+        )
+
+    def create_new_lab(self):
+        if not self._confirm_discard_lab():
+            return
+        title, accepted = QInputDialog.getText(
+            self, "New Kali Bay lab", "Lab or investigation name:"
+        )
+        if not accepted:
+            return
+        try:
+            lab = kali_store.create_lab(title)
+            self.active_lab = None
+            self.refresh_labs(select_id=lab["id"])
+        except (kali_store.StorageError, OSError) as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
+
+    def save_active_lab(self):
+        if not self.active_lab:
+            QMessageBox.information(self, "Kali Bay", "Choose a lab notebook first.")
+            return
+        try:
+            lab = kali_store.save_lab(
+                self.active_lab["id"], self.lab_editor.toPlainText(),
+                expected_revision=self.active_lab["revision"],
+            )
+            self.active_lab = lab
+            self.lab_status.setText(
+                f"Saved locally · revision {lab['revision']} · no data shared."
+            )
+        except (kali_store.StorageError, OSError) as error:
+            QMessageBox.warning(
+                self, "Kali Bay",
+                f"Notes were not overwritten: {error}"
+            )
+
+    def prepare_lab_for_webbie(self):
+        if not self.active_lab:
+            QMessageBox.information(self, "Kali Bay", "Choose a lab notebook first.")
+            return
+        confirm = QMessageBox.question(
+            self, "Review before sharing",
+            "Prepare up to 5,000 characters of these notes in Webbie's chat? "
+            "Nothing is sent until you press SEND TO WEBBIE. "
+            "Review sensitive details first.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        notes = self.lab_editor.toPlainText()[:5000]
+        text = (
+            "Help me review this authorized security lab. Offer defensive "
+            "investigation guidance; do not run commands. "
+            f"Lab: {self.active_lab['title']}\nNotes:\n{notes}"
+        )
+        self.open_webbie_security()
+        self.webbie_chat_entry.setText(text)
+        self.webbie_chat_entry.setFocus()
+        self.lab_status.setText(
+            "Notes prepared in Webbie's message box. Review and send manually."
+        )
+
     def build_category_page(self, categories, description):
         page = QWidget()
         layout = QVBoxLayout(page)
