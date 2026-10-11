@@ -848,8 +848,8 @@ def built_in_response(message, context_name="Cory"):
 
 def respond(message, context_name="Cory", advisory_context=None):
     if private_session_active() and re.match(
-            r"(?i)^\\s*(remember that|remember this:|save this to memory:|"
-            r"keep this in memory:)\\s*", str(message or "")):
+            r"(?i)^\s*(remember that|remember this:|save this to memory:|"
+            r"keep this in memory:)\s*", str(message or "")):
         return "Private session is on. I will not save that to long-term memory."
     memory_answer = long_term_memory_response(
         message,
