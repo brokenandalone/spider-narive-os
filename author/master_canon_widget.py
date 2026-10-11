@@ -192,7 +192,8 @@ class MasterCanonWidget(QWidget):
             ('Add canon proposal', self.add_entry),
             ('Edit selected', self.edit_entry),
             ('Open source chapter', self.open_source),
-            ('Check canon evidence', self.audit)
+            ('Check canon evidence', self.audit),
+            ('Read legacy canon notes', self.show_legacy_notes)
         ]:
             button = QPushButton(label)
             button.clicked.connect(method)
@@ -297,6 +298,37 @@ class MasterCanonWidget(QWidget):
             self.chapterRequested.emit(
                 claim['chapter_id'], claim['source_quote'], claim['source_digest']
             )
+
+    def show_legacy_notes(self):
+        """Offer existing notebook material without promoting it to established canon."""
+        scope = list(self.store.books()) if (
+            self.all_books.isChecked() or self.book_id is None
+        ) else [book for book in self.store.books()
+                if book['id'] == self.book_id]
+        lines = [
+            'EXISTING AUTHOR NOTES / UNREVIEWED SOURCE MATERIAL',
+            'These records remain in their original Canon notes and Story Bible.',
+            'Nothing here is automatically established or migrated.',
+            '',
+        ]
+        for book in scope:
+            canon_text = self.store.canon(book['id'])
+            entries = self.store.story_entries(book['id'])
+            if not canon_text.strip() and not entries:
+                continue
+            lines.append('BOOK: ' + book['title'])
+            if canon_text.strip():
+                lines.append('Original canon notebook:')
+                lines.append(canon_text)
+            for entry in entries:
+                lines.append(
+                    'Story Bible / ' + entry['category'] + ' / ' + entry['title']
+                )
+                lines.append(entry['body'])
+            lines.append('')
+        if len(lines) == 4:
+            lines.append('No legacy Canon notes or Story Bible entries found in this scope.')
+        self.details.setPlainText('\n'.join(lines))
 
     def audit(self):
         report = self.store.master_canon.audit(
