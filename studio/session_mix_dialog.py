@@ -16,12 +16,14 @@ if __package__:
     from .multitrack import SessionError
     from .session_presets import save_preset, load_preset, list_presets
     from .session_qc import audit_session_audio
+    from .mastering_dialog import MasteringDialog
 else:
     from session_project import inspect_session
     from session_mix import render_session
     from multitrack import SessionError
     from session_presets import save_preset, load_preset, list_presets
     from session_qc import audit_session_audio
+    from mastering_dialog import MasteringDialog
 
 
 class SessionAudioQcWorker(QThread):
@@ -184,7 +186,11 @@ class SessionMixDialog(QDialog):
         self.open_button = QPushButton("Open rendered mix folder")
         self.open_button.setEnabled(False)
         self.open_button.clicked.connect(self.open_rendered_folder)
-        for button in (self.mix_button, self.stop_button, self.play_button, self.open_button):
+        self.master_button = QPushButton("Master this mix")
+        self.master_button.setEnabled(False)
+        self.master_button.clicked.connect(self.open_mastering)
+        for button in (self.mix_button, self.stop_button, self.play_button,
+                       self.open_button, self.master_button):
             actions.addWidget(button)
         layout.addLayout(actions)
         if session_folder:
@@ -211,6 +217,7 @@ class SessionMixDialog(QDialog):
         self.preset_list.clear()
         self.play_button.setEnabled(False)
         self.open_button.setEnabled(False)
+        self.master_button.setEnabled(False)
         self.rendered = None
         self.status.setText("Checking track metadata and original SHA-256 checksums...")
         self.checker = SessionAuditWorker(self.folder.text().strip())
@@ -398,6 +405,7 @@ class SessionMixDialog(QDialog):
             self.rendered = Path(path)
             self.play_button.setEnabled(True)
             self.open_button.setEnabled(True)
+            self.master_button.setEnabled(True)
 
     def mix_finished(self):
         worker, self.worker = self.worker, None
@@ -419,6 +427,16 @@ class SessionMixDialog(QDialog):
         if self.rendered and self.rendered.is_file() and not self.rendered.is_symlink():
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.rendered))):
                 self.status.setText("No audio player opened. Open the WAV folder manually.")
+
+    def open_mastering(self):
+        """Offer mastering only for an existing rendered WAV; never auto-master."""
+        if (self.worker is not None or self.checker is not None or
+                self.quality_worker is not None or self.rendered is None
+                or not self.rendered.is_file() or self.rendered.is_symlink()):
+            self.status.setText("Render an intact session mix before mastering.")
+            return
+        dialog = MasteringDialog(source=self.rendered, parent=self)
+        dialog.exec_()
 
     def open_rendered_folder(self):
         if self.rendered and self.rendered.parent.is_dir():
