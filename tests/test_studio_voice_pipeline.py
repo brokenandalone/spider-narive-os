@@ -145,7 +145,8 @@ class HoldoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             owner_data = dataset(root)
-            clips = list((owner_data / "audio").glob("*.wav"))
+            clips = [owner_data / "audio" / f"clip-{index:04d}.wav"
+                     for index in (1, 2)]
             shutil.copyfile(clips[0], clips[1])
             contents = json.loads((owner_data / "manifest.json").read_text())
             contents["samples"][1]["sha256"] = hashlib.sha256(clips[1].read_bytes()).hexdigest()
