@@ -18,7 +18,7 @@ import wave
 ROLES = (
     "lead_vocal", "backing_vocal", "rhythm_guitar", "lead_guitar",
     "bass", "drums", "piano_keys", "other_instrument",
-    "instrumental_bed", "reference_mix",
+    "instrumental_bed", "reference_mix", "click_guide",
 )
 MAX_TRACKS = 24
 MAX_TOTAL_BYTES = 8 * 1024 ** 3
