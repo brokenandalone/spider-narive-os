@@ -660,6 +660,21 @@ class TheWeb(QMainWindow):
                 # A read-only home should not prevent app and workspace launches.
                 pass
 
+    def clear_recent_navigation(self):
+        """Owner-requested clearing of launcher history only.
+
+        Favorites and installed apps remain untouched.  A settings write
+        failure is reported instead of claiming the list was persisted.
+        """
+        self.navigation_state['recent'] = []
+        self.render_recent_shortcuts()
+        try:
+            save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Recent launcher history not saved: ' + str(error))
+            return False
+        return True
+
     def toggle_command_palette(self):
         self.command_palette.show_palette()
 
