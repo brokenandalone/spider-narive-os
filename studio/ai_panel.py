@@ -1293,11 +1293,19 @@ class StudioAIPanel(QWidget):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_training_set)))
 
     def copy_dataset_path(self):
-        audio = self.last_training_set / 'audio' if self.last_training_set else None
+        if (self.last_training_split and not self.last_training_split.is_symlink()
+                and (self.last_training_split / 'train/audio').is_dir()
+                and not (self.last_training_split / 'train/audio').is_symlink()):
+            audio = self.last_training_split / 'train/audio'
+            status = ('TRAIN-ONLY RVC audio path copied. Held-out evaluation recordings '
+                      'are kept separate. No model training has started.')
+        else:
+            audio = self.last_training_set / 'audio' if self.last_training_set else None
+            status = ('Full dataset RVC audio path copied without an evaluation holdout. '
+                      'Separate evaluation data before training to avoid leakage.')
         if audio and audio.is_dir() and not audio.is_symlink():
             QApplication.clipboard().setText(str(audio))
-            self.voice_status.setText('RVC training audio folder copied. Paste it into the local training interface. '
-                                      'No model training has started.')
+            self.voice_status.setText(status)
 
     def dataset_finished(self):
         worker, self.dataset_worker = self.dataset_worker, None
