@@ -14,9 +14,15 @@ import stat
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtNetwork import QLocalServer
+from pathlib import Path as _Path
+import sys
+sys.path.insert(0, str(_Path(__file__).resolve().parents[2] / 'webbie/agent'))
+from browser_routes import canonical_url
+sys.path.insert(0, str(_Path(__file__).resolve().parents[2] / 'webbie/actions'))
+from navigation_missions import parse_navigation_request
 
 NAME = 'webbie-operator.sock'
-MAX_REQUEST = 260
+MAX_REQUEST = 1800
 MAX_REPLY = 400
 APP_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.+-]{0,199}\.desktop$')
 
@@ -36,6 +42,8 @@ def private_socket_directory(runtime=None):
 
 class OperatorBridge(QObject):
     openRequested = pyqtSignal(str)
+    webRequested = pyqtSignal(str)
+    navigationProposed = pyqtSignal(str)
 
     def __init__(self, *, grant, runtime=None, parent=None):
         super().__init__(parent)
@@ -82,6 +90,24 @@ class OperatorBridge(QObject):
         data = self.grant.status()
         if not data['active']:
             self.finish(peer, 'Desktop task authorization is not active')
+            return
+        if packet.startswith('PLAN:'):
+            phrase = packet[5:]
+            if parse_navigation_request(phrase) is None:
+                self.finish(peer, 'Unsupported navigation plan')
+                return
+            # This stages visible text. It never begins a task or sends keys.
+            self.pending = peer
+            self.navigationProposed.emit(phrase)
+            return
+        if packet.startswith('WEB:'):
+            try:
+                url = canonical_url(packet[4:])
+            except ValueError:
+                self.finish(peer, 'Unsupported website address')
+                return
+            self.pending = peer
+            self.webRequested.emit(url)
             return
         if not packet.startswith('OPEN:'):
             self.finish(peer, 'Unsupported desktop control action')

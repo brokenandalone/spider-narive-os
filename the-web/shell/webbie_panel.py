@@ -19,8 +19,18 @@ from webbie_camera import camera_devices, capture_jpeg, describe_frame
 from webbie_face_profiles_ui import FaceProfileControls
 from webbie_vision_bridge import VisionBridge
 from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_catalog
+from webbie_reminders_dialog import WebbieRemindersDialog
+from webbie_cognitive_center import WebbieCognitiveDialog
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
+from browser_routes import parse_browser_command
+from jarvis_commands import gui_guide
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
+from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
 from context_awareness import AwarenessState
+from jarvis_context import publish_context
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
+from proactive_checks import read_status as proactive_snapshot, status_message as proactive_status_message, request_check_now
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'overlay'))
 from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 
@@ -200,6 +210,8 @@ class WebbiePanel(QWidget):
         self.camera_worker = None
         self.vision_bridge = None
         self.computer_dialog = None
+        self.reminders_dialog = None
+        self.cognitive_dialog = None
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
         self.awareness.sleep(self.face_sleeping)
@@ -230,6 +242,40 @@ class WebbiePanel(QWidget):
         self.awareness_button = QPushButton('What Webbie knows right now')
         self.awareness_button.clicked.connect(self.show_awareness)
         layout.addWidget(self.awareness_button)
+        jarvis_help_button = QPushButton('Jarvis commands and abilities')
+        jarvis_help_button.setObjectName('webbieJarvisHelp')
+        jarvis_help_button.clicked.connect(self.show_jarvis_commands)
+        layout.addWidget(jarvis_help_button)
+        cognitive_button = QPushButton('Jarvis cognitive control center')
+        cognitive_button.setObjectName('webbieCognitiveCenterButton')
+        cognitive_button.setToolTip(
+            'Local focus tasks, AI model health, private session and safe stop.')
+        cognitive_button.clicked.connect(self.open_cognitive_center)
+        layout.addWidget(cognitive_button)
+        # Independent read-only system status, no microphone or camera access.
+        self.proactive_label = QLabel('Proactive checks: awaiting first report')
+        self.proactive_label.setWordWrap(True)
+        self.proactive_label.setAccessibleName('Webbie proactive monitoring status')
+        layout.addWidget(self.proactive_label)
+        proactive_button = QPushButton('Show Webbie system checks')
+        proactive_button.setObjectName('webbieProactiveChecksButton')
+        proactive_button.setToolTip('Read the latest local results. Does not run an OS command.')
+        proactive_button.clicked.connect(self.show_proactive_checks)
+        layout.addWidget(proactive_button)
+        proactive_run_button = QPushButton('Run system checks now')
+        proactive_run_button.setObjectName('webbieProactiveRunButton')
+        proactive_run_button.setToolTip('Ask the resident agent to rerun local read-only checks; no system changes.')
+        proactive_run_button.clicked.connect(self.request_proactive_checks)
+        layout.addWidget(proactive_run_button)
+        reminders_button = QPushButton('My local reminders')
+        reminders_button.setObjectName('webbieLocalRemindersButton')
+        reminders_button.setToolTip('Create and remove on-device reminders with explicit clicks.')
+        reminders_button.clicked.connect(self.open_reminders_dialog)
+        layout.addWidget(reminders_button)
+        self.proactive_timer = QTimer(self)
+        self.proactive_timer.timeout.connect(self.refresh_proactive_status)
+        self.proactive_timer.start(10000)
+        self.refresh_proactive_status()
         # Explicit owner consent. Camera does not start when The Web launches.
         camera_controls = QHBoxLayout(); layout.addLayout(camera_controls)
         self.camera_selector = QComboBox()
@@ -311,6 +357,10 @@ class WebbiePanel(QWidget):
         self.send_button = QPushButton('Send'); self.send_button.setMinimumHeight(44)
         self.send_button.clicked.connect(self.send); row.addWidget(self.send_button)
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_state); self.timer.start(120)
+        self.jarvis_context_timer = QTimer(self)
+        self.jarvis_context_timer.timeout.connect(self.publish_jarvis_context)
+        self.jarvis_context_timer.start(15000)
+        self.publish_jarvis_context()
         self.refresh_state()
 
     def refresh_camera_devices(self):
@@ -460,6 +510,8 @@ class WebbiePanel(QWidget):
         self.awareness.sleep(self.face_sleeping)
         if self.face_sleeping:
             self.stop_camera()
+            if self.computer_dialog is not None:
+                self.computer_dialog.stop()
         self.face.sleeping = self.face_sleeping
         self.face.update()
         self.refresh_state()
@@ -556,6 +608,34 @@ class WebbiePanel(QWidget):
         if self.workspace_summary:
             description += '\nSelected: ' + self.workspace_summary
         self.context.setText(description)
+        self.publish_jarvis_context()
+
+    def publish_jarvis_context(self):
+        """Short-lived metadata only. Camera/screen pixels never written here."""
+        authorized = ''
+        selected_window = ''
+        mission_status = ''
+        if self.computer_dialog is not None:
+            approval = self.computer_dialog.grant.status()
+            if approval['active']:
+                authorized = approval['task']
+                if self.computer_dialog.nav_mission.plan is not None:
+                    mission_status = self.computer_dialog.nav_mission.progress()
+                chosen = self.computer_dialog.selected_window()
+                if (chosen is not None and
+                        chosen == self.computer_dialog.operator.target_window):
+                    selected_window = self.computer_dialog.windows.currentText()
+        try:
+            publish_context(
+                workspace=self.workspace_label, mode=self.workspace_mode,
+                selected_title=self.workspace_summary,
+                approved_task=authorized,
+                selected_window=selected_window,
+                mission_status=mission_status,
+                sleeping=self.face_sleeping,
+            )
+        except (OSError, PermissionError, ValueError):
+            pass
 
     def prepare_request(self, text):
         self.awareness.note_user_request(text)
@@ -577,6 +657,66 @@ class WebbiePanel(QWidget):
         if not self.face_sleeping:
             self.awareness.observation(
                 'screen', description, consent=True, ttl=45)
+
+    def open_reminders_dialog(self):
+        if self.reminders_dialog is None:
+            self.reminders_dialog = WebbieRemindersDialog(self)
+        self.reminders_dialog.refresh()
+        self.reminders_dialog.show()
+        self.reminders_dialog.raise_()
+        self.reminders_dialog.activateWindow()
+
+    def refresh_proactive_status(self):
+        state = proactive_snapshot()
+        last = state.get('last_run')
+        if not last:
+            label = 'Proactive checks: no completed report'
+        else:
+            values = [item['status'] for item in state['checks'].values()]
+            problems = values.count('warn')
+            pending = state.get('pending_count', 0)
+            label = (f'Proactive checks: {len(values)} tested, '
+                     f'{problems} warning(s), {pending} queued alert(s)')
+            if not state.get('enabled', True):
+                label += ' · disabled'
+        self.proactive_label.setText(label)
+
+    def show_proactive_checks(self):
+        self.refresh_proactive_status()
+        self.append_message('Webbie system checks', proactive_status_message())
+
+    def request_proactive_checks(self):
+        try:
+            request_check_now()
+            self.append_message('Webbie system checks',
+                'Read-only check requested. The resident agent will run it on its next health tick (at most once every 30 seconds).')
+        except (OSError, PermissionError, ValueError) as error:
+            self.append_message('Webbie system checks',
+                'Could not request local checks: ' + str(error))
+
+    def stop_sensitive_actions(self):
+        """One owner GUI action to drop camera and all desktop grants."""
+        if self.computer_dialog is not None:
+            self.computer_dialog.stop()
+        self.stop_camera()
+        self.awareness.revoke_observation('screen')
+        self.publish_jarvis_context()
+        self.append_message(
+            'Webbie',
+            'Camera off and desktop approvals revoked. Background checks remain active.')
+
+    def open_cognitive_center(self):
+        if self.cognitive_dialog is None:
+            self.cognitive_dialog = WebbieCognitiveDialog(
+                self, workspace_callback=lambda: self.awareness.snapshot()['workspace'],
+                emergency_callback=self.stop_sensitive_actions)
+        self.cognitive_dialog.refresh()
+        self.cognitive_dialog.show()
+        self.cognitive_dialog.raise_()
+        self.cognitive_dialog.activateWindow()
+
+    def show_jarvis_commands(self):
+        self.append_message('Jarvis command guide', gui_guide())
 
     def show_awareness(self):
         # Inspectable short-term context, not a long-term-memory database.
@@ -604,6 +744,33 @@ class WebbiePanel(QWidget):
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        # Direct owner text can stage a deterministic window-bound navigation
+        # mission. Neither the LLM nor a webpage can trigger this parser.
+        navigation = parse_navigation_request(text)
+        if navigation is not None:
+            self.open_computer_dialog()
+            if self.computer_dialog.offer_navigation(text):
+                self.append_message(
+                    'Webbie mission',
+                    f'{len(navigation.steps)} steps staged, no actions taken. '
+                    'Authorize the task, bind the exact window, preview, and '
+                    'click each next step to run it.')
+            self.entry.clear()
+            return
+        # Typed website commands show a visible review instead of triggering
+        # browser/network activity from model text. The GUI requires consent.
+        browser_request = parse_browser_command(text)
+        if browser_request is not None:
+            if not browser_request.url:
+                self.append_message('Status',
+                    'That address is blocked. Only public HTTPS sites are allowed.')
+            else:
+                self.open_computer_dialog()
+                if self.computer_dialog.offer_site(browser_request.url):
+                    self.append_message('Status',
+                        'Review the address, authorize a browser task and confirm opening it.')
+            self.entry.clear()
             return
         # A typed request to open an installed program invokes a visible task
         # grant. No words typed into chat directly authorize computer control.

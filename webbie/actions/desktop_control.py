@@ -23,6 +23,7 @@ KEYS = frozenset({
     'Escape', 'Tab', 'BackSpace', 'Delete', 'Up', 'Down', 'Left', 'Right',
     'Home', 'End', 'Page_Up', 'Page_Down', 'space', 'ctrl+a', 'ctrl+c',
     'ctrl+v', 'ctrl+x', 'ctrl+z', 'ctrl+shift+z', 'ctrl+s', 'alt+Tab',
+    'alt+Left', 'alt+Right', 'ctrl+r', 'ctrl+Page_Up', 'ctrl+Page_Down',
 })
 
 
