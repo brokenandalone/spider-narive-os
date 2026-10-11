@@ -24,10 +24,10 @@ class ProactiveSessionTests(unittest.TestCase):
         username = pwd.getpwuid(os.getuid()).pw_name
         def output(cmd, **kwargs):
             if "list-sessions" in cmd:
-                return f"2 1000 {username} seat0 tty2\\n7 1000 {username} seat0 tty7"
+                return f"2 1000 {username} seat0 tty2\n7 1000 {username} seat0 tty7"
             if "2" in cmd:
-                return "Active=no\\nIdleHint=yes\\nLockedHint=no\\nRemote=no\\nType=tty"
-            return "Active=yes\\nIdleHint=no\\nLockedHint=no\\nRemote=no\\nType=x11"
+                return "Active=no\nIdleHint=yes\nLockedHint=no\nRemote=no\nType=tty"
+            return "Active=yes\nIdleHint=no\nLockedHint=no\nRemote=no\nType=x11"
         with patch.object(subprocess, "check_output", side_effect=output):
             self.assertTrue(scope["session_is_active"]())
             self.assertEqual(scope["session_activity"]()[1], "active session 7")
@@ -35,7 +35,7 @@ class ProactiveSessionTests(unittest.TestCase):
     def test_locked_or_idle_session_is_rejected(self):
         username = pwd.getpwuid(os.getuid()).pw_name
         for field in ("LockedHint", "IdleHint"):
-            info = "Active=yes\\nIdleHint=no\\nLockedHint=no\\nRemote=no\\nType=wayland"
+            info = "Active=yes\nIdleHint=no\nLockedHint=no\nRemote=no\nType=wayland"
             info = info.replace(field + "=no", field + "=yes")
             def output(cmd, **kwargs):
                 return (f"7 1000 {username} seat0 tty7" if "list-sessions" in cmd else info)
