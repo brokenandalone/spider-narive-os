@@ -301,6 +301,10 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     app.processEvents()
     assert interrupted.tabs.count() == 1
     assert main.read_desktop_state(window.state_path, main.WORKSPACES)['open'] == default_layout['open']
+    with patch.object(main, 'write_desktop_state', side_effect=OSError('read-only config')):
+        assert not interrupted.adopt_current_layout()
+    assert interrupted._preserve_saved_session
+    assert main.read_desktop_state(window.state_path, main.WORKSPACES)['open'] == default_layout['open']
     assert interrupted.adopt_current_layout()
     assert main.read_desktop_state(window.state_path, main.WORKSPACES)['open'] == ['default']
     app.processEvents()
