@@ -49,6 +49,26 @@ class InterruptSpeechTests(unittest.TestCase):
         engine.cancelled.set()
         self.assertFalse(engine._execute(['espeak-ng', 'test']))
 
+    def test_cancelled_old_generation_cannot_restart_audio(self):
+        launcher = Mock()
+        engine = mod.InterruptibleSpeech(
+            popen=launcher, which=lambda name: '/usr/bin/espeak-ng'
+            if name == 'espeak-ng' else None, edge_tts=False)
+        engine.stop()
+        self.assertFalse(engine.speak('Outdated response', may_start=lambda: False))
+        self.assertTrue(engine.cancelled.is_set())
+        launcher.assert_not_called()
+
+    def test_current_generation_can_speak_after_previous_stop(self):
+        process = FakeProcess()
+        launcher = Mock(return_value=process)
+        engine = mod.InterruptibleSpeech(
+            popen=launcher, which=lambda name: '/usr/bin/espeak-ng'
+            if name == 'espeak-ng' else None, edge_tts=False)
+        engine.stop()
+        self.assertTrue(engine.speak('Corrected response', may_start=lambda: True))
+        self.assertEqual(launcher.call_count, 1)
+
 
 if __name__ == '__main__':
     unittest.main()
