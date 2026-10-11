@@ -37,6 +37,8 @@ sys.path.insert(
 
 from brain import respond
 from jarvis_context import read_context, context_summary, advisory_context
+from focus_tasks import focus_answer, advisory_focus, WORKSPACES
+from privacy_controls import private_session_active, privacy_explanation
 from interruptible_speech import InterruptibleSpeech
 from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
@@ -192,6 +194,11 @@ def write_state(**updates):
         except (OSError, ValueError, TypeError):
             pass
         state.update(updates)
+        if private_session_active():
+            # The resident status file must not persist new private exchanges.
+            state.pop("last_heard", None)
+            state.pop("last_reply", None)
+            state.pop("last_input", None)
         state["online"] = updates.get("online", True)
         state["pid"] = os.getpid()
         state["workspace"] = current_workspace()
@@ -314,6 +321,16 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    stripped = re.sub(
+        r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
+    if stripped in ("private session status", "is private session on",
+                    "is privacy mode on", "what is your privacy status"):
+        return privacy_explanation()
+    if stripped in ("what is my focus", "what am i focused on",
+                    "what should i work on next", "what is my next task",
+                    "what is my next focus step"):
+        workspace = current_workspace()
+        return focus_answer(workspace if workspace in WORKSPACES else "default")
     if is_capability_question(command):
         return voice_guide()
     # Read-only live snapshot. Status text never authorizes a desktop action.
@@ -616,10 +633,16 @@ def handle_command(command, voice=False, expected_turn=None,
                 # Spoken installed-app launches only request the existing
                 # owner's GUI grant; they cannot create one or run commands.
                 app_reply = installed_app_request(command) if voice else None
+                focus_workspace = current_workspace()
+                if focus_workspace not in WORKSPACES:
+                    focus_workspace = "default"
+                extra_context = advisory_context(read_context())
+                if not private_session_active():
+                    extra_context += "\n" + advisory_focus(focus_workspace)
                 reply = (app_reply if app_reply is not None else
                          respond(
                              command, context_name=current_name(),
-                             advisory_context=advisory_context(read_context())))
+                             advisory_context=extra_context))
 
     if voice:
         # A completed model request cannot resume speaking after STOP.
@@ -712,6 +735,7 @@ def voice_listener():
         can_run=lambda: not quiet_asleep(),
         on_error=lambda error: write_state(
             voice_turn_error=type(error).__name__),
+        on_supersede=speech_playback.stop,
     )
 
     def start_voice_turn(command):

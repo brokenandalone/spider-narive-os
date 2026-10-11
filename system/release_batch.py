@@ -52,6 +52,7 @@ APP_FILES = (
     'the-web/shell/tray_panel.py',
     'the-web/shell/webbie_panel.py',
     'the-web/shell/webbie_reminders_dialog.py',
+    'the-web/shell/webbie_focus_dialog.py', 'the-web/shell/webbie_cognitive_center.py',
     'the-web/shell/webbie_computer_panel.py',
     'the-web/shell/webbie_operator_bridge.py',
     'the-web/shell/webbie_camera.py', 'the-web/shell/webbie_faces.py',
@@ -76,7 +77,9 @@ APP_FILES = (
     'webbie/actions/autopilot_policy.py',
     'webbie/brain/brain.py', 'webbie/brain/context_awareness.py',
     'webbie/brain/jarvis_context.py',
-    'webbie/brain/local_models.py', 'system/onedrive.py',
+    'webbie/brain/local_models.py', 'webbie/brain/local_model_inventory.py',
+    'webbie/brain/focus_tasks.py', 'webbie/brain/privacy_controls.py',
+    'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
     # Cross-workspace October 10 source modules; each is individually hash-checked.

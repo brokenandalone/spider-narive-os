@@ -20,7 +20,8 @@ class VoiceTurnCoordinator:
     """
 
     def __init__(self, run_command, tracker, *, can_run=None, on_error=None,
-                 clock=None, queue_ttl=45, thread_factory=None):
+                 clock=None, queue_ttl=45, thread_factory=None,
+                 on_supersede=None):
         if not callable(run_command):
             raise TypeError("run_command must be callable")
         if not 1 <= queue_ttl <= 45:
@@ -29,6 +30,7 @@ class VoiceTurnCoordinator:
         self.tracker = tracker
         self.can_run = can_run or (lambda: True)
         self.on_error = on_error
+        self.on_supersede = on_supersede
         self.clock = clock or time.monotonic
         self.queue_ttl = queue_ttl
         self.thread_factory = thread_factory or threading.Thread
@@ -42,11 +44,21 @@ class VoiceTurnCoordinator:
         if not command or not self.can_run():
             return "ignored"
         # Only a separate trusted local verification adapter can set True.
-        item = (command, self.tracker.start(), speaker_verified is True)
         with self._lock:
             if self._busy:
-                self._pending = (item, self.clock() + self.queue_ttl)
+                # A new command is a correction: invalidate the slow prior
+                # answer immediately so it cannot speak after the correction.
+                generation = self.tracker.interrupted()
+                self._pending = (
+                    (command, generation, speaker_verified is True),
+                    self.clock() + self.queue_ttl)
+                if self.on_supersede is not None:
+                    try:
+                        self.on_supersede()
+                    except Exception:
+                        pass
                 return "queued"
+            item = (command, self.tracker.start(), speaker_verified is True)
             self._busy = True
         self._start_worker(item)
         return "started"

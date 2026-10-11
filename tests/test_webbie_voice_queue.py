@@ -43,6 +43,36 @@ class VoiceQueueTests(unittest.TestCase):
         self.assertTrue(finished.wait(2))
         self.assertEqual(received, [("first", False), ("third", False)])
 
+    def test_new_correction_invalidates_old_generation_immediately(self):
+        entered=threading.Event()
+        release=threading.Event()
+        replacement_done=threading.Event()
+        generations=[]
+        stopped=[]
+        tracker=turns.VoiceTurnTracker()
+
+        def run(command,generation,verified):
+            generations.append((command,generation))
+            if command=="slow":
+                entered.set()
+                self.assertTrue(release.wait(3))
+            if command=="latest":
+                replacement_done.set()
+
+        coordinator=queue.VoiceTurnCoordinator(
+            run,tracker,on_supersede=lambda:stopped.append("speech stopped"))
+        self.assertEqual(coordinator.submit("slow"),"started")
+        self.assertTrue(entered.wait(2))
+        old_generation=generations[0][1]
+        self.assertEqual(coordinator.submit("intermediate"),"queued")
+        self.assertFalse(tracker.current(old_generation))
+        self.assertEqual(coordinator.submit("latest"),"queued")
+        self.assertEqual(len(stopped),2)
+        release.set()
+        self.assertTrue(replacement_done.wait(3))
+        self.assertEqual([x[0] for x in generations],["slow","latest"])
+        self.assertNotEqual(generations[0][1],generations[1][1])
+
     def test_stop_discards_old_turn_then_accepts_correction(self):
         entered = threading.Event()
         release = threading.Event()
