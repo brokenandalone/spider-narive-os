@@ -387,8 +387,10 @@ class WebbieComputerDialog(QDialog):
         except ValueError as error:
             self.status(str(error))
             return False
+        # Show the exact destination before user confirmation.
+        self.browser_url.setText(destination)
         if not self.grant.authorize(
-                'browser.open.confirm', 'Website: ' + destination[:600]):
+                'browser.open.confirm', 'Website: ' + destination):
             self.status('Website navigation not approved.')
             return False
         if not self.grant.status()['active'] or self.operator.cancelled.is_set():
