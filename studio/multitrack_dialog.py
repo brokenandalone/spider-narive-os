@@ -12,8 +12,10 @@ from PyQt5.QtWidgets import (
 
 if __package__:
     from .multitrack import ROLES, DEFAULT_OUTPUT, SessionError, export_session
+    from .session_mix_dialog import SessionMixDialog
 else:
     from multitrack import ROLES, DEFAULT_OUTPUT, SessionError, export_session
+    from session_mix_dialog import SessionMixDialog
 
 
 class SessionExportWorker(QThread):
@@ -93,9 +95,12 @@ class MultitrackDialog(QDialog):
         self.open_button = QPushButton("Open exported folder")
         self.open_button.setEnabled(False)
         self.open_button.clicked.connect(self.open_exported)
+        self.mix_session_button = QPushButton("Reopen saved session and mix")
+        self.mix_session_button.clicked.connect(self.reopen_for_mix)
         action_row.addWidget(self.export_button)
         action_row.addWidget(self.cancel_button)
         action_row.addWidget(self.open_button)
+        action_row.addWidget(self.mix_session_button)
         layout.addLayout(action_row)
         layout.addWidget(QLabel("Session is saved privately in " + str(DEFAULT_OUTPUT)))
         for entry in seed_tracks:
@@ -175,6 +180,14 @@ class MultitrackDialog(QDialog):
     def open_exported(self):
         if self.exported_path and self.exported_path.is_dir():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.exported_path)))
+
+    def reopen_for_mix(self):
+        """Load the most recently exported session, or ask for another folder."""
+        if self.worker is not None:
+            return
+        selection = str(self.exported_path) if self.exported_path else None
+        editor = SessionMixDialog(selection, parent=self)
+        editor.exec_()
 
     def closeEvent(self, event):
         if self.worker is not None:
