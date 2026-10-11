@@ -1,8 +1,10 @@
 """Deterministic, offline tests for explicit Webbie coaching and APA warnings."""
 import unittest
+from pathlib import Path
+import tempfile
 
 from study.apa_preflight import analyze_apa_preflight, format_apa_preflight
-from study.study_coach import build_coach_prompt, parse_generated_flashcards, MODES
+from study.study_coach import build_coach_prompt, parse_generated_flashcards, save_coach_transcript, MODES
 
 
 class APAHelperTests(unittest.TestCase):
@@ -130,6 +132,27 @@ class CoachHelperTests(unittest.TestCase):
         self.assertEqual(parse_generated_flashcards("No structured cards."), [])
         with self.assertRaises(ValueError):
             parse_generated_flashcards(data, limit=0)
+
+    def test_private_transcript_save_requires_explicit_content_and_no_overwrite(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "session.txt"
+            saved = save_coach_transcript(
+                target, course="SOC-112", topic="Social change",
+                session=["STUDENT: Explain inequality.\nWEBBIE: A draft explanation."])
+            self.assertEqual(saved, target)
+            text = target.read_text(encoding="utf-8")
+            self.assertIn("SOC-112", text)
+            self.assertIn("AI responses are practice material", text)
+            self.assertIn("A draft explanation", text)
+            with self.assertRaises(FileExistsError):
+                save_coach_transcript(
+                    target, course="SOC-112", topic="Social change",
+                    session=["Would overwrite earlier work"])
+            self.assertEqual(target.read_text(encoding="utf-8"), text)
+            with self.assertRaises(ValueError):
+                save_coach_transcript(
+                    Path(folder) / "empty.txt", course="SOC-112",
+                    topic="Social change", session=[])
 
     def test_truncated_or_empty_card_not_imported(self):
         result = parse_generated_flashcards("Q: \nA: bad\nQ: Term\nA: ")
