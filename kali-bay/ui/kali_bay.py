@@ -276,6 +276,37 @@ class KaliBayWindow(QMainWindow):
     def build_ui(self):
         self.setStyleSheet(
             """
+            QWidget {
+                font-size: 15px;
+            }
+            QLineEdit, QComboBox, QPlainTextEdit {
+                color: #ffffff;
+                background: #160d27;
+                selection-color: #ffffff;
+                selection-background-color: #6b21a8;
+                border: 1px solid #a78bfa;
+                border-radius: 7px;
+                padding: 8px;
+                min-height: 25px;
+            }
+            QComboBox QAbstractItemView, QMenu {
+                color: #ffffff;
+                background: #160d27;
+                selection-color: #ffffff;
+                selection-background-color: #6b21a8;
+                border: 1px solid #a78bfa;
+                outline: 0;
+            }
+            QPushButton:focus, QLineEdit:focus, QComboBox:focus {
+                border: 2px solid #e9d5ff;
+            }
+            QToolTip {
+                color: #ffffff;
+                background: #241335;
+                border: 1px solid #c4b5fd;
+                padding: 6px;
+            }
+
             QLabel {
                 color: #f3eef6;
             }
@@ -470,8 +501,8 @@ class KaliBayWindow(QMainWindow):
                 background: #241335;
                 color: #d6c9e2;
                 border: 1px solid #5b3376;
-                padding: 12px 20px;
-                min-width: 155px;
+                padding: 12px 14px;
+                min-width: 115px;
                 font-weight: bold;
             }
             QTabBar::tab:selected {
@@ -620,9 +651,21 @@ class KaliBayWindow(QMainWindow):
         )
         about.setWordWrap(True)
         right.addWidget(about)
+        self.readiness_summary = QLabel(
+            "Readiness not checked. Select READINESS REPORT for a "
+            "read-only check of the existing Kali environment."
+        )
+        self.readiness_summary.setObjectName("kaliReadinessSummary")
+        self.readiness_summary.setWordWrap(True)
+        self.readiness_summary.setStyleSheet(
+            "background:#160d27;color:#f3e8ff;border:1px solid #a78bfa;"
+            "border-radius:8px;padding:12px;"
+        )
+        right.addWidget(self.readiness_summary)
         for caption, operation in (
             ("START EXISTING KALI", self.start_existing_kali),
             ("KALI HEALTH CHECK", self.open_kali_health),
+            ("READINESS REPORT", self.show_readiness_report),
             ("KALI TERMINAL", self.open_terminal),
             ("KALI PACKAGE MANAGER", self.open_packages),
             ("INSTALLED KALI PACKAGES", self.open_inventory),
@@ -818,6 +861,46 @@ class KaliBayWindow(QMainWindow):
     def open_kali_health(self):
         # Read-only diagnostic terminal for the existing container.
         self.launch_terminal_command([MANAGER, "doctor"])
+
+    def show_readiness_report(self):
+        """Show a fixed, read-only snapshot without starting Kali or repairs."""
+        try:
+            import json
+            result = subprocess.run(
+                [str(MANAGER), "readiness-json"],
+                text=True, capture_output=True, check=False, timeout=15,
+            )
+            if result.returncode:
+                raise ValueError(
+                    (result.stderr or result.stdout).strip()[:180]
+                    or "Kali Bay readiness check is unavailable."
+                )
+            report = json.loads(result.stdout)
+            if not isinstance(report, dict):
+                raise ValueError("Unexpected Kali readiness response.")
+            state = report.get("container_state", "unknown")
+            if state not in ("running", "stopped", "missing", "unknown"):
+                state = "unknown"
+            def available(key):
+                return "YES" if report.get(key) is True else "NO"
+            next_step = report.get("next_step", "Review Kali health manually.")
+            if not isinstance(next_step, str):
+                next_step = "Review Kali health manually."
+            next_step = next_step[:220]
+            self.readiness_summary.setText(
+                f"Podman: {available('podman')}    "
+                f"Distrobox: {available('distrobox')}\n"
+                f"Kali container: {state.upper()}    "
+                f"Full toolkit verified: {available('toolkit_ready')}\n"
+                f"GUI session: {available('gui_session')}    "
+                f"App catalog source: {available('catalog_source')}\n"
+                f"NEXT: {next_step}"
+            )
+        except (OSError, subprocess.TimeoutExpired, ValueError) as error:
+            self.readiness_summary.setText(
+                f"Readiness check unavailable: {str(error)[:180]}. "
+                "No container or packages were changed."
+            )
 
     def open_packages(self):
         # Explicit interactive shell in the existing Kali Distrobox.
