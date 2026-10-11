@@ -4,7 +4,9 @@
     "hey webbie",
     "webbie",
     "hey web",
-    "web"
+    "web",
+    "hey webby",
+    "webby"
   ],
   "greet_on_login": true,
   "check_in_minutes": 45,
