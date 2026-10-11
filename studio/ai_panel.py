@@ -30,6 +30,7 @@ if __package__:
     from .multitrack_dialog import MultitrackDialog
     from .session_mix_dialog import SessionMixDialog
     from .mastering_dialog import MasteringDialog
+    from .voice_review_dialog import VoiceReviewDialog
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from music_resume import discover_resumable, resume_music_job
@@ -47,6 +48,7 @@ else:
     from multitrack_dialog import MultitrackDialog
     from session_mix_dialog import SessionMixDialog
     from mastering_dialog import MasteringDialog
+    from voice_review_dialog import VoiceReviewDialog
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -605,6 +607,9 @@ class StudioAIPanel(QWidget):
         self.play_final_mix_button.setEnabled(False)
         self.play_final_mix_button.clicked.connect(self.play_final_mix)
         listening_actions.addWidget(self.play_final_mix_button)
+        self.voice_review_button = QPushButton('Compare My Voice A/B and record listener scores')
+        self.voice_review_button.clicked.connect(self.open_voice_review)
+        listening_actions.addWidget(self.voice_review_button)
         layout.addLayout(listening_actions)
         session_heading = QLabel('Editable band session: real multitrack DAW export')
         session_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
@@ -961,6 +966,15 @@ class StudioAIPanel(QWidget):
 
     def play_converted_voice(self):
         self._play_checked_wav(self.last_converted_vocal)
+
+    def open_voice_review(self):
+        """Owner-rated local A/B check after conversion, never self-certifies a model."""
+        original = self.rvc_vocal.text().strip() or None
+        candidate = (str(self.last_converted_vocal)
+                     if self.last_converted_vocal and self.last_converted_vocal.is_file()
+                     else None)
+        dialog = VoiceReviewDialog(original=original, converted=candidate, parent=self)
+        dialog.exec_()
 
     def play_final_mix(self):
         self._play_checked_wav(self.last_final_mix)
