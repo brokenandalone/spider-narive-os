@@ -128,6 +128,13 @@ class ForageWindow(
                 color: #f0eaf5;
             }
 
+            QComboBox QAbstractItemView {
+                background: #1c1027;
+                color: #ffffff;
+                selection-background-color: #7c3ab4;
+                selection-color: #ffffff;
+            }
+
             QPushButton {
                 background: #581c87;
                 border: 1px solid #7e22ce;
@@ -263,7 +270,7 @@ class ForageWindow(
         )
 
         self.status.setStyleSheet(
-            "color: #9b90a6;"
+            "color: #c8b6d8;"
         )
 
         layout.addWidget(
@@ -297,6 +304,9 @@ class ForageWindow(
         self,
         worker,
     ):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("A search or index refresh is already running.")
+            return False
         self.worker = worker
 
         worker.status.connect(
@@ -308,6 +318,7 @@ class ForageWindow(
         )
 
         worker.start()
+        return True
 
     def failure(
         self,
@@ -437,6 +448,8 @@ class ForageWindow(
                         "",
                     )
                 )
+                engine = html.escape(str(item.get("engine") or "web"))
+                published = html.escape(str(item.get("published") or "Date not supplied"))
 
                 chunks.append(
                     f"""
@@ -450,7 +463,8 @@ class ForageWindow(
                     <b>{title}</b>
                     </a>
                     <p>{snippet}</p>
-                    <small>{url}</small>
+                    <small>Via {engine} · {published}</small>
+                    <p><small>{url}</small></p>
                     </div>
                     """
                 )
