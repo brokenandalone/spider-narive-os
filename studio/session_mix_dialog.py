@@ -5,19 +5,21 @@ import threading
 from PyQt5.QtCore import Qt, QThread, QUrl, pyqtSignal
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
-    QApplication, QAbstractItemView, QCheckBox, QDialog, QDoubleSpinBox,
-    QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox,
-    QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QApplication, QAbstractItemView, QCheckBox, QComboBox, QDialog,
+    QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
+    QLineEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout,
 )
 
 if __package__:
     from .session_project import inspect_session
     from .session_mix import render_session
     from .multitrack import SessionError
+    from .session_presets import save_preset, load_preset, list_presets
 else:
     from session_project import inspect_session
     from session_mix import render_session
     from multitrack import SessionError
+    from session_presets import save_preset, load_preset, list_presets
 
 
 class SessionAuditWorker(QThread):
@@ -116,6 +118,19 @@ class SessionMixDialog(QDialog):
             "Explicitly include a full-song reference mix (may double recorded instruments)"
         )
         layout.addWidget(self.include_reference)
+        presets = QHBoxLayout()
+        self.preset_list = QComboBox()
+        self.save_preset_button = QPushButton("Save mix settings")
+        self.load_preset_button = QPushButton("Restore saved mix")
+        self.save_preset_button.setEnabled(False)
+        self.load_preset_button.setEnabled(False)
+        self.save_preset_button.clicked.connect(self.save_mix_preset)
+        self.load_preset_button.clicked.connect(self.load_mix_preset)
+        presets.addWidget(QLabel("Mix presets"))
+        presets.addWidget(self.preset_list)
+        presets.addWidget(self.save_preset_button)
+        presets.addWidget(self.load_preset_button)
+        layout.addLayout(presets)
         self.status = QLabel("No session loaded.")
         self.status.setTextFormat(Qt.PlainText)
         self.status.setWordWrap(True)
@@ -152,6 +167,9 @@ class SessionMixDialog(QDialog):
         self.session = None
         self.table.setRowCount(0)
         self.mix_button.setEnabled(False)
+        self.save_preset_button.setEnabled(False)
+        self.load_preset_button.setEnabled(False)
+        self.preset_list.clear()
         self.play_button.setEnabled(False)
         self.open_button.setEnabled(False)
         self.rendered = None
@@ -201,6 +219,8 @@ class SessionMixDialog(QDialog):
             "All tracks begin at their saved zero offset, plus optional per-track delay."
         )
         self.mix_button.setEnabled(True)
+        self.save_preset_button.setEnabled(True)
+        self.refresh_presets()
 
     def audit_finished(self):
         worker, self.checker = self.checker, None
@@ -222,6 +242,58 @@ class SessionMixDialog(QDialog):
                 "delay_ms": self.table.cellWidget(index, 6).value(),
             }
         return result
+
+    def refresh_presets(self):
+        self.preset_list.clear()
+        if self.session is None:
+            self.load_preset_button.setEnabled(False)
+            return
+        try:
+            for path, name in list_presets(self.session):
+                self.preset_list.addItem(name, str(path))
+        except SessionError as error:
+            self.status.setText(str(error))
+        self.load_preset_button.setEnabled(self.preset_list.count() > 0)
+
+    def save_mix_preset(self):
+        if self.session is None or self.worker is not None:
+            return
+        name, accepted = QInputDialog.getText(
+            self, "Save private mix preset", "Mix preset name:")
+        if not accepted:
+            return
+        try:
+            path = save_preset(
+                self.session, self.mix_controls(), name=name,
+                include_reference=self.include_reference.isChecked())
+            self.refresh_presets()
+            for index in range(self.preset_list.count()):
+                if self.preset_list.itemData(index) == str(path):
+                    self.preset_list.setCurrentIndex(index)
+                    break
+            self.status.setText("Private mix preset saved. Existing audio was untouched.")
+        except (OSError, SessionError, ValueError) as error:
+            self.status.setText(str(error))
+
+    def load_mix_preset(self):
+        if self.session is None or self.worker is not None:
+            return
+        selected = self.preset_list.currentData()
+        if not selected:
+            return
+        try:
+            preset = load_preset(self.session, selected)
+            for index, track in enumerate(self.session["tracks"]):
+                settings = preset["controls"][track["filename"]]
+                self.table.cellWidget(index, 2).setValue(settings["gain"])
+                self.table.cellWidget(index, 3).setValue(settings["pan"])
+                self.table.cellWidget(index, 4).setChecked(settings["mute"])
+                self.table.cellWidget(index, 5).setChecked(settings["solo"])
+                self.table.cellWidget(index, 6).setValue(settings["delay_ms"])
+            self.include_reference.setChecked(preset["include_reference"])
+            self.status.setText(f"Restored preset: {preset['name']}. No render was started.")
+        except (OSError, SessionError, ValueError) as error:
+            self.status.setText(str(error))
 
     def start_mix(self):
         if self.worker is not None or self.checker is not None or self.session is None:
