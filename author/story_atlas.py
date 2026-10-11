@@ -5,6 +5,7 @@ the writer and are never automatically promoted to canon by an AI.
 """
 import hashlib
 import re
+import sqlite3
 from collections import defaultdict
 
 
@@ -80,11 +81,14 @@ class StoryAtlas:
         notes = _clean(notes, 'Entity notes', 12000)
         if kind not in self.ENTITY_KINDS:
             raise ValueError('Unsupported atlas entity category.')
-        with self.db:
-            cursor = self.db.execute(
-                'INSERT INTO atlas_entities(name,kind,notes) VALUES(?,?,?)',
-                (name, kind, notes)
-            )
+        try:
+            with self.db:
+                cursor = self.db.execute(
+                    'INSERT INTO atlas_entities(name,kind,notes) VALUES(?,?,?)',
+                    (name, kind, notes)
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError('An atlas entry with this name already exists.') from error
         return cursor.lastrowid
 
     def relationships(self, book_id):
