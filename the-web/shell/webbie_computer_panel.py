@@ -30,6 +30,7 @@ from local_models import choose_local_model
 from visual_step import propose_step
 from autopilot_policy import AutopilotPolicy
 from navigation_missions import NavigationMission, parse_navigation_request
+from action_journal import ActionJournal
 from webbie_operator_bridge import OperatorBridge
 
 
@@ -121,6 +122,7 @@ class WebbieComputerDialog(QDialog):
         self.autopilot = AutopilotPolicy()
         self.autopilot_revision = 0
         self.nav_mission = NavigationMission()
+        self.action_journal = ActionJournal()
         self.pending_step = None
         self.pending_step_target = None
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
@@ -257,6 +259,16 @@ class WebbieComputerDialog(QDialog):
         self.report = QTextEdit(); self.report.setReadOnly(True)
         self.report.setMaximumHeight(150); layout.addWidget(self.report)
         self.report.setPlainText('No program or screen is being controlled.')
+        self.activity = QTextEdit(); self.activity.setReadOnly(True)
+        self.activity.setObjectName('webbieActivityHistory')
+        self.activity.setMaximumHeight(135)
+        self.activity.setPlainText(self.action_journal.display())
+        self.activity.setAccessibleName('Recent Webbie computer actions')
+        layout.addWidget(QLabel('Recent computer actions (current session only)'))
+        layout.addWidget(self.activity)
+        clear_history = QPushButton('Clear action history')
+        clear_history.clicked.connect(self.clear_activity)
+        layout.addWidget(clear_history)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh_status)
         self.timer.start(1000)
@@ -264,6 +276,14 @@ class WebbieComputerDialog(QDialog):
 
     def status(self, message):
         self.report.setPlainText(message)
+
+    def record_activity(self, event):
+        self.action_journal.record(event)
+        self.activity.setPlainText(self.action_journal.display())
+
+    def clear_activity(self):
+        self.action_journal.clear()
+        self.activity.setPlainText(self.action_journal.display())
 
     def selected_app(self):
         identity = self.app_select.currentData()
@@ -305,6 +325,7 @@ class WebbieComputerDialog(QDialog):
             self.grant.stop()
             self.status('Desktop voice bridge unavailable: ' + str(error))
             return
+        self.record_activity('grant_started')
         self.taskApproved.emit(task)
         self.status(f'Authorized: {app.name}. No changes made yet.')
         self.refresh_status()
@@ -312,6 +333,7 @@ class WebbieComputerDialog(QDialog):
     def stop(self):
         self.autopilot.stop()
         self.nav_mission.stop()
+        self.record_activity('stopped')
         self.operator.stop()
         self.pending_step = None
         self.pending_step_target = None
@@ -329,9 +351,11 @@ class WebbieComputerDialog(QDialog):
         else:
             title = 'Confirm Webbie change'
             body = preview + '\n\nConfirm this potentially destructive computer action?'
-        return QMessageBox.question(
+        approved = (QMessageBox.question(
             self, title, body,
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes)
+        self.record_activity('review_approved' if approved else 'review_denied')
+        return approved
 
     def refresh_status(self):
         # A deliberate voice/GUI "Webby stop" revokes desktop task grants.
@@ -447,6 +471,7 @@ class WebbieComputerDialog(QDialog):
             self.status('The system default browser could not handle this link.')
             return False
         self.browser_url.setText(destination)
+        self.record_activity('website_requested')
         self.status('Website open requested in the system default browser: ' +
                     destination[:300])
         self.refresh_status()
@@ -463,7 +488,8 @@ class WebbieComputerDialog(QDialog):
     def open_app(self):
         app = self.selected_app()
         if app:
-            self.action(self.operator.open_app, app.name)
+            result = self.action(self.operator.open_app, app.name)
+            self.record_activity('app_requested' if result else 'app_denied')
 
     def refresh_windows(self):
         listing = self.action(self.operator.windows)
@@ -490,7 +516,8 @@ class WebbieComputerDialog(QDialog):
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if choice == QMessageBox.Yes:
             self.pause_autopilot()
-            self.action(self.operator.bind_window, target)
+            if self.action(self.operator.bind_window, target):
+                self.record_activity('window_bound')
 
     def focus_window(self):
         if self.selected_window():
@@ -542,6 +569,7 @@ class WebbieComputerDialog(QDialog):
             if target not in {item['id'] for item in self.operator.windows()}:
                 raise ValueError('The selected window no longer exists')
             image = capture_window(target, approved=True)
+            self.record_activity('window_observed')
         except (ValueError, RuntimeError, PermissionError, OSError) as error:
             self.status(str(error)); return
         self.status('Local Ollama is describing this one authorized window.')
@@ -822,6 +850,7 @@ class WebbieComputerDialog(QDialog):
             return
         lines = [f'{index + 1}. {step.label} ({step.key})'
                  for index, step in enumerate(task.steps)]
+        self.record_activity('mission_staged')
         self.nav_status.setText(
             'Proposed sequence, NO ACTION TAKEN:\n' + '\n'.join(lines) +
             '\nApprove each step using Run next reviewed step. '
@@ -853,16 +882,20 @@ class WebbieComputerDialog(QDialog):
         pending = self.nav_mission.complete(
             success=result is not None, revision=revision)
         if result is None:
+            self.record_activity('mission_failed')
             self.nav_status.setText('Navigation failed; remaining steps canceled.')
         elif pending:
+            self.record_activity('mission_step')
             self.nav_status.setText('Step completed. ' + self.nav_mission.progress())
         else:
+            self.record_activity('mission_done')
             self.nav_status.setText(
                 'All requested navigation steps sent. Verify the window.')
         self.refresh_status()
 
     def cancel_navigation(self):
         self.nav_mission.stop()
+        self.record_activity('mission_canceled')
         self.nav_status.setText('Navigation mission canceled.')
         self.refresh_status()
 
