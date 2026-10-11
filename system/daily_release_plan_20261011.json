@@ -36,7 +36,10 @@
       "pull_requests": [
         54,
         58,
-        61
+        61,
+        67,
+        68,
+        69
       ],
       "required_files": [
         "webbie/agent/webbie.py",
@@ -58,6 +61,7 @@
     {
       "name": "Studio",
       "pull_requests": [
+        57,
         59,
         62
       ],
@@ -70,6 +74,7 @@
     {
       "name": "Author",
       "pull_requests": [
+        51,
         56
       ],
       "required_files": [
@@ -80,7 +85,8 @@
     {
       "name": "Kali Bay",
       "pull_requests": [
-        60
+        60,
+        65
       ],
       "required_files": [
         "kali-bay/ui/kali_bay.py",
@@ -100,9 +106,7 @@
     },
     {
       "name": "Media Center/Nova Radio",
-      "pull_requests": [
-        49
-      ],
+      "pull_requests": [],
       "required_files": [
         "media/ai-dj/service.py",
         "media/ai-dj/nova_host.py"
@@ -120,10 +124,22 @@
       "paths": []
     },
     {
+      "pr": 51,
+      "workspace": "Author",
+      "branch": "feature/author-docx-import-preview-20261011",
+      "observed_sha": "0c8f8a3225bdb8118dffe34b0e1d5249a2d83a88",
+      "paths": [
+        "author/main.py",
+        "author/manuscript_import.py",
+        "author/store.py"
+      ],
+      "integrated": false
+    },
+    {
       "pr": 52,
       "workspace": "The Web",
       "branch": "upgrades/the-web-menu-readability-20261011",
-      "observed_sha": "f09376efe2e82e288a7c1058ff19d28c4fefa980",
+      "observed_sha": "1723361cf7644a7275106407ddee517bda397c76",
       "integrated": false,
       "paths": [
         "the-web/shell/main.py",
@@ -131,6 +147,17 @@
         "the-web/shell/command_palette.py",
         "the-web/shell/navigation_core.py",
         "the-web/shell/readability.py"
+      ]
+    },
+    {
+      "pr": 53,
+      "workspace": "Study",
+      "branch": "feature/study-school-planner-20261011",
+      "observed_sha": "02cdb9fc6b97560b5e4b2eac33e214fa85cb9195",
+      "integrated": false,
+      "paths": [
+        "study/study.py",
+        "study/assignment_workflow.py"
       ]
     },
     {
@@ -146,6 +173,50 @@
       ]
     },
     {
+      "pr": 55,
+      "workspace": "Forage/Deep Forage",
+      "branch": "feature/forage-deep-research-20261011",
+      "observed_sha": "60bdc96c4dad4c812b11c4087514d74838aacc16",
+      "integrated": true,
+      "paths": [
+        "forage/engine.py",
+        "forage/local_index.py",
+        "forage/research_quality.py",
+        "forage/document_text.py",
+        "forage/deep-forage/deep_forage.py",
+        "webbie/agent/webbie.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 56,
+      "workspace": "Author",
+      "branch": "feature/author-project-map-progress-20261011",
+      "observed_sha": "78cf3b530c7c5fc95b55229a100a92e30f33936d",
+      "integrated": false,
+      "paths": [
+        "author/main.py",
+        "author/store.py",
+        "author/commands.py",
+        "author/control_socket.py",
+        "author/project_map.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 57,
+      "workspace": "Studio",
+      "branch": "feature/studio-band-pan-mute-20261011",
+      "observed_sha": "4b59692728d2ddba46a40c23469e2924e89674d2",
+      "paths": [
+        "studio/band_mix.py",
+        "studio/band_mixer_panel.py",
+        "studio/main.py",
+        "the-web/package/reconcile-native.py"
+      ],
+      "integrated": false
+    },
+    {
       "pr": 58,
       "workspace": "Webbie",
       "branch": "fix/webbie-proactive-checkins-20261011",
@@ -153,6 +224,32 @@
       "integrated": false,
       "paths": [
         "webbie/agent/webbie.py"
+      ]
+    },
+    {
+      "pr": 59,
+      "workspace": "Studio",
+      "branch": "feature/studio-session-mixing-20261011",
+      "observed_sha": "830c68a4c54a9b50b3cb7d966189747ac6440e39",
+      "integrated": false,
+      "paths": [
+        "studio/ai_panel.py",
+        "studio/session_mix.py",
+        "studio/session_project.py",
+        "studio/session_qc.py"
+      ]
+    },
+    {
+      "pr": 60,
+      "workspace": "Kali Bay",
+      "branch": "upgrades/kali-bay-command-center-20261011",
+      "observed_sha": "b2bda51c4ce5c99b3276d3c5c6c9b1f80d92bdf7",
+      "integrated": false,
+      "paths": [
+        "kali-bay/ui/kali_bay.py",
+        "kali-bay/bin/kali-bay",
+        "kali-bay/runtime/workspace_store.py",
+        "webbie/agent/kali_assistant.py"
       ]
     },
     {
@@ -172,46 +269,6 @@
       ]
     },
     {
-      "pr": 53,
-      "workspace": "Study",
-      "branch": "feature/study-school-planner-20261011",
-      "observed_sha": "02cdb9fc6b97560b5e4b2eac33e214fa85cb9195",
-      "integrated": false,
-      "paths": [
-        "study/study.py",
-        "study/assignment_workflow.py"
-      ]
-    },
-    {
-      "pr": 64,
-      "workspace": "Study",
-      "branch": "feature/study-assignment-workspaces-20261011",
-      "observed_sha": "7ebf6d388efe933f1c5ef595cbc907cbdfd4ce85",
-      "integrated": false,
-      "paths": [
-        "study/study.py",
-        "study/store.py",
-        "study/assignment_workflow.py",
-        "study/flashcards.py",
-        "study/assignment_workspace_ui.py",
-        "system/release_batch.py",
-        "the-web/package/install-desktop.sh"
-      ]
-    },
-    {
-      "pr": 59,
-      "workspace": "Studio",
-      "branch": "feature/studio-session-mixing-20261011",
-      "observed_sha": "e4b31933277c7cfba64210c3c106211f009d3101",
-      "integrated": false,
-      "paths": [
-        "studio/ai_panel.py",
-        "studio/session_mix.py",
-        "studio/session_project.py",
-        "studio/session_qc.py"
-      ]
-    },
-    {
       "pr": 62,
       "workspace": "Studio",
       "branch": "feature/studio-production-workflow-v8-20261011",
@@ -225,50 +282,97 @@
       ]
     },
     {
-      "pr": 56,
-      "workspace": "Author",
-      "branch": "feature/author-project-map-progress-20261011",
-      "observed_sha": "78cf3b530c7c5fc95b55229a100a92e30f33936d",
+      "pr": 64,
+      "workspace": "Study",
+      "branch": "feature/study-assignment-workspaces-20261011",
+      "observed_sha": "991a5b76759ea90d49cb0d54edf3ca5445008f64",
       "integrated": false,
       "paths": [
-        "author/main.py",
-        "author/store.py",
-        "author/commands.py",
-        "author/control_socket.py",
-        "author/project_map.py",
-        "system/release_batch.py"
+        "study/study.py",
+        "study/store.py",
+        "study/assignment_workflow.py",
+        "study/flashcards.py",
+        "study/assignment_workspace_ui.py",
+        "system/release_batch.py",
+        "the-web/package/install-desktop.sh"
       ]
     },
     {
-      "pr": 60,
+      "pr": 65,
       "workspace": "Kali Bay",
-      "branch": "upgrades/kali-bay-command-center-20261011",
-      "observed_sha": "b2bda51c4ce5c99b3276d3c5c6c9b1f80d92bdf7",
-      "integrated": false,
+      "branch": "upgrades/kali-bay-reports-playbooks-20261011",
+      "observed_sha": "577e004b37c3875c68852ddc1afbeae97c433726",
       "paths": [
+        "kali-bay/runtime/evidence_fingerprint.py",
+        "kali-bay/runtime/lab_reports.py",
         "kali-bay/ui/kali_bay.py",
-        "kali-bay/bin/kali-bay",
-        "kali-bay/runtime/workspace_store.py",
-        "webbie/agent/kali_assistant.py"
-      ]
+        "kali-bay/package/install-kali-bay.sh"
+      ],
+      "integrated": false
     },
     {
-      "pr": 55,
-      "workspace": "Forage/Deep Forage",
-      "branch": "feature/forage-deep-research-20261011",
-      "observed_sha": "60bdc96c4dad4c812b11c4087514d74838aacc16",
-      "integrated": true,
+      "pr": 67,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-jarvis-context-browser-20261011",
+      "observed_sha": "d4f40bed4bb6f778282ca1fe96e026584867b034",
       "paths": [
-        "forage/engine.py",
-        "forage/local_index.py",
-        "forage/research_quality.py",
-        "forage/document_text.py",
-        "forage/deep-forage/deep_forage.py",
         "webbie/agent/webbie.py",
-        "system/release_batch.py"
-      ]
+        "system/release_batch.py",
+        "the-web/shell/webbie_panel.py",
+        "tools/combined_release_audit.py",
+        "webbie/brain/brain.py",
+        "webbie/brain/jarvis_context.py",
+        "webbie/agent/browser_routes.py"
+      ],
+      "integrated": false
+    },
+    {
+      "pr": 68,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-jarvis-navigation-missions-20261011",
+      "observed_sha": "c7127cc3b6fcb70bae3cf4d2c7833aefecc95048",
+      "paths": [
+        "webbie/agent/webbie.py",
+        "system/release_batch.py",
+        "the-web/shell/webbie_panel.py",
+        "tools/combined_release_audit.py",
+        "webbie/brain/jarvis_context.py",
+        "webbie/agent/jarvis_commands.py",
+        "webbie/actions/navigation_missions.py"
+      ],
+      "integrated": false
+    },
+    {
+      "pr": 69,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-jarvis-cognitive-control-center-20261011",
+      "observed_sha": "1e895d036752baf2b6b6f7fba6df0e2d2f78383b",
+      "paths": [
+        "webbie/agent/webbie.py",
+        "system/release_batch.py",
+        "the-web/shell/webbie_panel.py",
+        "tools/combined_release_audit.py",
+        "webbie/brain/brain.py",
+        "webbie/agent/voice_queue.py",
+        "webbie/brain/privacy_controls.py"
+      ],
+      "integrated": false
     }
   ],
   "resolved_shared_paths": [],
-  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations."
+  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations.",
+  "additive_source_stage": {
+    "commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
+    "total_files": 107,
+    "application_modules": 47,
+    "tests": 43,
+    "docs": 17,
+    "source_status": "Staged only; shared entrypoints are not reconciled."
+  },
+  "integrated_source_ci_status": {
+    "run_url": "https://github.com/brokenandalone/spider-narive-os/actions/runs/38176249604",
+    "result": "failed",
+    "tested_commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
+    "reason": "Mixed Study, Author, Studio, Kali, and Webbie tests expose incompatible shared entrypoints."
+  }
 }
