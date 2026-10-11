@@ -671,8 +671,7 @@ class TheWeb(QMainWindow):
         matching = next((task for task in self.visible_launcher_windows()
                          if task.ident.lower() == ident.lower()), None)
         if matching is None:
-            self.status.setText('Window list changed. Open Windows to refresh it.')
-            self.toggle_window_overview()
+            self.status.setText('Window list changed. Use Open Windows to refresh it.')
             return
         wm_command('-i', '-a', matching.ident)
         self.status.setText('Requested window activation: ' + matching.title[:90])
