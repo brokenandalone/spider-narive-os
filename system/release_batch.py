@@ -65,7 +65,7 @@ APP_FILES = (
     'webbie/agent/app_open_route.py',
     'webbie/agent/voice_turns.py', 'webbie/agent/dialogue_state.py',
     'webbie/agent/voice_queue.py', 'webbie/agent/proactive_checks.py',
-    'webbie/agent/local_reminders.py',
+    'webbie/agent/local_reminders.py', 'webbie/agent/voice_supervisor.py',
     'webbie/voice/interruptible_speech.py', 'webbie/voice/whisper_listener.py',
     'webbie/actions/desktop_control.py', 'webbie/actions/window_safety.py',
     'webbie/actions/task_grants.py',
