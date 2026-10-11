@@ -559,6 +559,8 @@ class StudyWindow(QMainWindow):
                         self.open_assignment_workspace)
         self.add_action(workspace_buttons, "COURSE FLASHCARDS",
                         self.open_flashcards)
+        self.add_action(workspace_buttons, "MY PROGRESS",
+                        self.open_study_progress)
         assignments_layout.addLayout(workspace_buttons)
         self.assignment_table.itemDoubleClicked.connect(
             lambda _: self.open_assignment_workspace())
@@ -1116,6 +1118,21 @@ class StudyWindow(QMainWindow):
             dialog.exec_()
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, "Flashcards", str(error))
+
+    def open_study_progress(self):
+        """Private, manually entered scores and logged study sessions."""
+        if not self.current_course_id:
+            self.status.setText("Choose a course for your progress tracker.")
+            return
+        try:
+            if __package__:
+                from .study_progress_ui import StudyProgressDialog
+            else:
+                from study_progress_ui import StudyProgressDialog
+            dialog = StudyProgressDialog(self.store, self.current_course_id, self)
+            dialog.exec_()
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Study progress", str(error))
 
     def complete_assignment(self):
         assignment_id = (
