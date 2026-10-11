@@ -125,7 +125,7 @@ class ClickGuideTests(unittest.TestCase):
                 writer.setnchannels(1)
                 writer.setsampwidth(2)
                 writer.setframerate(8000)
-                writer.writeframes(b"\\x00\\x00" * 800)
+                writer.writeframes(b"\x00\x00" * 800)
             project = export_session([
                 {"path": str(root / "vocal.wav"), "role": "lead_vocal", "label": "Lead"},
                 {"path": str(guide), "role": "click_guide", "label": "Reference clock"},
