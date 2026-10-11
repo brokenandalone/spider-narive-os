@@ -66,9 +66,7 @@ class EvidenceLedgerTests(unittest.TestCase):
         exported = reports.export_saved_report(self.lab["id"])
         self.assertIn("Metadata checked offline", exported.read_text())
         self.assertIn(second["entry_hash"], exported.read_text())
-        self.assertIn("not real-world custody", exported.read_text().lower() if
-                      "not real-world custody" in exported.read_text().lower() else
-                      ledger.ledger_summary(self.lab["id"]).lower())
+        self.assertIn("does not establish authenticity or custody", exported.read_text())
 
     def test_tampering_refuses_new_events_and_report_exports(self):
         ledger.append_event(
