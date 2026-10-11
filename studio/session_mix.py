@@ -58,9 +58,9 @@ def mix_plan(session, controls=None, *, include_reference=False):
             raise SessionError("Mute and solo must be yes or no.")
         planned.append({**track, "gain": float(gain), "pan": float(pan),
                         "delay_ms": delay, "mute": mute, "solo": solo})
-    # Reference audio already contains a whole song and is excluded by default.
-    eligible = [t for t in planned if not t["mute"] and
-                (include_reference or t["role"] != "reference_mix")]
+    # Reference mixes risk doubling tracks; click guides must never enter a release mix.
+    eligible = [t for t in planned if not t["mute"] and t["role"] != "click_guide"
+                and (include_reference or t["role"] != "reference_mix")]
     if any(t["solo"] for t in eligible):
         eligible = [t for t in eligible if t["solo"]]
     if not eligible:
