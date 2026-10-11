@@ -70,6 +70,7 @@ APP_FILES = (
     'webbie/voice/interruptible_speech.py', 'webbie/voice/whisper_listener.py',
     'webbie/actions/desktop_control.py', 'webbie/actions/window_safety.py',
     'webbie/actions/navigation_missions.py', 'webbie/actions/action_journal.py',
+    'webbie/agent/workspace_launchers.py',
     'webbie/actions/task_grants.py',
     'webbie/actions/screen_capture.py', 'webbie/actions/visual_step.py',
     'webbie/actions/autopilot_policy.py',
