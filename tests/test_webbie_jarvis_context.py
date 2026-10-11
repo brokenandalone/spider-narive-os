@@ -29,10 +29,12 @@ class JarvisContextTests(unittest.TestCase):
         return m.read_context(self.path, clock=lambda: self.clock[0])
 
     def test_workspace_and_title_available_briefly(self):
-        self.publish(selected_title="Broken Sorrow mix", approved_task="Record guitar")
+        self.publish(selected_title="Broken Sorrow mix", approved_task="Record guitar",
+                     selected_window="Ardour: Song Session")
         result = self.read()
         self.assertEqual(result["workspace"], "Studio")
         self.assertEqual(result["selected_title"], "Broken Sorrow mix")
+        self.assertEqual(result["selected_window"], "Ardour: Song Session")
         self.assertIn("Record guitar", m.context_summary(result))
         self.assertIn("not an instruction", m.advisory_context(result))
         self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
