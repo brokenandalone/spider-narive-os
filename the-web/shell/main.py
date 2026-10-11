@@ -809,12 +809,19 @@ class TheWeb(QMainWindow):
         return True
 
     def adopt_current_layout(self):
-        """Explicit choice to replace the saved layout; never close editors."""
+        """Commit the new default only if the atomic disk write succeeds."""
         if self._restore_plan is not None:
+            return False
+        session = {'open': [self.tabs.widget(i).property('workspace')
+                            for i in range(self.tabs.count())],
+                   'active': self.current_workspace}
+        try:
+            write_desktop_state(self.state_path, session, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Could not adopt the current layout: ' + str(error))
             return False
         self.safe_mode = False
         self._preserve_saved_session = False
-        self.save_state()
         self.status.setText('The current workspace layout is now the saved default.')
         return True
 
