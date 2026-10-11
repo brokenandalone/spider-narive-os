@@ -55,6 +55,7 @@ if not SPIDER_ROOT.exists():
 # It is only written by explicit favorite, create-lab or save-notes clicks.
 sys.path.insert(0, str(SPIDER_ROOT / "kali-bay" / "runtime"))
 import workspace_store as kali_store
+import lab_reports as kali_reports
 
 
 MANAGER = (
@@ -574,6 +575,10 @@ class KaliBayWindow(QMainWindow):
         self.security_tabs.addTab(
             self.build_lab_page(),
             "LAB NOTES",
+        )
+        self.security_tabs.addTab(
+            self.build_guides_page(),
+            "LAB GUIDES",
         )
         self._focus_search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self._focus_search_shortcut.activated.connect(self.focus_tool_search)
@@ -1283,6 +1288,14 @@ class KaliBayWindow(QMainWindow):
         share.setObjectName("kaliPrepareLabWebbie")
         share.clicked.connect(self.prepare_lab_for_webbie)
         controls.addWidget(share)
+        export = QPushButton("EXPORT SAVED REPORT")
+        export.setObjectName("kaliExportLabReport")
+        export.setToolTip(
+            "Creates a private Markdown report from the most recently "
+            "saved revision. Unsaved editor text is never exported."
+        )
+        export.clicked.connect(self.export_active_lab_report)
+        controls.addWidget(export)
         right.addLayout(controls)
         self.lab_status = QLabel("Locally stored in your private Spider OS home.")
         self.lab_status.setObjectName("kaliLabStatus")
@@ -1431,6 +1444,158 @@ class KaliBayWindow(QMainWindow):
         self.lab_status.setText(
             "Notes prepared in Webbie's message box. Review and send manually."
         )
+
+    def export_active_lab_report(self):
+        """Explicit file creation from SAVED notes, never hidden background export."""
+        if not self.active_lab:
+            QMessageBox.information(self, "Kali Bay", "Select a saved lab first.")
+            return
+        if self._lab_has_unsaved_changes():
+            QMessageBox.information(
+                self, "Save notes first",
+                "Save your current edits before exporting a report. "
+                "No report has been created."
+            )
+            return
+        try:
+            destination = kali_reports.export_saved_report(
+                self.active_lab["id"]
+            )
+            self.lab_status.setText(
+                "Private report saved locally: " + str(destination)
+            )
+        except (kali_store.StorageError, OSError) as error:
+            QMessageBox.warning(
+                self, "Kali Bay", "Report was not exported: " + str(error)
+            )
+
+    def build_guides_page(self):
+        """Offline static learning workflows; no commands or generated targets."""
+        page = QWidget()
+        page.setObjectName("kaliLabGuides")
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(16)
+        sidebar = QWidget()
+        left = QVBoxLayout(sidebar)
+        heading = QLabel("DEFENSIVE LAB GUIDES")
+        heading.setStyleSheet("font-size:18px;color:#f5e9ff;font-weight:bold;")
+        left.addWidget(heading)
+        info = QLabel(
+            "Offline investigation checklists for your authorized labs. "
+            "Selecting a guide never scans, installs or executes anything."
+        )
+        info.setWordWrap(True)
+        left.addWidget(info)
+        self.guide_search = QLineEdit()
+        self.guide_search.setObjectName("kaliGuideSearch")
+        self.guide_search.setPlaceholderText("Search workflows…")
+        self.guide_search.textChanged.connect(self.filter_guides)
+        left.addWidget(self.guide_search)
+        self.guide_list = QListWidget()
+        self.guide_list.setObjectName("kaliGuidesList")
+        self.guide_list.setStyleSheet(
+            "QListWidget {background:#160d27;color:#ffffff;"
+            "border:1px solid #a78bfa;border-radius:7px;}"
+            "QListWidget::item {padding:10px;}"
+            "QListWidget::item:selected {background:#6b21a8;}"
+        )
+        self.guide_list.currentItemChanged.connect(self.preview_guide)
+        left.addWidget(self.guide_list, 1)
+        layout.addWidget(sidebar, 1)
+        right_widget = QWidget()
+        right = QVBoxLayout(right_widget)
+        self.guide_title = QLabel("Choose a defensive workflow.")
+        self.guide_title.setObjectName("kaliGuideTitle")
+        self.guide_title.setStyleSheet(
+            "font-size:19px;color:#e9d5ff;font-weight:bold;"
+        )
+        right.addWidget(self.guide_title)
+        self.guide_preview = QPlainTextEdit()
+        self.guide_preview.setObjectName("kaliGuidePreview")
+        self.guide_preview.setReadOnly(True)
+        right.addWidget(self.guide_preview, 1)
+        create = QPushButton("CREATE NOTEBOOK FROM GUIDE")
+        create.setObjectName("kaliCreateGuidedLab")
+        create.clicked.connect(self.create_guided_lab)
+        right.addWidget(create)
+        disclosure = QLabel(
+            "This creates a new PRIVATE local notebook with the guide "
+            "template only after you confirm. It does not run Kali commands."
+        )
+        disclosure.setWordWrap(True)
+        right.addWidget(disclosure)
+        layout.addWidget(right_widget, 2)
+        self.filter_guides()
+        return page
+
+    def filter_guides(self, *_args):
+        previous = self.guide_list.currentItem()
+        previous_id = previous.data(Qt.UserRole) if previous else None
+        choices = kali_reports.list_guides(self.guide_search.text())
+        self.guide_list.clear()
+        for guide in choices:
+            item = QListWidgetItem(
+                f"{guide['category']}  /  {guide['title']}"
+            )
+            item.setData(Qt.UserRole, guide["id"])
+            self.guide_list.addItem(item)
+        selected = 0
+        if previous_id:
+            for index in range(self.guide_list.count()):
+                if self.guide_list.item(index).data(Qt.UserRole) == previous_id:
+                    selected = index
+                    break
+        if self.guide_list.count():
+            self.guide_list.setCurrentRow(selected)
+        else:
+            self.guide_title.setText("No guide matches your search.")
+            self.guide_preview.clear()
+
+    def preview_guide(self, item, _previous=None):
+        if item is None:
+            return
+        try:
+            guide = kali_reports.guide_by_id(item.data(Qt.UserRole))
+            self.guide_title.setText(guide["title"])
+            self.guide_preview.setPlainText(
+                kali_reports.guide_template(guide["id"])
+            )
+        except kali_store.StorageError:
+            self.guide_title.setText("Unavailable guide")
+            self.guide_preview.clear()
+
+    def create_guided_lab(self):
+        current = self.guide_list.currentItem()
+        if current is None:
+            QMessageBox.information(self, "Kali Bay", "Select a guide first.")
+            return
+        if not self._confirm_discard_lab():
+            return
+        try:
+            guide = kali_reports.guide_by_id(current.data(Qt.UserRole))
+            template = kali_reports.guide_template(guide["id"])
+        except kali_store.StorageError as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
+            return
+        reply = QMessageBox.question(
+            self, "Create authorized lab",
+            f"Create a private notebook based on {guide['title']}? "
+            "No security tools will be executed.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            lab = kali_store.create_lab(guide["title"])
+            saved = kali_store.save_lab(
+                lab["id"], template, expected_revision=lab["revision"]
+            )
+            self.active_lab = None
+            self.refresh_labs(select_id=saved["id"])
+            self.security_tabs.setCurrentIndex(3)
+        except (kali_store.StorageError, OSError) as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
 
     def check_purple_defense_tools(self):
         """Show installed defensive binaries, never assume services are running."""
