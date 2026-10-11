@@ -10,7 +10,6 @@ import unicodedata
 
 INTERNAL_ACTIONS = (
     ('windows', 'Open Windows', 'Switch, minimize, or close a running window'),
-    ('home', 'Workspace Home', 'Return to The Web without closing open tabs'),
     ('webbie', 'Ask Webbie', 'Open your existing Webbie assistant'),
     ('quick-settings', 'Quick Settings', 'Network, appearance, and desktop controls'),
     ('notifications', 'Notifications', 'Review recent desktop alerts'),
