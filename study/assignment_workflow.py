@@ -9,7 +9,7 @@ import re
 WORK_FIELDS = ("instructions", "rubric", "research", "outline", "draft",
                "references", "feedback")
 MAX_FIELD = 120_000
-MAX_WEBBIE_CONTEXT = 14_000
+MAX_WEBBIE_CONTEXT = 11_000
 
 
 def normalized_fields(values):
