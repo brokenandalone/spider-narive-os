@@ -37,7 +37,8 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert (Path(folder)/'spider-os/appearance.json').is_file()
     with patch.object(main, 'list_tasks', return_value=[Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]), patch.object(main, 'close_window') as close, patch.object(main.QApplication, 'primaryScreen') as screen, patch.object(main, 'minimize_window', return_value=True) as minimize, patch.object(main, 'maximize_window') as maximize:
         screen.return_value.geometry.return_value.width.return_value = 1280
-        window.desktop_mode = True; window.taskbar.refresh()
+        window.desktop_mode = True
+        window.taskbar.render_tasks([Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')])
         group = window.taskbar.tasks.itemAt(0).widget()
         close_button = next(item for item in group.findChildren(QPushButton) if item.text() == '×')
         close_button.click(); close.assert_called_with('0x00000101')
@@ -47,8 +48,16 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         overflow.actions()[0].menu().actions()[2].trigger(); minimize.assert_called_with('0x00000103')
         overflow.actions()[0].menu().actions()[3].trigger(); maximize.assert_called_with('0x00000103')
         screen.return_value.geometry.return_value.width.return_value = 900
-        window.taskbar.refresh(); assert window.taskbar.tasks.itemAt(0).widget().menu() is not None
-        window.desktop_mode = False; window.taskbar.refresh()
+        window.taskbar.render_tasks([Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]); assert window.taskbar.tasks.itemAt(0).widget().menu() is not None
+        window.desktop_mode = False; window.taskbar.render_tasks([])
+    # Launcher search is a visible, fixed-target UI, never a shell interpreter.
+    window.command_palette.search.setText('Webbie')
+    assert any(window.command_palette.matches.item(i).data(Qt.UserRole) == ('workspace', 'webbie')
+               for i in range(window.command_palette.matches.count()))
+    window.command_palette.search.setText('Studio')
+    window.command_palette.refresh()
+    assert window.command_palette.matches.count() >= 1
+    window.command_palette.hide()
     for name in main.WORKSPACES:
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
@@ -118,6 +127,12 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     window.open_workspace('deep-forage')
     wallpaper_id=window.wallpaper_catalog.defaults['deep-forage']
     window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))
+    # Off-thread app and wmctrl discovery must finish before tearing down Qt.
+    app.processEvents()
+    for active in (window.app_scan_worker, window.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
     window.open_author();assert window.close()
     reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
     assert reopened.appearance=='light'
@@ -125,5 +140,10 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert reopened.taskbar.styleSheet()==reopened.styleSheet()
     assert reopened.workspace_widgets['author'].native.store.chapter(chapter)['content']=='Edited inside the workspace tab'
     assert reopened.wallpaper_catalog.selected_id('deep-forage')==wallpaper_id
+    app.processEvents()
+    for active in (reopened.app_scan_worker, reopened.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
     assert reopened.close();app.processEvents()
 print('DESKTOP INTEGRATION PASSED: 15 tabs, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')
