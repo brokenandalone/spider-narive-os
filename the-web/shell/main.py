@@ -657,6 +657,36 @@ class TheWeb(QMainWindow):
     def toggle_command_palette(self):
         self.command_palette.show_palette()
 
+    def visible_launcher_windows(self):
+        """Only fresh X11 window IDs already discovered by the taskbar."""
+        if (not self.desktop_mode or
+                time.monotonic() - self.taskbar.last_window_scan_at > 15.0):
+            return []
+        return list(self.taskbar.window_items)
+
+    def activate_launcher_window(self, ident):
+        """Require a fresh match, not an ID supplied by arbitrary text."""
+        if not valid_window_id(ident):
+            return
+        matching = next((task for task in self.visible_launcher_windows()
+                         if task.ident.lower() == ident.lower()), None)
+        if matching is None:
+            self.status.setText('Window list changed. Open Windows to refresh it.')
+            self.toggle_window_overview()
+            return
+        wm_command('-i', '-a', matching.ident)
+        self.status.setText('Requested window activation: ' + matching.title[:90])
+
+    def clear_recent_navigation(self):
+        """Explicit privacy control; favorites and open tabs stay untouched."""
+        self.navigation_state['recent'] = []
+        try:
+            save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Recent history could not be saved: ' + str(error))
+        self.render_recent_shortcuts()
+        self.command_palette.refresh()
+
     def execute_palette_action(self, ident):
         """Only explicitly registered desktop actions can be dispatched."""
         actions = {
@@ -737,6 +767,79 @@ class TheWeb(QMainWindow):
             except Exception as error:
                 self.status.setText('Notes could not be saved: ' + str(error)); return False
         return native is None or native.close()
+
+    def cycle_tab(self, direction):
+        destination = adjacent_index(self.tabs.count(),
+                                     self.tabs.currentIndex(), direction)
+        if destination >= 0:
+            self.tabs.setCurrentIndex(destination)
+
+    def tab_moved(self, origin, destination):
+        # The home tab must stay first even if someone drags it by accident.
+        if getattr(self, '_fixing_home_tab', False):
+            return
+        home = self.workspace_widgets.get('default')
+        home_index = self.tabs.indexOf(home) if home is not None else -1
+        if home_index > 0:
+            self._fixing_home_tab = True
+            try:
+                self.tabs.tabBar().moveTab(home_index, 0)
+            finally:
+                self._fixing_home_tab = False
+        self.save_state()
+
+    def tab_context_menu(self, point):
+        index = self.tabs.tabBar().tabAt(point)
+        page = self.tabs.widget(index)
+        if page is None:
+            return
+        workspace = page.property('workspace')
+        label = WORKSPACES.get(workspace, 'Workspace')
+        menu = QMenu(self.tabs)
+        menu.addAction('Open ' + label,
+                       lambda checked=False, target=index: self.tabs.setCurrentIndex(target))
+        if workspace != 'default':
+            pinned = ['workspace', workspace] in self.navigation_state.get('favorites', [])
+            menu.addAction('Unpin workspace' if pinned else 'Pin workspace',
+                           lambda checked=False, key=workspace:
+                               self.toggle_navigation_pin('workspace', key))
+            menu.addSeparator()
+            menu.addAction('Close ' + label,
+                           lambda checked=False, key=workspace:
+                               self.close_named_tab(key))
+        others = other_tab_names(
+            [self.tabs.widget(i).property('workspace') for i in range(self.tabs.count())],
+            workspace, WORKSPACES)
+        if others:
+            menu.addAction('Close other workspace tabs',
+                           lambda checked=False, key=workspace:
+                               self.close_other_workspace_tabs(key))
+        menu.addSeparator()
+        menu.addAction('Return to The Web home', self.show_desktop)
+        menu.exec_(self.tabs.tabBar().mapToGlobal(point))
+
+    def close_named_tab(self, workspace):
+        page = self.workspace_widgets.get(workspace)
+        if page is None or workspace == 'default':
+            return
+        index = self.tabs.indexOf(page)
+        if index >= 0:
+            self.close_tab(index)
+
+    def close_other_workspace_tabs(self, selected):
+        """Honor every native workspace's existing close/save guards."""
+        names = other_tab_names(
+            [self.tabs.widget(i).property('workspace') for i in range(self.tabs.count())],
+            selected, WORKSPACES)
+        for name in reversed(names):
+            if name not in self.workspace_widgets:
+                continue
+            self.close_named_tab(name)
+            if name in self.workspace_widgets:
+                # A native editor refused close or still has pending work.
+                return
+        if selected in self.workspace_widgets:
+            self.tabs.setCurrentWidget(self.workspace_widgets[selected])
 
     def close_tab(self, index):
         page = self.tabs.widget(index)
