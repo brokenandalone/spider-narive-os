@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "the-web/shell"))
 try:
-    from PyQt5.QtWidgets import QApplication, QMessageBox
+    from PyQt5.QtWidgets import QApplication, QMessageBox, QScrollArea
     from webbie_computer_panel import WebbieComputerDialog
     QT = True
 except ImportError:
@@ -34,6 +34,18 @@ class JarvisBrowserGuiTests(unittest.TestCase):
         panel = WebbieComputerDialog(discover=lambda: [app], run=Mock(),
                                     launcher=Mock(), browser_opener=opener)
         return panel
+
+    def test_control_panel_has_scrollable_layout(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(
+                os.environ, {"DISPLAY": ":0"}), patch(
+                "webbie_operator_bridge.private_socket_directory",
+                return_value=Path(temp)):
+            panel = self.make(temp, opener=Mock(return_value=True))
+            try:
+                self.assertIsNotNone(
+                    panel.findChild(QScrollArea, "webbieControlsScrollable"))
+            finally:
+                panel.close()
 
     def test_voice_proposal_never_grants_or_launches(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(
