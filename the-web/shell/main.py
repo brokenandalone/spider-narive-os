@@ -36,6 +36,7 @@ from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
 from window_overview import WindowOverview
 from appearance import LIGHT_STYLE, appearance_file, load_theme, save_theme
+from readability import load_menu_size, save_menu_size, readability_css
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
 from tray_panel import TrayPanel
@@ -102,7 +103,7 @@ class StartMenu(QDialog):
     def __init__(self, shell):
         super().__init__(shell, Qt.Popup)
         self.shell = shell
-        self.setObjectName('panel'); self.setStyleSheet(STYLE); self.resize(580, 650)
+        self.setObjectName('panel'); self.setStyleSheet(shell._appearance_style()); self.resize(580, 650)
         layout = QVBoxLayout(self)
         heading = QLabel('SPIDER OS  /  Start'); heading.setFont(QFont('Sans Serif', 22, QFont.Bold)); layout.addWidget(heading)
         self.search = QLineEdit(); self.search.setPlaceholderText('Find a workspace or installed app'); layout.addWidget(self.search)
@@ -135,14 +136,21 @@ class StartMenu(QDialog):
     def show_menu(self, dock):
         if self.isVisible():
             self.hide(); return
-        self.populate(); self.move(dock.x(), max(dock.screen().geometry().top(), dock.y() - self.height() - 8))
+        self.populate()
+        bounds = dock.screen().availableGeometry()
+        width = min(self.width(), max(320, bounds.width() - 16))
+        height = min(self.height(), max(280, bounds.height() - 16))
+        self.resize(width, height)
+        xpos = min(max(dock.x(), bounds.left() + 8), bounds.right() - width - 8)
+        ypos = min(max(dock.y() - height - 8, bounds.top() + 8), bounds.bottom() - height - 8)
+        self.move(xpos, ypos)
         self.show(); self.raise_(); self.search.setFocus()
 
 
 class Taskbar(QWidget):
     def __init__(self, shell):
         super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
-        self.shell = shell; self.setObjectName('panel'); self.setStyleSheet(STYLE)
+        self.shell = shell; self.setObjectName('panel'); self.setStyleSheet(shell._appearance_style())
         self.setWindowTitle('The Web Taskbar')
         layout = QHBoxLayout(self); layout.setContentsMargins(8, 4, 8, 4)
         self.start = button('Start', lambda: shell.start_menu.show_menu(self)); self.start.setIcon(QIcon(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png'))); layout.addWidget(self.start)
@@ -213,6 +221,7 @@ class TheWeb(QMainWindow):
         self.state_path = self.wallpaper_catalog.config.parent / 'desktop.json'
         self.appearance_path = appearance_file()
         self.appearance = load_theme(self.appearance_path)
+        self.menu_text_size = load_menu_size()
         self.installed_apps = discover_apps(desktops='TheWeb:KDE')
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(self._appearance_style())
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
@@ -566,7 +575,30 @@ class TheWeb(QMainWindow):
             panel.raise_()
 
     def _appearance_style(self):
-        return LIGHT_STYLE if self.appearance == 'light' else STYLE
+        base = LIGHT_STYLE if self.appearance == 'light' else STYLE
+        return base + readability_css(self.appearance, self.menu_text_size)
+
+    def _refresh_chrome_style(self):
+        # Qt menus and combo drop-downs may live in their own popup windows.
+        # Restyle The Web's windows explicitly, not KDE or GTK applications.
+        sheet = self._appearance_style()
+        self.setStyleSheet(sheet)
+        self.start_menu.setStyleSheet(sheet)
+        self.taskbar.setStyleSheet(sheet)
+        for panel_name in ('quick_settings_panel', 'window_overview',
+                           'notification_center', 'tray_panel', 'quick_volume'):
+            panel = getattr(self, panel_name, None)
+            if panel is not None:
+                panel.setStyleSheet(sheet)
+
+    def choose_menu_text_size(self, size):
+        if size == self.menu_text_size:
+            return
+        save_menu_size(size)
+        self.menu_text_size = size
+        self._refresh_chrome_style()
+        self.status.setText('Menu text set to ' + size.replace('-', ' ') +
+                            '. The setting will remain after sign-in.')
 
     def _brand_style(self):
         color = '#4c1674' if self.appearance == 'light' else '#e9d5ff'
@@ -581,12 +613,9 @@ class TheWeb(QMainWindow):
             return
         save_theme(theme, self.appearance_path)
         self.appearance = theme
-        stylesheet = self._appearance_style()
-        self.setStyleSheet(stylesheet)
+        self._refresh_chrome_style()
         self.brand_title.setStyleSheet(self._brand_style())
         self.background_surface.set_appearance(theme)
-        self.start_menu.setStyleSheet(stylesheet)
-        self.taskbar.setStyleSheet(stylesheet)
         self.status.setText('The Web appearance: ' + theme + '. KDE/GTK applications unchanged.')
 
     def toggle_window_overview(self):
@@ -613,7 +642,9 @@ class TheWeb(QMainWindow):
         if panel is None:
             self.quick_settings_panel=QuickSettingsPanel(
                 self, appearance_reader=lambda: self.appearance,
-                appearance_writer=self.choose_appearance)
+                appearance_writer=self.choose_appearance,
+                menu_size_reader=lambda: self.menu_text_size,
+                menu_size_writer=self.choose_menu_text_size)
             panel=self.quick_settings_panel
         if panel.isVisible():
             panel.hide()
