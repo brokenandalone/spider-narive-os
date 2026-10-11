@@ -44,3 +44,17 @@ The live PC's customized scripts and service versions are **not available to thi
 - Forage source foundation: [PR #55](https://github.com/brokenandalone/spider-narive-os/pull/55)
 
 **No live installation was performed by these GitHub commits.**
+
+## Kali Bay next integration: private Evidence Ledger, October 11 evening
+
+This downstream candidate adds Kali Bay's PR #70 evidence ledger on top of the already integrated Kali Bay launchers, favorites, Lab Notes, guides, report exports, Kali Purple and file fingerprinting found in draft PR #66. Unlike applying the original Kali feature branch directly, this preserves the release's **disabled separate Kali installer** and the global once-per-day batch guard.
+
+- Source modules added: `kali-bay/runtime/evidence_ledger.py`, `kali-bay/package/audit-upgrade.py`.
+- The current release's Kali UI and report module were confirmed to match the feature branch's exact pre-ledger blobs before updating, avoiding unrelated Webbie, Study, Studio, desktop or Media overwrites.
+- Single batch manifest now contains the evidence ledger and read-only audit script. Kali-specific selective script's **--install remains BLOCKED** and is not a second install path.
+- Daily continuity plan now tracks PR #70, the ledger and upgrade audit. Actual PC reconciliation and owner approval remain **false**; daily audit intentionally reports BLOCKED.
+- The additional evidence ledger and audit tests are included in the integrated candidate, alongside source syntax and six-tab GUI checks.
+
+Source-level automated checks must pass on the **new downstream candidate head**, not merely PR #66's earlier head. Once source checks pass, installed-PC audit, owner-modified Kali UI reconciliation, one-batch installer preview, verified backup/rollback and owner approval are all still needed. No source branch alone authorizes an install.
+
+**Do not mark `candidate_commit`, `installed_pc_reconciled`, `owner_approved_install`, `source_ci_verified`, or PR-integration flags as approved to make the gate pass.** The exact combined final SHA and physical machine acceptance have not been validated.
