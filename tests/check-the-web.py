@@ -159,7 +159,18 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         if active is not None and active.isRunning():
             assert active.wait(10000)
     app.processEvents()
-    window.open_author();assert window.close()
+    window.open_author()
+    checkpoint = window.save_layout_checkpoint()
+    assert checkpoint['active'] == 'author'
+    assert checkpoint['open'][0] == 'default'
+    assert window.restore_layout_checkpoint()
+    assert window.current_workspace == 'author'
+    window.toggle_workspace_recovery()
+    assert window.workspace_recovery.isVisible()
+    window.workspace_recovery.refresh()
+    assert window.workspace_recovery.list.count() == len(main.WORKSPACES) - 1
+    window.workspace_recovery.hide()
+    assert window.close()
     reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
     assert reopened.tabs.indexOf(reopened.workspace_widgets['default']) == 0
     assert reopened.tabs.indexOf(reopened.workspace_widgets['study']) == 1
@@ -174,4 +185,19 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
             assert active.wait(10000)
     app.processEvents()
     assert reopened.close();app.processEvents()
+    stored = main.read_desktop_state(window.state_path, main.WORKSPACES)
+    # A minimal safe-start cannot overwrite the saved normal session.
+    safe = main.TheWeb(restore=True, safe_mode=True)
+    safe.show()
+    assert safe.tabs.count() == 1
+    assert safe.current_workspace == 'default'
+    assert safe.safe_mode
+    app.processEvents()
+    for active in (safe.app_scan_worker, safe.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
+    assert safe.close()
+    assert main.read_desktop_state(window.state_path, main.WORKSPACES) == stored
+    app.processEvents()
 print('DESKTOP INTEGRATION PASSED: 15 tabs, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')
