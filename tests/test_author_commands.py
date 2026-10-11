@@ -41,6 +41,8 @@ class AuthorCommandTests(unittest.TestCase):
             "open the chapter outline": {"action": "open_project_map"},
             "Webbie, show story atlas": {"action": "open_story_atlas"},
             "open the character network": {"action": "open_story_atlas"},
+            "Webbie, show master canon": {"action": "open_master_canon"},
+            "open the character dossiers": {"action": "open_master_canon"},
         }
         for spoken, intent in expected.items():
             with self.subTest(spoken=spoken):
@@ -120,6 +122,8 @@ class AuthorCommandTests(unittest.TestCase):
                         self.assertIs(win.editor_tabs.currentWidget(), win.project_map)
                         win.handle_author_intent({"action": "open_story_atlas"})
                         self.assertIs(win.editor_tabs.currentWidget(), win.atlas_widget)
+                        win.handle_author_intent({"action": "open_master_canon"})
+                        self.assertIs(win.editor_tabs.currentWidget(), win.master_canon_widget)
             finally:
                 win.close()
                 APP.processEvents()
