@@ -11,6 +11,9 @@ if [[ "${1:-}" == --check ]]; then
     python3 -c 'from PyQt5.QtWidgets import QApplication'
     echo 'Desktop prerequisites passed.'; exit 0
 fi
+echo 'BLOCKED: Per-workspace desktop installation is disabled in the daily Spider OS release candidate.' >&2
+echo 'Use the approved single system-wide batch. --check remains available.' >&2
+exit 3
 if [[ $EUID -ne 0 ]]; then echo 'Run with sudo; this installs a selectable desktop session.' >&2; exit 1; fi
 user="${SUDO_USER:-}"
 if [[ -z "$user" || "$user" == root ]]; then echo 'Run sudo from your normal desktop account.' >&2; exit 1; fi
