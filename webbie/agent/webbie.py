@@ -44,6 +44,7 @@ from voice_turns import VoiceTurnTracker
 from voice_queue import VoiceTurnCoordinator
 from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
 from local_reminders import ReminderScheduler
+from voice_supervisor import VoiceSupervisor
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -809,6 +810,18 @@ def voice_listener():
         )
 
 
+def supervised_voice_listener():
+    """Keep the speech recognizer alive with bounded retries, not a service restart."""
+    supervisor = VoiceSupervisor(
+        voice_listener,
+        lambda: running,
+        notify=lambda reason, delay: write_state(
+            voice_listener=False, voice_retry_in_seconds=delay,
+            voice_retry_reason=reason),
+    )
+    supervisor.serve()
+
+
 def session_is_active():
     try:
         output = subprocess.check_output(
@@ -1058,7 +1071,7 @@ def main():
             daemon=True,
         ),
         threading.Thread(
-            target=voice_listener,
+            target=supervised_voice_listener,
             name="webbie-voice",
             daemon=True,
         ),
