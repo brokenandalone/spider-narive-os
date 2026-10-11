@@ -287,7 +287,7 @@ class WebbieComputerDialog(QDialog):
                     'that site. Proceed in your system default browser?')
         else:
             title = 'Confirm Webbie change'
-            body = preview + '\\n\\nConfirm this potentially destructive computer action?'
+            body = preview + '\n\nConfirm this potentially destructive computer action?'
         return QMessageBox.question(
             self, title, body,
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
