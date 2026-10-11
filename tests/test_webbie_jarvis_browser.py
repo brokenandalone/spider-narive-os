@@ -3,12 +3,14 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 p = ROOT / "webbie/agent/browser_routes.py"
 spec = importlib.util.spec_from_file_location("jarvis_browser_tests", p)
 m = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = m
 spec.loader.exec_module(m)
 
 
