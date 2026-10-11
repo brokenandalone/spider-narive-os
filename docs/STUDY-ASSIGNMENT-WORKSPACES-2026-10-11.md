@@ -40,14 +40,30 @@ Reveal an answer, then mark Remembered or Needs practice. Lower-scored cards
 are shown first after review. Review counts and cards remain in the local
 Study database, not in the school gradebook.
 
-### Native readability
+### Manual progress and study-time journal
+
+The selected course now opens MY PROGRESS.
+
+- In My grade tracker, manually enter points earned and points possible for
+  an assignment. The total shows only scored assignments and is a simple
+  points-earned percentage, **not** an official SNHU grade or term GPA.
+  Extra credit is supported up to 300%, with bounded validation.
+- Clear a recorded score without changing the original assignment status.
+- In Study time journal, enter the topic and minutes for a session you already
+  completed, or delete an incorrect entry. The latest 100 entries are shown.
+- Both records live in two new additive Study SQLite tables: assignment_scores
+  and study_sessions. Neither gradebooks nor school LMS data is accessed.
+- Sessions are manual; no background tracking, time surveillance, or grades are
+  invented by the application.
+
+## Native readability
 Study now styles table headers and popup menus with contrasting colors.
 
 ## Compatibility and privacy
 
 The existing courses, assignments and notes tables are unchanged.
-Two optional tables are created with CREATE TABLE IF NOT EXISTS:
-assignment_workspaces and flashcards. Course files, Webbie models and
+Four optional tables are created with CREATE TABLE IF NOT EXISTS:
+assignment_workspaces, flashcards, assignment_scores and study_sessions. Course files, Webbie models and
 Microsoft OAuth/rclone credentials remain untouched. No auto-upload,
 school submission, grading, or login automation occurs.
 
@@ -65,6 +81,8 @@ block installation pending review.
 3. Launch Study, double-click an existing assignment and save/reopen each
    section; verify course notes are unchanged.
 4. Open a flashcard deck, add/import, reveal answers and check review counts.
+   Also open MY PROGRESS; enter a manual score, record a study session, then
+   restart Study to confirm both entries survive.
 5. Request Webbie help; verify no output replaces earlier work unless approved.
 6. Export a DOCX and inspect title page, draft, source accuracy and references.
 7. Verify SNHU/My SNHU sign-in and school OneDrive separately; account login
