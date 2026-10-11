@@ -14,8 +14,11 @@ def valid_score(earned, possible):
     # Extra-credit scores over 100% are allowed and clearly shown as entered.
     if earned > possible * 3:
         raise ValueError("Earned points exceed 300% of possible. Check the entry.")
-    return (earned.quantize(Decimal(".01"), rounding=ROUND_HALF_UP),
-            possible.quantize(Decimal(".01"), rounding=ROUND_HALF_UP))
+    earned = earned.quantize(Decimal(".01"), rounding=ROUND_HALF_UP)
+    possible = possible.quantize(Decimal(".01"), rounding=ROUND_HALF_UP)
+    if possible <= 0:
+        raise ValueError("Possible points must be at least 0.01.")
+    return earned, possible
 
 
 def grade_summary(rows):
