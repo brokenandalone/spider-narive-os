@@ -122,6 +122,26 @@ class StudyStore:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS assignment_steps (
+                id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                due TEXT NOT NULL DEFAULT '',
+                completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)),
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
+                UNIQUE(assignment_id, title)
+            );
+            CREATE TABLE IF NOT EXISTS assignment_sources (
+                id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                reference TEXT NOT NULL,
+                locator TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
+                UNIQUE(assignment_id, reference)
+            );
             """
         )
 
@@ -526,6 +546,103 @@ class StudyStore:
                 "DELETE FROM study_sessions WHERE course_id=? AND id=?",
                 (course_id, session_id),
             )
+
+    def assignment_steps(self, assignment_id):
+        return self.db.execute(
+            "SELECT id, assignment_id, title, due, completed "
+            "FROM assignment_steps WHERE assignment_id=? "
+            "ORDER BY completed ASC, CASE WHEN due = '' THEN 1 ELSE 0 END, due, id",
+            (assignment_id,),
+        ).fetchall()
+
+    def add_assignment_step(self, assignment_id, title, due=""):
+        return self.add_assignment_steps(assignment_id, [(title, due)]) > 0
+
+    def add_assignment_steps(self, assignment_id, items):
+        try:
+            from .milestones import valid_step
+        except ImportError:
+            from milestones import valid_step
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment no longer exists.")
+        if len(items) > 100:
+            raise ValueError("Add at most 100 steps at once.")
+        checked = [(assignment_id,) + valid_step(title, due)
+                   for title, due in items]
+        with self.db:
+            previous = self.db.total_changes
+            self.db.executemany(
+                "INSERT OR IGNORE INTO assignment_steps(assignment_id, title, due) "
+                "VALUES (?, ?, ?)", checked)
+            return self.db.total_changes - previous
+
+    def set_step_completed(self, assignment_id, step_id, completed):
+        if not isinstance(completed, bool):
+            raise ValueError("Step completion must be True or False.")
+        with self.db:
+            return self.db.execute(
+                "UPDATE assignment_steps SET completed=? "
+                "WHERE assignment_id=? AND id=?",
+                (int(completed), assignment_id, step_id),
+            ).rowcount == 1
+
+    def delete_assignment_step(self, assignment_id, step_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM assignment_steps WHERE assignment_id=? AND id=?",
+                (assignment_id, step_id),
+            )
+
+    def assignment_sources(self, assignment_id):
+        return self.db.execute(
+            "SELECT id, assignment_id, reference, locator, notes "
+            "FROM assignment_sources WHERE assignment_id=? ORDER BY id",
+            (assignment_id,),
+        ).fetchall()
+
+    def assignment_source(self, assignment_id, source_id):
+        return self.db.execute(
+            "SELECT id, reference, locator, notes FROM assignment_sources "
+            "WHERE assignment_id=? AND id=?",
+            (assignment_id, source_id),
+        ).fetchone()
+
+    def add_assignment_source(self, assignment_id, reference, locator="", notes=""):
+        try:
+            from .milestones import valid_source
+        except ImportError:
+            from milestones import valid_source
+        reference, locator, notes = valid_source(reference, locator, notes)
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment no longer exists.")
+        with self.db:
+            return self.db.execute(
+                "INSERT OR IGNORE INTO assignment_sources "
+                "(assignment_id, reference, locator, notes) VALUES (?, ?, ?, ?)",
+                (assignment_id, reference, locator, notes),
+            ).rowcount == 1
+
+    def delete_assignment_source(self, assignment_id, source_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM assignment_sources WHERE assignment_id=? AND id=?",
+                (assignment_id, source_id),
+            )
+
+    def planner_rows(self):
+        """Every course, dates entered locally, with next incomplete step."""
+        return self.db.execute(
+            "SELECT a.id, a.course_id, c.name AS course, a.title, a.due, a.status, "
+            "(SELECT COUNT(*) FROM assignment_steps s WHERE s.assignment_id=a.id) "
+            "AS steps_total, "
+            "(SELECT COUNT(*) FROM assignment_steps s WHERE s.assignment_id=a.id "
+            "AND s.completed=1) AS steps_done, "
+            "(SELECT s.title FROM assignment_steps s "
+            "WHERE s.assignment_id=a.id AND s.completed=0 "
+            "ORDER BY CASE WHEN s.due='' THEN 1 ELSE 0 END, s.due, s.id LIMIT 1) "
+            "AS next_step "
+            "FROM assignments a JOIN courses c ON c.id=a.course_id ORDER BY a.id"
+        ).fetchall()
 
     def all_assignments(self):
         return self.db.execute(

@@ -71,6 +71,8 @@ class AssignmentWorkspaceDialog(QDialog):
         for caption, callback in [
             ("Save workspace", self.save),
             ("Check draft", self.check),
+            ("Plan steps", self.open_steps),
+            ("Research sources", self.open_sources),
             ("Work with Webbie", self.use_webbie),
             ("Export APA Word", self.export_apa),
             ("Open course folder", self.open_folder),
@@ -122,6 +124,41 @@ class AssignmentWorkspaceDialog(QDialog):
             f"Owner-entered reference lines: {report['reference_lines']}\n\n"
             f"{notes}\n\nThis check does not verify references, APA accuracy, "
             "academic integrity, rubric satisfaction or grade.")
+
+    def open_steps(self):
+        """Manage optional owner-entered steps without calling an AI or website."""
+        try:
+            if __package__:
+                from .milestones_ui import MilestonesDialog
+            else:
+                from milestones_ui import MilestonesDialog
+            MilestonesDialog(self.store, self.assignment_id, self).exec_()
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Checklist", str(error))
+
+    def open_sources(self):
+        """Append owner-entered reference text only if explicitly selected."""
+        try:
+            if __package__:
+                from .source_library_ui import AssignmentSourcesDialog
+            else:
+                from source_library_ui import AssignmentSourcesDialog
+            dialog = AssignmentSourcesDialog(self.store, self.assignment_id, self)
+            if dialog.exec_() != QDialog.Accepted or not dialog.selected_reference:
+                return
+            reference = dialog.selected_reference
+            editor = self.editors["references"]
+            prior = editor.toPlainText()
+            entries = [line.strip() for line in prior.splitlines() if line.strip()]
+            if reference in entries:
+                self.status.setText("Reference already appears in this assignment.")
+                return
+            editor.setPlainText(prior.rstrip() + ("\n" if prior.strip() else "") + reference)
+            self.tabs.setCurrentWidget(editor)
+            if not self.save():
+                QMessageBox.warning(self, "References", "Reference copy could not be saved.")
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Research sources", str(error))
 
     def use_webbie(self):
         try:
