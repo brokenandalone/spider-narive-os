@@ -14,11 +14,13 @@ if __package__:
     from .web_features import AuthorToolkit
     from .control_socket import AuthorCommandServer
     from .project_map import ProjectMap
+    from .atlas_widget import AtlasWidget
 else:
     from store import AuthorStore
     from web_features import AuthorToolkit
     from control_socket import AuthorCommandServer
     from project_map import ProjectMap
+    from atlas_widget import AtlasWidget
 
 
 class AuthorWindow(QMainWindow):
@@ -57,6 +59,9 @@ class AuthorWindow(QMainWindow):
         self.project_map.chapterRequested.connect(self.jump_to_chapter_id)
         self.project_map.statusChanged.connect(self.project_map_status)
         tabs.addTab(self.project_map, 'Project Map')
+        self.atlas_widget = AtlasWidget(self.store)
+        self.atlas_widget.chapterRequested.connect(self.jump_to_chapter_id)
+        tabs.addTab(self.atlas_widget, 'Story Atlas')
         tabs.currentChanged.connect(self.on_tab_changed)
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
@@ -137,6 +142,7 @@ class AuthorWindow(QMainWindow):
         self.load_chapters()
         self.toolkit.set_book(self.book_id)
         self.project_map.set_book(self.book_id)
+        self.atlas_widget.set_book(self.book_id)
 
     def load_chapters(self):
         self.chapters.blockSignals(True); self.chapters.clear()
@@ -158,9 +164,10 @@ class AuthorWindow(QMainWindow):
             self.status.setText(message)
 
     def on_tab_changed(self, index):
-        if (self.editor_tabs.widget(index) is self.project_map
+        target = self.editor_tabs.widget(index)
+        if (target in (self.project_map, self.atlas_widget)
                 and self.book_id is not None and self.flush()):
-            self.project_map.refresh()
+            target.refresh()
 
     def jump_to_chapter_id(self, chapter_id):
         """Navigate only within the selected book; never open unrelated books."""
