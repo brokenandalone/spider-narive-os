@@ -471,9 +471,96 @@ class TheWeb(QMainWindow):
             item = QListWidgetItem('No installed apps found.'); item.setToolTip('Refresh after installing an app in this workspace.'); item.setFlags(Qt.NoItemFlags); apps.addItem(item)
 
     def refresh_apps(self):
-        self.installed_apps = discover_apps(desktops='TheWeb:KDE')
-        for name in self.app_lists: self.populate_app_list(name)
-        self.start_menu.populate(); self.status.setText(f'{len(self.installed_apps)} installed apps found.')
+        """Discover potentially hundreds of XDG files off the UI thread."""
+        if self.app_scan_worker is not None and self.app_scan_worker.isRunning():
+            self.status.setText('Application discovery is already running.')
+            return
+        self.status.setText('Finding installed applications in the background…')
+        worker = AppCatalogWorker(self)
+        self.app_scan_worker = worker
+        worker.found.connect(self.apps_discovered)
+        worker.failed.connect(lambda detail: self.status.setText(
+            'Application discovery failed: ' + detail))
+        worker.finished.connect(self.app_scan_finished)
+        worker.start()
+
+    def apps_discovered(self, applications):
+        self.installed_apps = applications
+        for name in list(self.app_lists):
+            self.populate_app_list(name)
+        self.start_menu.populate()
+        self.command_palette.refresh()
+        self.status.setText(f'{len(applications)} installed applications found.')
+
+    def app_scan_finished(self):
+        self.app_scan_worker = None
+
+    def workspaces_for_navigation(self):
+        return WORKSPACES
+
+    def render_pinned_workspaces(self):
+        """Keep quick access predictable without changing existing tabs."""
+        row = getattr(self, 'pinned_row', None)
+        if row is None:
+            return
+        while row.count():
+            item = row.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        shown = 0
+        for kind, ident in self.navigation_state.get('favorites', []):
+            if kind != 'workspace' or ident not in WORKSPACES:
+                continue
+            shortcut = button('★ ' + WORKSPACES[ident],
+                              lambda checked=False, name=ident: self.open_workspace(name))
+            shortcut.setToolTip('Pinned workspace · use Quick Launch to unpin')
+            row.addWidget(shortcut)
+            shown += 1
+            if shown >= 8:
+                break
+        if not shown:
+            row.addWidget(QLabel('No pinned workspaces. Ctrl+K opens Quick Launch.'))
+        row.addStretch(1)
+
+    def toggle_navigation_pin(self, kind, ident):
+        if not toggle_favorite(self.navigation_state, kind, ident, WORKSPACES):
+            self.status.setText('Pin unavailable. You may have reached the 24-item limit.')
+            return
+        try:
+            save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Could not save pinned items: ' + str(error))
+        self.render_pinned_workspaces()
+
+    def remember_navigation(self, kind, ident):
+        if getattr(self, '_restoring', False):
+            return
+        if record_recent(self.navigation_state, kind, ident, WORKSPACES):
+            try:
+                save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
+            except OSError:
+                # A read-only home should not prevent app and workspace launches.
+                pass
+
+    def toggle_command_palette(self):
+        self.command_palette.show_palette()
+
+    def execute_palette_action(self, ident):
+        """Only explicitly registered desktop actions can be dispatched."""
+        actions = {
+            'windows': self.toggle_window_overview,
+            'webbie': self.toggle_webbie_assistant,
+            'quick-settings': self.toggle_quick_settings,
+            'notifications': self.toggle_notifications,
+            'tray': self.toggle_tray,
+            'refresh-apps': self.refresh_apps,
+            'desktop': self.show_desktop,
+            'system-settings': self.open_settings,
+            'lock': self.lock_session,
+        }
+        action = actions.get(ident)
+        if action is not None and ident in {key for key, _, _ in INTERNAL_ACTIONS}:
+            action()
 
     def open_workspace(self, name):
         if name not in WORKSPACES: return
@@ -502,6 +589,8 @@ class TheWeb(QMainWindow):
                 layout.addWidget(surface, 1)
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
+        if name != 'default':
+            self.remember_navigation('workspace', name)
         self.update_webbie_context()
         # Workspace navigation must never activate KDE Show Desktop, which hides
         # normal application windows, including Firefox and the file manager.
@@ -518,7 +607,9 @@ class TheWeb(QMainWindow):
         app = next((a for a in self.installed_apps if a.desktop_id == ident), None)
         if not app: return
         self.open_workspace(app.workspace)
-        try: self.launch(launch_command(app), app.workspace, 'Opened ' + app.name + '.')
+        try:
+            self.launch(launch_command(app), app.workspace, 'Opened ' + app.name + '.')
+            self.remember_navigation('app', app.desktop_id)
         except RuntimeError as error: self.status.setText(str(error))
 
     def can_close(self, page):
@@ -534,6 +625,8 @@ class TheWeb(QMainWindow):
 
     def close_tab(self, index):
         page = self.tabs.widget(index)
+        if page is None:
+            return
         if page.property('workspace') == 'default' or not self.can_close(page): return
         name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); page.deleteLater(); self.save_state()
 
@@ -557,22 +650,29 @@ class TheWeb(QMainWindow):
         except (OSError, ValueError) as error: self.status.setText('Could not save wallpaper: ' + str(error))
 
     def save_state(self):
-        if getattr(self, '_restoring', False): return
+        if getattr(self, '_restoring', False):
+            return
         try:
-            self.state_path.parent.mkdir(parents=True, exist_ok=True); temporary = self.state_path.with_suffix('.tmp')
-            temporary.write_text(json.dumps({'open': list(self.workspace_widgets), 'active': self.current_workspace})); temporary.replace(self.state_path)
-        except OSError as error: self.status.setText('Could not save desktop state: ' + str(error))
+            write_desktop_state(self.state_path, {
+                'open': [self.tabs.widget(i).property('workspace')
+                         for i in range(self.tabs.count())],
+                'active': self.current_workspace,
+            }, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Could not save desktop state: ' + str(error))
 
     def restore_state(self):
         self._restoring = True
         try:
-            data = json.loads(self.state_path.read_text())
-            for name in data.get('open', []):
-                if name in WORKSPACES and name != 'default': self.open_workspace(name)
-            name = data.get('active', 'default')
-            if name in self.workspace_widgets: self.open_workspace(name)
-        except (OSError, ValueError, TypeError): pass
-        finally: self._restoring = False
+            data = read_desktop_state(self.state_path, WORKSPACES)
+            for name in data['open']:
+                if name != 'default':
+                    self.open_workspace(name)
+            name = data['active']
+            if name in self.workspace_widgets:
+                self.open_workspace(name)
+        finally:
+            self._restoring = False
 
     def launch(self, command, workspace='default', message='Opened.'):
         self.set_workspace(workspace)
@@ -631,7 +731,7 @@ class TheWeb(QMainWindow):
         self.setStyleSheet(sheet)
         self.start_menu.setStyleSheet(sheet)
         self.taskbar.setStyleSheet(sheet)
-        for panel_name in ('quick_settings_panel', 'window_overview',
+        for panel_name in ('command_palette', 'quick_settings_panel', 'window_overview',
                            'notification_center', 'tray_panel', 'quick_volume'):
             panel = getattr(self, panel_name, None)
             if panel is not None:
