@@ -23,6 +23,11 @@ def parse_author_command(value):
         r"(?:project map|chapter outline|manuscript outline)", text
     ):
         return {"action": "open_project_map"}
+    if re.fullmatch(
+        r"(?:please\s+)?(?:show|open)(?:\s+(?:me|the|my))?\s+"
+        r"(?:story atlas|character network|story timeline|timeline map)", text
+    ):
+        return {"action": "open_story_atlas"}
     # Commands target only the active selection. No guessed book/chapter.
     if re.fullmatch(r"(?:please\s+)?(?:stop|cancel)(?:\s+(?:the|my))?\s+(?:review|reviewing)", text):
         return {"action": "cancel_review"}
