@@ -66,9 +66,11 @@ def legacy_studio(upstream):
         "if __package__:\n"
         "    from .tools import TOOLS, resolve_tool\n"
         "    from .ai_panel import StudioAIPanel\n"
+        "    from .band_mixer_panel import BandMixerPanel\n"
         "else:\n"
         "    from tools import TOOLS, resolve_tool\n"
-        "    from ai_panel import StudioAIPanel\n", '')
+        "    from ai_panel import StudioAIPanel\n"
+        "    from band_mixer_panel import BandMixerPanel\n", '')
     style = (
         "            QWidget { background: #0c0a10; color: #eeeaf3; }\n"
         "            QTabBar::tab { background:#21172d; color:#e9d5ff; padding:8px; }\n"

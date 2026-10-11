@@ -87,6 +87,69 @@ class BandMixTests(unittest.TestCase):
             with self.assertRaises(MixError):
                 band_mix.validate_tracks({'backing': one, 'lead_guitar': hardlink})
 
+    def test_pan_and_mute_are_independent_and_encoded_in_filter(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            stems = {'rhythm_guitar': root / 'rhythm.wav',
+                     'lead_guitar': root / 'lead.wav',
+                     'guest_vocal': root / 'guest.wav'}
+            for source in stems.values():
+                wav(source)
+            cmd = band_mix.band_mix_command(
+                'ffmpeg', stems, {'lead_guitar': .7}, root / 'out.wav',
+                pans={'rhythm_guitar': -.35, 'lead_guitar': .45},
+                mutes={'guest_vocal': True},
+            )
+            graph = cmd[cmd.index('-filter_complex') + 1]
+            self.assertIn('balance_out=-0.350', graph)
+            self.assertIn('balance_out=0.450', graph)
+            self.assertIn('volume=0.700', graph)
+            self.assertIn('volume=0.000[stem0]', graph)
+            self.assertEqual(cmd.count('-i'), 3)
+
+    def test_bad_pan_mute_and_all_silent_rejected_before_export(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tracks = {'rhythm_guitar': root / 'one.wav',
+                      'lead_guitar': root / 'two.wav'}
+            for path in tracks.values():
+                wav(path)
+            for pan in (True, float('nan'), float('inf'), -1.1, 1.1, 'left'):
+                with self.assertRaises(MixError):
+                    band_mix.validate_mix_options(tracks, {'rhythm_guitar': pan})
+            for mute in (0, 'yes', None):
+                with self.assertRaises(MixError):
+                    band_mix.validate_mix_options(tracks, mutes={'lead_guitar': mute})
+            with self.assertRaisesRegex(MixError, 'Unmute'):
+                band_mix.mix_band_tracks(
+                    tracks, output_root=root / 'out',
+                    mutes={'rhythm_guitar': True, 'lead_guitar': True},
+                )
+            self.assertFalse((root / 'out').exists())
+            with self.assertRaises(MixError):
+                band_mix.validate_mix_options(tracks, {'bass': 0.3})
+
+    def test_mix_manifest_records_pan_and_muted_flags(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tracks = {'rhythm_guitar': root / 'one.wav',
+                      'lead_guitar': root / 'two.wav'}
+            for path in tracks.values():
+                wav(path)
+            with patch.object(band_mix.shutil, 'which', return_value='/usr/bin/ffmpeg'), \
+                 patch.object(band_mix.subprocess, 'Popen', side_effect=FakeProcess):
+                target = band_mix.mix_band_tracks(
+                    tracks, output_root=root / 'out',
+                    pans={'rhythm_guitar': -.4, 'lead_guitar': .4},
+                    mutes={'rhythm_guitar': True},
+                )
+            record = json.loads((target.parent / 'band-mix.json').read_text())
+            by_role = {row['role']: row for row in record['independent_tracks']}
+            self.assertEqual(by_role['rhythm_guitar']['pan'], -.4)
+            self.assertTrue(by_role['rhythm_guitar']['muted'])
+            self.assertEqual(by_role['lead_guitar']['pan'], .4)
+            self.assertFalse(by_role['lead_guitar']['muted'])
+
     def test_cancel_before_output_and_refuse_existing_target(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
