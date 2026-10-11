@@ -20,8 +20,11 @@ from webbie_face_profiles_ui import FaceProfileControls
 from webbie_vision_bridge import VisionBridge
 from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_catalog
 from webbie_reminders_dialog import WebbieRemindersDialog
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
+from browser_routes import parse_browser_command
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
 from context_awareness import AwarenessState
+from jarvis_context import publish_context
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from proactive_checks import read_status as proactive_snapshot, status_message as proactive_status_message, request_check_now
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'overlay'))
@@ -339,6 +342,10 @@ class WebbiePanel(QWidget):
         self.send_button = QPushButton('Send'); self.send_button.setMinimumHeight(44)
         self.send_button.clicked.connect(self.send); row.addWidget(self.send_button)
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_state); self.timer.start(120)
+        self.jarvis_context_timer = QTimer(self)
+        self.jarvis_context_timer.timeout.connect(self.publish_jarvis_context)
+        self.jarvis_context_timer.start(15000)
+        self.publish_jarvis_context()
         self.refresh_state()
 
     def refresh_camera_devices(self):
@@ -584,6 +591,24 @@ class WebbiePanel(QWidget):
         if self.workspace_summary:
             description += '\nSelected: ' + self.workspace_summary
         self.context.setText(description)
+        self.publish_jarvis_context()
+
+    def publish_jarvis_context(self):
+        """Short-lived metadata only. Camera/screen pixels never written here."""
+        authorized = ''
+        if self.computer_dialog is not None:
+            approval = self.computer_dialog.grant.status()
+            if approval['active']:
+                authorized = approval['task']
+        try:
+            publish_context(
+                workspace=self.workspace_label, mode=self.workspace_mode,
+                selected_title=self.workspace_summary,
+                approved_task=authorized,
+                sleeping=self.face_sleeping,
+            )
+        except (OSError, PermissionError, ValueError):
+            pass
 
     def prepare_request(self, text):
         self.awareness.note_user_request(text)
@@ -668,6 +693,20 @@ class WebbiePanel(QWidget):
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        # Typed website commands show a visible review instead of triggering
+        # browser/network activity from model text. The GUI requires consent.
+        browser_request = parse_browser_command(text)
+        if browser_request is not None:
+            if not browser_request.url:
+                self.append_message('Status',
+                    'That address is blocked. Only public HTTPS sites are allowed.')
+            else:
+                self.open_computer_dialog()
+                if self.computer_dialog.offer_site(browser_request.url):
+                    self.append_message('Status',
+                        'Review the address, authorize a browser task and confirm opening it.')
+            self.entry.clear()
             return
         # A typed request to open an installed program invokes a visible task
         # grant. No words typed into chat directly authorize computer control.
