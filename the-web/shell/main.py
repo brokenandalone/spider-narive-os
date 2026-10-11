@@ -304,6 +304,7 @@ class TheWeb(QMainWindow):
         self.workspace_load_errors = {}
         self.safe_mode = safe_mode
         self._restore_plan = None
+        self._preserve_saved_session = False
         self._restore_user_navigated = False
         self._restore_arranging = False
         self._skip_final_state_save = False
@@ -756,6 +757,67 @@ class TheWeb(QMainWindow):
     def is_staged_restoring(self):
         return self._restore_plan is not None
 
+
+    def staged_restore_status(self):
+        plan = self._restore_plan
+        return plan.report() if plan is not None else None
+
+    def pause_staged_restore(self):
+        plan = self._restore_plan
+        if plan is None or not plan.pause():
+            return False
+        self.status.setText('Workspace restoration paused. Use Recovery to resume.')
+        return True
+
+    def resume_staged_restore(self):
+        plan = self._restore_plan
+        if plan is None or not plan.resume():
+            return False
+        self.status.setText('Resuming saved workspace tabs…')
+        QTimer.singleShot(0, self.next_staged_restore)
+        return True
+
+    def skip_staged_workspace(self, name):
+        plan = self._restore_plan
+        if plan is None or not plan.skip(name):
+            return False
+        label = WORKSPACES.get(name, name)
+        self.status.setText(
+            f'Skipping {label} for this startup only. Previous saved layout preserved.')
+        if plan.done():
+            self.finish_staged_restore()
+        return True
+
+    def prioritize_staged_workspace(self, name):
+        plan = self._restore_plan
+        if plan is None or not plan.prioritize(name):
+            return False
+        self.status.setText(f'{WORKSPACES[name]} will load next.')
+        return True
+
+    def stop_staged_restore(self):
+        plan = self._restore_plan
+        if plan is None:
+            return False
+        plan.cancel()
+        self._restore_plan = None
+        self._restoring = False
+        self._preserve_saved_session = True
+        self.status.setText(
+            'Startup restoration stopped. Previous layout preserved. '
+            'Use Recovery to save the currently open tabs.')
+        return True
+
+    def adopt_current_layout(self):
+        """Explicit choice to replace the saved layout; never close editors."""
+        if self._restore_plan is not None:
+            return False
+        self.safe_mode = False
+        self._preserve_saved_session = False
+        self.save_state()
+        self.status.setText('The current workspace layout is now the saved default.')
+        return True
+
     def retry_workspace(self, name):
         if name not in WORKSPACES or name == 'default':
             return
@@ -785,6 +847,7 @@ class TheWeb(QMainWindow):
             self._restore_plan.cancel()
             self._restore_plan = None
             self._restoring = False
+        self._preserve_saved_session = False
         self.safe_mode = False
         self._restoring = True
         try:
@@ -810,6 +873,7 @@ class TheWeb(QMainWindow):
         if name not in WORKSPACES: return
         if self._restore_plan is not None and activate:
             self._restore_user_navigated = True
+            self._restore_plan.acknowledge(name)
         if name not in self.workspace_widgets:
             page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
             layout = QHBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8); layout.addWidget(self.application_panel(name))
@@ -998,7 +1062,7 @@ class TheWeb(QMainWindow):
     def save_state(self):
         # Starting with --safe-workspaces must not overwrite the last
         # known tab layout merely because the minimal shell was opened.
-        if getattr(self, 'safe_mode', False):
+        if getattr(self, 'safe_mode', False) or getattr(self, '_preserve_saved_session', False):
             return
         if getattr(self, '_restoring', False) or getattr(self, '_skip_final_state_save', False):
             return
@@ -1033,7 +1097,7 @@ class TheWeb(QMainWindow):
 
     def next_staged_restore(self):
         plan = self._restore_plan
-        if plan is None or plan.cancelled:
+        if plan is None or plan.cancelled or plan.paused:
             return
         name = plan.pop()
         if name is None:
@@ -1069,11 +1133,22 @@ class TheWeb(QMainWindow):
             self._restore_arranging = False
         self._restore_plan = None
         self._restoring = False
+        # An intentionally skipped workspace does not implicitly rewrite the
+        # previous saved layout. Explicitly adopting the visible tabs is required.
+        if plan.skipped:
+            self._preserve_saved_session = True
         if not self._restore_user_navigated and plan.active in self.workspace_widgets:
             self.tabs.setCurrentWidget(self.workspace_widgets[plan.active])
         self.save_state()
         self.update_webbie_context()
-        self.status.setText(f'{len(ordered) - 1} workspace tabs restored. The Web is ready.')
+        skipped = len(plan.skipped)
+        if skipped:
+            self.status.setText(
+                f'{len(ordered) - 1} tabs restored; {skipped} skipped. '
+                'Original saved session preserved. Use Recovery to save the current layout.')
+        else:
+            self.status.setText(
+                f'{len(ordered) - 1} workspace tabs restored. The Web is ready.')
 
     def restore_state(self):
         self._restoring = True
@@ -1302,6 +1377,9 @@ class TheWeb(QMainWindow):
         if bridge is not None and bridge.poll() is None:
             bridge.terminate()
         if self.notification_toast is not None: self.notification_toast.close()
+        if self._restore_plan is not None:
+            self._restore_plan.cancel()
+            self._restore_plan = None
         self.taskbar.timer.stop()
         self.command_palette.close()
         recovery = getattr(self, 'workspace_recovery', None)
