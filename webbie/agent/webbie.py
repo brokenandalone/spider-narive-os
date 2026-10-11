@@ -518,6 +518,13 @@ def verified_workspace_voice_action(command, *, speaker_verified=False,
     """
     if speaker_verified is not True or quiet_asleep():
         return None
+    from forage_research_bridge import handle_verified_research
+    research_reply = handle_verified_research(
+        command, speaker_verified=True, asleep=False,
+        root=Path(workspace_path()).resolve(),
+    )
+    if research_reply is not None:
+        return research_reply
     workspace = current_workspace() if workspace is None else workspace
     if workspace == 'author':
         from author_voice_bridge import dispatch_verified_author_voice
