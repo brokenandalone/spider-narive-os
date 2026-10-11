@@ -106,6 +106,22 @@ class StudyStore:
                 FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE,
                 UNIQUE(course_id, front, back)
             );
+            CREATE TABLE IF NOT EXISTS assignment_scores (
+                assignment_id INTEGER PRIMARY KEY,
+                earned TEXT NOT NULL,
+                possible TEXT NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id)
+                    ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS study_sessions (
+                id INTEGER PRIMARY KEY,
+                course_id INTEGER NOT NULL,
+                topic TEXT NOT NULL,
+                minutes INTEGER NOT NULL CHECK(minutes BETWEEN 1 AND 600),
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE
+            );
             """
         )
 
@@ -448,6 +464,67 @@ class StudyStore:
             self.db.execute(
                 "DELETE FROM flashcards WHERE course_id=? AND id=?",
                 (course_id, card_id),
+            )
+
+    def assignment_scores(self, course_id):
+        """Manual points for assignments in one course, including ungraded work."""
+        return self.db.execute(
+            "SELECT a.id, a.title, a.due, s.earned, s.possible "
+            "FROM assignments a LEFT JOIN assignment_scores s "
+            "ON s.assignment_id=a.id WHERE a.course_id=? "
+            "ORDER BY a.due, a.title", (course_id,),
+        ).fetchall()
+
+    def set_assignment_score(self, assignment_id, earned, possible):
+        try:
+            from .study_progress import valid_score
+        except ImportError:
+            from study_progress import valid_score
+        earned, possible = valid_score(earned, possible)
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("The assignment no longer exists.")
+        with self.db:
+            self.db.execute(
+                "INSERT INTO assignment_scores(assignment_id, earned, possible) "
+                "VALUES(?, ?, ?) ON CONFLICT(assignment_id) DO UPDATE SET "
+                "earned=excluded.earned, possible=excluded.possible, "
+                "updated_at=CURRENT_TIMESTAMP",
+                (assignment_id, str(earned), str(possible)),
+            )
+
+    def clear_assignment_score(self, assignment_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM assignment_scores WHERE assignment_id=?",
+                (assignment_id,),
+            )
+
+    def study_sessions(self, course_id):
+        return self.db.execute(
+            "SELECT id, topic, minutes, created_at FROM study_sessions "
+            "WHERE course_id=? ORDER BY created_at DESC, id DESC LIMIT 100",
+            (course_id,),
+        ).fetchall()
+
+    def add_study_session(self, course_id, topic, minutes):
+        try:
+            from .study_progress import valid_study_session
+        except ImportError:
+            from study_progress import valid_study_session
+        topic, minutes = valid_study_session(topic, minutes)
+        if self.course(course_id) is None:
+            raise ValueError("The course no longer exists.")
+        with self.db:
+            return self.db.execute(
+                "INSERT INTO study_sessions(course_id, topic, minutes) "
+                "VALUES (?, ?, ?)", (course_id, topic, minutes),
+            ).lastrowid
+
+    def delete_study_session(self, course_id, session_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM study_sessions WHERE course_id=? AND id=?",
+                (course_id, session_id),
             )
 
     def all_assignments(self):
