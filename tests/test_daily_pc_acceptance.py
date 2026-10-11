@@ -38,6 +38,33 @@ class DailyPCAcceptanceTests(unittest.TestCase):
         self.assertEqual(result["blockers"], [])
         self.assertEqual(before, (self.installed / acceptance.FILES["Webbie"]).read_bytes())
 
+    def test_kali_evidence_and_report_sources_are_required(self):
+        source = self.source / acceptance.FILES["Kali evidence chain"]
+        installed = self.installed / acceptance.FILES["Kali evidence chain"]
+        source.write_text("new evidence ledger source\\n")
+        check = acceptance.inspect(
+            self.source, self.installed, phase="after", check_services=False
+        )
+        self.assertEqual(check["status"], "BLOCKED")
+        self.assertEqual(check["files"]["Kali evidence chain"]["state"], "different")
+        self.assertTrue(any("Kali evidence chain" in item
+                            for item in check["blockers"]))
+        installed.write_bytes(source.read_bytes())
+        check = acceptance.inspect(
+            self.source, self.installed, phase="after", check_services=False
+        )
+        self.assertEqual(check["files"]["Kali evidence chain"]["state"], "matching")
+
+        report = self.installed / acceptance.FILES["Kali report engine"]
+        report.unlink()
+        check = acceptance.inspect(
+            self.source, self.installed, phase="before", check_services=False
+        )
+        self.assertEqual(check["status"], "BLOCKED")
+        self.assertEqual(check["files"]["Kali report engine"]["state"],
+                         "installed_unavailable")
+        self.assertFalse(report.exists())
+
     def test_postinstall_rejects_unreconciled_code(self):
         (self.source / acceptance.FILES["Forage"]).write_text("new version")
         result = acceptance.inspect(self.source, self.installed,

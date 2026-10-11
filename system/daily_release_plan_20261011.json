@@ -86,11 +86,14 @@
       "name": "Kali Bay",
       "pull_requests": [
         60,
-        65
+        65,
+        70
       ],
       "required_files": [
         "kali-bay/ui/kali_bay.py",
-        "kali-bay/runtime/workspace_store.py"
+        "kali-bay/runtime/workspace_store.py",
+        "kali-bay/runtime/evidence_ledger.py",
+        "kali-bay/package/audit-upgrade.py"
       ]
     },
     {
@@ -357,10 +360,25 @@
         "webbie/brain/privacy_controls.py"
       ],
       "integrated": false
+    },
+    {
+      "pr": 70,
+      "workspace": "Kali Bay",
+      "branch": "upgrades/kali-bay-evidence-ledger-20261011",
+      "observed_sha": "653c8136ed7779918073bdd085d2cc72b8949f88",
+      "integrated": false,
+      "paths": [
+        "kali-bay/ui/kali_bay.py",
+        "kali-bay/runtime/lab_reports.py",
+        "kali-bay/runtime/evidence_ledger.py",
+        "kali-bay/package/audit-upgrade.py",
+        "kali-bay/package/install-kali-bay.sh",
+        "system/release_batch.py"
+      ]
     }
   ],
   "resolved_shared_paths": [],
-  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations.",
+  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations. Kali Evidence Ledger PR #70 is additionally staged for integration review in the downstream release candidate; its source checks do not replace installed-PC audit or owner approval. Candidate remains intentionally BLOCKED.",
   "additive_source_stage": {
     "commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
     "total_files": 107,

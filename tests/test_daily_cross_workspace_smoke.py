@@ -34,7 +34,14 @@ REQUIRED_WIRING = {
     "studio/main.py": ("BandMixerPanel", "StudioAIPanel"),
     "kali-bay/ui/kali_bay.py": (
         "build_lab_page", "build_guides_page", "start_catalog_load",
+        "build_ledger_page", "refresh_evidence_ledger",
         "open_webbie_security",
+    ),
+    "kali-bay/runtime/evidence_ledger.py": (
+        "append_event", "verify_ledger", "MAX_ENTRIES",
+    ),
+    "kali-bay/package/audit-upgrade.py": (
+        "blocked_customized", "safe_for_automatic_replacement",
     ),
     "the-web/shell/main.py": (
         "toggle_command_palette", "open_pinned_slot", "choose_menu_text_size",

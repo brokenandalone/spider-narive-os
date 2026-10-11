@@ -102,8 +102,9 @@ with tempfile.TemporaryDirectory() as d:
          patch.object(ui.subprocess,"run",
                       return_value=CompletedProcess([],0,"missing","")):
         win=ui.KaliBayWindow()
-        assert win.security_tabs.count()==5
+        assert win.security_tabs.count()==6
         assert win.security_tabs.tabText(4)=="LAB GUIDES"
+        assert win.security_tabs.tabText(5)=="EVIDENCE LEDGER"
         assert win.guide_list.count()>=8
         win.guide_search.setText("packet")
         assert win.guide_list.count()==1

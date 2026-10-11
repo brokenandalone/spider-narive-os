@@ -53,6 +53,11 @@ COMPONENTS = {
     "Kali Bay": (
         "kali-bay/ui/kali_bay.py", "kali-bay/bin/kali-bay",
         "kali-bay/runtime/kali_apps.py",
+        "kali-bay/runtime/workspace_store.py",
+        "kali-bay/runtime/lab_reports.py",
+        "kali-bay/runtime/evidence_fingerprint.py",
+        "kali-bay/runtime/evidence_ledger.py",
+        "kali-bay/package/audit-upgrade.py",
         "kali-bay/package/install-kali-bay.sh",
     ),
     "Nova and BCN Radio": (
