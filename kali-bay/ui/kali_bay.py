@@ -13,6 +13,8 @@ from PyQt5.QtGui import (
     QFont,
     QPainter,
     QPixmap,
+    QKeySequence,
+    QShortcut,
 )
 from PyQt5.QtWidgets import (
     QApplication,
@@ -25,6 +27,8 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QComboBox,
+    QCheckBox,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -45,6 +49,12 @@ if not SPIDER_ROOT.exists():
         .resolve()
         .parents[2]
     )
+
+
+# Local storage is intentionally isolated from the Kali Distrobox.
+# It is only written by explicit favorite, create-lab or save-notes clicks.
+sys.path.insert(0, str(SPIDER_ROOT / "kali-bay" / "runtime"))
+import workspace_store as kali_store
 
 
 MANAGER = (
@@ -249,6 +259,14 @@ class KaliBayWindow(QMainWindow):
         super().__init__()
 
         self._wallpaper = None
+        try:
+            self.favorites = kali_store.get_favorites()
+            self.favorites_error = ""
+        except kali_store.StorageError as error:
+            self.favorites = set()
+            self.favorites_error = str(error)
+        self.active_lab = None
+        self._switching_labs = False
 
         self.setWindowTitle(
             "Kali Bay | Spider OS"
@@ -530,6 +548,12 @@ class KaliBayWindow(QMainWindow):
             ),
             "PURPLE DEFENSE",
         )
+        self.security_tabs.addTab(
+            self.build_lab_page(),
+            "LAB NOTES",
+        )
+        self._focus_search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self._focus_search_shortcut.activated.connect(self.focus_tool_search)
         outer.addWidget(self.security_tabs, 1)
 
         warning = QLabel(
@@ -605,6 +629,11 @@ class KaliBayWindow(QMainWindow):
             self.filter_desktop_tools
         )
         left.addWidget(self.desktop_category)
+        self.favorite_only = QCheckBox("FAVORITES ONLY")
+        self.favorite_only.setObjectName("kaliFavoritesOnly")
+        self.favorite_only.setStyleSheet("color:#ffffff;font-weight:bold;")
+        self.favorite_only.toggled.connect(self.filter_desktop_tools)
+        left.addWidget(self.favorite_only)
         self.installed_desktop_apps = []
         load_apps = QPushButton("LOAD ALL INSTALLED KALI APPS")
         load_apps.setObjectName("kaliLoadInstalledApps")
@@ -629,7 +658,12 @@ class KaliBayWindow(QMainWindow):
             "QListWidget::item:selected {background:#5b21b6;}"
         )
         self.desktop_list.itemDoubleClicked.connect(self.open_desktop_item)
+        self.desktop_list.currentItemChanged.connect(self.update_tool_details)
         left.addWidget(self.desktop_list, 1)
+        save_favorite = QPushButton("☆ SAVE / REMOVE FAVORITE")
+        save_favorite.setObjectName("kaliToggleFavorite")
+        save_favorite.clicked.connect(self.toggle_selected_favorite)
+        left.addWidget(save_favorite)
         launch = QPushButton("OPEN SELECTED TOOL")
         launch.setObjectName("kaliDesktopLaunchTool")
         launch.clicked.connect(self.open_selected_desktop_tool)
@@ -662,6 +696,14 @@ class KaliBayWindow(QMainWindow):
             "border-radius:8px;padding:12px;"
         )
         right.addWidget(self.readiness_summary)
+        self.tool_details = QLabel("Choose a tool to see its purpose. Only you launch it.")
+        self.tool_details.setObjectName("kaliSelectedToolDetails")
+        self.tool_details.setWordWrap(True)
+        self.tool_details.setStyleSheet(
+            "color:#ffffff;background:#1f1233;border:1px solid #6d42a1;"
+            "border-radius:7px;padding:10px;"
+        )
+        right.addWidget(self.tool_details)
         for caption, operation in (
             ("START EXISTING KALI", self.start_existing_kali),
             ("KALI HEALTH CHECK", self.open_kali_health),
@@ -698,16 +740,24 @@ class KaliBayWindow(QMainWindow):
     def filter_desktop_tools(self, *_args):
         query = self.desktop_search.text().strip().casefold()
         category = self.desktop_category.currentText()
+        favorites_only = self.favorite_only.isChecked()
         self.desktop_list.clear()
         for group, label, tool_id in DESKTOP_TOOL_MENU:
+            favorite = "builtin:" + tool_id
+            if favorites_only and favorite not in self.favorites:
+                continue
             if category != "All categories" and group != category:
                 continue
             if query and query not in (group + " " + label).casefold():
                 continue
-            item = QListWidgetItem(f"{group}  /  {label}")
+            star = "★ " if favorite in self.favorites else ""
+            item = QListWidgetItem(f"{star}{group}  /  {label}")
             item.setData(Qt.UserRole, tool_id)
             self.desktop_list.addItem(item)
         for app in self.installed_desktop_apps:
+            favorite = "app:" + app["id"]
+            if favorites_only and favorite not in self.favorites:
+                continue
             group = app["category"]
             label = app["name"]
             if category != "All categories" and group != category:
@@ -716,12 +766,78 @@ class KaliBayWindow(QMainWindow):
                 group + " " + label + " " + app["description"]
             ).casefold():
                 continue
-            item = QListWidgetItem(f"{group}  /  {label}")
+            star = "★ " if favorite in self.favorites else ""
+            item = QListWidgetItem(f"{star}{group}  /  {label}")
             item.setToolTip(app["description"])
             item.setData(Qt.UserRole, ("app", app["id"]))
             self.desktop_list.addItem(item)
         if self.desktop_list.count():
             self.desktop_list.setCurrentRow(0)
+
+    def focus_tool_search(self):
+        self.security_tabs.setCurrentIndex(0)
+        self.desktop_search.setFocus()
+        self.desktop_search.selectAll()
+
+    def selected_favorite_key(self):
+        item = self.desktop_list.currentItem()
+        if item is None:
+            return None
+        value = item.data(Qt.UserRole)
+        if isinstance(value, str):
+            if value in {row[2] for row in DESKTOP_TOOL_MENU}:
+                return "builtin:" + value
+        elif isinstance(value, (list, tuple)) and len(value) == 2:
+            if value[0] == "app" and value[1] in {
+                app["id"] for app in self.installed_desktop_apps
+            }:
+                return "app:" + value[1]
+        return None
+
+    def toggle_selected_favorite(self):
+        key = self.selected_favorite_key()
+        if key is None:
+            QMessageBox.information(self, "Kali Bay", "Select a valid Kali tool first.")
+            return
+        try:
+            self.favorites = kali_store.set_favorite(
+                key, key not in self.favorites
+            )
+            self.favorites_error = ""
+            self.filter_desktop_tools()
+        except kali_store.StorageError as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
+
+    def update_tool_details(self, item, _previous=None):
+        if item is None or not hasattr(self, "tool_details"):
+            return
+        value = item.data(Qt.UserRole)
+        explanations = {
+            "wireshark": "Inspect packet captures for traffic analysis.",
+            "nmap": "Open an interactive shell for authorized network inventory.",
+            "burpsuite": "Examine authorized web application requests.",
+            "zaproxy": "Review web application security in your own lab.",
+            "ghidra": "Reverse engineer binary files in a controlled workspace.",
+            "msfconsole": "Open a workbench for a pre-approved test lab.",
+            "suricata": "Investigate detection rules and network evidence.",
+            "yara": "Inspect files and malware signatures.",
+            "lynis": "Review system hardening and audit guidance.",
+            "clamtk": "Inspect local files using an antivirus interface.",
+        }
+        if isinstance(value, str):
+            detail = explanations.get(value, "Approved Kali tool.")
+        elif isinstance(value, (tuple, list)) and len(value) == 2:
+            matches = [
+                app for app in self.installed_desktop_apps
+                if app["id"] == value[1] and value[0] == "app"
+            ]
+            detail = matches[0]["description"] if matches else "Kali application."
+        else:
+            detail = "Select an installed Kali application."
+        self.tool_details.setText(
+            f"{item.text()}\n{detail or 'Installed Kali application.'}\n"
+            "Opening a tool does not run a scan automatically."
+        )
 
     def open_selected_desktop_tool(self):
         item = self.desktop_list.currentItem()
