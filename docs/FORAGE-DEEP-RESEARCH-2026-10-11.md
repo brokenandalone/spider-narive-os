@@ -27,3 +27,31 @@ python3 system/release_batch.py --check
 ```
 
 On the owner's *staged* Spider OS tree, not live services: check local `curl -fsS 'http://127.0.0.1:8888/search?q=test&format=json'`, verify installed DDGS virtualenv/Python version, run Qt with `QT_QPA_PLATFORM=offscreen`, inspect report and source export, test queueing and stop, ensure GUI doesn't hang, and verify no regression to Webbie microphone/camera. Do not merge the draft into main or restart working services as part of a test.
+
+
+## Major V3 source additions
+
+- Research depth: Quick (2 searches, up to 6 sources), Standard (4 searches, up to 12), Intensive (6 searches, up to 20); user-selected General/Academic/Technical/Creative lenses.
+- The local Ollama model may be set with `SPIDER_FORAGE_MODEL`; existing default remains unchanged. No model is downloaded, installed or switched automatically.
+- Research source JSON includes lens, depth, queries, evidence source text, provenance summary and citation audit. Metadata flags missing publication dates, snippet-only results, single-host evidence and near-duplicate article text. **Neither host counts nor lexical overlap prove a fact.**
+- Citation references are validated for range and for visibly unreferenced long paragraphs. Failed model citation reviews are withheld and clearly labeled; this is not semantic fact-checking.
+- Synthesis input budget is bounded. The saved source JSON retains the original extracted text and reports make truncation explicit.
+- The Deep Forage GUI has approved-folder Study/Author exports. The user must select an existing destination folder. Files are copied with a prefix and mode 0600, with exclusive creation; they never overwrite an assignment or manuscript or submit homework.
+- A separately speaker-verified Webbie voice bridge can open Deep Forage with an initial research question and list recent report titles/statuses. **The PC currently supplies no trusted speaker-verification signal to this route**, so voice handling must remain disabled by default. A wake phrase or recognized transcript is not verification.
+- `forage/forage_cli.py` exposes opt-in `status`, `search --web --query`, `local --query`, `research --topic --depth --focus`, `history`, and `index`. `status` only checks local endpoints and lists reports; the CLI does not silently research or index sources.
+- Explicitly selected local index roots can include bounded DOCX files and text-based PDFs. DOCX is parsed locally from bounded OOXML `word/document.xml` only. PDF extraction uses `pdftotext` when installed, with a timeout and no OCR. Scanned PDFs without text and files whose format/dependency is unsupported are skipped. No macro execution, external document-link fetching or whole-home scanning.
+- The DOCX/PDF index retains the existing 2 MiB per-file cap, source symlink/credential exclusions, 0600 local SQLite index, atomic rebuild, and immediate configured-root revocation behavior.
+
+### Explicit CLI smoke checks (staged sources only)
+
+```bash
+python3 forage/forage_cli.py status
+python3 forage/forage_cli.py history
+python3 forage/forage_cli.py local --query 'sociology'
+python3 -m unittest discover -s tests -p 'test_forage*.py'
+python3 -m unittest discover -s tests -p 'test_local_index.py'
+python3 -m unittest discover -s tests -p 'test_webbie_workspace_voice_gate.py'
+python3 system/release_batch.py --check
+```
+
+**Important:** GitHub Actions source success does not prove the new features run on the current installed Spider OS. A private PC audit must compare installed and candidate files, especially customized `webbie/agent/webbie.py`, and verify the actual `pdftotext`, PyQt, SearXNG and Ollama environment. Preserve the October 10–11 guarded batch release blockers until those tests pass.
