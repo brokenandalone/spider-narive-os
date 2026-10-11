@@ -92,6 +92,11 @@ def parse_request(message: str):
         return None
     direct = phrase.casefold().strip()
     if direct in (
+        "check kali purple tools", "show kali purple tools",
+        "check kali defense tools", "show kali defense tools",
+    ):
+        return ("purple_tools", None)
+    if direct in (
         "show kali readiness", "check kali readiness",
         "show kali bay readiness", "check kali bay readiness",
         "is kali ready", "is kali bay ready",
@@ -188,6 +193,41 @@ def handle_kali_request(message: str, manager=None):
         return (
             "The Kali Bay manager isn't available here. "
             "I haven't started or changed anything."
+        )
+    if operation == "purple_tools":
+        import json
+        try:
+            checked = subprocess.run(
+                [str(command), "purple-json"], capture_output=True,
+                text=True, timeout=18, check=False,
+            )
+            if checked.returncode:
+                return "Kali Purple inventory is unavailable; nothing was started."
+            report = json.loads(checked.stdout)
+            if not isinstance(report, dict):
+                raise ValueError("Invalid Kali Purple result")
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return "I couldn't read Kali Purple's installed tool inventory."
+        state = report.get("state", "unknown")
+        if state != "running":
+            return (
+                f"Kali Purple inventory unavailable because the container is "
+                f"{state if state in ('missing', 'stopped', 'unknown', 'unavailable') else 'unknown'}. "
+                "I haven't started anything."
+            )
+        installed = report.get("tools", {})
+        if not isinstance(installed, dict):
+            return "The Kali Purple inventory was invalid."
+        names = (
+            "suricata", "zeek", "yara", "lynis", "clamscan",
+            "wireshark", "tcpdump", "tshark", "auditctl",
+        )
+        ready = [name for name in names if installed.get(name) is True]
+        return (
+            f"Kali Purple has {len(ready)} of {len(names)} checked security "
+            f"commands available: {', '.join(ready) or 'none detected'}. "
+            "That doesn't mean any sensor or service is running. "
+            "I made no changes."
         )
     if operation == "readiness":
         import json
