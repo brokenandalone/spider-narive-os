@@ -27,10 +27,12 @@ if __package__:
     from .tools import TOOLS, resolve_tool
     from .ai_panel import StudioAIPanel
     from .band_mixer_panel import BandMixerPanel
+    from .release_panel import ReleasePanel
 else:
     from tools import TOOLS, resolve_tool
     from ai_panel import StudioAIPanel
     from band_mixer_panel import BandMixerPanel
+    from release_panel import ReleasePanel
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 
@@ -145,6 +147,11 @@ class SpiderStudio(QMainWindow):
         band_scroll.setWidgetResizable(True)
         band_scroll.setWidget(self.band_mixer_panel)
         self.tool_tabs.addTab(band_scroll, 'Band Mixer')
+        self.release_panel = ReleasePanel(band_mixer=self.band_mixer_panel)
+        release_scroll = QScrollArea()
+        release_scroll.setWidgetResizable(True)
+        release_scroll.setWidget(self.release_panel)
+        self.tool_tabs.addTab(release_scroll, 'Release Desk')
         self.tool_buttons = []
         for category, tools in TOOLS.items():
             page = QWidget(); grid = QGridLayout(page)
