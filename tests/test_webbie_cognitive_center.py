@@ -32,6 +32,7 @@ class CognitiveCenterTests(unittest.TestCase):
             for identifier in (
                 "webbieFocusTaskButton","webbieInspectModelsButton",
                 "webbieReadinessButton",
+                "webbieVoiceLabButton", "webbieHearingTestButton",
                 "webbiePrivateSessionButton","webbieClearRecentChatButton",
                 "webbieSensitiveStopButton"):
                 button=center.findChild(QPushButton,identifier)
@@ -109,6 +110,35 @@ class CognitiveCenterTests(unittest.TestCase):
                 center.inspect_readiness()
             self.assertIn("No recent heartbeat",center.report.toPlainText())
             self.assertIn("No hardware was activated",center.report.toPlainText())
+        finally:
+            center.close()
+
+    def test_voice_lab_is_readonly_by_default(self):
+        center=WebbieCognitiveDialog(workspace_callback=lambda:"studio")
+        try:
+            info={
+                "whisper_available":True,"whisper_model_available":True,
+                "arecord_available":True,"voiceprint_opted_in":False,
+                "voiceprint_file_present":False,"voiceprint_verified":False,
+            }
+            with patch("webbie_cognitive_center.inspect_voice_lab",
+                       return_value=info):
+                center.inspect_voice_lab()
+            self.assertIn("NOT VERIFIED",center.report.toPlainText())
+            self.assertIn("No microphone audio",center.report.toPlainText())
+        finally:
+            center.close()
+
+    def test_hearing_test_requires_explicit_gui_approval(self):
+        center=WebbieCognitiveDialog(workspace_callback=lambda:"studio")
+        try:
+            from PyQt5.QtWidgets import QMessageBox
+            with patch("webbie_cognitive_center.QMessageBox.question",
+                       return_value=QMessageBox.No),patch(
+                       "webbie_cognitive_center.HearingTestWorker.start") as start:
+                center.test_hearing()
+            start.assert_not_called()
+            self.assertIsNone(center.hearing_worker)
         finally:
             center.close()
 
