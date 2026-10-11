@@ -9,6 +9,7 @@ import tempfile
 import threading
 import urllib.error
 import urllib.request
+from privacy_controls import private_session_active
 
 
 DEFAULT_MODEL = "qwen3:1.7b"
@@ -68,6 +69,8 @@ _conversation_lock = threading.RLock()
 
 
 def load_conversation():
+    if private_session_active():
+        return []
     try:
         data = json.loads(
             CONVERSATION_FILE.read_text(
@@ -109,6 +112,8 @@ def load_conversation():
 
 
 def save_conversation(messages):
+    if private_session_active():
+        return
     temp = None
     try:
         CONVERSATION_FILE.parent.mkdir(
@@ -143,6 +148,8 @@ def save_conversation(messages):
 
 
 def remember_turn(user_text, assistant_text):
+    if private_session_active():
+        return
     user_text = str(
         user_text or ""
     ).strip()
@@ -165,7 +172,13 @@ def remember_turn(user_text, assistant_text):
 
 
 def clear_conversation():
-    save_conversation([])
+    """Explicit local owner action may clear recent conversation in any mode."""
+    with _conversation_lock:
+        try:
+            CONVERSATION_FILE.unlink(missing_ok=True)
+        except OSError:
+            return False
+    return True
 
 
 
@@ -208,6 +221,8 @@ def _memory_conn():
 
 
 def remember_memory(content, category="general"):
+    if private_session_active():
+        return False
     content = str(content or "").strip()
 
     if not content:
@@ -254,6 +269,8 @@ def _memory_tokens(text):
 
 
 def recall_memories(query, limit=6):
+    if private_session_active():
+        return []
     query_tokens = _memory_tokens(query)
 
     if not query_tokens:
@@ -328,6 +345,8 @@ def recall_memories(query, limit=6):
 
 
 def recent_memories(limit=10):
+    if private_session_active():
+        return []
     try:
         conn = _memory_conn()
 
@@ -495,6 +514,8 @@ def should_auto_remember(text):
 
 
 def maybe_auto_remember(text):
+    if private_session_active():
+        return False
     if not should_auto_remember(text):
         return False
 
@@ -826,6 +847,10 @@ def built_in_response(message, context_name="Cory"):
 
 
 def respond(message, context_name="Cory", advisory_context=None):
+    if private_session_active() and re.match(
+            r"(?i)^\\s*(remember that|remember this:|save this to memory:|"
+            r"keep this in memory:)\\s*", str(message or "")):
+        return "Private session is on. I will not save that to long-term memory."
     memory_answer = long_term_memory_response(
         message,
         context_name=context_name,
