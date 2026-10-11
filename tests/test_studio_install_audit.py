@@ -53,9 +53,9 @@ class StudioInstallAuditTests(unittest.TestCase):
                    ' .. adelay A->A Delay\n'
                    ' .. aformat A->A Format\n'
                    ' .. fakefilter A->A mentions amix\n')
-        with patch.object(helper.shutil, 'which', return_value='/usr/bin/ffmpeg'), \\
-             patch.object(helper.subprocess, 'run', return_value=subprocess.CompletedProcess(
-                 args=[], returncode=0, stdout=listing, stderr='')):
+        with (patch.object(helper.shutil, 'which', return_value='/usr/bin/ffmpeg'),
+              patch.object(helper.subprocess, 'run', return_value=subprocess.CompletedProcess(
+                  args=[], returncode=0, stdout=listing, stderr=''))):
             report = helper.ffmpeg_status()
         self.assertEqual(report['missing_filters'], [])
         self.assertIn('adelay', report['required_filters'])
