@@ -23,6 +23,7 @@ if __package__:
         PROJECTS_ROOT, save_project, load_project, list_projects, recent_mixes,
     )
     from .multitrack_dialog import MultitrackDialog
+    from .mix_presets import PRESETS, PRESET_IDS, preset_mix_values
     from .song_mix import MixError, valid_wav
 else:
     from band_mix import (
@@ -33,6 +34,7 @@ else:
         PROJECTS_ROOT, save_project, load_project, list_projects, recent_mixes,
     )
     from multitrack_dialog import MultitrackDialog
+    from mix_presets import PRESETS, PRESET_IDS, preset_mix_values
     from song_mix import MixError, valid_wav
 
 ROLE_LABELS = {
@@ -129,6 +131,18 @@ class BandMixerPanel(QWidget):
         recall.addWidget(self.project_refresh)
         recall.addWidget(self.project_load)
         layout.addLayout(recall)
+
+        preset_row = QHBoxLayout()
+        self.mix_preset = QComboBox()
+        for key in PRESET_IDS:
+            self.mix_preset.addItem(PRESETS[key]['name'], key)
+        self.mix_preset.setCurrentIndex(self.mix_preset.findData('broken_sorrow'))
+        self.apply_preset_button = QPushButton('Apply starting mix preset')
+        self.apply_preset_button.clicked.connect(self.apply_mix_preset)
+        preset_row.addWidget(QLabel('Quick mix'))
+        preset_row.addWidget(self.mix_preset, 1)
+        preset_row.addWidget(self.apply_preset_button)
+        layout.addLayout(preset_row)
 
         self.track_heading = QLabel('INDEPENDENT WAV TRACKS')
         self.track_heading.setStyleSheet('font-size:17px; color:#c4b5fd; font-weight:bold;')
@@ -242,6 +256,24 @@ class BandMixerPanel(QWidget):
         layout.addStretch()
         self.refresh_projects()
         self.refresh_history()
+
+    def apply_mix_preset(self):
+        if self.worker is not None:
+            self.status.setText('Finish the current render before changing mix levels.')
+            return
+        try:
+            gains, pans = preset_mix_values(self.mix_preset.currentData())
+        except ValueError as exc:
+            self.status.setText(str(exc))
+            return
+        for role in ROLES:
+            self.gains[role].setValue(gains[role])
+            self.pans[role].setValue(pans[role])
+        self.status.setText(
+            'Mix starting preset applied to levels and pan only. '
+            'Existing WAV paths, mute, solo and timing offsets are unchanged. '
+            'Save a new project revision to keep these settings.'
+        )
 
     def choose_wav(self, role):
         selected, _ = QFileDialog.getOpenFileName(
