@@ -30,6 +30,36 @@ class NativeWorkspaceTests(unittest.TestCase):
             self.assertFalse(panel.lyrics.isEnabled())
             panel.close()
 
+    def test_independent_band_stem_controls_and_cancel(self):
+        with tempfile.TemporaryDirectory() as folder:
+            panel = StudioAIPanel(folder)
+            self.assertIn('rhythm_guitar', panel.band_track_fields)
+            self.assertIn('lead_guitar', panel.band_track_fields)
+            self.assertIn('guest_vocal', panel.band_track_fields)
+            self.assertFalse(panel.band_mix_play_button.isEnabled())
+            panel.start_band_mix()
+            self.assertIn('two to eight', panel.status.text())
+            panel.band_track_fields['rhythm_guitar'].setText('/tmp/recorded-rhythm.wav')
+            panel.band_track_fields['lead_guitar'].setText('/tmp/recorded-lead.wav')
+            panel.band_track_gains['lead_guitar'].setValue(.7)
+            with patch('studio.ai_panel.validate_tracks') as validate, \
+                 patch('studio.ai_panel.BandMixWorker') as worker:
+                panel.start_band_mix()
+                validate.assert_called_once()
+                roles, gains = validate.call_args.args
+                self.assertEqual(set(roles), {'rhythm_guitar', 'lead_guitar'})
+                self.assertEqual(gains['lead_guitar'], .7)
+                self.assertFalse(panel.band_mix_button.isEnabled())
+                self.assertTrue(panel.band_mix_cancel_button.isEnabled())
+                worker.return_value.start.assert_called_once()
+                panel.cancel_band_mix()
+                worker.return_value.stop.set.assert_called_once()
+                panel.band_mix_done('/tmp/private-band-mix.wav', 'Saved')
+                self.assertTrue(panel.band_mix_play_button.isEnabled())
+                panel.band_mix_finished()
+                self.assertTrue(panel.band_mix_button.isEnabled())
+            panel.close()
+
     def test_multiple_singers_and_second_guitar_controls(self):
         with tempfile.TemporaryDirectory() as folder:
             panel = StudioAIPanel(folder)
