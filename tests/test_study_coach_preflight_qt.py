@@ -43,9 +43,9 @@ class CoachQtTests(unittest.TestCase):
                 course="PSY-328", topic="Personality", materials="Owner notes",
                 notes="Course notes", store=self.store, course_id=self.course_id)
             self.assertFalse(dialog.notes_checkbox.isChecked())
-            self.assertFalse(dialog.notes_preview.isVisible())
+            self.assertTrue(dialog.notes_preview.isHidden())
             dialog.notes_checkbox.setChecked(True)
-            self.assertTrue(dialog.notes_preview.isVisible())
+            self.assertFalse(dialog.notes_preview.isHidden())
             self.assertIn("Course notes", dialog.notes_preview.toPlainText())
             self.assertIn("COURSE NOTES SELECTED BY OWNER", dialog.selected_material())
             dialog.notes_checkbox.setChecked(False)
