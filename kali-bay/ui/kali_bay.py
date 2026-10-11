@@ -27,6 +27,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QComboBox,
     QCheckBox,
+    QFileDialog,
     QInputDialog,
     QMainWindow,
     QMessageBox,
@@ -56,6 +57,7 @@ if not SPIDER_ROOT.exists():
 sys.path.insert(0, str(SPIDER_ROOT / "kali-bay" / "runtime"))
 import workspace_store as kali_store
 import lab_reports as kali_reports
+import evidence_fingerprint as kali_evidence
 
 
 MANAGER = (
@@ -277,6 +279,23 @@ class KaliCatalogWorker(QThread):
             self.failed.emit(str(error)[:220])
 
 
+class KaliEvidenceWorker(QThread):
+    """Hash an explicitly selected file off the GUI thread; no file changes."""
+
+    ready = pyqtSignal(dict)
+    failed = pyqtSignal(str)
+
+    def __init__(self, path, parent=None):
+        super().__init__(parent)
+        self.path = path
+
+    def run(self):
+        try:
+            self.ready.emit(kali_evidence.fingerprint(self.path))
+        except (kali_evidence.EvidenceError, OSError) as error:
+            self.failed.emit(str(error))
+
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -291,6 +310,9 @@ class KaliBayWindow(QMainWindow):
         self.active_lab = None
         self._switching_labs = False
         self.catalog_worker = None
+        self.evidence_worker = None
+        self.evidence_result = None
+        self.evidence_lab_id = None
 
         self.setWindowTitle(
             "Kali Bay | Spider OS"
@@ -1208,6 +1230,12 @@ class KaliBayWindow(QMainWindow):
         self.webbie_chat_entry.setFocus()
 
     def closeEvent(self, event):
+        if self.evidence_worker and self.evidence_worker.isRunning():
+            event.ignore()
+            self.lab_status.setText(
+                "Selected-file fingerprint is finishing; no file was changed."
+            )
+            return
         if self.catalog_worker and self.catalog_worker.isRunning():
             event.ignore()
             self.desktop_apps_status.setText(
@@ -1297,6 +1325,20 @@ class KaliBayWindow(QMainWindow):
         export.clicked.connect(self.export_active_lab_report)
         controls.addWidget(export)
         right.addLayout(controls)
+        evidence_controls = QHBoxLayout()
+        calculate = QPushButton("FINGERPRINT SELECTED FILE")
+        calculate.setObjectName("kaliFingerprintFile")
+        calculate.setToolTip(
+            "Read SHA-256 of a file you select, up to 256 MiB. "
+            "The file is not executed, copied or uploaded."
+        )
+        calculate.clicked.connect(self.select_evidence_file)
+        evidence_controls.addWidget(calculate)
+        append = QPushButton("ADD FINGERPRINT TO NOTES")
+        append.setObjectName("kaliAppendFingerprint")
+        append.clicked.connect(self.append_evidence_record)
+        evidence_controls.addWidget(append)
+        right.addLayout(evidence_controls)
         self.lab_status = QLabel("Locally stored in your private Spider OS home.")
         self.lab_status.setObjectName("kaliLabStatus")
         self.lab_status.setWordWrap(True)
@@ -1443,6 +1485,83 @@ class KaliBayWindow(QMainWindow):
         self.webbie_chat_entry.setFocus()
         self.lab_status.setText(
             "Notes prepared in Webbie's message box. Review and send manually."
+        )
+
+    def select_evidence_file(self):
+        if not self.active_lab:
+            QMessageBox.information(
+                self, "Kali Bay", "Choose an authorized lab notebook first."
+            )
+            return
+        if self.evidence_worker is not None:
+            return
+        filename, _filter = QFileDialog.getOpenFileName(
+            self, "Choose evidence for read-only SHA-256", str(Path.home()),
+            "All files (*)"
+        )
+        if not filename:
+            return
+        self.evidence_result = None
+        self.evidence_lab_id = self.active_lab["id"]
+        self.lab_status.setText(
+            "Calculating a local fingerprint. No file is uploaded or executed."
+        )
+        worker = KaliEvidenceWorker(filename, self)
+        self.evidence_worker = worker
+        worker.ready.connect(self.evidence_ready)
+        worker.failed.connect(self.evidence_failed)
+        worker.finished.connect(self.evidence_finished)
+        worker.start()
+
+    def evidence_ready(self, result):
+        self.evidence_result = result
+        self.lab_status.setText(
+            f"SHA-256 computed for {result['filename']} "
+            f"({result['size_bytes']} bytes). Click ADD FINGERPRINT TO NOTES "
+            "to include it. No data has been uploaded or saved to notes."
+        )
+
+    def evidence_failed(self, message):
+        self.evidence_result = None
+        self.lab_status.setText(
+            "Evidence fingerprint unavailable: " + str(message)[:220]
+        )
+
+    def evidence_finished(self):
+        worker = self.evidence_worker
+        self.evidence_worker = None
+        if worker is not None:
+            worker.deleteLater()
+
+    def append_evidence_record(self):
+        if not self.active_lab or not self.evidence_result:
+            QMessageBox.information(
+                self, "Kali Bay", "Select a lab and fingerprint a file first."
+            )
+            return
+        if self.evidence_lab_id != self.active_lab["id"]:
+            self.evidence_result = None
+            QMessageBox.warning(
+                self, "Kali Bay",
+                "You changed labs. Select the evidence file again."
+            )
+            return
+        try:
+            record = kali_evidence.note_entry(self.evidence_result)
+        except kali_evidence.EvidenceError as error:
+            QMessageBox.warning(self, "Kali Bay", str(error))
+            return
+        contents = self.lab_editor.toPlainText()
+        if len(contents) + len(record) > kali_store.MAX_NOTE_CHARS:
+            QMessageBox.warning(
+                self, "Kali Bay", "Your notebook is too large for this record."
+            )
+            return
+        self.lab_editor.setPlainText(contents + record)
+        self.evidence_result = None
+        self.lab_status.setText(
+            "Fingerprint added to UNSAVED notes. Click SAVE LOCAL NOTES "
+            "to retain it; no evidence file was modified or uploaded."
         )
 
     def export_active_lab_report(self):
