@@ -118,12 +118,26 @@ def legacy_studio(upstream):
 
 def enhanced_studio(upstream):
     result = recognized_studio_visual_preferences(upstream)
-    result = one_replace(result,
-        '        self.refresh_tools()\n\n        footer = QLabel(',
-        '        self.refresh_tools()\n\n' + STUDIO_OLD_NOTE.replace('content.addSpacing(20)', 'content.addSpacing(8)').replace('        content.addStretch()\n', '') + '        footer = QLabel(')
-    result = one_replace(result,
-        "self.status.setText('Application opened.')",
-        "self.status.setText('Launched: ' + ' '.join(command))")
+    # Two owner-reviewed source variants are valid:
+    # 1. Fresh GitHub Studio has no Media Center note and old status text.
+    # 2. The previously reconciled Spider OS Studio ALREADY has the note
+    #    and personalized launch status. Don't insert them twice.
+    note = STUDIO_OLD_NOTE.replace(
+        'content.addSpacing(20)', 'content.addSpacing(8)'
+    ).replace('        content.addStretch()\n', '')
+    bare = '        self.refresh_tools()\n\n        footer = QLabel('
+    with_note = '        self.refresh_tools()\n\n' + note + '        footer = QLabel('
+    if result.count(bare) == 1 and result.count(with_note) == 0:
+        result = one_replace(result, bare, with_note)
+    elif result.count(with_note) != 1 or result.count(bare) != 0:
+        raise ValueError('Unrecognized Studio note layout; preserving installed code.')
+
+    old_status = "self.status.setText('Application opened.')"
+    owner_status = "self.status.setText('Launched: ' + ' '.join(command))"
+    if result.count(old_status) == 1 and result.count(owner_status) == 0:
+        result = one_replace(result, old_status, owner_status)
+    elif result.count(owner_status) != 1 or result.count(old_status) != 0:
+        raise ValueError('Unrecognized Studio launch status; preserving installed code.')
     ast.parse(result)
     return result
 
