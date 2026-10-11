@@ -1,407 +1,260 @@
 #!/usr/bin/env python3
-
+"""Deep Forage native UI: sequential queue, graceful stop, report/source history."""
 import html
 import os
-import sys
+from pathlib import Path
 import subprocess
+import sys
+import threading
 
-from PyQt5.QtCore import (
-    QThread,
-    pyqtSignal,
-)
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
-    QApplication,
-    QLabel,
-    QLineEdit,
-    QMainWindow,
-    QPushButton,
-    QTextBrowser,
-    QVBoxLayout,
-    QWidget,
+    QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QMainWindow, QPushButton, QTextBrowser, QVBoxLayout, QWidget,
 )
 
-ROOT = os.path.dirname(
-    os.path.dirname(
-        os.path.abspath(
-            __file__
-        )
-    )
-)
+ROOT = str(Path(__file__).resolve().parents[1])
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
-sys.path.insert(
-    0,
-    ROOT,
-)
-
-from engine import (
-    deep_research,
-)
+from engine import deep_research, ResearchCancelled, REPORT_DIR
+from research_archive import list_reports
 
 
-class ResearchWorker(
-    QThread
-):
-    progress = pyqtSignal(
-        str
-    )
+class ResearchWorker(QThread):
+    progress = pyqtSignal(str)
+    completed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+    stopped = pyqtSignal(str)
 
-    completed = pyqtSignal(
-        object
-    )
-
-    failed = pyqtSignal(
-        str
-    )
-
-    def __init__(
-        self,
-        topic,
-    ):
+    def __init__(self, topic):
         super().__init__()
-
         self.topic = topic
+        self.cancel_event = threading.Event()
+
+    def cancel(self):
+        self.cancel_event.set()
 
     def run(self):
         try:
             result = deep_research(
-                self.topic,
-                progress=(
-                    self.progress.emit
-                ),
+                self.topic, progress=self.progress.emit,
+                cancel=self.cancel_event.is_set,
             )
-
-            self.completed.emit(
-                result
-            )
-
+            self.completed.emit(result)
+        except ResearchCancelled as error:
+            self.stopped.emit(str(error))
         except Exception as error:
-            self.failed.emit(
-                str(error)
-            )
+            self.failed.emit(str(error))
 
 
-class DeepForageWindow(
-    QMainWindow
-):
-    def __init__(
-        self,
-        initial_topic="",
-    ):
+class DeepForageWindow(QMainWindow):
+    def __init__(self, initial_topic=""):
         super().__init__()
-
         self.worker = None
+        self.pending_topics = []
+        self.history_rows = []
         self.last_report = None
-
-        self.setWindowTitle(
-            "Deep Forage | Spider OS"
-        )
-
-        self.resize(
-            1050,
-            760,
-        )
-
-        self.setStyleSheet(
-            """
-            QMainWindow,
-            QWidget {
-                background: #09070c;
-                color: #f5eff8;
+        self.last_sources = None
+        self.setWindowTitle("Deep Forage | Spider OS")
+        self.resize(1080, 800)
+        self.setStyleSheet("""
+            QWidget, QMainWindow {background:#09070c;color:#f5eff8;font-size:14px;}
+            QLineEdit, QTextBrowser, QComboBox, QListWidget {
+                background:#150f1d;border:1px solid #8150ae;
+                border-radius:7px;padding:9px;color:#f5eff8;
+                selection-background-color:#7132a8;selection-color:#fff;
             }
-
-            QLineEdit,
-            QTextBrowser {
-                background: #150f1d;
-                border: 1px solid #6b21a8;
-                border-radius: 8px;
-                padding: 10px;
-                color: #f5eff8;
+            QComboBox QAbstractItemView {
+                background:#180e20;color:#fff;selection-background-color:#7132a8;
             }
-
             QPushButton {
-                background: #6b21a8;
-                border: 1px solid #9333ea;
-                border-radius: 8px;
-                padding: 11px;
-                color: white;
-                font-weight: bold;
+                background:#63218f;border:1px solid #a35bea;
+                border-radius:7px;padding:10px;color:#fff;font-weight:bold;
             }
-            """
-        )
-
+            QPushButton:disabled {background:#282230;color:#aaa1ad;border-color:#51445b;}
+            QPushButton:hover:!disabled {background:#8130b7;}
+        """)
         root = QWidget()
+        self.setCentralWidget(root)
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(11)
 
-        self.setCentralWidget(
-            root
-        )
+        title = QLabel("DEEP FORAGE")
+        title.setStyleSheet("font-size:30px;font-weight:bold;color:#d8b4fe;")
+        layout.addWidget(title)
+        description = QLabel("RESEARCH  •  VERIFY  •  COMPARE  •  EXPORT")
+        description.setStyleSheet("color:#c5b5ce;")
+        layout.addWidget(description)
 
-        layout = QVBoxLayout(
-            root
-        )
+        self.topic = QLineEdit(initial_topic)
+        self.topic.setPlaceholderText("What should Deep Forage investigate?")
+        self.topic.returnPressed.connect(self.research)
+        layout.addWidget(self.topic)
 
-        layout.setContentsMargins(
-            25,
-            25,
-            25,
-            25,
-        )
+        row = QHBoxLayout()
+        self.run_button = QPushButton("BEGIN RESEARCH")
+        self.run_button.clicked.connect(self.research)
+        row.addWidget(self.run_button)
+        self.stop_button = QPushButton("STOP RESEARCH")
+        self.stop_button.setEnabled(False)
+        self.stop_button.clicked.connect(self.stop_research)
+        row.addWidget(self.stop_button)
+        layout.addLayout(row)
 
-        title = QLabel(
-            "DEEP FORAGE"
-        )
+        self.status = QLabel("Ready. Search runs on this PC; results require verified sources.")
+        self.status.setStyleSheet("color:#ceb6de;")
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
 
-        title.setStyleSheet(
-            """
-            font-size: 32px;
-            font-weight: bold;
-            color: #d8b4fe;
-            """
-        )
-
-        layout.addWidget(
-            title
-        )
-
-        description = QLabel(
-            "Autonomous multi-source research\n"
-            "SEARCH · READ · COMPARE · SYNTHESIZE"
-        )
-
-        description.setStyleSheet(
-            "color:#a99daf;"
-        )
-
-        layout.addWidget(
-            description
-        )
-
-        self.topic = QLineEdit()
-
-        self.topic.setPlaceholderText(
-            "What should Deep Forage investigate?"
-        )
-
-        self.topic.setText(
-            initial_topic
-        )
-
-        self.topic.returnPressed.connect(
-            self.research
-        )
-
-        layout.addWidget(
-            self.topic
-        )
-
-        self.run_button = QPushButton(
-            "BEGIN DEEP FORAGE"
-        )
-
-        self.run_button.clicked.connect(
-            self.research
-        )
-
-        layout.addWidget(
-            self.run_button
-        )
-
-        self.status = QLabel(
-            "Ready."
-        )
-
-        self.status.setStyleSheet(
-            "color:#9e93a5;"
-        )
-
-        layout.addWidget(
-            self.status
-        )
+        queue_title = QLabel("Pending research queue")
+        queue_title.setStyleSheet("color:#d8b4fe;font-weight:bold;")
+        layout.addWidget(queue_title)
+        self.queue_view = QListWidget()
+        self.queue_view.setMaximumHeight(105)
+        layout.addWidget(self.queue_view)
 
         self.output = QTextBrowser()
+        self.output.setOpenExternalLinks(True)
+        layout.addWidget(self.output, 1)
 
-        self.output.setOpenExternalLinks(
-            True
-        )
+        saved = QHBoxLayout()
+        self.open_report = QPushButton("OPEN SAVED REPORT")
+        self.open_report.clicked.connect(self.open_saved_report)
+        self.open_report.setEnabled(False)
+        saved.addWidget(self.open_report)
+        self.open_sources = QPushButton("OPEN SOURCE EXPORT")
+        self.open_sources.clicked.connect(self.open_saved_sources)
+        self.open_sources.setEnabled(False)
+        saved.addWidget(self.open_sources)
+        layout.addLayout(saved)
 
-        layout.addWidget(
-            self.output,
-            1,
-        )
+        history_row = QHBoxLayout()
+        self.history = QComboBox()
+        self.history.setAccessibleName("Previous research reports")
+        history_row.addWidget(self.history, 1)
+        self.history_button = QPushButton("OPEN HISTORY")
+        self.history_button.clicked.connect(self.open_history)
+        history_row.addWidget(self.history_button)
+        layout.addLayout(history_row)
+        self.refresh_history()
 
-        self.open_report = QPushButton(
-            "OPEN SAVED REPORT"
-        )
+    def refresh_history(self):
+        self.history_rows = list_reports(REPORT_DIR)
+        self.history.clear()
+        for record in self.history_rows:
+            self.history.addItem(
+                record["title"] + "  [" + record["evidence_status"] + "]",
+                record["path"],
+            )
+        self.history_button.setEnabled(bool(self.history_rows))
 
-        self.open_report.setEnabled(
-            False
-        )
-
-        self.open_report.clicked.connect(
-            self.open_saved_report
-        )
-
-        layout.addWidget(
-            self.open_report
-        )
+    def _refresh_queue(self):
+        self.queue_view.clear()
+        self.queue_view.addItems(self.pending_topics)
 
     def research(self):
-        topic = (
-            self.topic.text()
-            .strip()
-        )
-
+        topic = self.topic.text().strip()
         if not topic:
+            self.status.setText("Enter a research question first.")
             return
+        if self.worker and self.worker.isRunning():
+            if len(self.pending_topics) >= 20:
+                self.status.setText("Queue full. Finish or cancel existing work first.")
+                return
+            self.pending_topics.append(topic)
+            self._refresh_queue()
+            self.status.setText(f"Queued: {topic}")
+            self.topic.clear()
+            return
+        self._start(topic)
 
-        self.run_button.setEnabled(
-            False
-        )
-
+    def _start(self, topic):
+        self.topic.clear()
         self.output.clear()
-
-        self.status.setText(
-            "Deep Forage started..."
-        )
-
-        self.worker = ResearchWorker(
-            topic
-        )
-
-        self.worker.progress.connect(
-            self.status.setText
-        )
-
-        self.worker.failed.connect(
-            self.failed
-        )
-
-        self.worker.completed.connect(
-            self.completed
-        )
-
+        self.run_button.setText("ADD TO QUEUE")
+        self.stop_button.setEnabled(True)
+        self.status.setText(f"Researching: {topic}")
+        self.worker = ResearchWorker(topic)
+        self.worker.progress.connect(self.status.setText)
+        self.worker.completed.connect(self.completed)
+        self.worker.failed.connect(self.failed)
+        self.worker.stopped.connect(self.stopped)
+        self.worker.finished.connect(self._after_finished)
         self.worker.start()
 
-    def failed(
-        self,
-        message,
-    ):
-        self.run_button.setEnabled(
-            True
-        )
+    def stop_research(self):
+        self.pending_topics.clear()
+        self._refresh_queue()
+        if self.worker and self.worker.isRunning():
+            self.worker.cancel()
+            self.stop_button.setEnabled(False)
+            self.status.setText("Stopping after the current network operation or model chunk.")
+        else:
+            self.status.setText("Queue cleared.")
 
-        self.status.setText(
-            "Deep Forage failed."
-        )
+    def _after_finished(self):
+        self.stop_button.setEnabled(False)
+        if self.pending_topics:
+            next_topic = self.pending_topics.pop(0)
+            self._refresh_queue()
+            self._start(next_topic)
+        else:
+            self.run_button.setText("BEGIN RESEARCH")
 
-        self.output.setPlainText(
-            message
-        )
+    def failed(self, message):
+        self.status.setText("Research failed. Previous saved reports are unaffected.")
+        self.output.setPlainText(message)
 
-    def completed(
-        self,
-        result,
-    ):
-        self.run_button.setEnabled(
-            True
-        )
+    def stopped(self, message):
+        self.status.setText(message)
+        self.output.setPlainText("Cancelled. No partial report was published.")
 
-        self.last_report = (
-            result["report_path"]
-        )
-
-        self.open_report.setEnabled(
-            True
-        )
-
-        self.status.setText(
-            "Research complete."
-        )
-
-        report = html.escape(
-            result["report"]
-        ).replace(
-            "\n",
-            "<br>",
-        )
-
-        sources = []
-
-        for index, source in enumerate(
-            result["sources"],
-            start=1,
-        ):
-            title = html.escape(
-                source["title"]
-            )
-
-            url = html.escape(
-                source["url"],
-                quote=True,
-            )
-
-            sources.append(
-                f'{index}. '
-                f'<a href="{url}">'
-                f'{title}</a>'
-            )
-
+    def completed(self, result):
+        self.last_report = result["report_path"]
+        self.last_sources = result.get("sources_path")
+        self.open_report.setEnabled(True)
+        self.open_sources.setEnabled(bool(self.last_sources))
+        state = result.get("evidence_status", "unknown")
+        self.status.setText("Research finished. Evidence status: " + state)
+        report = html.escape(result["report"]).replace("\n", "<br>")
+        links = []
+        for number, source in enumerate(result["sources"], start=1):
+            title = html.escape(str(source.get("title", "Source")))
+            url = html.escape(str(source.get("url", "")), quote=True)
+            kind = html.escape(str(source.get("evidence_kind", "unknown")))
+            links.append(f'{number}. <a href="{url}">{title}</a> ({kind})')
         self.output.setHtml(
-            "<h2>Deep Forage Report</h2>"
-            f"<p>{report}</p>"
-            "<hr>"
-            "<h3>Sources</h3>"
-            + "<br>".join(
-                sources
-            )
-            + "<hr>"
-            + "<p><b>Saved:</b> "
-            + html.escape(
-                self.last_report
-            )
-            + "</p>"
+            "<h2>Deep Forage Report</h2><p>" + report + "</p><hr>"
+            "<h3>Evidence sources</h3>" + "<br>".join(links)
+            + "<hr><p>Saved: " + html.escape(self.last_report) + "</p>"
         )
+        self.refresh_history()
 
-    def open_saved_report(
-        self,
-    ):
-        if not self.last_report:
-            return
+    @staticmethod
+    def _open(path):
+        if path and Path(path).is_file() and not Path(path).is_symlink():
+            subprocess.Popen(["xdg-open", path], start_new_session=True)
 
-        subprocess.Popen(
-            [
-                "xdg-open",
-                self.last_report,
-            ],
-            start_new_session=True,
-        )
+    def open_saved_report(self):
+        self._open(self.last_report)
+
+    def open_saved_sources(self):
+        self._open(self.last_sources)
+
+    def open_history(self):
+        path = self.history.currentData()
+        self._open(path)
 
 
 def main():
-    initial = (
-        " ".join(
-            sys.argv[1:]
-        )
-        if len(sys.argv) > 1
-        else ""
-    )
-
-    app = QApplication(
-        sys.argv
-    )
-
-    app.setApplicationName(
-        "Deep Forage"
-    )
-
-    window = DeepForageWindow(
-        initial
-    )
-
+    initial = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else ""
+    app = QApplication(sys.argv)
+    app.setApplicationName("Deep Forage")
+    window = DeepForageWindow(initial)
     window.show()
-
-    sys.exit(
-        app.exec_()
-    )
+    sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
