@@ -133,6 +133,8 @@ APP_FILES = (
     # Candidate-only additive components from today's workspace branches.
     'author/manuscript_import.py',
     'author/project_map.py',
+    'author/atlas_widget.py',
+    'author/story_atlas.py',
     'kali-bay/runtime/evidence_fingerprint.py',
     'kali-bay/runtime/evidence_ledger.py',
     'kali-bay/package/audit-upgrade.py',
@@ -152,6 +154,9 @@ APP_FILES = (
     'studio/session_presets.py',
     'studio/session_project.py',
     'studio/session_qc.py',
+    'studio/mix_presets.py',
+    'studio/release_export.py',
+    'studio/release_panel.py',
     'study/assignment_planner.py',
     'study/assignment_workflow.py',
     'study/assignment_workspace_ui.py',
