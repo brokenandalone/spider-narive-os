@@ -126,6 +126,8 @@ class AtlasStoreTests(unittest.TestCase):
 
     def test_relationships_and_atlas_data_survive_reopening(self):
         mira = self.store.atlas.add_entity('Mira', 'Character')
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            self.store.atlas.add_entity('mira', 'Character')
         clock = self.store.atlas.add_entity('The Clock', 'Object')
         self.store.atlas.add_relationship(
             self.a, mira, clock, 'protects', notes='A mysterious object.'
