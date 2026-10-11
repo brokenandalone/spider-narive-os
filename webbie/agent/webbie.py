@@ -645,33 +645,20 @@ def clean_phrase(text):
 
 
 def remove_wake_word(phrase):
-    phrase = clean_phrase(phrase)
-
+    """Keep URL punctuation intact after an explicitly addressed wake word."""
+    original = str(phrase or "").strip()
     wake_words = sorted(
-        CONFIG.get(
-            "wake_words",
-            [],
-        ),
-        key=len,
-        reverse=True,
-    )
-
+        CONFIG.get("wake_words", []), key=len, reverse=True)
     for wake in wake_words:
-        wake = clean_phrase(wake)
-
-        index = phrase.find(wake)
-
-        if index >= 0:
-            remainder = (
-                phrase[
-                    index + len(wake):
-                ]
-                .strip()
-            )
-
-            return True, remainder
-
-    return False, phrase
+        word = clean_phrase(wake)
+        if not word:
+            continue
+        parts = [re.escape(token) for token in word.split()]
+        pattern = r"^\\s*" + r"\\s+".join(parts) + r"\\b[\\s,:.!?]*"
+        match = re.match(pattern, original, flags=re.I)
+        if match:
+            return True, original[match.end():].strip()
+    return False, original
 
 
 def voice_listener():
@@ -743,10 +730,8 @@ def voice_listener():
     def on_text(phrase):
         global awaiting_command_until
 
-        phrase = clean_phrase(
-            phrase
-        )
-
+        original_phrase = str(phrase or "").strip()
+        phrase = clean_phrase(original_phrase)
         if not phrase:
             return
 
@@ -782,15 +767,15 @@ def voice_listener():
             return
 
         if now < awaiting_command_until:
-            woke, command = remove_wake_word(phrase)
+            woke, command = remove_wake_word(original_phrase)
             awaiting_command_until = next_window(
                 awaiting_command_until, 'command', now)
-            start_voice_turn(command if woke and command else phrase)
+            start_voice_turn(command if woke and command else original_phrase)
             return
 
         woke, command = (
             remove_wake_word(
-                phrase
+                original_phrase
             )
         )
 
