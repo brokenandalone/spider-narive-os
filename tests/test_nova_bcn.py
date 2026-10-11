@@ -77,5 +77,90 @@ class PersonaTests(unittest.TestCase):
             self.assertEqual(service.ollama_script(self.song), "Nova here, BCN radio.")
             compose.assert_called_once()
 
+
+class NativeHTTPTests(unittest.TestCase):
+    """Exercise real HTTP requests, not just Python persona imports."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib
+        import threading
+        from http.server import ThreadingHTTPServer
+        cls.service = importlib.import_module("service")
+        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), cls.service.Handler)
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+        cls.base = "http://127.0.0.1:" + str(cls.server.server_port)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join(timeout=3)
+
+    def request(self, path, method="GET", body=None):
+        import urllib.error
+        import urllib.request
+        import json
+        payload = None if body is None else json.dumps(body).encode("utf8")
+        req = urllib.request.Request(self.base + path, data=payload, method=method)
+        if payload is not None:
+            req.add_header("Content-Type", "application/json")
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            response = opener.open(req, timeout=3)
+        except urllib.error.HTTPError as error:
+            response = error
+        with response:
+            data = response.read()
+            return response.status, dict(response.headers), (
+                json.loads(data) if data else None
+            )
+
+    def test_health_endpoint_returns_json_and_nova_identity(self):
+        status, headers, body = self.request("/health")
+        self.assertEqual(status, 200)
+        self.assertIn("application/json", headers["Content-Type"])
+        self.assertEqual(body["ok"], True)
+        self.assertEqual(body["host"], "Nova")
+        self.assertEqual(body["service"], "Spider AI DJ")
+        self.assertEqual(body["port"], self.service.PORT)
+
+    def test_options_and_unknown_get_have_valid_headers(self):
+        status, headers, body = self.request("/health", "OPTIONS")
+        self.assertEqual(status, 204)
+        self.assertIsNone(body)
+        self.assertIn("POST", headers["Access-Control-Allow-Methods"])
+        status, _, body = self.request("/not-found")
+        self.assertEqual(status, 404)
+        self.assertEqual(body["error"], "not found")
+
+    def test_prepare_route_handles_valid_requests_and_unknown_post(self):
+        from pathlib import Path
+        from contextlib import ExitStack
+        unknown, _, missing = self.request("/other", "POST", {"type":"transition"})
+        self.assertEqual(unknown, 404)
+        self.assertEqual(missing["error"], "not found")
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(self.service, "ollama_script", return_value="Nova for BCN"))
+            stack.enter_context(patch.object(self.service, "make_audio", return_value=Path("/tmp/nova-test.wav")))
+            stack.enter_context(patch.object(self.service, "cleanup"))
+            success, headers, message = self.request(
+                "/dj/prepare", "POST",
+                {"type":"station_id","secondsRemaining":7}
+            )
+        self.assertEqual(success, 200)
+        self.assertEqual(message["host"], "Nova")
+        self.assertEqual(message["script"], "Nova for BCN")
+        self.assertEqual(message["type"], "station_id")
+        self.assertEqual(message["talkOver"]["crossfadeSeconds"], 3.0)
+        self.assertIn("application/json", headers["Content-Type"])
+
+    def test_prepare_error_stays_json_not_broken_pipe(self):
+        with patch.object(self.service, "ollama_script", side_effect=RuntimeError("tts unavailable")):
+            status, _, body = self.request("/dj/prepare", "POST", {"type":"transition"})
+        self.assertEqual(status, 500)
+        self.assertIn("tts unavailable", body["error"])
+
 if __name__ == "__main__":
     unittest.main()
