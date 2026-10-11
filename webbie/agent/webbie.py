@@ -2,6 +2,7 @@
 
 import json
 import os
+import pwd
 import re
 import signal
 import socket
@@ -685,126 +686,113 @@ def voice_listener():
         )
 
 
-def session_is_active():
-    try:
-        output = subprocess.check_output(
-            [
-                "loginctl",
-                "list-sessions",
-                "--no-legend",
-            ],
-            text=True,
-            stderr=subprocess.DEVNULL,
-        )
 
+def session_activity():
+    """Find ANY active local graphical session for this user.
+
+    The old implementation returned on the FIRST matching session, even
+    when a second KDE session was active, and silently hid lookup errors.
+    """
+    try:
+        owner = pwd.getpwuid(os.getuid()).pw_name
+        output = subprocess.check_output(
+            ["loginctl", "list-sessions", "--no-legend", "--no-pager"],
+            text=True, stderr=subprocess.DEVNULL,
+            timeout=4,
+        )
         for line in output.splitlines():
             parts = line.split()
-
-            if len(parts) < 3:
+            if len(parts) < 3 or parts[2] != owner:
                 continue
-
             session_id = parts[0]
-            username = parts[2]
-
-            if username != os.environ.get(
-                "USER",
-                "",
-            ):
-                continue
-
-            active = subprocess.check_output(
-                [
-                    "loginctl",
-                    "show-session",
-                    session_id,
-                    "-p",
-                    "Active",
-                    "--value",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-
-            idle = subprocess.check_output(
-                [
-                    "loginctl",
-                    "show-session",
-                    session_id,
-                    "-p",
-                    "IdleHint",
-                    "--value",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-
-            return (
-                active == "yes"
-                and idle != "yes"
+            properties = subprocess.check_output(
+                ["loginctl", "show-session", session_id,
+                 "-p", "Active", "-p", "IdleHint", "-p", "LockedHint",
+                 "-p", "Remote", "-p", "Type", "--no-pager"],
+                text=True, stderr=subprocess.DEVNULL,
+                timeout=4,
             )
+            data = dict(row.split("=", 1) for row in properties.splitlines()
+                        if "=" in row)
+            if (data.get("Active") == "yes"
+                    and data.get("IdleHint") != "yes"
+                    and data.get("LockedHint") != "yes"
+                    and data.get("Remote") != "yes"
+                    and data.get("Type") in ("x11", "wayland")):
+                return True, "active session " + session_id
+        return False, "no active, unlocked, non-idle KDE session"
+    except Exception as error:
+        return False, "session lookup failed: " + type(error).__name__
 
-    except Exception:
-        pass
 
-    return False
+def session_is_active():
+    """Backward-compatible boolean interface for other integrations."""
+    return session_activity()[0]
+
+
+def quiet_asleep():
+    """Honor existing portrait sleep state without changing its owner controls."""
+    sleep_path = Path.home() / ".config" / "spider-os" / "webbie-face.json"
+    try:
+        flag = json.loads(sleep_path.read_text(encoding="utf-8"))
+        if not flag.get("asleep"):
+            return False
+        until = flag.get("until")
+        if not until:
+            return True
+        try:
+            return float(until) > time.time()
+        except (TypeError, ValueError):
+            return True
+    except (OSError, ValueError, TypeError):
+        return False
 
 
 def proactive_loop():
-    if CONFIG.get(
-        "greet_on_login",
-        True,
-    ):
+    if CONFIG.get("greet_on_login", True):
         time.sleep(8)
+        if not quiet_asleep():
+            hour = datetime.now().hour
+            greeting = ("Good morning" if hour < 12
+                        else "Good afternoon" if hour < 18
+                        else "Good evening")
+            try:
+                say(f"{greeting}, {current_name()}. Webbie is online.")
+                write_state(proactive_startup="greeting attempted")
+            except Exception as error:
+                write_state(proactive_startup_error=type(error).__name__)
 
-        hour = datetime.now().hour
-
-        if hour < 12:
-            greeting = "Good morning"
-
-        elif hour < 18:
-            greeting = "Good afternoon"
-
-        else:
-            greeting = "Good evening"
-
-        say(
-            f"{greeting}, {current_name()}. "
-            "Webbie is online."
-        )
-
-    minutes = max(
-        15,
-        int(
-            CONFIG.get(
-                "check_in_minutes",
-                45,
-            )
-        ),
-    )
-
-    next_check = (
-        time.time()
-        + minutes * 60
-    )
-
+    try:
+        minutes = max(15, int(CONFIG.get("check_in_minutes", 45)))
+    except (TypeError, ValueError):
+        minutes = 45
+    next_check = time.time() + minutes * 60
+    previous_status = None
     while running:
         time.sleep(30)
-
         if time.time() < next_check:
             continue
-
-        next_check = (
-            time.time()
-            + minutes * 60
-        )
-
-        if not session_is_active():
-            continue
-
-        say(
-            f"{current_name()}, "
-            "do you need anything?"
-        )
+        active, reason = session_activity()
+        if quiet_asleep():
+            status = "quiet sleep, check-in deferred"
+        elif not active:
+            status = reason + ", check-in deferred"
+        else:
+            status = "check-in attempted"
+            try:
+                say(f"{current_name()}, do you need anything?")
+            except Exception as error:
+                status = "check-in speech failed: " + type(error).__name__
+                # Retry later rather than killing the scheduling thread.
+                next_check = time.time() + 60
+            else:
+                next_check = time.time() + minutes * 60
+                write_state(proactive_last_checkin=datetime.now().isoformat())
+        if status != previous_status:
+            write_state(proactive_status=status,
+                        proactive_last_checked=datetime.now().isoformat())
+            print("Webbie proactive:", status, flush=True)
+            previous_status = status
 
 
 def socket_server():
