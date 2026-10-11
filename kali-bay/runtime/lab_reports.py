@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import os
 import workspace_store as store
+import evidence_ledger as ledger
 
 GUIDES = (
     ("asset-baseline", "Authorized asset inventory", "Identify",
@@ -92,7 +93,7 @@ def guide_template(identifier):
     )
 
 
-def render_report(lab):
+def render_report(lab, chain_summary=None):
     checked = store._project(lab)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     # Indented text preserves user notes without treating them as report headings.
@@ -106,6 +107,11 @@ def render_report(lab):
         f"Generated (UTC): {now}\n\n"
         "Evidence disclaimer: User-authored notes, not independently verified.\n\n"
         "## Saved investigation notes\n\n" + indented + "\n\n"
+        "## Local evidence chain\n\n"
+        + ("\n".join("    " + line for line in chain_summary.splitlines())
+           if chain_summary is not None
+           else "    No evidence events have been registered.")
+        + "\n\n"
         "## Reviewer checklist\n\n"
         "- [ ] Confirm written authorization and scope\n"
         "- [ ] Verify evidence provenance and timestamps\n"
@@ -117,7 +123,9 @@ def render_report(lab):
 
 def export_saved_report(identifier):
     lab = store.get_lab(identifier)
-    report = render_report(lab)
+    # Never export a claim of validated evidence if the local ledger was altered.
+    chain_info = ledger.ledger_summary(identifier)
+    report = render_report(lab, chain_info)
     base = store._private_base(create=True)
     destination = base / "reports"
     if destination.is_symlink():
