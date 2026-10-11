@@ -40,7 +40,7 @@ from jarvis_context import read_context, context_summary, advisory_context
 from interruptible_speech import InterruptibleSpeech
 from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
-from app_open_route import installed_app_request, request_approved_website
+from app_open_route import installed_app_request, request_approved_website, request_navigation_preview
 from browser_routes import parse_browser_command
 from voice_turns import VoiceTurnTracker
 from voice_queue import VoiceTurnCoordinator
@@ -580,10 +580,15 @@ def handle_command(command, voice=False, expected_turn=None,
         last_input="voice" if voice else "text",
     )
 
+    # Natural navigation phrases can stage an owner-reviewed mission.
+    # This callback cannot send keys or create a desktop task grant.
+    navigation_reply = request_navigation_preview(command) if voice else None
     # Jarvis browser actions never execute in the agent. A literal user
     # request may propose a URL to the existing GUI, which confirms it.
     browser = parse_browser_command(command) if voice else None
-    if browser is not None:
+    if navigation_reply is not None:
+        reply = navigation_reply
+    elif browser is not None:
         reply = (request_approved_website(browser.url) if browser.url else
                  "That website address is blocked. Use a public HTTPS address.")
     elif re.fullmatch(
