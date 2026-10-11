@@ -119,6 +119,22 @@ class DailyContinuityTests(unittest.TestCase):
         errors, _ = gate.audit(self.plan, self.staged, self.backups, TODAY)
         self.assertIn("DAILY INSTALL SLOT ALREADY USED OR AMBIGUOUS", errors)
 
+    def test_actual_installer_will_not_apply_an_unreconciled_daily_plan(self):
+        import importlib.util
+        script = ROOT / "system/release_batch.py"
+        spec = importlib.util.spec_from_file_location(
+            "spider_batch_daily_gate_contract", script
+        )
+        module = importlib.util.module_from_spec(spec)
+        import sys
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        with self.assertRaisesRegex(RuntimeError, "Combined daily release BLOCKED"):
+            module.require_daily_continuity(self.backups, ROOT)
+        content = script.read_text()
+        self.assertIn("if args.action == 'apply':\\n            require_daily_continuity(backup_root)",
+                      content.replace("\\n", "\n"))
+
     def test_wrong_date_or_missing_verified_installer_hook_blocks(self):
         self.ready_plan()
         future = datetime(2026, 10, 12, 9, 0,
