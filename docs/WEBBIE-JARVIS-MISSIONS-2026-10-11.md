@@ -109,3 +109,13 @@ custom memory, full desktop workflow, or real keyboard behavior.
   reconciliation is blocked; preserve reversible backups and restore plan.
 
 **Not merged, not installed, no live PC acceptance test has happened.**
+
+### 6. Discoverable Jarvis commands and honest limitations
+
+The Web now has a **Jarvis commands and abilities** button showing the
+supported website, contextual-awareness, window navigation and proactive
+command syntax, plus what still needs consent or further development.
+Spoken **Webbie, what can you do?** and **Webbie help** get a concise,
+source-grounded answer rather than a language model inventing unrestricted
+computer access. The source guide never implies these upgrades are already
+installed on the owner's live PC.
