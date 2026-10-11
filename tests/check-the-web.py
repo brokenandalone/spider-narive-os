@@ -252,4 +252,55 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     app.processEvents()
     assert safe_again.close()
     app.processEvents()
+    # Pause, prioritize and skip a queued native workspace. The saved normal
+    # layout must remain untouched when any workspace was intentionally skipped.
+    default_layout = {
+        'open': ['default', 'studio', 'author', 'study'], 'active': 'study'}
+    main.write_desktop_state(window.state_path, default_layout, main.WORKSPACES)
+    guarded = main.TheWeb(desktop_mode=True)
+    assert guarded.pause_staged_restore()
+    app.processEvents()
+    assert guarded.tabs.count() == 1
+    assert guarded.staged_restore_status()['paused']
+    guarded.toggle_workspace_recovery()
+    recovery = guarded.workspace_recovery
+    assert recovery.pause_restore.text() == 'Resume restoring'
+    assert not recovery.adopt_layout.isEnabled()
+    recovery.hide()
+    assert guarded.prioritize_staged_workspace('study')
+    assert guarded.skip_staged_workspace('author')
+    assert guarded.staged_restore_status()['next'] == 'study'
+    assert guarded.resume_staged_restore()
+    started = time.monotonic()
+    while guarded.is_staged_restoring() and time.monotonic() - started < 20:
+        app.processEvents()
+        time.sleep(.025)
+    assert not guarded.is_staged_restoring()
+    assert 'author' not in guarded.workspace_widgets
+    assert 'study' in guarded.workspace_widgets
+    assert 'studio' in guarded.workspace_widgets
+    assert guarded._preserve_saved_session
+    assert main.read_desktop_state(window.state_path, main.WORKSPACES)['open'] == default_layout['open']
+    app.processEvents()
+    for active in (guarded.app_scan_worker, guarded.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
+    assert guarded.close()
+    assert main.read_desktop_state(window.state_path, main.WORKSPACES)['open'] == default_layout['open']
+    # Only the explicit adopt control replaces the old session on disk.
+    interrupted = main.TheWeb(desktop_mode=True)
+    assert interrupted.stop_staged_restore()
+    app.processEvents()
+    assert interrupted.tabs.count() == 1
+    assert main.read_desktop_state(window.state_path, main.WORKSPACES)['open'] == default_layout['open']
+    assert interrupted.adopt_current_layout()
+    assert main.read_desktop_state(window.state_path, main.WORKSPACES)['open'] == ['default']
+    app.processEvents()
+    for active in (interrupted.app_scan_worker, interrupted.taskbar.window_scan_worker):
+        if active is not None and active.isRunning():
+            assert active.wait(10000)
+    app.processEvents()
+    assert interrupted.close()
+    app.processEvents()
 print('DESKTOP INTEGRATION PASSED: 15 tabs, staged workspace startup, safe resume, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')
