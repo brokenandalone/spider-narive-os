@@ -27,7 +27,7 @@ REQUIRED_WIRING = {
     "study/store.py": (
         "assignment_record", "add_flashcards", "set_assignment_score",
     ),
-    "author/main.py": ("project_map_status", "import_docx", "AuthorWindow", "StoryAtlas"),
+    "author/main.py": ("project_map_status", "import_docx", "AuthorWindow", "AtlasWidget"),
     "author/store.py": ("chapter_plan", "import_docx", "AuthorStore"),
     "studio/ai_panel.py": (
         "open_multitrack_session", "open_saved_session_mix", "open_mastering_desk",
