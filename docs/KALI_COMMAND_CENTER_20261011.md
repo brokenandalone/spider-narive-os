@@ -52,3 +52,8 @@ Extra tests:
 ~~~
 python3 -m unittest discover -s tests -p 'test_kali_purple_inventory.py' -v
 ~~~
+
+## Nonblocking desktop app catalog
+The native **LOAD ALL INSTALLED KALI APPS** control now runs its fixed `apps-json` discovery through a bounded background Qt worker instead of blocking the desktop window for up to 24 seconds. It updates the application list only after safe parsing on the UI thread. Duplicate clicks are ignored while one worker is active, and close waits for in-flight work to finish safely. Existing direct catalog helper remains available for CI/tests and explicitly called code. The worker never launches an application.
+
+Additional test: `python3 -m unittest discover -s tests -p 'test_kali_catalog_async.py' -v`.
