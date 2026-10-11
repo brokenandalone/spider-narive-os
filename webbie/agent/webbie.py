@@ -40,13 +40,15 @@ from jarvis_context import read_context, context_summary, advisory_context
 from interruptible_speech import InterruptibleSpeech
 from interrupt_intent import is_direct_stop
 from stop_signal import request_stop
-from app_open_route import installed_app_request, request_approved_website
+from app_open_route import installed_app_request, request_approved_website, request_navigation_preview
 from browser_routes import parse_browser_command
 from voice_turns import VoiceTurnTracker
 from voice_queue import VoiceTurnCoordinator
 from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
 from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
+from workspace_launchers import workspace_command
+from jarvis_commands import is_capability_question, voice_guide
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
 from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
@@ -312,6 +314,8 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    if is_capability_question(command):
+        return voice_guide()
     # Read-only live snapshot. Status text never authorizes a desktop action.
     check_phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", lower)).strip()
     if re.fullmatch(
@@ -433,18 +437,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("media")
-
-        if launch(
-            [
-                "/usr/local/bin/spider-media-player"
-            ]
-        ):
-            return "Opening Media."
-
-        return (
-            "Spider Media Player is not installed yet."
-        )
+        command_line = workspace_command("media")
+        if command_line and launch(command_line):
+            set_workspace("media")
+            return "Spider Media Center launch requested."
+        return ("Spider Media Center launcher was not found. "
+                "No application was started.")
 
     if (
         "study" in lower
@@ -482,12 +480,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("studio")
-
-        return (
-            "Studio selected. "
-            "I'll call you Justin here."
-        )
+        command_line = workspace_command("studio")
+        if command_line and launch(command_line):
+            set_workspace("studio")
+            return "Spider Studio launch requested."
+        return ("Spider Studio launcher was not found. "
+                "No application was started.")
 
     if "terminal" in lower and any(
         word in lower
@@ -580,16 +578,22 @@ def handle_command(command, voice=False, expected_turn=None,
         last_input="voice" if voice else "text",
     )
 
+    # Natural navigation phrases can stage an owner-reviewed mission.
+    # This callback cannot send keys or create a desktop task grant.
+    navigation_reply = request_navigation_preview(command) if voice else None
     # Jarvis browser actions never execute in the agent. A literal user
     # request may propose a URL to the existing GUI, which confirms it.
     browser = parse_browser_command(command) if voice else None
-    if browser is not None:
+    if navigation_reply is not None:
+        reply = navigation_reply
+    elif browser is not None:
         reply = (request_approved_website(browser.url) if browser.url else
                  "That website address is blocked. Use a public HTTPS address.")
     elif re.fullmatch(
-        r"(?:hey )?(?:webbie|webby|web)[ ,]+"
+        r"(?:(?:hey )?(?:webbie|webby|web)[ ,]+)?"
         r"(?:what am i working on|what is my current task|what workspace am i in|"
-        r"what is on my screen|what are we doing)", command, re.I,
+        r"what is on my screen|what are we doing|what step are we on|"
+        r"what is the next step|what is our navigation status)", command, re.I,
     ):
         reply = context_summary(read_context())
     # Speech-triggered camera questions work only with consent granted in

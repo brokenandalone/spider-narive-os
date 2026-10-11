@@ -29,6 +29,8 @@ sys.path.insert(0, str(ROOT / 'webbie/brain'))
 from local_models import choose_local_model
 from visual_step import propose_step
 from autopilot_policy import AutopilotPolicy
+from navigation_missions import NavigationMission, parse_navigation_request
+from action_journal import ActionJournal
 from webbie_operator_bridge import OperatorBridge
 
 
@@ -119,11 +121,14 @@ class WebbieComputerDialog(QDialog):
         self.step_worker = None
         self.autopilot = AutopilotPolicy()
         self.autopilot_revision = 0
+        self.nav_mission = NavigationMission()
+        self.action_journal = ActionJournal()
         self.pending_step = None
         self.pending_step_target = None
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
         self.bridge.openRequested.connect(self.handle_voice_open)
         self.bridge.webRequested.connect(self.handle_voice_web)
+        self.bridge.navigationProposed.connect(self.handle_voice_navigation)
 
         # Keep all explicit approval controls readable on smaller screens.
         outer = QVBoxLayout(self)
@@ -225,9 +230,45 @@ class WebbieComputerDialog(QDialog):
         self.autopilot_pause.setObjectName('webbieAutopilotPause')
         self.autopilot_pause.clicked.connect(self.pause_autopilot)
         autopilot_row.addWidget(self.autopilot_pause)
+        mission_label = QLabel(
+            'Jarvis navigation missions: preview a literal request, then '
+            'approve each step in one specifically authorized window.')
+        mission_label.setWordWrap(True)
+        layout.addWidget(mission_label)
+        self.navigation_input = QLineEdit()
+        self.navigation_input.setObjectName('webbieNavigationRequest')
+        self.navigation_input.setMaxLength(220)
+        self.navigation_input.setPlaceholderText(
+            'scroll down twice then go back, or next tab')
+        layout.addWidget(self.navigation_input)
+        navigation_row = QHBoxLayout(); layout.addLayout(navigation_row)
+        self.nav_preview_button = QPushButton('Preview navigation steps')
+        self.nav_preview_button.setObjectName('webbieNavPreview')
+        self.nav_preview_button.clicked.connect(self.preview_navigation)
+        navigation_row.addWidget(self.nav_preview_button)
+        self.nav_next_button = QPushButton('Run next reviewed step')
+        self.nav_next_button.setObjectName('webbieNavNext')
+        self.nav_next_button.clicked.connect(self.run_navigation_step)
+        navigation_row.addWidget(self.nav_next_button)
+        self.nav_cancel_button = QPushButton('Cancel mission')
+        self.nav_cancel_button.clicked.connect(self.cancel_navigation)
+        navigation_row.addWidget(self.nav_cancel_button)
+        self.nav_status = QLabel('No navigation mission active.')
+        self.nav_status.setWordWrap(True)
+        layout.addWidget(self.nav_status)
         self.report = QTextEdit(); self.report.setReadOnly(True)
         self.report.setMaximumHeight(150); layout.addWidget(self.report)
         self.report.setPlainText('No program or screen is being controlled.')
+        self.activity = QTextEdit(); self.activity.setReadOnly(True)
+        self.activity.setObjectName('webbieActivityHistory')
+        self.activity.setMaximumHeight(135)
+        self.activity.setPlainText(self.action_journal.display())
+        self.activity.setAccessibleName('Recent Webbie computer actions')
+        layout.addWidget(QLabel('Recent computer actions (current session only)'))
+        layout.addWidget(self.activity)
+        clear_history = QPushButton('Clear action history')
+        clear_history.clicked.connect(self.clear_activity)
+        layout.addWidget(clear_history)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh_status)
         self.timer.start(1000)
@@ -235,6 +276,14 @@ class WebbieComputerDialog(QDialog):
 
     def status(self, message):
         self.report.setPlainText(message)
+
+    def record_activity(self, event):
+        self.action_journal.record(event)
+        self.activity.setPlainText(self.action_journal.display())
+
+    def clear_activity(self):
+        self.action_journal.clear()
+        self.activity.setPlainText(self.action_journal.display())
 
     def selected_app(self):
         identity = self.app_select.currentData()
@@ -276,12 +325,15 @@ class WebbieComputerDialog(QDialog):
             self.grant.stop()
             self.status('Desktop voice bridge unavailable: ' + str(error))
             return
+        self.record_activity('grant_started')
         self.taskApproved.emit(task)
         self.status(f'Authorized: {app.name}. No changes made yet.')
         self.refresh_status()
 
     def stop(self):
         self.autopilot.stop()
+        self.nav_mission.stop()
+        self.record_activity('stopped')
         self.operator.stop()
         self.pending_step = None
         self.pending_step_target = None
@@ -299,9 +351,11 @@ class WebbieComputerDialog(QDialog):
         else:
             title = 'Confirm Webbie change'
             body = preview + '\n\nConfirm this potentially destructive computer action?'
-        return QMessageBox.question(
+        approved = (QMessageBox.question(
             self, title, body,
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes)
+        self.record_activity('review_approved' if approved else 'review_denied')
+        return approved
 
     def refresh_status(self):
         # A deliberate voice/GUI "Webby stop" revokes desktop task grants.
@@ -325,10 +379,16 @@ class WebbieComputerDialog(QDialog):
                         self.inspect_button, self.close_button, self.click_button,
                         self.key_button, self.type_button, self.suggest_button):
             control.setEnabled(active)
+        self.nav_preview_button.setEnabled(active)
+        self.nav_next_button.setEnabled(active and
+                                        self.nav_mission.plan is not None and
+                                        self.nav_mission.clock() < self.nav_mission.expires)
         self.apply_step_button.setEnabled(
             active and self.pending_step is not None and
             self.pending_step.get('action') in {'click', 'press'})
         if not active:
+            self.nav_mission.stop()
+            self.nav_status.setText('No active grant; navigation mission stopped.')
             self.pending_step = None
             self.bridge.deactivate()
             if not self.operator.cancelled.is_set():
@@ -411,6 +471,7 @@ class WebbieComputerDialog(QDialog):
             self.status('The system default browser could not handle this link.')
             return False
         self.browser_url.setText(destination)
+        self.record_activity('website_requested')
         self.status('Website open requested in the system default browser: ' +
                     destination[:300])
         self.refresh_status()
@@ -427,7 +488,8 @@ class WebbieComputerDialog(QDialog):
     def open_app(self):
         app = self.selected_app()
         if app:
-            self.action(self.operator.open_app, app.name)
+            result = self.action(self.operator.open_app, app.name)
+            self.record_activity('app_requested' if result else 'app_denied')
 
     def refresh_windows(self):
         listing = self.action(self.operator.windows)
@@ -454,7 +516,8 @@ class WebbieComputerDialog(QDialog):
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if choice == QMessageBox.Yes:
             self.pause_autopilot()
-            self.action(self.operator.bind_window, target)
+            if self.action(self.operator.bind_window, target):
+                self.record_activity('window_bound')
 
     def focus_window(self):
         if self.selected_window():
@@ -506,6 +569,7 @@ class WebbieComputerDialog(QDialog):
             if target not in {item['id'] for item in self.operator.windows()}:
                 raise ValueError('The selected window no longer exists')
             image = capture_window(target, approved=True)
+            self.record_activity('window_observed')
         except (ValueError, RuntimeError, PermissionError, OSError) as error:
             self.status(str(error)); return
         self.status('Local Ollama is describing this one authorized window.')
@@ -517,6 +581,7 @@ class WebbieComputerDialog(QDialog):
         self.screen_worker.start()
 
     def pause_autopilot(self):
+        self.nav_mission.stop()
         if self.autopilot.active:
             self.autopilot.stop()
             self.status('Autopilot paused. Existing task grant remains revocable.')
@@ -729,6 +794,109 @@ class WebbieComputerDialog(QDialog):
         else:
             self.status(self.report.toPlainText() +
                         '\nVerify the window before the next step.')
+        self.refresh_status()
+
+    def handle_voice_navigation(self, phrase):
+        """Voice may propose, but only local clicks can authorize and execute."""
+        staged = self.offer_navigation(phrase)
+        if self.bridge.pending is not None:
+            self.bridge.finish(
+                self.bridge.pending,
+                'Navigation staged. Review the steps in Computer Control.' if staged
+                else 'Unable to stage that navigation request.')
+
+    def offer_navigation(self, request):
+        """Present only direct user-supplied navigation text; no auto-action."""
+        proposed = parse_navigation_request(request)
+        if proposed is None:
+            return False
+        self.nav_mission.stop()
+        self.navigation_input.setText(str(request)[:220])
+        self.nav_status.setText(
+            f'{len(proposed.steps)} navigation step(s) proposed. '
+            'Authorize a task, select and bind its exact window, then preview.')
+        return True
+
+    def preview_navigation(self):
+        """No mouse or key movement occurs from a preview."""
+        self.nav_mission.stop()
+        task = parse_navigation_request(self.navigation_input.text())
+        if task is None:
+            self.nav_status.setText('Unsupported request. Use scroll, back, '
+                                    'forward, reload, or next/previous tab.')
+            self.refresh_status()
+            return
+        grant = self.grant.status()
+        target = self.selected_window()
+        app = self.selected_app()
+        browser = app is not None and is_browser_app(app)
+        if (not grant['active'] or target is None or
+                target != self.operator.target_window or app is None):
+            self.nav_status.setText(
+                'First authorize a desktop task and bind the exact window.')
+            self.refresh_status()
+            return
+        if grant['selected_app_id'] != app.desktop_id:
+            self.nav_status.setText('Authorized app changed; please reauthorize.')
+            self.refresh_status()
+            return
+        try:
+            revision = self.nav_mission.stage(
+                task, window=target, selected_app_id=app.desktop_id,
+                browser=browser, approved=True)
+        except (PermissionError, ValueError) as error:
+            self.nav_status.setText(str(error))
+            self.refresh_status()
+            return
+        lines = [f'{index + 1}. {step.label} ({step.key})'
+                 for index, step in enumerate(task.steps)]
+        self.record_activity('mission_staged')
+        self.nav_status.setText(
+            'Proposed sequence, NO ACTION TAKEN:\n' + '\n'.join(lines) +
+            '\nApprove each step using Run next reviewed step. '
+            f'This mission expires in two minutes (revision {revision}).')
+        self.refresh_status()
+
+    def run_navigation_step(self):
+        """One clicked step, one checked grant, one bound-window operation."""
+        app = self.selected_app()
+        grant = self.grant.status()
+        target = self.selected_window()
+        browser = app is not None and is_browser_app(app)
+        revision = self.nav_mission.revision
+        try:
+            step = self.nav_mission.next_step(
+                granted=grant['active'] and
+                        target == self.operator.target_window and
+                        grant['selected_app_id'] == (
+                            app.desktop_id if app else None),
+                window=target, app_id=app.desktop_id if app else None,
+                browser=browser, revision=revision)
+        except (ValueError, PermissionError) as error:
+            self.nav_status.setText(str(error))
+            self.refresh_status()
+            return
+        # A user click is a new, per-step consent event; no model output
+        # or socket command enters this action path.
+        result = self.action(self.operator.press, step.key)
+        pending = self.nav_mission.complete(
+            success=result is not None, revision=revision)
+        if result is None:
+            self.record_activity('mission_failed')
+            self.nav_status.setText('Navigation failed; remaining steps canceled.')
+        elif pending:
+            self.record_activity('mission_step')
+            self.nav_status.setText('Step completed. ' + self.nav_mission.progress())
+        else:
+            self.record_activity('mission_done')
+            self.nav_status.setText(
+                'All requested navigation steps sent. Verify the window.')
+        self.refresh_status()
+
+    def cancel_navigation(self):
+        self.nav_mission.stop()
+        self.record_activity('mission_canceled')
+        self.nav_status.setText('Navigation mission canceled.')
         self.refresh_status()
 
     def closeEvent(self, event):

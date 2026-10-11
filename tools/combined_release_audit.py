@@ -28,6 +28,8 @@ COMPONENTS = {
         "the-web/shell/webbie_computer_panel.py",
         "the-web/shell/webbie_reminders_dialog.py",
         "the-web/shell/main.py", "webbie/actions/autopilot_policy.py",
+        "webbie/actions/navigation_missions.py", "webbie/actions/action_journal.py",
+        "webbie/agent/workspace_launchers.py", "webbie/agent/jarvis_commands.py",
         "the-web/package/reconcile-native.py",
     ),
     "Study and school OneDrive": (
@@ -77,7 +79,8 @@ WIRING = {
     ),
     "the-web/shell/webbie_panel.py": (
         "show_proactive_checks", "open_reminders_dialog",
-        "publish_jarvis_context", "parse_browser_command"),
+        "publish_jarvis_context", "parse_browser_command",
+        "parse_navigation_request"),
     "study/study.py": ("open_homework", "open_school_onedrive"),
     "studio/main.py": ("StudioAIPanel",),
     "author/main.py": ("AuthorToolkit", "AuthorCommandServer"),

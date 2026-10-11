@@ -89,3 +89,34 @@ def request_approved_website(url):
                 'The browser request was not completed.')
     except OSError:
         return 'Webbie Computer Control is unavailable.'
+
+
+def request_navigation_preview(command):
+    """Voice requests can only *stage* a reviewed mission in the approved UI.
+
+    Voice identity verification is not connected yet; never click or send
+    keystrokes from this path. The owner must approve every actual step.
+    """
+    sys.path.insert(0, str(ROOT / 'webbie/actions'))
+    from navigation_missions import parse_navigation_request
+    proposal = parse_navigation_request(command)
+    if proposal is None:
+        return None
+    runtime = Path(os.environ.get(
+        'XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'spider-os'
+    path = runtime / 'webbie-operator.sock'
+    if (runtime.is_symlink() or path.is_symlink() or
+            not path.exists() or not stat.S_ISSOCK(path.stat().st_mode)):
+        return ('I can plan that navigation, but first open Webbie Computer '
+                'Control and approve a desktop task.')
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(3)
+            client.connect(str(path))
+            client.sendall(('PLAN:' + str(command).strip()).encode('utf-8'))
+            response = client.recv(401)
+        return (response[:400].decode('utf-8', 'replace')
+                if response and len(response) <= 400 else
+                'The desktop navigation request was not completed.')
+    except OSError:
+        return 'Webbie Computer Control is not available to review this mission.'

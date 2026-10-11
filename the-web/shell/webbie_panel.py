@@ -22,6 +22,9 @@ from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_
 from webbie_reminders_dialog import WebbieRemindersDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
+from jarvis_commands import gui_guide
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
+from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
 from context_awareness import AwarenessState
 from jarvis_context import publish_context
@@ -237,6 +240,10 @@ class WebbiePanel(QWidget):
         self.awareness_button = QPushButton('What Webbie knows right now')
         self.awareness_button.clicked.connect(self.show_awareness)
         layout.addWidget(self.awareness_button)
+        jarvis_help_button = QPushButton('Jarvis commands and abilities')
+        jarvis_help_button.setObjectName('webbieJarvisHelp')
+        jarvis_help_button.clicked.connect(self.show_jarvis_commands)
+        layout.addWidget(jarvis_help_button)
         # Independent read-only system status, no microphone or camera access.
         self.proactive_label = QLabel('Proactive checks: awaiting first report')
         self.proactive_label.setWordWrap(True)
@@ -597,10 +604,13 @@ class WebbiePanel(QWidget):
         """Short-lived metadata only. Camera/screen pixels never written here."""
         authorized = ''
         selected_window = ''
+        mission_status = ''
         if self.computer_dialog is not None:
             approval = self.computer_dialog.grant.status()
             if approval['active']:
                 authorized = approval['task']
+                if self.computer_dialog.nav_mission.plan is not None:
+                    mission_status = self.computer_dialog.nav_mission.progress()
                 chosen = self.computer_dialog.selected_window()
                 if (chosen is not None and
                         chosen == self.computer_dialog.operator.target_window):
@@ -611,6 +621,7 @@ class WebbiePanel(QWidget):
                 selected_title=self.workspace_summary,
                 approved_task=authorized,
                 selected_window=selected_window,
+                mission_status=mission_status,
                 sleeping=self.face_sleeping,
             )
         except (OSError, PermissionError, ValueError):
@@ -673,6 +684,9 @@ class WebbiePanel(QWidget):
             self.append_message('Webbie system checks',
                 'Could not request local checks: ' + str(error))
 
+    def show_jarvis_commands(self):
+        self.append_message('Jarvis command guide', gui_guide())
+
     def show_awareness(self):
         # Inspectable short-term context, not a long-term-memory database.
         # Camera observations stay out of this display unless vision is enabled.
@@ -699,6 +713,19 @@ class WebbiePanel(QWidget):
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        # Direct owner text can stage a deterministic window-bound navigation
+        # mission. Neither the LLM nor a webpage can trigger this parser.
+        navigation = parse_navigation_request(text)
+        if navigation is not None:
+            self.open_computer_dialog()
+            if self.computer_dialog.offer_navigation(text):
+                self.append_message(
+                    'Webbie mission',
+                    f'{len(navigation.steps)} steps staged, no actions taken. '
+                    'Authorize the task, bind the exact window, preview, and '
+                    'click each next step to run it.')
+            self.entry.clear()
             return
         # Typed website commands show a visible review instead of triggering
         # browser/network activity from model text. The GUI requires consent.

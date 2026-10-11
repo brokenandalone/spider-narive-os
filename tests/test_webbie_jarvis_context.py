@@ -39,6 +39,16 @@ class JarvisContextTests(unittest.TestCase):
         self.assertIn("not an instruction", m.advisory_context(result))
         self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
 
+    def test_owner_reviewed_mission_step_expires_with_context(self):
+        self.publish(selected_window="Browser window",
+                     approved_task="Scroll through the page",
+                     mission_status="Step 2 of 3: Go Back")
+        fresh=self.read()
+        self.assertIn("Step 2 of 3",fresh["mission_status"])
+        self.assertIn("Step 2 of 3",m.context_summary(fresh))
+        self.clock[0]+=91
+        self.assertEqual(self.read(),{})
+
     def test_expiration(self):
         self.publish(selected_title="Old browser")
         self.clock[0] += 91
