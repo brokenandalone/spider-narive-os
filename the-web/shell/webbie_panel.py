@@ -144,16 +144,47 @@ class SpeakingPortrait(QLabel):
             painter.setOpacity(1.0)
             painter.setRenderHint(QPainter.Antialiasing, True)
             painter.fillRect(self.rect(), QColor(19, 11, 47, 67))
-            pen = QPen(QColor(70, 44, 103, 238), max(2.0, size * .024))
-            pen.setCapStyle(Qt.RoundCap)
-            painter.setPen(pen)
+            # A thin curved stroke over open-eye artwork still looks awake.
+            # Mask each open eye with an actual filled eyelid first, then draw
+            # the curved closed-lid seam above it. Only affects sleep render.
             for left in (.315, .555):
-                eye = QPainterPath()
-                eye.moveTo(self.width() * left, self.height() * .420)
-                eye.cubicTo(self.width() * (left + .032), self.height() * .464,
-                            self.width() * (left + .104), self.height() * .466,
-                            self.width() * (left + .145), self.height() * .420)
-                painter.drawPath(eye)
+                mid = left + .073
+                mask = QPainterPath()
+                mask.moveTo(self.width() * (left - .021),
+                            self.height() * .399)
+                mask.cubicTo(self.width() * (left + .016),
+                             self.height() * .363,
+                             self.width() * (left + .131),
+                             self.height() * .363,
+                             self.width() * (left + .169),
+                             self.height() * .400)
+                mask.lineTo(self.width() * (left + .169),
+                            self.height() * .479)
+                mask.cubicTo(self.width() * (mid + .059),
+                             self.height() * .507,
+                             self.width() * (mid - .060),
+                             self.height() * .507,
+                             self.width() * (left - .021),
+                             self.height() * .479)
+                mask.closeSubpath()
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(48, 30, 69, 248))
+                painter.drawPath(mask)
+                pen = QPen(QColor(186, 139, 217, 240),
+                           max(2.0, size * .018))
+                pen.setCapStyle(Qt.RoundCap)
+                painter.setPen(pen)
+                painter.setBrush(Qt.NoBrush)
+                seam = QPainterPath()
+                seam.moveTo(self.width() * (left - .004),
+                            self.height() * .433)
+                seam.cubicTo(self.width() * (left + .040),
+                             self.height() * .465,
+                             self.width() * (left + .110),
+                             self.height() * .465,
+                             self.width() * (left + .148),
+                             self.height() * .433)
+                painter.drawPath(seam)
             # A tiny moon and gentle 'Zzz' remain readable even if portrait
             # artwork uses a different crop or face position.
             painter.setPen(QColor(223, 210, 255, 245))
