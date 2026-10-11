@@ -15,9 +15,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'studio'))
-spec = importlib.util.spec_from_file_location('music_backend_test', ROOT / 'studio/music_backend.py')
-m = importlib.util.module_from_spec(spec); sys.modules[spec.name] = m; spec.loader.exec_module(m)
+# Import as a real package, so its arrangement companion resolves correctly.
+# A preserved legacy studio/studio.py cannot shadow the explicit package.
+from studio import music_backend as m
 
 
 def wav_fixture():

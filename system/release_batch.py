@@ -72,7 +72,66 @@ APP_FILES = (
     'webbie/brain/local_models.py', 'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
+    # Cross-workspace October 10 source modules; each is individually hash-checked.
+    'author/commands.py',
+    'author/commands_client.py',
+    'author/continuity_engine.py',
+    'author/control_socket.py',
+    'author/review_engine.py',
+    'author/review_history.py',
+    'author/voice_reader.py',
+    'forage/engine.py',
+    'kali-bay/bin/kali-bay',
+    'kali-bay/runtime/kali_apps.py',
+    'kali-bay/ui/kali_bay.py',
+    'media/ai-dj/nova_host.py',
+    'media/ai-dj/service.py',
+    'studio/__init__.py',
+    'studio/ai_panel.py',
+    'studio/arrangement.py',
+    'studio/main.py',
+    'studio/music_backend.py',
+    'studio/owner_voice_model.py',
+    'studio/song_mix.py',
+    'studio/stem_separation.py',
+    'studio/voice_conversion.py',
+    'studio/voice_dataset.py',
+    'study/assignment_review.py',
+    'study/bin/webbie-homework',
+    'study/course_materials.py',
+    'study/draft_storage.py',
+    'study/homework.py',
+    'study/homework_ui.py',
+    'study/school_material_picker.py',
+    'study/school_onedrive.py',
+    'study/school_portal.py',
+    'study/school_upload.py',
+    'study/study.py', 'study/store.py', 'study/dashboard.py',
+    'study/apa.py', 'study/paper_dialog.py', 'studio/tools.py',
+    'webbie/agent/author_voice_bridge.py',
+    'webbie/agent/kali_assistant.py',
+    # Auxiliary modules omitted by the original PR #48 integration.
+    'author/narration_bookmarks.py',
+    'author/review_cache.py',
+    'media/ai-dj/spider-ai-dj.service',
+    'studio/ai_controls.py',
+    'studio/package/music-engine.sh',
+    'studio/package/voice-engine.sh',
+    'studio/rvc_loopback.py',
+    'studio/voice_profile.py',
+    'the-web/package/reconcile-native.py',
+    'kali-bay/package/install-kali-bay.sh',
 )
+# Exact recognized historical Study source blobs from the prior guarded
+# installer. Unknown owner PC edits still block the entire transaction.
+KNOWN_STUDY_BLOBS = {
+    'study/study.py': {
+        '456f0279b397f7776b8ba9a8ccaf',
+        '422029cbc30b462d87ff52eaa6c608b63f9ce499',
+    },
+    'study/store.py': {'c7fa2cef87f66f187e6253a7059f7a5d335703f0'},
+}
+
 UNITS = ('webbie-onedrive.service', 'webbie-onedrive.timer')
 MENU = ('webbie-face-sleep-tonight.desktop',
         'webbie-face-wake.desktop', 'webbie-onedrive-connect.desktop')
@@ -105,7 +164,13 @@ def prepare_items(root=PROJECT_ROOT, install=INSTALL_ROOT, units=UNIT_ROOT,
     for relative in APP_FILES:
         mode = 0o755 if relative in (
             'the-web/shell/main.py', 'the-web/overlay/webbie_face.py',
-            'system/onedrive.py') else 0o644
+            'system/onedrive.py', 'kali-bay/bin/kali-bay',
+            'study/bin/webbie-homework', 'author/main.py',
+            'studio/package/music-engine.sh', 'studio/package/voice-engine.sh',
+            'the-web/package/reconcile-native.py',
+            'kali-bay/package/install-kali-bay.sh',
+            'studio/main.py', 'study/study.py', 'media/ai-dj/service.py'
+        ) else 0o644
         found.append(Item(root / relative, install / relative, mode=mode,
                           reference=relative))
     for unit in UNITS:
@@ -131,6 +196,12 @@ def safe_path(path):
         if parent == parent.parent:
             break
     return True
+
+
+def git_blob_sha(path):
+    data = Path(path).read_bytes()
+    header = b'blob ' + str(len(data)).encode('ascii') + b'\0'
+    return hashlib.sha1(header + data).hexdigest()
 
 
 def known_baseline(root, relative, observed_hash, refs=BASELINES):
@@ -168,6 +239,9 @@ def inspect(items, project_root=PROJECT_ROOT, refs=BASELINES, known_checker=know
             results.append((item, 'BLOCKED', 'not a regular installed file')); continue
         if sha256(src) == sha256(dest):
             results.append((item, 'CURRENT', 'identical bytes')); continue
+        if item.reference in KNOWN_STUDY_BLOBS:
+            if git_blob_sha(dest) in KNOWN_STUDY_BLOBS[item.reference]:
+                results.append((item, 'UPGRADE', 'recognized exact older Study source')); continue
         if (item.reference and known_checker(project_root, item.reference,
                                              sha256(dest), refs)):
             results.append((item, 'UPGRADE', 'recognized source baseline')); continue

@@ -124,9 +124,16 @@ def save_conversation(messages):
             fd, name = tempfile.mkstemp(prefix='.webbie-conversation-',
                                         dir=CONVERSATION_FILE.parent)
             temp = Path(name)
+            # Explicitly protect the current conversation even when an
+            # inherited umask, legacy file or backup path was permissive.
+            # No modifications are made to the previous file on failure.
             with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+                os.fchmod(stream.fileno(), 0o600)
                 json.dump(messages, stream, indent=2, ensure_ascii=False)
+                stream.flush()
+                os.fsync(stream.fileno())
             temp.replace(CONVERSATION_FILE)
+            os.chmod(CONVERSATION_FILE, 0o600)
 
     except Exception:
         pass

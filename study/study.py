@@ -329,7 +329,9 @@ class StudyWindow(QMainWindow):
 
         school_actions = QHBoxLayout()
         self.add_action(school_actions, "APA PAPER", self.create_apa_paper)
+        self.add_action(school_actions, "WEBBIE HOMEWORK", self.open_homework)
         self.add_action(school_actions, "MY SNHU", self.open_snhu)
+        self.add_action(school_actions, "SCHOOL ONEDRIVE", self.open_school_onedrive)
         self.add_action(school_actions, "APA GUIDE", self.open_apa_guide)
         outer.addLayout(school_actions)
         self.dashboard = QLabel()
@@ -1188,6 +1190,39 @@ class StudyWindow(QMainWindow):
     def open_snhu(self):
         self.school_tabs.setCurrentIndex(1)
         self.school_portal.open()
+
+    def open_homework(self):
+        """Open Webbie's writing editor for the currently selected course."""
+        try:
+            if __package__:
+                from .homework_ui import HomeworkDialog
+            else:
+                from homework_ui import HomeworkDialog
+            course = self.store.course(self.current_course_id) if self.current_course_id else None
+            selected_row = self.assignment_table.currentRow()
+            selected = self.assignment_table.item(selected_row, 0) if selected_row >= 0 else None
+            dialog = HomeworkDialog(
+                self,
+                course=course["name"] if course else "",
+                assignment=selected.text() if selected else "",
+                notes=self.store.get_notes(self.current_course_id) if course else "",
+                folder=self.store.course_folder(self.current_course_id),
+            )
+            dialog.exec_()
+        except Exception as error:
+            QMessageBox.warning(self, "Webbie Homework", str(error))
+
+    def open_school_onedrive(self):
+        # School Microsoft identity is independent of personal Webbie storage.
+        try:
+            if __package__:
+                from .school_onedrive import SchoolOneDriveDialog
+            else:
+                from school_onedrive import SchoolOneDriveDialog
+            dialog = SchoolOneDriveDialog(self, self.store.course_folder(self.current_course_id))
+            dialog.exec_()
+        except Exception as error:
+            QMessageBox.warning(self, 'School OneDrive', str(error))
 
     def open_apa_guide(self):
         self.launch(['xdg-open', 'https://apastyle.apa.org/instructional-aids/student-paper-setup-guide.pdf'])

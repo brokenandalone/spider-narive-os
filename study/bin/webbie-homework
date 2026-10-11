@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""Standalone Webbie Homework launcher, sharing the Study course database."""
+import sys
+from pathlib import Path
+from PyQt5.QtWidgets import QApplication
+
+STUDY_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(STUDY_ROOT))
+from homework_ui import HomeworkDialog
+from store import StudyStore
+
+
+def main():
+    app = QApplication(sys.argv)
+    store = StudyStore()
+    store.ensure_default_course()
+    try:
+        courses = store.courses()
+        first = courses[0] if courses else None
+        course_id = first["id"] if first else None
+        dialog = HomeworkDialog(
+            course=first["name"] if first else "",
+            notes=store.get_notes(course_id) if course_id else "",
+            folder=store.course_folder(course_id),
+        )
+        return dialog.exec_()
+    finally:
+        store.close()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -24,7 +24,7 @@ def visual_question(command):
     return any(phrase.startswith(part) for part in starts)
 
 
-def ask_vision(question, runtime=None, timeout=65):
+def ask_vision(question, runtime=None, timeout=130):
     if not visual_question(question):
         return None
     candidate = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))

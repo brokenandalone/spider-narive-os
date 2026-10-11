@@ -507,7 +507,31 @@ def handle_builtin(command):
     return None
 
 
-def handle_command(command, voice=False, expected_turn=None):
+def verified_workspace_voice_action(command, *, speaker_verified=False,
+                                    workspace=None):
+    """Only a separately verified speaker can trigger Author/Kali operations.
+
+    Neither voice recognition, a wake phrase, a friendly workspace name nor
+    model-generated text counts as speaker verification. The existing voice
+    listener has not yet supplied a verified identity signal, so voice actions
+    remain disabled until that PC-specific gate is deliberately wired.
+    """
+    if speaker_verified is not True or quiet_asleep():
+        return None
+    workspace = current_workspace() if workspace is None else workspace
+    if workspace == 'author':
+        from author_voice_bridge import dispatch_verified_author_voice
+        return dispatch_verified_author_voice(
+            command, speaker_verified=True, workspace='author'
+        )
+    if workspace == 'kali-bay':
+        from kali_assistant import handle_kali_request
+        return handle_kali_request(command)
+    return None
+
+
+def handle_command(command, voice=False, expected_turn=None,
+                   speaker_verified=False):
     command = str(command or "").strip()
 
     if not command:
@@ -533,15 +557,23 @@ def handle_command(command, voice=False, expected_turn=None):
     if voice and visual_question(command):
         reply = ask_vision(command)
     else:
-        built_in = handle_builtin(command)
-        if built_in:
-            reply = built_in
+        verified_reply = (
+            verified_workspace_voice_action(
+                command, speaker_verified=speaker_verified
+            ) if voice else None
+        )
+        if verified_reply is not None:
+            reply = verified_reply
         else:
-            # A spoken installed-app launch only requests the exact current
-            # owner-selected GUI grant; it cannot create one or run commands.
-            app_reply = installed_app_request(command) if voice else None
-            reply = (app_reply if app_reply is not None else
-                     respond(command, context_name=current_name()))
+            built_in = handle_builtin(command)
+            if built_in:
+                reply = built_in
+            else:
+                # Spoken installed-app launches only request the existing
+                # owner's GUI grant; they cannot create one or run commands.
+                app_reply = installed_app_request(command) if voice else None
+                reply = (app_reply if app_reply is not None else
+                         respond(command, context_name=current_name()))
 
     if voice:
         # A completed model request cannot resume speaking after STOP.

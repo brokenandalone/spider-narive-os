@@ -133,7 +133,7 @@ class VisionBridge(QObject):
             QLocalServer.removeServer(str(self.path))
 
 
-def ask_vision(question, runtime=None, timeout=65):
+def ask_vision(question, runtime=None, timeout=130):
     """Synchronous resident agent route; socket exists ONLY with camera ON."""
     if not visual_question(question):
         return None

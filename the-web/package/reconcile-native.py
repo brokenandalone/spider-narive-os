@@ -57,6 +57,32 @@ def one_replace(text, old, new):
     return text.replace(old, new, 1)
 
 
+def recognized_studio_visual_preferences(source):
+    """Normalize either audited Studio visual variant.
+
+    The PC was already at the 22-point/50px layout when the October 10
+    Studio AI tabs were merged. Strictly allow only the original 18/24
+    or the owner's reviewed 22/50 values; reject unknown custom layouts.
+    """
+    pairs = (
+        ("logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
+         "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))"),
+        ("content.setContentsMargins(24, 24, 24, 24)",
+         "content.setContentsMargins(50, 48, 50, 48)"),
+    )
+    original = all(source.count(old) == 1 and source.count(new) == 0
+                   for old, new in pairs)
+    customized = all(source.count(new) == 1 and source.count(old) == 0
+                     for old, new in pairs)
+    if original:
+        for old, new in pairs:
+            source = one_replace(source, old, new)
+        return source
+    if customized:
+        return source  # The reviewed PC layout is already applied.
+    raise ValueError('Unrecognized Studio visual layout; preserving installed code.')
+
+
 def legacy_studio(upstream):
     """Reconstruct exactly the locally customized older Studio seen on the PC."""
     result = upstream
@@ -77,12 +103,7 @@ def legacy_studio(upstream):
         "            QPushButton:disabled { background:#17121d; color:#93869e; border-color:#352543; }\n"
     )
     result = one_replace(result, style, '')
-    result = one_replace(result,
-        "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
-        "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))")
-    result = one_replace(result,
-        'content.setContentsMargins(24, 24, 24, 24)',
-        'content.setContentsMargins(50, 48, 50, 48)')
+    result = recognized_studio_visual_preferences(result)
     start, end = '        self.tool_tabs = QTabWidget()\n', '        footer = QLabel('
     if result.count(start) != 1 or result.count(end) != 1:
         raise ValueError('Upstream Studio tab layout changed.')
@@ -96,18 +117,27 @@ def legacy_studio(upstream):
 
 
 def enhanced_studio(upstream):
-    result = one_replace(upstream,
-        "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
-        "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))")
-    result = one_replace(result,
-        'content.setContentsMargins(24, 24, 24, 24)',
-        'content.setContentsMargins(50, 48, 50, 48)')
-    result = one_replace(result,
-        '        self.refresh_tools()\n\n        footer = QLabel(',
-        '        self.refresh_tools()\n\n' + STUDIO_OLD_NOTE.replace('content.addSpacing(20)', 'content.addSpacing(8)').replace('        content.addStretch()\n', '') + '        footer = QLabel(')
-    result = one_replace(result,
-        "self.status.setText('Application opened.')",
-        "self.status.setText('Launched: ' + ' '.join(command))")
+    result = recognized_studio_visual_preferences(upstream)
+    # Two owner-reviewed source variants are valid:
+    # 1. Fresh GitHub Studio has no Media Center note and old status text.
+    # 2. The previously reconciled Spider OS Studio ALREADY has the note
+    #    and personalized launch status. Don't insert them twice.
+    note = STUDIO_OLD_NOTE.replace(
+        'content.addSpacing(20)', 'content.addSpacing(8)'
+    ).replace('        content.addStretch()\n', '')
+    bare = '        self.refresh_tools()\n\n        footer = QLabel('
+    with_note = '        self.refresh_tools()\n\n' + note + '        footer = QLabel('
+    if result.count(bare) == 1 and result.count(with_note) == 0:
+        result = one_replace(result, bare, with_note)
+    elif result.count(with_note) != 1 or result.count(bare) != 0:
+        raise ValueError('Unrecognized Studio note layout; preserving installed code.')
+
+    old_status = "self.status.setText('Application opened.')"
+    owner_status = "self.status.setText('Launched: ' + ' '.join(command))"
+    if result.count(old_status) == 1 and result.count(owner_status) == 0:
+        result = one_replace(result, old_status, owner_status)
+    elif result.count(owner_status) != 1 or result.count(old_status) != 0:
+        raise ValueError('Unrecognized Studio launch status; preserving installed code.')
     ast.parse(result)
     return result
 
