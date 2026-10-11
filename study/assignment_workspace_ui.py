@@ -241,6 +241,8 @@ class AssignmentWorkspaceDialog(QDialog):
                 assignment=self.assignment["title"],
                 notes=self.store.get_notes(self.assignment["course_id"]),
                 folder=self.folder,
+                store=self.store,
+                course_id=self.assignment["course_id"],
             )
             assistant.directions.setPlainText(directions)
             assistant.materials.setPlainText(webbie_materials(self.values()))
