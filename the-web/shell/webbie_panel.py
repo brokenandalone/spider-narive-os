@@ -22,7 +22,7 @@ from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
 from context_awareness import AwarenessState
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
-from proactive_checks import read_status as proactive_snapshot, status_message as proactive_status_message
+from proactive_checks import read_status as proactive_snapshot, status_message as proactive_status_message, request_check_now
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'overlay'))
 from webbie_face import asleep as face_asleep, set_sleep as set_face_sleep
 
@@ -242,6 +242,11 @@ class WebbiePanel(QWidget):
         proactive_button.setToolTip('Read the latest local results. Does not run an OS command.')
         proactive_button.clicked.connect(self.show_proactive_checks)
         layout.addWidget(proactive_button)
+        proactive_run_button = QPushButton('Run system checks now')
+        proactive_run_button.setObjectName('webbieProactiveRunButton')
+        proactive_run_button.setToolTip('Ask the resident agent to rerun local read-only checks; no system changes.')
+        proactive_run_button.clicked.connect(self.request_proactive_checks)
+        layout.addWidget(proactive_run_button)
         self.proactive_timer = QTimer(self)
         self.proactive_timer.timeout.connect(self.refresh_proactive_status)
         self.proactive_timer.start(10000)
@@ -612,6 +617,15 @@ class WebbiePanel(QWidget):
     def show_proactive_checks(self):
         self.refresh_proactive_status()
         self.append_message('Webbie system checks', proactive_status_message())
+
+    def request_proactive_checks(self):
+        try:
+            request_check_now()
+            self.append_message('Webbie system checks',
+                'Read-only check requested. The resident agent will run it on its next health tick (at most once every 30 seconds).')
+        except (OSError, PermissionError, ValueError) as error:
+            self.append_message('Webbie system checks',
+                'Could not request local checks: ' + str(error))
 
     def show_awareness(self):
         # Inspectable short-term context, not a long-term-memory database.
