@@ -23,6 +23,7 @@ if __package__:
     from .song_mix import mix_vocals, MixError, valid_wav
     from .stem_separation import separate, SeparationError
     from .owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
+    from .multitrack_dialog import MultitrackDialog
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
     from tools import TOOLS, resolve_tool
@@ -33,6 +34,7 @@ else:
     from song_mix import mix_vocals, MixError, valid_wav
     from stem_separation import separate, SeparationError
     from owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
+    from multitrack_dialog import MultitrackDialog
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -474,6 +476,17 @@ class StudioAIPanel(QWidget):
         self.play_final_mix_button.clicked.connect(self.play_final_mix)
         listening_actions.addWidget(self.play_final_mix_button)
         layout.addLayout(listening_actions)
+        session_heading = QLabel('Editable band session: real multitrack DAW export')
+        session_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
+        layout.addWidget(session_heading)
+        session_notice = QLabel('Collect real isolated lead/guest vocals, rhythm and lead guitars, '
+            'bass, drums and keys into one private session for Ardour or Qtractor. '
+            'An AI-generated full-song WAV is a reference mix, not separate instruments.')
+        session_notice.setWordWrap(True)
+        layout.addWidget(session_notice)
+        self.open_session_button = QPushButton('Build multitrack DAW session')
+        self.open_session_button.clicked.connect(self.open_multitrack_session)
+        layout.addWidget(self.open_session_button)
         buttons = QHBoxLayout()
         self.preset = QPushButton('Broken Sorrow preset')
         self.preset.clicked.connect(lambda: self.style.setPlainText(BROKEN_SORROW))
@@ -1076,6 +1089,30 @@ class StudioAIPanel(QWidget):
             self.status.setText('Requested Audacity for the selected take.')
         except OSError:
             self.status.setText('Could not launch Audacity.')
+
+    def open_multitrack_session(self):
+        """Open the multitrack handoff without generating or changing audio."""
+        entries = []
+        candidates = [
+            (self.selected(), 'reference_mix', 'Generated song reference'),
+            (self.mix_backing.text().strip(), 'instrumental_bed', 'User-selected instrumental'),
+            (self.mix_vocal.text().strip() or self.rvc_vocal.text().strip(),
+             'lead_vocal', 'User-selected isolated vocal'),
+        ]
+        seen = set()
+        for path, role, label in candidates:
+            if not path:
+                continue
+            source = Path(path).expanduser()
+            if (source.is_symlink() or not source.is_file()
+                    or source.suffix.lower() != '.wav'):
+                continue
+            resolved = source.resolve()
+            if resolved not in seen:
+                entries.append({'path': str(resolved), 'role': role, 'label': label})
+                seen.add(resolved)
+        dialog = MultitrackDialog(entries, title=self.title.text().strip(), parent=self)
+        dialog.exec_()
 
     def export(self):
         source = self.selected()
