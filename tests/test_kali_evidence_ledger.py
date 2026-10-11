@@ -106,13 +106,14 @@ class EvidenceLedgerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as elsewhere:
             reference = Path(elsewhere) / "file"
             reference.write_text("outside")
-            ledger._lock_path(self.lab["id"]).symlink_to(reference)
+            lock = ledger._lock_path(self.lab["id"])
+            lock.symlink_to(reference)
             with self.assertRaisesRegex(store.StorageError, "Linked ledger lock"):
                 ledger.append_event(
                     self.lab["id"], "registered", self.meta, "Allowed",
                 )
             self.assertEqual(reference.read_text(), "outside")
-            ledger._lock_path(self.lab["id"]).unlink()
+            lock.unlink()
             ledger._ledger_path(self.lab["id"]).symlink_to(reference)
             with self.assertRaises(store.StorageError):
                 ledger.read_ledger(self.lab["id"])
