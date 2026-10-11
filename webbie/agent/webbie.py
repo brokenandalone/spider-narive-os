@@ -307,7 +307,7 @@ def set_workspace(name):
 def handle_builtin(command):
     lower = command.lower().strip()
     # Read-only live snapshot. Status text never authorizes a desktop action.
-    check_phrase = re.sub(r"\\s+", " ", re.sub(r"[^a-z0-9 ]", " ", lower)).strip()
+    check_phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", lower)).strip()
     if re.fullmatch(
         r"(?:hey )?(?:webbie|webby|web) "
         r"(?:proactive status|check status|system check status|system health|"
