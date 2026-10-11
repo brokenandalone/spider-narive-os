@@ -240,5 +240,44 @@ class ProactiveTests(unittest.TestCase):
         self.assertEqual(seen, [("http://127.0.0.1:11434/api/tags", 2)])
 
 
+    def test_owner_check_request_runs_early_and_deletes_marker(self):
+        monitor = self.monitor()
+        first = monitor.tick()
+        self.clock[0] += 60
+        mod.request_check_now(self.path, clock=lambda: self.clock[0])
+        marker = Path(str(self.path) + ".request")
+        self.assertTrue(marker.exists())
+        second = monitor.tick()
+        self.assertEqual(second["last_run"], self.clock[0])
+        self.assertGreater(second["last_run"], first["last_run"])
+        self.assertFalse(marker.exists())
+
+    def test_check_request_is_throttled_but_preserved(self):
+        monitor = self.monitor()
+        first = monitor.tick()
+        self.clock[0] += 5
+        mod.request_check_now(self.path, clock=lambda: self.clock[0])
+        second = monitor.tick()
+        self.assertEqual(first["last_run"], second["last_run"])
+        self.assertTrue(Path(str(self.path) + ".request").exists())
+        self.clock[0] += 26
+        self.assertEqual(monitor.tick()["last_run"], self.clock[0])
+
+    def test_check_request_must_have_valid_timestamp(self):
+        monitor = self.monitor()
+        first = monitor.tick()
+        self.clock[0] += 60
+        marker = Path(str(self.path) + ".request")
+        mod._store_private_json(marker, {"check_now": True, "requested": self.clock[0] + 100000})
+        self.assertEqual(monitor.tick()["last_run"], first["last_run"])
+        self.assertFalse(marker.exists())
+
+    def test_request_marker_is_private(self):
+        mod.request_check_now(self.path)
+        marker = Path(str(self.path) + ".request")
+        self.assertEqual(stat.S_IMODE(marker.stat().st_mode), 0o600)
+
+
+
 if __name__ == "__main__":
     unittest.main()
