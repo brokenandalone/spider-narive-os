@@ -16,7 +16,7 @@ import time
 DEFAULT_PATH = Path.home() / ".local/state/spider-os/webbie-jarvis-context.json"
 MAX_BYTES = 3072
 TTL = 90
-FIELDS = ("workspace", "mode", "selected_title", "selected_window", "approved_task")
+FIELDS = ("workspace", "mode", "selected_title", "selected_window", "approved_task", "mission_status")
 
 
 def _label(value, maximum):
@@ -28,8 +28,8 @@ def _label(value, maximum):
 
 
 def publish_context(*, workspace, mode="Normal", selected_title="",
-                    approved_task="", selected_window="", sleeping=False,
-                    path=DEFAULT_PATH,
+                    approved_task="", selected_window="", mission_status="",
+                    sleeping=False, path=DEFAULT_PATH,
                     clock=None):
     """Called only by the live trusted Webbie GUI, never by model or voice text."""
     target = Path(path)
@@ -50,6 +50,7 @@ def publish_context(*, workspace, mode="Normal", selected_title="",
         "selected_title": "" if sleeping else _label(selected_title, 160),
         "selected_window": "" if sleeping else _label(selected_window, 140),
         "approved_task": "" if sleeping else _label(approved_task, 200),
+        "mission_status": "" if sleeping else _label(mission_status, 180),
     }
     payload = json.dumps(item, separators=(",", ":"), ensure_ascii=False).encode()
     if len(payload) > MAX_BYTES:
@@ -91,7 +92,7 @@ def read_context(path=DEFAULT_PATH, *, clock=None):
         return {key: _label(data.get(key), limit) for key, limit in (
             ("workspace", 80), ("mode", 60), ("selected_title", 160),
             ("selected_window", 140),
-            ("approved_task", 200))}
+            ("approved_task", 200), ("mission_status", 180))}
     except (OSError, ValueError, TypeError, UnicodeError):
         return {}
 
@@ -110,6 +111,8 @@ def context_summary(data):
         lines.append("Selected window: " + data["selected_window"])
     if data.get("approved_task"):
         lines.append("Approved task: " + data["approved_task"])
+    if data.get("mission_status"):
+        lines.append("Navigation: " + data["mission_status"])
     return ". ".join(lines) + ". Nothing here authorizes computer control."
 
 
