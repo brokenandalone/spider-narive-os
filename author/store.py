@@ -95,6 +95,46 @@ class AuthorStore:
         # Imports create new chapters and never modify the original file.
         return self.create_chapter(book_id, path.stem, path.read_text(encoding='utf-8-sig'))
 
+    def import_docx(self, path, expected_fingerprint=None):
+        """Create a completely new book from an unchanged DOCX in one transaction.
+
+        Re-importing identical files is blocked. Updated DOCX files create new
+        books, never replacements, leaving every existing chapter and canon safe.
+        """
+        if __package__:
+            from .manuscript_import import parse_docx
+        else:
+            from manuscript_import import parse_docx
+        preview = parse_docx(path)
+        if (expected_fingerprint is not None
+                and preview.fingerprint != expected_fingerprint):
+            raise ValueError('The DOCX changed since preview. Preview it again.')
+        with self.db:
+            self.db.execute("""
+                CREATE TABLE IF NOT EXISTS imported_docx_files(
+                    fingerprint TEXT PRIMARY KEY,
+                    book_id INTEGER NOT NULL REFERENCES books(id)
+                )
+            """)
+            if self.db.execute(
+                'SELECT 1 FROM imported_docx_files WHERE fingerprint=?',
+                (preview.fingerprint,)
+            ).fetchone():
+                raise ValueError('This exact DOCX is already imported; nothing was changed.')
+            book_id = self.db.execute(
+                'INSERT INTO books(title) VALUES(?)', (preview.title,)
+            ).lastrowid
+            for title, content in preview.chapters:
+                self.db.execute(
+                    'INSERT INTO chapters(book_id,title,content) VALUES(?,?,?)',
+                    (book_id, title, content)
+                )
+            self.db.execute(
+                'INSERT INTO imported_docx_files(fingerprint,book_id) VALUES(?,?)',
+                (preview.fingerprint, book_id)
+            )
+        return book_id
+
     def backup(self, path):
         path = Path(path)
         if path.resolve() == (self.root / 'library.sqlite3').resolve():
