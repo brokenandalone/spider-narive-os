@@ -255,6 +255,12 @@ class SessionMixDialog(QDialog):
             delay.setRange(0, 20000)
             delay.setSingleStep(10)
             self.table.setCellWidget(index, 6, delay)
+            if track["role"] == "click_guide":
+                # Tracking assistance never belongs in a release mix.
+                for column in (2, 3, 4, 5, 6):
+                    self.table.cellWidget(index, column).setEnabled(False)
+                self.table.setItem(
+                    index, 7, QTableWidgetItem(track["label"] + " (tracking only)"))
         rates = ", ".join(map(str, session["sample_rates"]))
         self.meta.setText(
             f"{session['title']} | {len(session['tracks'])} verified tracks | "
