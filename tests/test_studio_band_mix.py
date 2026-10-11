@@ -1,0 +1,102 @@
+"""Offline tests for independent guitar/vocal stems and private mix receipts."""
+import json
+from pathlib import Path
+import tempfile
+import threading
+import unittest
+from unittest.mock import patch
+import wave
+from studio import band_mix
+from studio.song_mix import MixError
+
+
+def wav(path, stereo=False, rate=8000):
+    with wave.open(str(path), 'wb') as out:
+        out.setnchannels(2 if stereo else 1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(b'\0\0' * (1600 if stereo else 800))
+
+
+class FakeProcess:
+    def __init__(self, argv, **kwargs):
+        self.returncode = 0
+        wav(Path(argv[-1]), stereo=True, rate=48000)
+    def poll(self):
+        return self.returncode
+
+
+class BandMixTests(unittest.TestCase):
+    def test_two_guitars_and_guest_singer_are_independent_inputs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            stems = {role: root / (role + '.wav') for role in
+                     ('backing', 'lead_vocal', 'guest_vocal', 'rhythm_guitar', 'lead_guitar')}
+            for audio in stems.values(): wav(audio)
+            cmd = band_mix.band_mix_command('ffmpeg', stems, {'lead_guitar': .7}, root / 'fresh.wav')
+            graph = cmd[cmd.index('-filter_complex') + 1]
+            self.assertIn('amix=inputs=5', graph)
+            self.assertIn('volume=0.700[stem4]', graph)
+            self.assertEqual(cmd.count('-i'), 5)
+            self.assertIn('-n', cmd)
+            self.assertNotIn('-y', cmd)
+
+    def test_private_render_receipt_and_unchanged_tracks(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            stems = {'backing': root / 'bed.wav', 'rhythm_guitar': root / 'rhythm.wav',
+                     'lead_guitar': root / 'lead.wav', 'guest_vocal': root / 'female.wav'}
+            for audio in stems.values(): wav(audio)
+            before = {role: path.read_bytes() for role, path in stems.items()}
+            with patch.object(band_mix.shutil, 'which', return_value='/usr/bin/ffmpeg'), \
+                 patch.object(band_mix.subprocess, 'Popen', side_effect=FakeProcess) as launch:
+                output = band_mix.mix_band_tracks(stems, output_root=root / 'exports',
+                                                  gains={'guest_vocal': .9})
+            self.assertEqual(output.name, 'band-mix.wav')
+            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(output.parent.stat().st_mode & 0o777, 0o700)
+            manifest = output.parent / 'band-mix.json'
+            self.assertEqual(manifest.stat().st_mode & 0o777, 0o600)
+            data = json.loads(manifest.read_text())
+            self.assertEqual([e['role'] for e in data['independent_tracks']],
+                             ['backing', 'guest_vocal', 'rhythm_guitar', 'lead_guitar'])
+            self.assertTrue(data['source_tracks_preserved'])
+            self.assertEqual(before, {role: path.read_bytes() for role, path in stems.items()})
+            self.assertEqual(launch.call_count, 1)
+            self.assertNotIn('shell', launch.call_args.kwargs)
+
+    def test_reject_duplicates_symlink_fake_wav_and_bad_gains(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            one, two = root / 'one.wav', root / 'two.wav'
+            wav(one); wav(two)
+            with self.assertRaises(MixError):
+                band_mix.validate_tracks({'backing': one, 'lead_guitar': one})
+            (root / 'linked.wav').symlink_to(one)
+            with self.assertRaises(MixError):
+                band_mix.validate_tracks({'backing': one, 'lead_guitar': root / 'linked.wav'})
+            (root / 'fake.wav').write_text('not WAV')
+            with self.assertRaises(MixError):
+                band_mix.validate_tracks({'backing': one, 'lead_guitar': root / 'fake.wav'})
+            for gain in (-.1, 2.1, float('nan'), True):
+                with self.assertRaises(MixError):
+                    band_mix.validate_tracks({'backing': one, 'lead_guitar': two}, {'backing': gain})
+            with self.assertRaises(MixError):
+                band_mix.validate_tracks({'backing': one, 'unknown': two})
+            hardlink = root / 'hardlink.wav'; hardlink.hardlink_to(one)
+            with self.assertRaises(MixError):
+                band_mix.validate_tracks({'backing': one, 'lead_guitar': hardlink})
+
+    def test_cancel_before_output_and_refuse_existing_target(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            one, two = root / 'one.wav', root / 'two.wav'
+            wav(one); wav(two)
+            selected = {'backing': one, 'lead_guitar': two}
+            stop = threading.Event(); stop.set()
+            with self.assertRaisesRegex(MixError, 'cancelled'):
+                band_mix.mix_band_tracks(selected, output_root=root / 'new-folder', stop=stop)
+            self.assertFalse((root / 'new-folder').exists())
+            (root / 'existing.wav').touch()
+            with self.assertRaises(MixError):
+                band_mix.band_mix_command('ffmpeg', selected, {}, root / 'existing.wav')
