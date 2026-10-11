@@ -114,3 +114,12 @@ any GUI/service replacement.
 
 **GitHub CI success is not live-PC acceptance. This draft contains no
 OS deployment and makes no promises of full Jarvis autonomy.**
+
+### Sleeping portrait improvement
+
+The approved original Webbie portrait is unchanged while awake. The sleep
+renderer now overlays **filled closed eyelids**, rather than thin arcs over
+open eyes that could still appear awake beneath the Zzz indicator. The eye
+masks, dimming and sleep label apply only in sleeping mode and are covered by
+an offscreen Qt image-comparison regression test. This is a source UI change,
+not a promise that the currently installed PC face has updated.
