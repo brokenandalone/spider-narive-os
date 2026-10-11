@@ -35,7 +35,7 @@ def repeated_evidence(sources, threshold=0.78):
     sets = []
     for source in sources[:30]:
         content = str(source.get("content") or source.get("snippet") or "").lower()
-        words = re.findall(r"[^\\W_]+", content, flags=re.UNICODE)[:800]
+        words = re.findall(r"[^\W_]+", content, flags=re.UNICODE)[:800]
         sets.append({tuple(words[i:i+4]) for i in range(len(words)-3)})
     pairs = []
     for a, left in enumerate(sets):
