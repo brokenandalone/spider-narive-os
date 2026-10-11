@@ -14,7 +14,7 @@ assignment's dedicated workspace choose Learn with Webbie.
 
 The tutor loads the selected course and assignment title, displays the user
 selected assignment instructions/rubric/research, and provides an editable
-text area for owner review. Course notes are unchecked by default. Nothing is
+text area for owner review. Course notes are unchecked by default. When checked, a scrollable preview displays the selected notes for review. Nothing is
 sent to the local Webbie brain until the owner chooses Ask Webbie.
 
 Five modes use the **existing, installed Webbie local Ollama backend**:
@@ -25,8 +25,10 @@ Five modes use the **existing, installed Webbie local Ollama backend**:
 - Up to twelve flashcards in Q:/A: format for review.
 
 The owner can ask follow-ups in the same window. Short-lived session history
-is only held in memory and cleared when the dialog closes or the owner presses
-Clear tutoring history. The owner can copy the answer to their clipboard.
+is held in memory until the dialog closes or the owner presses
+Clear tutoring history. The owner can copy the answer to their clipboard or
+explicitly save a private TXT transcript. Transcript files do not overwrite
+existing files and are limited to 250 KB; no automatic transcript save occurs.
 For flashcards, every proposed Q:/A: card is displayed in a confirmation
 preview, and saving is optional. No model-generated cards are silently stored.
 
@@ -76,10 +78,13 @@ PC installation.
    private Study backup outside the course folder.
 2. Open Study, choose PSY-328 or SOC-112 (only if those user-entered courses
    exist) and open a local assignment, without creating fake deadlines.
-3. Launch the coach; verify that unselected course notes remain hidden,
+3. Launch the coach; verify unselected course notes stay excluded,
+   and opt-in shows the source notes in a preview before the local AI request,
    different tutoring modes work, the local backend responds, and errors
    leave the coursework intact.
-4. Generate flashcards, decline the confirmation once, then review and
+4. Save a private tutoring TXT transcript, then try the same filename and
+   confirm the earlier saved content is not replaced.
+5. Generate flashcards, decline confirmation once, then review and
    approve selected cards, and verify that only approved cards are saved.
 5. Enter example references and a draft, run the offline preflight, confirm
    citation warnings are advisory and do not alter anything.
