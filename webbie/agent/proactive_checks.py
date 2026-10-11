@@ -159,6 +159,43 @@ def probe_ai_dj(*, runner=subprocess.run):
     return "warn", "The BCN AI DJ user service is not active; this does not prove radio is off-air."
 
 
+
+def request_check_now(path=DEFAULT_STATE, *, clock=None):
+    """Trusted local GUI button: request read-only probes on the next tick.
+
+    No direct access to microphones, model prompts or desktop control.
+    This marker is data only, never a command interpreter.
+    """
+    target = Path(str(path) + ".request")
+    _store_private_json(target, {"check_now": True, "requested": float(
+        (clock or time.time)())})
+    return True
+
+
+def _take_check_request(path, now, last):
+    """Honor a recent owner-local request after a 30-second safety throttle."""
+    marker = Path(str(path) + ".request")
+    value = _read_small_json(marker)
+    requested = value.get("requested")
+    if (value.get("check_now") is not True
+            or not isinstance(requested, (int, float))):
+        return False
+    if (requested > now + 60 or now - requested > 3600):
+        try:
+            marker.unlink()
+        except OSError:
+            pass
+        return False
+    if now - last < 30:
+        return False
+    try:
+        marker.unlink()
+    except OSError:
+        return False
+    return True
+
+
+
 class ProactiveMonitor:
     """Bounded checks + persistent change detection with no repeated alert spam."""
 
@@ -214,7 +251,10 @@ class ProactiveMonitor:
         if not isinstance(last, (int, float)) or last > now:
             last = 0
         due = now - last >= self.settings["check_in_minutes"] * 60
-        if due:
+        # GUI-triggered read-only checks cannot run more often than once
+        # every 30 seconds, even if the button is clicked repeatedly.
+        requested = _take_check_request(self.path, now, last)
+        if due or requested:
             results = self._collect()
             if not isinstance(results, dict):
                 results = {}
