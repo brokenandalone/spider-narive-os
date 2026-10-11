@@ -82,6 +82,56 @@ class NativeReconciliationTests(unittest.TestCase):
             self.assertEqual(helper.reconcile(source, destination, 'Studio'),
                              'current')
 
+    def test_preintegrated_owner_studio_does_not_duplicate_note_or_status(self):
+        upstream = (ROOT / 'studio/main.py').read_text()
+        owner = upstream.replace(
+            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
+            "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))",
+        ).replace(
+            'content.setContentsMargins(24, 24, 24, 24)',
+            'content.setContentsMargins(50, 48, 50, 48)',
+        )
+        note = helper.STUDIO_OLD_NOTE.replace(
+            'content.addSpacing(20)', 'content.addSpacing(8)'
+        ).replace('        content.addStretch()\\n', '')
+        marker = '        self.refresh_tools()\\n\\n        footer = QLabel('
+        self.assertEqual(owner.count(marker), 1)
+        owner = owner.replace(
+            marker,
+            '        self.refresh_tools()\\n\\n' + note + '        footer = QLabel(',
+            1,
+        ).replace(
+            "self.status.setText('Application opened.')",
+            "self.status.setText('Launched: ' + ' '.join(command))",
+            1,
+        )
+        self.assertEqual(helper.enhanced_studio(owner), owner)
+        self.assertEqual(owner.count('Webbie remains the resident AI service'), 1)
+        previous = helper.legacy_studio(owner)
+        self.assertNotIn('self.tool_tabs = QTabWidget()', previous)
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / 'upstream.py'
+            installed = Path(folder) / 'installed.py'
+            source.write_text(owner)
+            installed.write_text(previous)
+            self.assertEqual(helper.reconcile(source, installed, 'Studio'),
+                             'reconciled')
+            self.assertEqual(installed.read_text(), owner)
+
+    def test_unrecognized_studio_note_and_status_remain_blocked(self):
+        source = (ROOT / 'studio/main.py').read_text()
+        valid = helper.enhanced_studio(source)
+        for candidate in (
+            valid.replace('Webbie remains the resident AI service',
+                          'UNREVIEWED PERSONAL NOTE'),
+            valid.replace("self.status.setText('Launched: ' + ' '.join(command))",
+                          "self.status.setText('UNREVIEWED STATUS')"),
+        ):
+            with self.subTest(candidate=candidate[-80:]):
+                with self.assertRaisesRegex(ValueError,
+                                            'Unrecognized Studio'):
+                    helper.enhanced_studio(candidate)
+
     def test_mixed_or_unknown_studio_layout_still_fails_closed(self):
         upstream = (ROOT / 'studio/main.py').read_text()
         mixed = upstream.replace(
