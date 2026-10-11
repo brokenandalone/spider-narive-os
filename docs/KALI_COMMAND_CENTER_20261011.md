@@ -41,3 +41,14 @@ bash kali-bay/package/install-kali-bay.sh --check
 
 ## Intended next steps
 After deployment gates: async Kali app catalog refresh without freezing UI, locally sourced security tool documentation and sanitized evidence import, desktop/window inspection with explicit Webbie permissions, read-only Kali Purple sensor dashboard (no autostart), device-by-device testing and rollback.
+
+
+## Kali Purple defensive inventory expansion
+The same source branch now adds `kali-bay purple-json`, a non-mutating inventory of **nine** familiar Kali Purple/security command binaries: Suricata, Zeek, YARA, Lynis, ClamAV's clamscan, Wireshark, tcpdump, tshark and auditctl. It returns bounded JSON reflecting the existing running Kali container. Missing or stopped containers return a status without a start attempt. The JSON command does not even initialize the user state directory.
+
+The native **PURPLE DEFENSE** tab has a **CHECK PURPLE DEFENSE TOOLS (READ ONLY)** control with installed/not-detected display. Webbie also understands **check Kali Purple tools** as a fixed read-only request. **Binary presence is not equivalent to a configured, active detection service**, and no SOC sensor or service is automatically started.
+
+Extra tests:
+~~~
+python3 -m unittest discover -s tests -p 'test_kali_purple_inventory.py' -v
+~~~
