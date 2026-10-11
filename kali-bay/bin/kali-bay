@@ -19,10 +19,13 @@ KALI_ROOT="$(
     pwd
 )"
 
-mkdir -p \
-    "${STATE_DIR}" \
-    "${DATA_DIR}" \
-    "${KALI_HOME}"
+# A readiness query must not create any host directories.
+if [[ "${1:-ui}" != "readiness-json" ]]; then
+    mkdir -p \
+        "${STATE_DIR}" \
+        "${DATA_DIR}" \
+        "${KALI_HOME}"
+fi
 
 
 die() {
