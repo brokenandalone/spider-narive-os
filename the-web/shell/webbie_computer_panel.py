@@ -13,7 +13,8 @@ from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QHBoxLayout,
                              QLabel, QLineEdit, QMessageBox, QPushButton,
-                             QSpinBox, QTextEdit, QVBoxLayout)
+                             QSpinBox, QTextEdit, QVBoxLayout, QScrollArea,
+                             QWidget)
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'webbie/actions'))
@@ -103,7 +104,7 @@ class WebbieComputerDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
         self.setObjectName('webbieComputerControl')
-        self.resize(510, 610)
+        self.resize(640, 730)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
         # Resolve preferences against locally INSTALLED Ollama models in the
         # background worker. Never download or switch the owner's engine.
@@ -124,7 +125,15 @@ class WebbieComputerDialog(QDialog):
         self.bridge.openRequested.connect(self.handle_voice_open)
         self.bridge.webRequested.connect(self.handle_voice_web)
 
-        layout = QVBoxLayout(self)
+        # Keep all explicit approval controls readable on smaller screens.
+        outer = QVBoxLayout(self)
+        self.controls_scroll = QScrollArea(self)
+        self.controls_scroll.setObjectName('webbieControlsScrollable')
+        self.controls_scroll.setWidgetResizable(True)
+        body = QWidget(self.controls_scroll)
+        self.controls_scroll.setWidget(body)
+        outer.addWidget(self.controls_scroll)
+        layout = QVBoxLayout(body)
         notice = QLabel(
             'CONTROL IS OFF BY DEFAULT. Choose an installed program and a '
             'specific task. Permission lasts up to five minutes or 75 actions, '
