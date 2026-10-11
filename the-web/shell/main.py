@@ -42,6 +42,7 @@ from navigation_core import INTERNAL_ACTIONS, valid_window_id
 from navigation_state import (navigation_file, load_navigation, save_navigation,
                               record_recent, toggle_favorite)
 from desktop_state import read_desktop_state, write_desktop_state
+from restore_plan import RestorePlan, desired_tab_order
 from workspace_navigation import adjacent_index, other_tab_names, workspace_context_summary
 from command_palette import CommandPalette
 from workspace_recovery import WorkspaceRecovery
@@ -302,6 +303,10 @@ class TheWeb(QMainWindow):
         self.app_scan_worker = None
         self.workspace_load_errors = {}
         self.safe_mode = safe_mode
+        self._restore_plan = None
+        self._restore_user_navigated = False
+        self._skip_final_state_save = False
+        self.workspace_load_seconds = {}
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(self._appearance_style())
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.build_ui(); self.background_surface.set_appearance(self.appearance); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
@@ -335,7 +340,10 @@ class TheWeb(QMainWindow):
         self.tabs.tabBar().customContextMenuRequested.connect(self.tab_context_menu)
         self.set_workspace('default')
         if restore and not self.safe_mode:
-            self.restore_state()
+            if self.desktop_mode:
+                self.begin_staged_restore()
+            else:
+                self.restore_state()
         elif self.safe_mode:
             self.status.setText('SAFE WORKSPACE START: prior tab layout preserved. Open Recovery to inspect.')
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_status); self.timer.start(15000)
@@ -758,7 +766,11 @@ class TheWeb(QMainWindow):
         session = read_checkpoint(checkpoint_path(), WORKSPACES)
         if session is None:
             return False
-        # An explicit restore after safe-start allows a new saved layout.
+        # User-initiated checkpoint restore takes priority over staged startup.
+        if self._restore_plan is not None:
+            self._restore_plan.cancel()
+            self._restore_plan = None
+            self._restoring = False
         self.safe_mode = False
         self._restoring = True
         try:
@@ -780,11 +792,14 @@ class TheWeb(QMainWindow):
         self.update_webbie_context()
         return True
 
-    def open_workspace(self, name):
+    def open_workspace(self, name, activate=True):
         if name not in WORKSPACES: return
+        if self._restore_plan is not None and activate:
+            self._restore_user_navigated = True
         if name not in self.workspace_widgets:
             page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
             layout = QHBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8); layout.addWidget(self.application_panel(name))
+            began = time.monotonic()
             try:
                 self.workspace_load_errors.pop(name, None)
                 if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
@@ -795,6 +810,7 @@ class TheWeb(QMainWindow):
                 self.workspace_load_errors[name] = type(error).__name__[:80]
                 self.status.setText(
                     f'Could not open {WORKSPACES[name]}. Use Recovery to retry.')
+            self.workspace_load_seconds[name] = round(time.monotonic() - began, 3)
             page.native = native
             if name == 'author' and native is not None and hasattr(native, 'show_webbie_review') is False:
                 native.show_webbie_review = self.show_author_review
@@ -824,7 +840,11 @@ class TheWeb(QMainWindow):
             position = self.tabs.addTab(page, WORKSPACES[name])
             self.tabs.setTabToolTip(position, 'Workspace: ' + WORKSPACES[name] +
                                     '\nDrag to reorder. Right-click for tab actions.')
-        self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
+        if not activate:
+            return
+        self.tabs.setCurrentWidget(self.workspace_widgets[name])
+        self.set_workspace(name)
+        self.save_state()
         if name != 'default':
             self.remember_navigation('workspace', name)
         self.update_webbie_context()
@@ -940,6 +960,8 @@ class TheWeb(QMainWindow):
         name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); page.deleteLater(); self.save_state()
 
     def tab_changed(self, index):
+        if self._restore_plan is not None and index >= 0:
+            self._restore_user_navigated = True
         if index >= 0:
             self.set_workspace(self.tabs.widget(index).property('workspace')); self.save_state()
 
@@ -963,7 +985,7 @@ class TheWeb(QMainWindow):
         # known tab layout merely because the minimal shell was opened.
         if getattr(self, 'safe_mode', False):
             return
-        if getattr(self, '_restoring', False):
+        if getattr(self, '_restoring', False) or getattr(self, '_skip_final_state_save', False):
             return
         try:
             write_desktop_state(self.state_path, {
@@ -973,6 +995,66 @@ class TheWeb(QMainWindow):
             }, WORKSPACES)
         except OSError as error:
             self.status.setText('Could not save desktop state: ' + str(error))
+
+    def begin_staged_restore(self):
+        """Show the desktop first; load one saved workspace per event-loop turn.
+
+        On first launch in an actual desktop session, a single heavy native
+        import should never delay the initial window paint behind every
+        other saved tab.
+        """
+        if self._restore_plan is not None:
+            return
+        session = read_desktop_state(self.state_path, WORKSPACES)
+        plan = RestorePlan(session, WORKSPACES)
+        self._restore_plan = plan
+        self._restore_user_navigated = False
+        self._restoring = True
+        if not plan.pending:
+            self.finish_staged_restore()
+            return
+        self.status.setText(f'Restoring 0/{len(plan.pending)} workspace tabs…')
+        QTimer.singleShot(0, self.next_staged_restore)
+
+    def next_staged_restore(self):
+        plan = self._restore_plan
+        if plan is None or plan.cancelled:
+            return
+        name = plan.pop()
+        if name is None:
+            self.finish_staged_restore()
+            return
+        try:
+            self.open_workspace(name, activate=False)
+        except Exception:
+            # Loading errors are reflected in the Recovery Center. The rest
+            # of the saved session must continue opening.
+            self.workspace_load_errors[name] = 'LoadFailure'
+        loaded, total = plan.progress()
+        self.status.setText(f'Restored {loaded}/{total} workspace tabs…')
+        QTimer.singleShot(20, self.next_staged_restore)
+
+    def finish_staged_restore(self):
+        plan = self._restore_plan
+        if plan is None:
+            return
+        ordered = desired_tab_order(
+            plan, [self.tabs.widget(i).property('workspace')
+                   for i in range(self.tabs.count())])
+        for target, name in enumerate(ordered):
+            page = self.workspace_widgets.get(name)
+            if page is None:
+                continue
+            start = self.tabs.indexOf(page)
+            if start >= 0 and start != target:
+                self.tabs.tabBar().moveTab(start, target)
+        self._restore_plan = None
+        self._restoring = False
+        if not self._restore_user_navigated and plan.active in self.workspace_widgets:
+            self.tabs.setCurrentWidget(self.workspace_widgets[plan.active])
+        self.save_state()
+        self.update_webbie_context()
+        self.status.setText(f'{len(ordered) - 1} workspace tabs restored. The Web is ready.')
 
     def restore_state(self):
         self._restoring = True
