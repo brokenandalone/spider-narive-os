@@ -254,6 +254,28 @@ class KaliWebbieReplyWorker(QThread):
             self.failed.emit("Webbie connection: " + str(error))
 
 
+class KaliCatalogWorker(QThread):
+    """Read only the real Kali app catalog without freezing the main UI."""
+    loaded = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def run(self):
+        try:
+            result = subprocess.run(
+                [str(MANAGER), "apps-json"], text=True,
+                capture_output=True, check=False, timeout=24,
+            )
+            if result.returncode:
+                self.failed.emit(
+                    (result.stderr or result.stdout).strip()[:220]
+                    or "Kali catalog is unavailable."
+                )
+                return
+            self.loaded.emit(result.stdout)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            self.failed.emit(str(error)[:220])
+
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -267,6 +289,7 @@ class KaliBayWindow(QMainWindow):
             self.favorites_error = str(error)
         self.active_lab = None
         self._switching_labs = False
+        self.catalog_worker = None
 
         self.setWindowTitle(
             "Kali Bay | Spider OS"
@@ -641,7 +664,7 @@ class KaliBayWindow(QMainWindow):
             "Read Kali's actual installed system .desktop menu. "
             "Does not install software, run scans or start the container."
         )
-        load_apps.clicked.connect(self.load_installed_desktop_apps)
+        load_apps.clicked.connect(self.start_catalog_load)
         left.addWidget(load_apps)
         self.desktop_apps_status = QLabel(
             "Ten featured tools. Load the installed Kali application catalog."
@@ -855,20 +878,51 @@ class KaliBayWindow(QMainWindow):
         # Static featured tools retain the fixed legacy approved manager IDs.
         self.open_tool(value)
 
-    def load_installed_desktop_apps(self):
+    def start_catalog_load(self):
+        if self.catalog_worker is not None:
+            return
+        self.desktop_apps_status.setText(
+            "Checking installed Kali apps in the background. No tool started."
+        )
+        worker = KaliCatalogWorker(self)
+        self.catalog_worker = worker
+        worker.loaded.connect(
+            lambda result: self.load_installed_desktop_apps(payload=result)
+        )
+        worker.failed.connect(self.catalog_load_error)
+        worker.finished.connect(self.catalog_load_finished)
+        worker.start()
+
+    def catalog_load_error(self, message):
+        self.desktop_apps_status.setText(
+            "Kali app discovery unavailable: " + str(message)[:180]
+        )
+
+    def catalog_load_finished(self):
+        worker = self.catalog_worker
+        self.catalog_worker = None
+        if worker is not None:
+            worker.deleteLater()
+
+    def load_installed_desktop_apps(self, payload=None):
         """Inventory only. Never initialize/start Kali or run app Exec lines."""
         try:
             import json
-            result = subprocess.run(
-                [str(MANAGER), "apps-json"],
-                capture_output=True, text=True, timeout=24, check=False,
-            )
-            if result.returncode:
-                raise ValueError(
-                    (result.stderr or result.stdout).strip()[:220]
-                    or "Kali isn't running or desktop apps are unavailable."
+            if payload is None:
+                result = subprocess.run(
+                    [str(MANAGER), "apps-json"],
+                    capture_output=True, text=True, timeout=24, check=False,
                 )
-            apps = json.loads(result.stdout).get("applications", [])
+                if result.returncode:
+                    raise ValueError(
+                        (result.stderr or result.stdout).strip()[:220]
+                        or "Kali isn't running or desktop apps are unavailable."
+                    )
+                payload = result.stdout
+            document = json.loads(payload)
+            if not isinstance(document, dict):
+                raise ValueError("Unexpected Kali application inventory.")
+            apps = document.get("applications", [])
             if not isinstance(apps, list):
                 raise ValueError("Unexpected Kali application inventory.")
             import re
@@ -1149,6 +1203,12 @@ class KaliBayWindow(QMainWindow):
         self.webbie_chat_entry.setFocus()
 
     def closeEvent(self, event):
+        if self.catalog_worker and self.catalog_worker.isRunning():
+            event.ignore()
+            self.desktop_apps_status.setText(
+                "Catalog lookup is finishing; no Kali app was launched."
+            )
+            return
         if self.webbie_worker and self.webbie_worker.isRunning():
             event.ignore()
             self.webbie_chat_log.appendPlainText(
