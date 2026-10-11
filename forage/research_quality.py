@@ -26,6 +26,33 @@ def canonical_url(raw):
     return urlunsplit((parts.scheme.lower(), host + port, path, parts.query, ""))
 
 
+def repeated_evidence(sources, threshold=0.78):
+    """Identify likely copied text, not factual agreements/disagreements.
+
+    Same-site and cross-site mirrors can make independent-source counts look
+    stronger than they are. This is a bounded lexical overlap signal only.
+    """
+    sets = []
+    for source in sources[:30]:
+        content = str(source.get("content") or source.get("snippet") or "").lower()
+        words = re.findall(r"[^\\W_]+", content, flags=re.UNICODE)[:800]
+        sets.append({tuple(words[i:i+4]) for i in range(len(words)-3)})
+    pairs = []
+    for a, left in enumerate(sets):
+        if len(left) < 5:
+            continue
+        for b in range(a + 1, len(sets)):
+            right = sets[b]
+            if len(right) < 5:
+                continue
+            union = left | right
+            overlap = len(left & right) / len(union) if union else 0
+            if overlap >= threshold:
+                pairs.append({"source_a": a + 1, "source_b": b + 1,
+                              "lexical_overlap": round(overlap, 3)})
+    return pairs
+
+
 def source_summary(sources):
     kinds = Counter(str(s.get("evidence_kind", "unknown")) for s in sources)
     engines = Counter(str(s.get("engine", "unknown")) for s in sources)
@@ -45,11 +72,14 @@ def source_summary(sources):
             "sha256": hashlib.sha256(evidence.encode("utf-8")).hexdigest() if evidence else None,
             "reported_date": str(source.get("published", "")).strip() or None,
         })
+    repeated = repeated_evidence(sources)
     warnings = []
     if not sources:
         warnings.append("No retrievable evidence was obtained.")
     if kinds.get("page_text", 0) == 0 and sources:
         warnings.append("Only search snippets were available; no page text was read.")
+    if repeated:
+        warnings.append("Similar text appears in multiple sources; mirrors may not be independent corroboration.")
     if sources and len(hosts) < 2:
         warnings.append("Evidence comes from only one host; independent corroboration was not established.")
     if sources and all(not row["reported_date"] for row in inspected):
@@ -64,6 +94,7 @@ def source_summary(sources):
         "host_counts": dict(hosts),
         "provider_counts": dict(engines),
         "source_details": inspected,
+        "near_duplicate_evidence": repeated,
         "warnings": warnings,
         "note": "Counts and metadata are not verification that any claim is true.",
     }
