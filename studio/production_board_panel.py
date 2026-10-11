@@ -224,7 +224,7 @@ class ProductionBoardPanel(QWidget):
         for role in ROLES:
             self.sources[role].setText(data['assets'].get(role, ''))
             if role in self.reviewed:
-                self.reviewed[role].setChecked(data['reviewed_stems'][role])
+                self.reviewed[role].setChecked(data['reviewed_stems'].get(role, False))
         missing = ', '.join(data['missing'])
         self.status.setText(
             'Checkpoint restored. Missing WAV files: ' + missing
