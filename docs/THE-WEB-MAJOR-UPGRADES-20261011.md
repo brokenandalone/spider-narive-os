@@ -227,3 +227,63 @@ non-blocking. Each individual workspace can still occupy the GUI thread
 during its own initialization. The first launch and subsequent event-loop
 scheduling require live visual testing on the actual Spider OS PC. No code
 in this branch is automatically installed on the device.
+
+## Round 6: interruptible restoration and private diagnostics
+
+This extends the *same* October 11 source branch, without changing the
+installed PC, user documents, X11 security policy, or Webbie task grants.
+
+### Controllable restoration queue
+
+The **Recovery** panel can now pause/resume the staged restore process,
+prioritize a queued workspace for next launch, skip a queued workspace for
+this startup, or stop restoring the remaining queue.
+
+- A manual launch of a still-queued workspace is acknowledged and not
+  launched a second time by the queue.
+- Pausing does not discard pending tabs. Resuming schedules the next
+  workspace on the Qt event loop.
+- Skipping is a *startup-only* decision. Skipped workspaces and their saved
+  identities remain in the original stored session file.
+- Stopping cancels the pending operations, not the already opened editors.
+  The previous saved tab arrangement is preserved.
+- If even one workspace was intentionally skipped, The Web will not silently
+  replace the previous startup layout with the partial session when closing.
+- To intentionally save the current arrangement, choose **Save current
+  layout as default** in Recovery and approve the confirmation. This explicit
+  control is disabled during active restoration.
+- Original tab ordering is independent of temporarily prioritized loading.
+  The Web preserves the visible navigation choice made during recovery.
+
+This does not kill a *currently executing* Qt workspace constructor. Each
+individual native workspace loader still runs on the GUI thread and must
+finish before the queued control action can be processed.
+
+### Owner-approved safe desktop report
+
+Recovery now offers **Copy safe diagnostic report**. Only a direct button
+click copies the report to the local clipboard. Nothing is uploaded or sent
+to Webbie.
+
+The report is limited to known workspace IDs, current/open workspace names,
+module health states, bounded load timings, restoration status, safe-start
+flag and counts of installed apps and open X11 windows. It does not read
+or include the titles of windows, browser URLs, personal filenames, paths,
+document text, clipboard contents, passwords, microphone, webcam or logs.
+
+### Verification
+
+```bash
+python3 -m unittest discover -s tests -p 'test_web_restore_plan.py' -v
+python3 -m unittest discover -s tests -p 'test_web_desktop_diagnostics.py' -v
+QT_QPA_PLATFORM=offscreen dbus-run-session -- python3 -u tests/check-the-web.py .
+```
+
+Qt smoke tests now cover pausing, priority, skip protection, stopping,
+explicitly adopting the partial layout, and copying the safe report. Verify
+actual keyboard focus, responsive status updates and visually readable
+Recovery controls on the Spider OS computer before installing.
+
+Known limitation: restoring a large native workspace can still block the
+UI while *that particular workspace* is initialized. The per-workspace queue
+gives control between loads, not during a single synchronous constructor.
