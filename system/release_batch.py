@@ -134,6 +134,8 @@ APP_FILES = (
     'author/manuscript_import.py',
     'author/project_map.py',
     'kali-bay/runtime/evidence_fingerprint.py',
+    'kali-bay/runtime/evidence_ledger.py',
+    'kali-bay/package/audit-upgrade.py',
     'kali-bay/runtime/lab_reports.py',
     'kali-bay/runtime/workspace_store.py',
     'studio/band_mix.py',
