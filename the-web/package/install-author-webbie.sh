@@ -8,6 +8,13 @@ if [[ "$mode" != --check && "$mode" != --apply ]]; then
     echo 'Usage: bash install-author-webbie.sh [--check|--apply]' >&2
     exit 2
 fi
+# Single daily system-wide installation is authoritative. A targeted
+# workspace install cannot reserve or bypass that one installation slot.
+if [[ "$mode" == --apply ]]; then
+    echo 'BLOCKED: Targeted Author/Webbie installs are disabled in the daily consolidated release.' >&2
+    echo 'Use the reviewed Spider OS system-wide batch after continuity approval.' >&2
+    exit 3
+fi
 source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 root=/usr/local/lib/spider-os
 baseline_refs=(
@@ -21,6 +28,18 @@ managed=(
   author/web_features.py
   author/speech.py
   author/publishing.py
+  author/review_engine.py
+  author/review_cache.py
+  author/review_history.py
+  author/continuity_engine.py
+  author/narration_bookmarks.py
+  author/voice_reader.py
+  author/commands.py
+  author/commands_client.py
+  author/control_socket.py
+  author/manuscript_import.py
+  author/project_map.py
+  webbie/agent/author_voice_bridge.py
   the-web/shell/main.py
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py
