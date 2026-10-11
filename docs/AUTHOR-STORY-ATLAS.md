@@ -34,3 +34,7 @@ The branch stacks on PR #56. Merge the Author dependency chain first. Back up yo
 
 Unit tests: test_author_story_atlas.py, test_author_install_manifests.py, test_author_commands.py.
 CI success validates the GitHub source, not the live Spider OS PC installation.
+
+## Graphical chronology
+
+The Timeline tab includes a horizontal, selectable chronology strip that follows numeric story order. Clicking an event marker highlights the exact event row for editing or opening its source chapter. The strip displays up to 160 events for responsive drawing; the full saved chronology is always present in the table below. Red markers indicate missing or outdated evidence; verified quotes use purple markers.
