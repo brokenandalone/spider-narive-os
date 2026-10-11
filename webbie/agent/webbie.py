@@ -654,7 +654,7 @@ def remove_wake_word(phrase):
         if not word:
             continue
         parts = [re.escape(token) for token in word.split()]
-        pattern = r"^\\s*" + r"\\s+".join(parts) + r"\\b[\\s,:.!?]*"
+        pattern = r"^\s*" + r"\s+".join(parts) + r"\b[\s,:.!?]*"
         match = re.match(pattern, original, flags=re.I)
         if match:
             return True, original[match.end():].strip()
