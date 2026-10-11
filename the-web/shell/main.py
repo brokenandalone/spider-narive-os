@@ -2,6 +2,7 @@
 """The Web desktop: native workspace tabs, installed applications and taskbar."""
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -538,6 +539,29 @@ class TheWeb(QMainWindow):
 
     def app_scan_finished(self):
         self.app_scan_worker = None
+
+    def visible_launcher_windows(self):
+        """Read-only snapshot of user-visible window IDs; no arbitrary targets."""
+        try:
+            tasks = list_tasks()
+        except (OSError, RuntimeError, ValueError):
+            return []
+        return [
+            task for task in tasks[:100]
+            if re.fullmatch(r'0x[0-9a-fA-F]{1,16}', str(getattr(task, 'ident', '')))
+            and int(task.ident, 16) != 0
+            and str(getattr(task, 'title', '')).strip()
+        ]
+
+    def activate_launcher_window(self, ident):
+        """Switch only to a window verified in a fresh X11 task snapshot."""
+        if not isinstance(ident, str) or not re.fullmatch(r'0x[0-9a-fA-F]{1,16}', ident):
+            return False
+        available = {task.ident for task in self.visible_launcher_windows()}
+        if ident not in available:
+            return False
+        wm_command('-i', '-a', ident)
+        return True
 
     def workspaces_for_navigation(self):
         return WORKSPACES
