@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 
 REQUESTS = frozenset({
-    "what can you do", "what can you control", "what are your abilities",
+    "help", "what can you do", "what can you control", "what are your abilities",
     "show me your commands", "jarvis help", "webbie help",
     "how do i use computer control", "what commands can i say",
     "what can webbie do", "how can you help me on my computer",
