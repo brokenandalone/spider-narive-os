@@ -107,5 +107,40 @@ class ClickGuideTests(unittest.TestCase):
             dialog.close()
 
 
+    def test_recording_guide_controls_disabled_in_mixer(self):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PyQt5.QtWidgets import QApplication
+            from PyQt5.QtTest import QTest
+            from studio.session_mix_dialog import SessionMixDialog
+        except ImportError as error:
+            self.skipTest(f"PyQt5 unavailable: {error}")
+        import time
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            guide = write_guide(tempo=120, bars=1, countin_bars=0,
+                                output_root=root / "guides")
+            with wave.open(str(root / "vocal.wav"), "wb") as writer:
+                writer.setnchannels(1)
+                writer.setsampwidth(2)
+                writer.setframerate(8000)
+                writer.writeframes(b"\\x00\\x00" * 800)
+            project = export_session([
+                {"path": str(root / "vocal.wav"), "role": "lead_vocal", "label": "Lead"},
+                {"path": str(guide), "role": "click_guide", "label": "Reference clock"},
+            ], title="Click disabled in mix", output_root=root / "sessions")
+            dialog = SessionMixDialog(project)
+            deadline = time.monotonic() + 4
+            while dialog.checker is not None and time.monotonic() < deadline:
+                QTest.qWait(10)
+            self.assertIsNotNone(dialog.session)
+            self.assertEqual(dialog.table.rowCount(), 2)
+            for column in (2, 3, 4, 5, 6):
+                self.assertFalse(dialog.table.cellWidget(1, column).isEnabled())
+            self.assertIn("tracking only", dialog.table.item(1, 7).text())
+            dialog.close()
+
+
 if __name__ == "__main__":
     unittest.main()
