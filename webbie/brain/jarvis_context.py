@@ -16,7 +16,8 @@ import time
 DEFAULT_PATH = Path.home() / ".local/state/spider-os/webbie-jarvis-context.json"
 MAX_BYTES = 3072
 TTL = 90
-FIELDS = ("workspace", "mode", "selected_title", "selected_window", "approved_task", "mission_status")
+FIELDS = ("workspace", "mode", "selected_title", "selected_window",
+          "approved_task", "mission_status", "last_action")
 
 
 def _label(value, maximum):
@@ -29,7 +30,7 @@ def _label(value, maximum):
 
 def publish_context(*, workspace, mode="Normal", selected_title="",
                     approved_task="", selected_window="", mission_status="",
-                    sleeping=False, path=DEFAULT_PATH,
+                    last_action="", sleeping=False, path=DEFAULT_PATH,
                     clock=None):
     """Called only by the live trusted Webbie GUI, never by model or voice text."""
     target = Path(path)
@@ -51,6 +52,7 @@ def publish_context(*, workspace, mode="Normal", selected_title="",
         "selected_window": "" if sleeping else _label(selected_window, 140),
         "approved_task": "" if sleeping else _label(approved_task, 200),
         "mission_status": "" if sleeping else _label(mission_status, 180),
+        "last_action": "" if sleeping else _label(last_action, 120),
     }
     payload = json.dumps(item, separators=(",", ":"), ensure_ascii=False).encode()
     if len(payload) > MAX_BYTES:
@@ -92,7 +94,8 @@ def read_context(path=DEFAULT_PATH, *, clock=None):
         return {key: _label(data.get(key), limit) for key, limit in (
             ("workspace", 80), ("mode", 60), ("selected_title", 160),
             ("selected_window", 140),
-            ("approved_task", 200), ("mission_status", 180))}
+            ("approved_task", 200), ("mission_status", 180),
+            ("last_action", 120))}
     except (OSError, ValueError, TypeError, UnicodeError):
         return {}
 
@@ -113,6 +116,8 @@ def context_summary(data):
         lines.append("Approved task: " + data["approved_task"])
     if data.get("mission_status"):
         lines.append("Navigation: " + data["mission_status"])
+    if data.get("last_action"):
+        lines.append("Last desktop receipt: " + data["last_action"])
     return ". ".join(lines) + ". Nothing here authorizes computer control."
 
 
