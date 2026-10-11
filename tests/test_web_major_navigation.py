@@ -45,6 +45,20 @@ class QuickLaunchTests(unittest.TestCase):
         self.assertTrue(any(x.ident == 'webbie' for x in find_items('webbie', WORKSPACES)))
         self.assertTrue(any(x.ident == 'quick-settings' for x in find_items('quick settings', WORKSPACES)))
 
+    def test_only_live_hex_window_ids_can_be_suggested(self):
+        from desktop import Task
+        tasks = [
+            Task("0x00000101", "Movie Player"),
+            Task("0x00000102", "Editor"),
+            Task("../../etc/passwd", "Movie Spoof"),
+            Task("0x0", "Movie Zero"),
+            Task("0xDEADBEEF;id", "Movie Injection"),
+        ]
+        rows = find_items("movie", WORKSPACES, APPS, windows=tasks)
+        self.assertEqual([(x.kind, x.ident) for x in rows],
+                         [("window", "0x00000101")])
+        self.assertEqual(find_items("Movie", WORKSPACES, APPS, windows=()), [])
+
     def test_not_a_command_executor(self):
         for command in ('; sudo rm -rf', '$(touch file)', '|||'):
             results = find_items(command, WORKSPACES, APPS)
