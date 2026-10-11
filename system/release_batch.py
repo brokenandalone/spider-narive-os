@@ -77,6 +77,7 @@ STUDY_STUDIO_FILES = (
     'study/study_progress.py', 'study/study_progress_ui.py',
     'study/milestones.py', 'study/milestones_ui.py',
     'study/source_library_ui.py', 'study/weekly_planner_ui.py',
+    'study/study_backup.py', 'study/study_backup_ui.py',
     'study/bin/webbie-homework',
     'studio/main.py', 'studio/tools.py', 'studio/music_backend.py',
     'studio/ai_panel.py',

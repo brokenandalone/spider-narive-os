@@ -553,6 +553,7 @@ class StudyWindow(QMainWindow):
         planner_buttons = QHBoxLayout()
         self.add_action(planner_buttons, "IMPORT CSV ASSIGNMENTS", self.import_csv_assignments)
         self.add_action(planner_buttons, "EXPORT COURSE CALENDAR", self.export_course_calendar)
+        self.add_action(planner_buttons, "PRIVATE STUDY BACKUP", self.open_study_backup)
         assignments_layout.addLayout(planner_buttons)
 
         workspace_buttons = QHBoxLayout()
@@ -1119,6 +1120,17 @@ class StudyWindow(QMainWindow):
             dialog.exec_()
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, "Flashcards", str(error))
+
+    def open_study_backup(self):
+        """Manually archive a consistent database copy and private course files."""
+        try:
+            if __package__:
+                from .study_backup_ui import StudyBackupDialog
+            else:
+                from study_backup_ui import StudyBackupDialog
+            StudyBackupDialog(self).exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Study backup", str(error))
 
     def open_weekly_planner(self):
         """Open a user-triggered overview of dates and milestones across courses."""

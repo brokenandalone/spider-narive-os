@@ -22,6 +22,7 @@ class StudyBatchReleaseTests(unittest.TestCase):
             "study/study_progress.py", "study/study_progress_ui.py",
             "study/milestones.py", "study/milestones_ui.py",
             "study/source_library_ui.py", "study/weekly_planner_ui.py",
+            "study/study_backup.py", "study/study_backup_ui.py",
             "study/homework.py",
             "study/homework_ui.py", "study/assignment_review.py",
             "study/school_onedrive.py", "study/school_upload.py",

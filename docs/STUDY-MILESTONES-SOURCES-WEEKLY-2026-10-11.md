@@ -14,11 +14,13 @@ The owner confirmed a **full installation of the October 10, 2026 upgrades** on 
 
 **Deletion safety:** confirms when an assignment contains any saved notebook text, steps, or source references, and explains which local records will be deleted. Course files in Documents are not deleted.
 
+**Private Study backup and verification:** from the Study assignments pane, choose PRIVATE STUDY BACKUP. Explicitly create a ZIP with a consistent SQLite copy of Study records and local course-folder files, or verify an existing ZIP with a SHA-256 manifest. Archives are private, written with restrictive file permissions, and never replace an existing file. An archive must be saved outside the Study folder to avoid recursion. Personal school credentials and browser profiles are not included, but the archive still contains private schoolwork and must be stored securely. A backup is not a restore action. Size and file-count limits produce clear errors rather than silently skipping large files.
+
 ## Technical changes
 
 - Additive SQLite tables: assignment_steps and assignment_sources; no changes to existing columns, credentials, user data roots, or already installed service names.
 - Local source validation for dates, step names, references and notes; all entry points require user actions.
-- Shared reversible batch release includes four modules: study/milestones.py, study/milestones_ui.py, study/source_library_ui.py, study/weekly_planner_ui.py.
+- Shared reversible batch release includes six modules: study/milestones.py, study/milestones_ui.py, study/source_library_ui.py, study/weekly_planner_ui.py, study/study_backup.py, study/study_backup_ui.py.
 - Desktop installer preflights all four modules, adds missing modules only and preserves unknown installed source edits with existing reconciliation gates.
 - No school account login, assignment submission, unsolicited cloud transfer or alleged source verification.
 
@@ -31,4 +33,5 @@ The owner confirmed a **full installation of the October 10, 2026 upgrades** on 
 5. Open Weekly Plan, verify 7/14/30 day filters and undated entries, and open the right course/assignment by double-click.
 6. Restart Study. Confirm all existing course notes, earlier saved drafts and user-entered scores are intact.
 7. Check APA export and confirm it has only approved user-entered references. Verify every citation independently.
-8. The owner PC must confirm installed SNHU and OneDrive authentication separately. GitHub cannot establish those.
+8. Create a private Study ZIP in a directory outside the course folder, verify it independently and inspect the archive's manifest. Confirm tampering and duplicate filenames are rejected.
+9. The owner PC must confirm installed SNHU and OneDrive authentication separately. GitHub cannot establish those.
