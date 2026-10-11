@@ -31,6 +31,7 @@ from visual_step import propose_step
 from autopilot_policy import AutopilotPolicy
 from navigation_missions import NavigationMission, parse_navigation_request
 from action_journal import ActionJournal
+from action_receipts import ActionReceipts
 from webbie_operator_bridge import OperatorBridge
 
 
@@ -123,6 +124,7 @@ class WebbieComputerDialog(QDialog):
         self.autopilot_revision = 0
         self.nav_mission = NavigationMission()
         self.action_journal = ActionJournal()
+        self.action_receipts = ActionReceipts()
         self.pending_step = None
         self.pending_step_target = None
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
@@ -263,6 +265,10 @@ class WebbieComputerDialog(QDialog):
         self.activity.setObjectName('webbieActivityHistory')
         self.activity.setMaximumHeight(135)
         self.activity.setPlainText(self.action_journal.display())
+        self.receipt_label = QLabel('Last action: no recent receipt')
+        self.receipt_label.setObjectName('webbieLastActionReceipt')
+        self.receipt_label.setWordWrap(True)
+        layout.addWidget(self.receipt_label)
         self.activity.setAccessibleName('Recent Webbie computer actions')
         layout.addWidget(QLabel('Recent computer actions (current session only)'))
         layout.addWidget(self.activity)
@@ -280,6 +286,10 @@ class WebbieComputerDialog(QDialog):
     def record_activity(self, event):
         self.action_journal.record(event)
         self.activity.setPlainText(self.action_journal.display())
+
+    def receipt(self, action, outcome):
+        self.action_receipts.record(action, outcome)
+        self.receipt_label.setText('Last action: ' + self.action_receipts.summary())
 
     def clear_activity(self):
         self.action_journal.clear()
@@ -334,6 +344,7 @@ class WebbieComputerDialog(QDialog):
         self.autopilot.stop()
         self.nav_mission.stop()
         self.record_activity('stopped')
+        self.receipt('stop', 'canceled')
         self.operator.stop()
         self.pending_step = None
         self.pending_step_target = None
@@ -358,6 +369,10 @@ class WebbieComputerDialog(QDialog):
         return approved
 
     def refresh_status(self):
+        # Do not leave a stale result displayed after its 90-second receipt TTL.
+        if hasattr(self, 'receipt_label'):
+            self.receipt_label.setText(
+                'Last action: ' + self.action_receipts.summary())
         # A deliberate voice/GUI "Webby stop" revokes desktop task grants.
         # Consume only a stop-only marker, never instructions or approvals.
         if consume_stop():
@@ -412,6 +427,7 @@ class WebbieComputerDialog(QDialog):
         if (app is not None and app.desktop_id == app_id
                 and self.grant.status()['active']):
             result = self.action(self.operator.open_app, app.name)
+        self.receipt('application', 'requested' if result is not None else 'denied')
         peer = self.bridge.pending
         if peer is not None:
             self.bridge.finish(
@@ -450,6 +466,7 @@ class WebbieComputerDialog(QDialog):
         if (app is None or not is_browser_app(app) or not status['active']
                 or status['selected_app_id'] != app.desktop_id
                 or self.operator.cancelled.is_set()):
+            self.receipt('website', 'denied')
             self.status('Select a web browser and authorize the current task first.')
             return False
         try:
@@ -462,16 +479,19 @@ class WebbieComputerDialog(QDialog):
         self.browser_url.setText(destination)
         if not self.grant.authorize(
                 'browser.open.confirm', 'Website: ' + destination):
+            self.receipt('website', 'denied')
             self.status('Website navigation not approved.')
             return False
         if not self.grant.status()['active'] or self.operator.cancelled.is_set():
             self.status('Browser grant expired before navigation.')
             return False
         if not self.browser_opener(QUrl(destination)):
+            self.receipt('website', 'failed')
             self.status('The system default browser could not handle this link.')
             return False
         self.browser_url.setText(destination)
         self.record_activity('website_requested')
+        self.receipt('website', 'requested')
         self.status('Website open requested in the system default browser: ' +
                     destination[:300])
         self.refresh_status()
@@ -490,6 +510,7 @@ class WebbieComputerDialog(QDialog):
         if app:
             result = self.action(self.operator.open_app, app.name)
             self.record_activity('app_requested' if result else 'app_denied')
+            self.receipt('application', 'requested' if result is not None else 'failed')
 
     def refresh_windows(self):
         listing = self.action(self.operator.windows)
@@ -518,6 +539,7 @@ class WebbieComputerDialog(QDialog):
             self.pause_autopilot()
             if self.action(self.operator.bind_window, target):
                 self.record_activity('window_bound')
+                self.receipt('window', 'observed')
 
     def focus_window(self):
         if self.selected_window():
@@ -570,6 +592,7 @@ class WebbieComputerDialog(QDialog):
                 raise ValueError('The selected window no longer exists')
             image = capture_window(target, approved=True)
             self.record_activity('window_observed')
+            self.receipt('observation', 'observed')
         except (ValueError, RuntimeError, PermissionError, OSError) as error:
             self.status(str(error)); return
         self.status('Local Ollama is describing this one authorized window.')
@@ -883,12 +906,15 @@ class WebbieComputerDialog(QDialog):
             success=result is not None, revision=revision)
         if result is None:
             self.record_activity('mission_failed')
+            self.receipt('navigation', 'failed')
             self.nav_status.setText('Navigation failed; remaining steps canceled.')
         elif pending:
             self.record_activity('mission_step')
+            self.receipt('navigation', 'requested')
             self.nav_status.setText('Step completed. ' + self.nav_mission.progress())
         else:
             self.record_activity('mission_done')
+            self.receipt('navigation', 'requested')
             self.nav_status.setText(
                 'All requested navigation steps sent. Verify the window.')
         self.refresh_status()
@@ -896,6 +922,7 @@ class WebbieComputerDialog(QDialog):
     def cancel_navigation(self):
         self.nav_mission.stop()
         self.record_activity('mission_canceled')
+        self.receipt('navigation', 'canceled')
         self.nav_status.setText('Navigation mission canceled.')
         self.refresh_status()
 
