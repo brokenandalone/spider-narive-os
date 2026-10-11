@@ -2,6 +2,7 @@
 
 import json
 import os
+import pwd
 import re
 import signal
 import socket
@@ -863,67 +864,45 @@ def supervised_voice_listener():
     supervisor.serve()
 
 
-def session_is_active():
-    try:
-        output = subprocess.check_output(
-            [
-                "loginctl",
-                "list-sessions",
-                "--no-legend",
-            ],
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=4,
-        )
+def session_activity():
+    """Find an unlocked, active local graphical session belonging to this user.
 
+    Check ALL sessions rather than stopping on the first inactive TTY.
+    Loginctl failure is inactivity, never permission to interrupt the user.
+    """
+    try:
+        owner = pwd.getpwuid(os.getuid()).pw_name
+        output = subprocess.check_output(
+            ["loginctl", "list-sessions", "--no-legend", "--no-pager"],
+            text=True, stderr=subprocess.DEVNULL, timeout=4,
+        )
         for line in output.splitlines():
             parts = line.split()
-
-            if len(parts) < 3:
+            if len(parts) < 3 or parts[2] != owner:
                 continue
+            identifier = parts[0]
+            details = subprocess.check_output(
+                ["loginctl", "show-session", identifier,
+                 "-p", "Active", "-p", "IdleHint", "-p", "LockedHint",
+                 "-p", "Remote", "-p", "Type", "--no-pager"],
+                text=True, stderr=subprocess.DEVNULL, timeout=4,
+            )
+            flags = dict(row.split("=", 1) for row in details.splitlines()
+                         if "=" in row)
+            if (flags.get("Active") == "yes"
+                    and flags.get("IdleHint") != "yes"
+                    and flags.get("LockedHint") != "yes"
+                    and flags.get("Remote") != "yes"
+                    and flags.get("Type") in ("x11", "wayland")):
+                return True, "active session " + identifier
+        return False, "no active, unlocked, non-idle local graphical session"
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        return False, "session lookup failed: " + type(error).__name__
 
-            session_id = parts[0]
-            username = parts[2]
 
-            if username != os.environ.get(
-                "USER",
-                "",
-            ):
-                continue
-
-            active = subprocess.check_output(
-                [
-                    "loginctl",
-                    "show-session",
-                    session_id,
-                    "-p",
-                    "Active",
-                    "--value",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-
-            idle = subprocess.check_output(
-                [
-                    "loginctl",
-                    "show-session",
-                    session_id,
-                    "-p",
-                    "IdleHint",
-                    "--value",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-
-            if active == "yes" and idle != "yes":
-                return True
-
-    except Exception:
-        pass
-
-    return False
+def session_is_active():
+    """Backward-compatible boolean for Webbie proactive monitor."""
+    return session_activity()[0]
 
 
 def proactive_loop():
