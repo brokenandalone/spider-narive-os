@@ -51,6 +51,53 @@ class NativeReconciliationTests(unittest.TestCase):
             self.assertIn('Webbie remains the resident AI service', updated)
             self.assertEqual(helper.reconcile(source, dest, 'Studio'), 'current')
 
+    def test_already_customized_pc_studio_still_reconciles_known_tabs(self):
+        upstream = (ROOT / 'studio/main.py').read_text()
+        owner_visual = upstream.replace(
+            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
+            "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))",
+        ).replace(
+            'content.setContentsMargins(24, 24, 24, 24)',
+            'content.setContentsMargins(50, 48, 50, 48)',
+        )
+        self.assertNotEqual(owner_visual, upstream)
+        self.assertEqual(
+            helper.recognized_studio_visual_preferences(owner_visual),
+            owner_visual,
+        )
+        previous = helper.legacy_studio(owner_visual)
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / 'upstream.py'
+            destination = Path(folder) / 'installed.py'
+            source.write_text(owner_visual)
+            destination.write_text(previous)
+            self.assertEqual(
+                helper.reconcile(source, destination, 'Studio'),
+                'reconciled',
+            )
+            merged = destination.read_text()
+            self.assertIn("QFont('Sans Serif', 22, QFont.Bold)", merged)
+            self.assertIn('content.setContentsMargins(50, 48, 50, 48)', merged)
+            self.assertIn('self.tool_tabs = QTabWidget()', merged)
+            self.assertEqual(helper.reconcile(source, destination, 'Studio'),
+                             'current')
+
+    def test_mixed_or_unknown_studio_layout_still_fails_closed(self):
+        upstream = (ROOT / 'studio/main.py').read_text()
+        mixed = upstream.replace(
+            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
+            "logo.setFont(QFont('Sans Serif', 22, QFont.Bold))",
+        )
+        unknown = upstream.replace(
+            "logo.setFont(QFont('Sans Serif', 18, QFont.Bold))",
+            "logo.setFont(QFont('Sans Serif', 23, QFont.Bold))",
+        )
+        for variant in (mixed, unknown):
+            with self.subTest(variant=variant[:100]):
+                with self.assertRaisesRegex(ValueError,
+                                            'Unrecognized Studio visual layout'):
+                    helper.legacy_studio(variant)
+
     def test_unknown_studio_changes_are_preserved(self):
         upstream = (ROOT / 'studio/main.py').read_text()
         previous = helper.legacy_studio(upstream).replace('CREATE. BUILD. PLAY.', 'PERSONAL STUDIO')
