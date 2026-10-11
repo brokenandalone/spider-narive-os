@@ -22,6 +22,7 @@ from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_
 from webbie_reminders_dialog import WebbieRemindersDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
+from jarvis_commands import gui_guide
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
 from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
@@ -239,6 +240,10 @@ class WebbiePanel(QWidget):
         self.awareness_button = QPushButton('What Webbie knows right now')
         self.awareness_button.clicked.connect(self.show_awareness)
         layout.addWidget(self.awareness_button)
+        jarvis_help_button = QPushButton('Jarvis commands and abilities')
+        jarvis_help_button.setObjectName('webbieJarvisHelp')
+        jarvis_help_button.clicked.connect(self.show_jarvis_commands)
+        layout.addWidget(jarvis_help_button)
         # Independent read-only system status, no microphone or camera access.
         self.proactive_label = QLabel('Proactive checks: awaiting first report')
         self.proactive_label.setWordWrap(True)
@@ -678,6 +683,9 @@ class WebbiePanel(QWidget):
         except (OSError, PermissionError, ValueError) as error:
             self.append_message('Webbie system checks',
                 'Could not request local checks: ' + str(error))
+
+    def show_jarvis_commands(self):
+        self.append_message('Jarvis command guide', gui_guide())
 
     def show_awareness(self):
         # Inspectable short-term context, not a long-term-memory database.
