@@ -100,6 +100,9 @@ class StudyCoachDialog(QDialog):
         self.copy_button = QPushButton("Copy answer")
         self.copy_button.clicked.connect(self.copy_response)
         actions.addWidget(self.copy_button)
+        self.readings_button = QPushButton("Choose course reading")
+        self.readings_button.clicked.connect(self.import_reading)
+        actions.addWidget(self.readings_button)
         self.cards_button = QPushButton("Preview and save flashcards")
         self.cards_button.clicked.connect(self.save_flashcards)
         actions.addWidget(self.cards_button)
@@ -164,6 +167,38 @@ class StudyCoachDialog(QDialog):
             return
         QApplication.clipboard().setText(self.response.toPlainText())
         self.status.setText("Copied the visible Webbie response to your clipboard.")
+
+    def import_reading(self):
+        """User chooses reading and sees excerpt before any local model call."""
+        if self.worker is not None:
+            self.status.setText("Complete the active request before changing sources.")
+            return
+        if self.store is None or self.course_id is None:
+            QMessageBox.information(self, "Course readings",
+                                    "Select a course in Study before choosing a reading.")
+            return
+        try:
+            if __package__:
+                from .reading_library_ui import ReadingLibraryDialog
+            else:
+                from reading_library_ui import ReadingLibraryDialog
+            picker = ReadingLibraryDialog(self.store, self.course_id, self, pick=True)
+            if picker.exec_() != QDialog.Accepted or not picker.selected_excerpt:
+                return
+            excerpt = picker.selected_excerpt
+            existing = self.materials.toPlainText().strip()
+            candidate = existing + ("\n\n" if existing else "") + excerpt
+            if len(candidate) > 14000:
+                QMessageBox.warning(
+                    self, "Course readings",
+                    "Combined reading context exceeds 14,000 characters. "
+                    "Shorten the existing excerpt or replace it manually.")
+                return
+            self.materials.setPlainText(candidate)
+            self.status.setText("Selected reading is in your editable prompt. "
+                                "Webbie has NOT been contacted.")
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Course reading", str(error))
 
     def save_flashcards(self):
         if self.worker is not None:

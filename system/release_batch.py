@@ -79,6 +79,7 @@ STUDY_STUDIO_FILES = (
     'study/source_library_ui.py', 'study/weekly_planner_ui.py',
     'study/study_backup.py', 'study/study_backup_ui.py',
     'study/apa_preflight.py', 'study/study_coach.py', 'study/study_coach_ui.py',
+    'study/reading_library.py', 'study/reading_library_ui.py',
     'study/bin/webbie-homework',
     'studio/main.py', 'studio/tools.py', 'studio/music_backend.py',
     'studio/ai_panel.py',

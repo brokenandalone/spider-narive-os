@@ -565,6 +565,8 @@ class StudyWindow(QMainWindow):
                         self.open_study_progress)
         self.add_action(workspace_buttons, "WEBBIE STUDY COACH",
                         self.open_study_coach)
+        self.add_action(workspace_buttons, "COURSE READINGS",
+                        self.open_course_readings)
         assignments_layout.addLayout(workspace_buttons)
         self.assignment_table.itemDoubleClicked.connect(
             lambda _: self.open_assignment_workspace())
@@ -1147,6 +1149,20 @@ class StudyWindow(QMainWindow):
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, "Weekly planner", str(error))
 
+    def open_course_readings(self):
+        """Browse manually imported documents for the selected course only."""
+        if not self.current_course_id:
+            self.status.setText("Select a course before opening its reading library.")
+            return
+        try:
+            if __package__:
+                from .reading_library_ui import ReadingLibraryDialog
+            else:
+                from reading_library_ui import ReadingLibraryDialog
+            ReadingLibraryDialog(self.store, self.current_course_id, self).exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Course Readings", str(error))
+
     def open_study_coach(self):
         """Study Coach only sees explicitly previewed and selected materials."""
         try:
@@ -1435,6 +1451,8 @@ class StudyWindow(QMainWindow):
                 assignment=record["title"] if record else "",
                 notes=self.store.get_notes(self.current_course_id) if course else "",
                 folder=folder,
+                store=self.store if course else None,
+                course_id=self.current_course_id if course else None,
             )
             if workspace:
                 if workspace["instructions"].strip() or workspace["rubric"].strip():

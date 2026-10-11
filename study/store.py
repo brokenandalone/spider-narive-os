@@ -142,6 +142,18 @@ class StudyStore:
                 FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
                 UNIQUE(assignment_id, reference)
             );
+            CREATE TABLE IF NOT EXISTS course_readings (
+                id INTEGER PRIMARY KEY,
+                course_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                excerpt TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE,
+                UNIQUE(course_id, sha256),
+                UNIQUE(course_id, relative_path)
+            );
             """
         )
 
@@ -643,6 +655,50 @@ class StudyStore:
             "AS next_step "
             "FROM assignments a JOIN courses c ON c.id=a.course_id ORDER BY a.id"
         ).fetchall()
+
+    def course_readings(self, course_id):
+        """Only private reading records associated with the selected course."""
+        return self.db.execute(
+            "SELECT id, course_id, title, relative_path, sha256, excerpt, created_at "
+            "FROM course_readings WHERE course_id=? ORDER BY title COLLATE NOCASE, id",
+            (course_id,),
+        ).fetchall()
+
+    def course_reading(self, course_id, reading_id):
+        return self.db.execute(
+            "SELECT id, course_id, title, relative_path, sha256, excerpt, created_at "
+            "FROM course_readings WHERE course_id=? AND id=?",
+            (course_id, reading_id),
+        ).fetchone()
+
+    def find_course_reading_by_hash(self, course_id, checksum):
+        return self.db.execute(
+            "SELECT id, relative_path FROM course_readings WHERE course_id=? AND sha256=?",
+            (course_id, checksum),
+        ).fetchone()
+
+    def add_course_reading(self, course_id, title, relative_path, checksum, excerpt):
+        """Private metadata for a successfully copied, user-selected document."""
+        from pathlib import PurePosixPath
+        from string import hexdigits
+        path = PurePosixPath(str(relative_path))
+        if (self.course(course_id) is None or not isinstance(title, str)
+                or len(title) > 180 or not title.strip()
+                or not isinstance(excerpt, str) or not excerpt.strip()
+                or len(excerpt) > 12000
+                or not isinstance(checksum, str) or len(checksum) != 64
+                or any(char not in hexdigits for char in checksum)
+                or len(path.parts) != 2 or path.parts[0] != "Readings"
+                or any(part in ("", ".", "..") or "\\" in part
+                       for part in path.parts)):
+            raise ValueError("Invalid course reading record.")
+        with self.db:
+            return self.db.execute(
+                "INSERT OR IGNORE INTO course_readings"
+                "(course_id, title, relative_path, sha256, excerpt) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (course_id, title, relative_path, checksum.lower(), excerpt),
+            ).rowcount == 1
 
     def all_assignments(self):
         return self.db.execute(
