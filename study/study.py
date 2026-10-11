@@ -1341,23 +1341,48 @@ class StudyWindow(QMainWindow):
         self.school_portal.open()
 
     def open_homework(self):
-        """Open Webbie's writing editor for the currently selected course."""
+        """Webbie gets the selected assignment's saved context, with explicit handoff."""
         try:
             if __package__:
                 from .homework_ui import HomeworkDialog
+                from .assignment_workflow import webbie_directions, webbie_materials
+                from .draft_storage import save_snapshot
             else:
                 from homework_ui import HomeworkDialog
+                from assignment_workflow import webbie_directions, webbie_materials
+                from draft_storage import save_snapshot
             course = self.store.course(self.current_course_id) if self.current_course_id else None
-            selected_row = self.assignment_table.currentRow()
-            selected = self.assignment_table.item(selected_row, 0) if selected_row >= 0 else None
+            selected_id = self.selected_assignment_id() if course else None
+            record = self.store.assignment_record(selected_id) if selected_id else None
+            workspace = self.store.get_assignment_workspace(selected_id) if record else None
+            folder = self.store.course_folder(self.current_course_id)
             dialog = HomeworkDialog(
                 self,
                 course=course["name"] if course else "",
-                assignment=selected.text() if selected else "",
+                assignment=record["title"] if record else "",
                 notes=self.store.get_notes(self.current_course_id) if course else "",
-                folder=self.store.course_folder(self.current_course_id),
+                folder=folder,
             )
+            if workspace:
+                if workspace["instructions"].strip() or workspace["rubric"].strip():
+                    dialog.directions.setPlainText(webbie_directions(workspace))
+                dialog.materials.setPlainText(webbie_materials(workspace))
+                dialog.draft.setPlainText(workspace["draft"])
             dialog.exec_()
+            if workspace:
+                candidate = dialog.draft.toPlainText()
+                previous = workspace["draft"]
+                if candidate.strip() and candidate != previous:
+                    answer = QMessageBox.question(
+                        self, "Save Webbie draft to assignment",
+                        "Copy the edited draft to the selected assignment workspace? "
+                        "The previous draft will be backed up first.")
+                    if answer == QMessageBox.Yes:
+                        if previous.strip():
+                            save_snapshot(folder, record["title"], previous)
+                        updated = dict(workspace, draft=candidate)
+                        self.store.save_assignment_workspace(selected_id, updated)
+                        self.status.setText("Webbie draft copied into the saved assignment workspace.")
         except Exception as error:
             QMessageBox.warning(self, "Webbie Homework", str(error))
 
