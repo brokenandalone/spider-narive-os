@@ -16,6 +16,7 @@ if __package__:
     from .project_map import ProjectMap
     from .atlas_widget import AtlasWidget
     from .master_canon_widget import MasterCanonWidget
+    from .canon_intelligence_widget import CanonIntelligenceWidget
 else:
     from store import AuthorStore
     from web_features import AuthorToolkit
@@ -23,6 +24,7 @@ else:
     from project_map import ProjectMap
     from atlas_widget import AtlasWidget
     from master_canon_widget import MasterCanonWidget
+    from canon_intelligence_widget import CanonIntelligenceWidget
 
 
 class AuthorWindow(QMainWindow):
@@ -67,6 +69,10 @@ class AuthorWindow(QMainWindow):
         self.master_canon_widget = MasterCanonWidget(self.store)
         self.master_canon_widget.chapterRequested.connect(self.jump_to_canon_source)
         tabs.addTab(self.master_canon_widget, 'Master Canon')
+        self.canon_intelligence = CanonIntelligenceWidget(
+            self.store, self.current_chapter, self.flush)
+        self.canon_intelligence.sourceRequested.connect(self.jump_to_canon_source)
+        tabs.addTab(self.canon_intelligence, 'Canon Intelligence')
         tabs.currentChanged.connect(self.on_tab_changed)
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
@@ -110,6 +116,9 @@ class AuthorWindow(QMainWindow):
         elif action == 'open_master_canon':
             if self.flush():
                 self.editor_tabs.setCurrentWidget(self.master_canon_widget)
+        elif action == 'open_canon_intelligence':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.canon_intelligence)
 
     def action(self, function):
         try:
@@ -155,6 +164,7 @@ class AuthorWindow(QMainWindow):
         self.project_map.set_book(self.book_id)
         self.atlas_widget.set_book(self.book_id)
         self.master_canon_widget.set_book(self.book_id)
+        self.canon_intelligence.set_book(self.book_id)
 
     def load_chapters(self):
         self.chapters.blockSignals(True); self.chapters.clear()
@@ -477,6 +487,12 @@ class AuthorWindow(QMainWindow):
                 self.status.setText('Library backup saved.')
 
     def closeEvent(self, event):
+        if not self.canon_intelligence.shutdown():
+            self.status.setText(
+                'Canon Intelligence is cancelling the running local review. '
+                'Close Author after the model request finishes.')
+            event.ignore()
+            return
         if not self.toolkit.shutdown():
             self.status.setText(
                 'Webbie is stopping the active review or narration. '
