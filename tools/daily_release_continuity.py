@@ -126,6 +126,7 @@ def audit(plan, root, receipt_root=None, now=None):
     if not SHA.fullmatch(str(plan.get("candidate_commit") or "")):
         blocked.append("NO PINNED COMBINED CANDIDATE")
     gates = {
+        "model_compatibility_verified": "WEBBIE INSTALLED MODEL COMPATIBILITY NOT VERIFIED",
         "source_ci_verified": "FULL COMBINED SOURCE TESTS NOT VERIFIED",
         "installed_pc_reconciled": "INSTALLED PC CUSTOMIZATIONS NOT RECONCILED",
         "rollback_validated": "COMBINED ROLLBACK NOT VALIDATED",
