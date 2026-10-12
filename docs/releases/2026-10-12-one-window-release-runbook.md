@@ -1,97 +1,80 @@
-# Spider OS October 12, 2026 | ALL Upgrades, ONE Coordinated Release Window
+# Spider OS October 12, 2026 | One NATIVE OS Upgrade Batch Only
 
-**Audit snapshot only. Do not install from this branch. No files on the owner PC have changed.**
+**AUDIT/PLAN ONLY. NO INSTALLATION IS APPROVED.**
 
-## Why this exists
+## Hard project boundary
 
-The native Spider OS nightly sources contain many nested feature branches and PRs.
-Other work happened concurrently in the Media Center, BCN website, Nova and a
-legacy Spider OS1 mirror. A green CI run on Wave Six covers its exact commit,
-not changes merged into another repository afterward. *Do not assume a PR is
-installed merely because it is merged into its repository.*
+**This release is exclusively for the native `spider-narive-os` desktop installation.**
 
-The complete, machine-readable audit is:
-`docs/releases/2026-10-12-master-cross-repo-inventory.json`
+- **IN SCOPE:** The Web desktop, Webbie, its Qwen3 8B configuration and
+  voice/mic/STOP/owner trust, System and Recovery, Guardian, Study, Author,
+  Spider Studio, Forage, Deep Forage, Kali Bay and OS integration services.
+- **Native Nova exception:** The `media/ai-dj` Python service *inside*
+  `spider-narive-os` is OS-owned integration, and its existing on-PC code
+  needs preservation. Native Spider OS PR #102 shared Australian voices
+  merged to main after Wave Six was frozen. Review and reconcile this
+  **OS service only**, without updating Spider Media Center or BCN.
+- **OUT OF SCOPE:** Spider Media Center V7/V6 application and its entire
+  GitHub repo, playlists, artist show UI, packaging, updater and independent
+  release schedule.
+- **OUT OF SCOPE:** BCN Network public website, backend, Command Center,
+  story pages, hosting and all deployments.
+- **OUT OF SCOPE:** Legacy Spider-OS1 mirror/image installation and
+  bootloader or disk repartitioning.
 
-At capture time the linked repositories showed:
-- **Native Spider OS (`spider-narive-os`): 94 open PRs.** These include old
-  stacked ancestors and alternative designs. **Do not merge or install 94
-  times**. Classify every pending PR as already inherited, superseded,
-  still wanted, incompatible, or needing integration; reconcile overlapping
-  entrypoints once.
-- **Spider-OS1 legacy mirror: 9 open PRs.** Source reference only. Not a
-  second OS installation or an authorization to touch the bootloader.
-- **Spider Media Center: 2 open PRs.** PR #11 bounded radio shutdown and
-  PR #23 new Nova Australian voice-selector / library cleanup / cue rotation.
-  The V7 playlist workshop and all-four-artist show generator (PRs #21 and
-  #22) are already merged into Media Center main, but PC installation remains
-  unverified.
-- **BCN website: 1 open draft PR (#14)** for dedicated Broken World pages.
-  BCN v3–v15 updates including latest Command Center work are merged into
-  BCN main, but production deployment and end-to-end admin checks remain
-  separate.
-- **Nova shared voices (native Spider OS PR #102)** merged to Spider OS main,
-  **AFTER** the previous Wave Six SHA was frozen. The new
-  `media/ai-dj/nova_voice.py` module is absent from that exact Wave Six
-  candidate. The new PR's `media/ai-dj/service.py` changes overlap the
-  owner's customized live Nova service. Preserve live behavior and explicitly
-  reconcile voice selection. Do not silently copy an older service over it.
-- **Matilda fallback docs (native PR #100)** remains open; review before
-  final release, and preserve the user's installed voice preference.
+**Media Center and BCN will be handled only in separate project upgrade
+sessions. They do not gate or participate in this native OS release.**
 
-## Three deployment targets in one coordinated session
+The old cross-repository snapshot was preserved strictly as reference at
+`docs/references/2026-10-12-independent-projects.json`. It is NOT an
+install manifest, test dependency or approval checklist.
 
-1. **Native Spider OS local batch**: The Web, Webbie, Qwen3 8B selector,
-   resident voice/microphone/STOP, Nova server integration, Study, Author,
-   Studio, Forage, Deep Forage, Kali Bay and desktop. Preserve the uploaded
-   31 customized installed source files and their semantics. Use one local
-   release candidate and one guarded OS installer with a single backup/
-   rollback receipt. No model pull, bootloader rewrite, credential migration,
-   hidden camera capture or unconditional privileged automation.
-2. **Spider Media Center app**: separate V7 application installer plus Nova
-   radio bridge validation. The entire merged playlist workshop and BCN
-   generation workflow must be present; integrate approved PR #23 if desired.
-   Validate actual bulk selection, playlist saving, radio shows, only the
-   four approved artists including J-Cold, user playback, fullscreen GPU
-   visualizer and actual Nova voice/audio rather than HTTP health alone.
-3. **BCN website/server**: separate deploy from `bcn-network`. Verify
-   visitor/owner access, private admin authorization, public pages,
-   artwork/story pages, web backend, live station status and rollback.
-   Review PR #14 rather than assuming its unmerged pages are deployed.
+## Current native OS situation
 
-These are **three independent deployment/rollback procedures** coordinated
-as ONE owner-visible upgrade window. They are not technically one executable
-installer, and success in one must never mask failure in another.
+Native Spider OS has 94 open PRs at the October 12 audit snapshot, many
+of them historical stacked branches and competing designs. They are NOT 94
+distinct new installs. Classify and deduplicate the PRs by actual ancestry,
+files and retained behavior, then freeze one owner-approved OS source commit.
 
-## Freeze and release rules
+The owner PC previously reported 31 custom source files which the old
+installer refused to overwrite. The offline preservation stage successfully
+held each supplied owner file byte-for-byte in a separate review candidate,
+but that is *not* a semantic feature merge. New functions wired into
+entrypoints still need deliberate integration and tests.
 
-- Recheck all GitHub repos **immediately before build freeze**; this JSON is
-  as-of October 12, not an immutable promise that no later PRs exist.
-- Every PR is explicitly classified and cited, including old ancestors,
-  competing changes, new main merges and external deploys. Deduplicate
-  nested PR histories by commit ancestry and source diff, not by titles.
-- Use the user's running PC as the functional baseline. The 31-file
-  offline staging process preserving owner bytes is **NOT a completed merge**.
-  New entrypoint-only features still need manual integration and interface
-  testing. Do not commit personal source/voiceprints to a public repo.
-- Confirm `qwen3:8b` remains configured, the owner speaker policy only
-  authorizes Cory and Shayna, and emergency STOP works. Verify hearing,
-  silence handling, speaker echo, TTS output, Australian voice and
-  reactive audio with consent and actual hardware.
-- Compare the final combined sources with the owner-provided fingerprints
-  immediately before and after apply. No unrecognized overwrite.
-- Obtain explicit owner approval of the exact frozen SHA and per-target
-  release packages after tests. Confirm full backups, rollback *test* and
-  no already-used same-day OS install receipt.
-- If a post-freeze PR or local customization arrives, either review it
-  and rebuild/test a **new final SHA** or explicitly defer it to a later
-  session. Don't quietly drop it. Never wave through unverified code.
-- Capture the next known-good state **only after all physical tests pass**.
+## OS-only release requirements
 
-## Important reality checks
+1. Reconcile all 31 installed source files against the native candidate.
+   Preserve locally tested browser, Webbie agent, Whisper/RMS microphone,
+   speaker trust, existing desktop menu readability, and owner projects.
+2. Keep Webbie's installed **qwen3:8b** model and configured Australian
+   voice. Review native PR #102 Nova shared voices only for the
+   `spider-narive-os` AI DJ service; never install or alter the
+   separate Media Center application as part of this step.
+3. Integrate The Web, System, Recovery, Webbie, Study, Author, Studio,
+   Kali Bay, Forage and Deep Forage upgrades with source-level and
+   behavioral tests. No wholesale replacement of newer installed code.
+4. Freeze one native OS Git commit after all desired OS-only changes.
+   Run all source CI on **that exact commit**. Confirm the checkout has no
+   unexpected modifications and the known-good PC fingerprint still matches.
+5. Complete physical tests of user login, desktop workspaces, file/save
+   paths, Qwen3 8B chat, wake/STOP, hearing, TTS, approved owner speech,
+   security tool authorization and **native Nova OS service**. Passing
+   HTTP health or source CI alone cannot validate live audio.
+6. Obtain the owner's explicit approval for **one** central native OS
+   installation with a verified backup, available recovery process,
+   daily install receipt and rollback. No automatic reboot or install.
+7. After verifying the installation on the real PC, record a new
+   owner-confirmed known-good snapshot.
 
-No package is currently approved to install. The all-upgrades ledger is a
-scope guard and audit, not a real feature merge, downloadable complete
-installer, device-control credential or proof that a service is operational.
-The previous CI run passing 1,165 tests validates its own source snapshot,
-NOT this newer full release, Media Center, BCN deployment or real PC.
+## Exclusions enforced by the release guard
+
+`tools/release_inventory_guard.py` must reject any OS release inventory
+which: includes a separate project in its in-scope repositories; adds
+Media Center or BCN approvals/PRs to the OS release gates; fails to name
+both external projects as exclusions; or claims a ready/installed status.
+The external-project reference does not determine release readiness.
+
+**Release gates remain closed.** The previous 1,165 passing source tests
+belong to the earlier owner-preserving staging commit, not this revised
+scope or a functional installed OS candidate.
