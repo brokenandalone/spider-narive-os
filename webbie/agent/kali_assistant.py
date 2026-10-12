@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from kali_named_app import parse_named_app_request,launch_named_kali_app
 
 INSTALLED_MANAGER = Path("/usr/local/lib/spider-os/kali-bay/bin/kali-bay")
 SOURCE_MANAGER = Path(__file__).resolve().parents[2] / "kali-bay/bin/kali-bay"
@@ -134,12 +135,24 @@ def _excerpt(text: str, limit: int = 280) -> str:
     return value.strip()[:limit]
 
 
-def handle_kali_request(message: str, manager=None):
-    """Return response for one user action, None when not a Kali action.
+def handle_kali_request(message: str, manager=None, *,
+                        allow_named_apps=False):
+    """Dispatch a literal owner-requested Kali app with no tool parameters.
 
-    The caller supplies the *literal human request*, never an LLM reply.
-    No action creates or restarts a container. No scan is launched.
+    Named inventory launches additionally require a standing owner-approved
+    and unpaused capability, checked by the trusted caller.
     """
+    phrase=literal_user_text(message)
+    named=parse_named_app_request(phrase)
+    if named is not None:
+        if allow_named_apps is not True:
+            return ("Kali on-demand access is not authorized. "
+                    "Enable permanent owner permissions in The Web.")
+        command=Path(manager) if manager is not None else _manager()
+        if (command is None or not command.is_file()
+                or not os.access(command,os.X_OK)):
+            return "The Kali Bay manager is unavailable; nothing was launched."
+        return launch_named_kali_app(phrase,command)
     intent = parse_request(message)
     if intent is None:
         return None
@@ -150,9 +163,11 @@ def handle_kali_request(message: str, manager=None):
             "OWASP ZAP, Ghidra, ClamTK, or the Nmap, Metasploit, "
             "Suricata, YARA and Lynis workbenches. I won't run a "
             "scan, attack or privileged command on your behalf. "
-            "You can also ask me to open the full Kali terminal or the "
-            "interactive Kali package manager, or list and search your "
-            "installed Kali applications."
+            "With permanent owner authorization, you can also say "
+            "'open Kali app' followed by any exact installed Kali GUI "
+            "application name. Opening a tool does not execute scans. "
+            "You can open the full Kali terminal, package manager, "
+            "or list and search installed Kali applications."
         )
     command = Path(manager) if manager is not None else _manager()
     if command is None or not command.is_file() or not os.access(command, os.X_OK):
