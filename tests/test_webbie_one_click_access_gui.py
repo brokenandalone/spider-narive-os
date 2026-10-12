@@ -50,7 +50,7 @@ class OwnerOneClickUITests(unittest.TestCase):
                     button.click()
                 self.assertTrue(dialog.grant.status()["wide"])
                 self.assertEqual(dialog.grant.status()["eligible_apps"],2)
-                self.assertFalse(dialog.bridge.server.isListening())
+                self.assertTrue(dialog.bridge.server.isListening())
                 started.assert_not_called()
                 self.assertFalse(dialog.click_button.isEnabled())
                 self.assertFalse(dialog.type_button.isEnabled())
@@ -80,6 +80,29 @@ class OwnerOneClickUITests(unittest.TestCase):
                 self.assertEqual(dialog.grant.status()["selected_app_id"],"")
                 self.assertFalse(dialog.grant.authorize(
                     "app.open","app_id=konsole.desktop"))
+            finally:
+                dialog.close()
+
+    def test_already_approved_typing_open_starts_safe_program_without_new_prompt(self):
+        with tempfile.TemporaryDirectory() as folder,patch.dict(
+                os.environ,{"DISPLAY":":0"}),patch(
+                "webbie_operator_bridge.private_socket_directory",
+                return_value=Path(folder)):
+            started=Mock()
+            dialog=WebbieComputerDialog(
+                discover=self.apps,launcher=started,run=Mock())
+            try:
+                dialog.authorize_wide_access()
+                with patch("desktop_control.app_catalog",return_value=
+                           SimpleNamespace(launch_command=lambda app:[
+                               "gio","launch",str(app.path)])),patch(
+                           "webbie_computer_panel.QMessageBox.question",
+                           side_effect=AssertionError("No new approval")):
+                    self.assertTrue(dialog.open_program_safe("audacity.desktop"))
+                    self.assertTrue(dialog.open_program_safe("firefox.desktop"))
+                self.assertEqual(started.call_count,2)
+                self.assertFalse(dialog.open_program_safe("konsole.desktop"))
+                self.assertEqual(started.call_count,2)
             finally:
                 dialog.close()
 
