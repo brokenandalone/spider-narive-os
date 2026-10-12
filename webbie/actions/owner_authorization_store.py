@@ -15,7 +15,8 @@ import tempfile
 DEFAULT_PATH=Path.home()/".config/spider-os/webbie-owner-authorization.json"
 VERSION=1
 MAX_BYTES=2048
-DISABLED={"version":VERSION,"authorized":False,"paused":True}
+DISABLED={"version":VERSION,"authorized":False,"paused":True,
+          "kali_on_demand":False}
 ACTIONS=frozenset(("authorize","pause","resume","revoke"))
 
 
@@ -33,11 +34,15 @@ def read_policy(path=DEFAULT_PATH):
         if (not isinstance(raw,dict) or raw.get("version")!=VERSION
                 or type(raw.get("authorized")) is not bool
                 or type(raw.get("paused")) is not bool
+                or type(raw.get("kali_on_demand")) is not bool
                 or raw.get("profile")!="routine_apps_only"
                 or not raw["authorized"] and not raw["paused"]):
             return dict(DISABLED)
+        if raw["kali_on_demand"] and not raw["authorized"]:
+            return dict(DISABLED)
         return {"version":VERSION,"authorized":raw["authorized"],
-                "paused":raw["paused"]}
+                "paused":raw["paused"],
+                "kali_on_demand":raw["kali_on_demand"]}
     except (OSError,TypeError,ValueError,UnicodeError):
         return dict(DISABLED)
 
@@ -77,14 +82,17 @@ def update_policy(action, *, owner_clicked=False, path=DEFAULT_PATH):
 
     previous=read_policy(target)
     if action=="authorize":
-        new={"version":VERSION,"authorized":True,"paused":False}
+        new={"version":VERSION,"authorized":True,"paused":False,
+             "kali_on_demand":True}
     elif action=="resume":
         if not previous["authorized"]:
             raise PermissionError("First grant permanent authorization")
-        new={"version":VERSION,"authorized":True,"paused":False}
+        new={"version":VERSION,"authorized":True,"paused":False,
+             "kali_on_demand":previous["kali_on_demand"]}
     elif action=="pause":
         new={"version":VERSION,"authorized":previous["authorized"],
-             "paused":True}
+             "paused":True,
+             "kali_on_demand":previous["kali_on_demand"]}
     else:
         new=dict(DISABLED)
 
