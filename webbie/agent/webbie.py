@@ -35,7 +35,7 @@ sys.path.insert(
 
 
 from brain import respond
-from tts import speak
+from tts import speech_controller
 from speaker_guard import SpeakerGuard
 
 
@@ -242,25 +242,9 @@ def say(text):
         text,
     )
 
-    speaking_marker = (
-        RUNTIME_DIR
-        / "webbie-speaking"
-    )
-
+    # Nonblocking speech allows the mic listener to hear verified stop commands.
     with speech_lock:
-        try:
-            speaking_marker.write_text(
-                "speaking",
-                encoding="utf-8",
-            )
-
-            speak(text)
-
-        finally:
-            try:
-                speaking_marker.unlink()
-            except OSError:
-                pass
+        speech_controller.start(text)
 
 
 def launch(command):
@@ -517,6 +501,11 @@ def handle_command(command, voice=False):
     if not command:
         return ""
 
+    # Stop is a control command, not a language-model request.
+    if clean_phrase(command) in {"stop","stop speaking","be quiet","quiet","cancel speech"}:
+        speech_controller.stop()
+        return "" if voice else "Speech stopped."
+
     write_state(
         last_heard=command,
         last_input="voice" if voice else "text",
@@ -608,20 +597,34 @@ def voice_listener():
         voice_error=None,
     )
 
-    def on_text(phrase, audio_path=None):
+    def on_text(phrase, audio_path=None, during_speech=False):
         global awaiting_command_until, awaiting_command_speaker
-        # Text alone cannot tell us who spoke. Deny absent audio or identity.
         speaker = VOICE_GUARD.identify(audio_path) if audio_path else None
         if speaker is None:
             return
-
         phrase = clean_phrase(phrase)
         if not phrase:
             return
 
+        woke, command = remove_wake_word(phrase)
+        stop_phrases = {"stop","stop speaking","be quiet","quiet","cancel speech"}
+        # While Webbie is talking, ignore everything except an explicit
+        # verified interruption. This limits feedback from her own speakers.
+        if during_speech:
+            if woke and command in stop_phrases:
+                speech_controller.stop()
+                awaiting_command_until = 0
+                awaiting_command_speaker = None
+            return
+
+        if woke and command in stop_phrases:
+            speech_controller.stop()
+            awaiting_command_until = 0
+            awaiting_command_speaker = None
+            return
+
         now = time.time()
         if now < awaiting_command_until:
-            # The same verified speaker must give the follow-up command.
             if awaiting_command_speaker != speaker:
                 return
             awaiting_command_until = 0.0
@@ -631,13 +634,11 @@ def voice_listener():
 
         awaiting_command_until = 0.0
         awaiting_command_speaker = None
-        woke, command = remove_wake_word(phrase)
         if not woke:
             return
         if command:
             handle_command(command, voice=True)
             return
-
         awaiting_command_speaker = speaker
         awaiting_command_until = time.time() + 10
         say(f"I'm here, {current_name()}.")
@@ -855,6 +856,7 @@ def socket_server():
 def stop_service(signum, frame):
     global running
     running = False
+    speech_controller.stop()
 
 
 def main():
