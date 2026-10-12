@@ -92,10 +92,22 @@ class OperatorBridge(QObject):
             self.finish(peer, 'Desktop task authorization is not active')
             return
         if data.get('wide'):
-            # Broad grants NEVER accept website navigation, arbitrary key
-            # commands, clipboard contents or LLM-directed task plans here.
+            # This local bridge accepts only OWNER-authenticated agent requests.
+            # No arbitrary key, clipboard, prompt, tool parameter or script.
+            if packet.startswith('WEB:'):
+                try:
+                    url=canonical_url(packet[4:])
+                except ValueError:
+                    self.finish(peer,'Unsupported website address')
+                    return
+                if not self.grant.wide.authorize('web.open','url='+url):
+                    self.finish(peer,'Website access is not currently authorized')
+                    return
+                self.pending=peer
+                self.webRequested.emit(url)
+                return
             if not packet.startswith('OPEN:'):
-                self.finish(peer, 'Safe access only accepts ordinary app launches')
+                self.finish(peer,'Only app opening and public HTTPS links are supported')
                 return
             app_id = packet[5:]
             if not APP_ID.fullmatch(app_id) or not self.grant.can_open_wide(app_id):

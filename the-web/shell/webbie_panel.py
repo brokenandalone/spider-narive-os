@@ -26,9 +26,14 @@ from webbie_unified_workflow import WebbieUnifiedWorkflowDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
+from kali_assistant import handle_kali_request
+from kali_named_app import parse_named_app_request
+from console_bridge import parse_console_request,perform_console_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
 from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
+from owner_authorization_store import read_policy,update_policy
 from context_awareness import AwarenessState
 from unified_workflow import UnifiedWorkflow
 from jarvis_context import publish_context
@@ -99,6 +104,20 @@ class ReplyWorker(QThread):
         except (OSError, ValueError) as error:
             self.failed.emit('Unable to reach Webbie: ' + str(error))
 
+
+class ConsoleWorker(QThread):
+    """Bounded read-only shell-free diagnostic off the GUI thread."""
+    reported=pyqtSignal(str)
+
+    def __init__(self,request,authorized,parent=None):
+        super().__init__(parent)
+        self.request=request
+        self.authorized=authorized
+
+    def run(self):
+        result=perform_console_request(
+            self.request,authorized=self.authorized)
+        self.reported.emit(result or 'Unsupported console request.')
 
 class CameraWorker(QThread):
     """One in-memory camera frame, analyzed by local Ollama off the GUI thread."""
@@ -251,6 +270,7 @@ class WebbiePanel(QWidget):
         self.face_sleeping = face_asleep()
         self._observed_sleep = self.face_sleeping
         self.camera_worker = None
+        self.console_worker = None
         self.vision_bridge = None
         self.computer_dialog = None
         self.reminders_dialog = None
@@ -389,23 +409,30 @@ class WebbiePanel(QWidget):
         computer_button.clicked.connect(self.open_computer_dialog)
         layout.addWidget(computer_button)
         access_row=QHBoxLayout();layout.addLayout(access_row)
-        self.safe_access_button=QPushButton('One click: Allow Webbie safe access')
+        self.safe_access_button=QPushButton(
+            'Permanently authorize Webbie (routine apps + Kali on command)')
         self.safe_access_button.setObjectName('webbieOwnerOneClickAccess')
         self.safe_access_button.setToolTip(
-            '30-minute local safe-access session. Opens ordinary apps, '
-            'inspects selected windows, navigates and reads local service '
-            'status. Deletes, installs, shell/root, Kali tools, purchases, '
-            'uploads, broadcasts, sends, and account changes are blocked.')
+            'One owner click saves routine app permissions permanently, '
+            'including exact requested Kali GUI tool launches. '
+            'Never authorizes arbitrary security scans, attacks, '
+            'deletions, privilege escalation, messages, broadcasts '
+            'or purchases. Separate authenticated app integrations still apply.')
         self.safe_access_button.clicked.connect(self.enable_safe_access)
         access_row.addWidget(self.safe_access_button)
-        revoke=QPushButton('Revoke access now')
+        revoke=QPushButton('Pause Webbie now')
         revoke.setObjectName('webbieOwnerRevokeAll')
         revoke.clicked.connect(self.stop_sensitive_actions)
         access_row.addWidget(revoke)
+        remove=QPushButton('Remove permanent permission')
+        remove.setObjectName('webbieOwnerRemovePermission')
+        remove.clicked.connect(self.remove_saved_permissions)
+        layout.addWidget(remove)
         access_note=QLabel(
-            'Safe access lasts 30 minutes, is not saved, and never overrides '
-            'speaker identity or the blocked-action rules. Online services '
-            'still require their existing individual sign-ins.')
+            'Saved permanently and restored after login unless paused. '
+            'Kali tools launch ONLY on your direct instruction. '
+            'STOP pauses access; remove permission cancels saved approval. '
+            'Online services require their own sign-ins.')
         access_note.setWordWrap(True)
         layout.addWidget(access_note)
         self.cloud_label = QLabel(cloud_state_label())
@@ -434,6 +461,28 @@ class WebbiePanel(QWidget):
         self.jarvis_context_timer.start(15000)
         self.publish_jarvis_context()
         self.refresh_state()
+        # A valid saved owner permission is active after login without
+        # re-clicking, but no camera is started and no app is opened.
+        QTimer.singleShot(0,self.restore_standing_access)
+
+    def restore_standing_access(self):
+        record=read_policy()
+        if not record.get('authorized') or record.get('paused'):
+            return
+        if self.computer_dialog is None:
+            self.computer_dialog=WebbieComputerDialog(self)
+            self.computer_dialog.taskApproved.connect(
+                self.awareness.note_user_request)
+            self.computer_dialog.screenObserved.connect(
+                self._remember_consented_screen)
+            self.computer_dialog.actionOutcome.connect(
+                self._workflow_action)
+            self.computer_dialog.authorizationRevoked.connect(
+                lambda: self.awareness.revoke_observation('screen'))
+            self.computer_dialog.authorizationRevoked.connect(
+                self.unified_workflow.stop)
+        # Constructing the hidden panel restores its already authorized
+        # control bridge. Nothing launches until an actual owner request.
 
     def refresh_camera_devices(self):
         if self.camera_allowed:
@@ -784,6 +833,13 @@ class WebbiePanel(QWidget):
         self.unified_workflow.stop()
         if self.computer_dialog is not None:
             self.computer_dialog.stop()
+        else:
+            # Persist STOP even when the control dialog has not been opened.
+            if read_policy().get('authorized'):
+                try:
+                    update_policy('pause')
+                except (OSError,ValueError,PermissionError):
+                    pass
         self.stop_camera()
         self.awareness.revoke_observation('screen')
         self.publish_jarvis_context()
@@ -837,10 +893,21 @@ class WebbiePanel(QWidget):
                             json.dumps(state, indent=2, ensure_ascii=False))
 
     def enable_safe_access(self):
-        """The single deliberate owner's click enables routine access only."""
+        """Owner GUI click saves permanent bounded access plus Kali-on-demand."""
         self.open_computer_dialog()
         if self.computer_dialog is not None:
             self.computer_dialog.authorize_wide_access()
+            self.publish_jarvis_context()
+
+    def remove_saved_permissions(self):
+        """Explicit owner click removes persistent access, unlike STOP."""
+        self.open_computer_dialog()
+        if self.computer_dialog is not None:
+            if self.computer_dialog.remove_permanent_authorization():
+                self.unified_workflow.stop()
+                self.stop_camera()
+                self.awareness.revoke_observation('screen')
+                self.append_message('Webbie','Permanent permissions removed.')
             self.publish_jarvis_context()
 
     def open_computer_dialog(self, suggested_app_id=None):
@@ -861,9 +928,51 @@ class WebbiePanel(QWidget):
         self.computer_dialog.raise_()
         self.computer_dialog.activateWindow()
 
+    def _console_reply(self,message):
+        record=read_policy()
+        if record.get('authorized') and not record.get('paused'):
+            self.append_message('Webbie Console',message)
+        else:
+            self.append_message('Webbie Console','Console response discarded after STOP.')
+
+    def _console_finished(self):
+        self.pending=False
+        self.send_button.setEnabled(True)
+        self.entry.setEnabled(True)
+        self.refresh_state()
+
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        console=parse_console_request(text)
+        if console is not None:
+            record=read_policy()
+            allowed=record.get('authorized') is True and record.get('paused') is False
+            self.append_message('You',text)
+            self.entry.clear()
+            self.pending=True
+            self.send_button.setEnabled(False)
+            self.entry.setEnabled(False)
+            self.console_worker=ConsoleWorker(text,allowed,self)
+            self.console_worker.reported.connect(self._console_reply)
+            self.console_worker.finished.connect(self._console_finished)
+            self.console_worker.start()
+            return
+        # Only literal typed owner requests can request launching named Kali
+        # desktop applications, and only under the saved unpaused policy.
+        # No LLM/screen/webpage output ever reaches this command handler.
+        if parse_named_app_request(text) is not None:
+            approval=read_policy()
+            if (approval.get('authorized') is True and
+                    approval.get('paused') is False and
+                    approval.get('kali_on_demand') is True):
+                answer=handle_kali_request(text,allow_named_apps=True)
+            else:
+                answer=('Kali tool access is not currently authorized. '
+                        'Enable or resume permanent owner permissions.')
+            self.append_message('Webbie',answer or 'Kali app request not recognized.')
+            self.entry.clear()
             return
         # Direct owner text can stage a deterministic window-bound navigation
         # mission. Neither the LLM nor a webpage can trigger this parser.
@@ -886,10 +995,23 @@ class WebbiePanel(QWidget):
                 self.append_message('Status',
                     'That address is blocked. Only public HTTPS sites are allowed.')
             else:
-                self.open_computer_dialog()
-                if self.computer_dialog.offer_site(browser_request.url):
-                    self.append_message('Status',
-                        'Review the address, authorize a browser task and confirm opening it.')
+                # With permanent approval, don't open a redundant Computer
+                # Control dialog on every website request.
+                if self.computer_dialog is None:
+                    self.restore_standing_access()
+                if (self.computer_dialog is not None and
+                        self.computer_dialog.grant.status().get('wide')):
+                    opened=self.computer_dialog.open_website_safe(
+                        browser_request.url)
+                    self.append_message(
+                        'Webbie','Website opening requested; page load not verified.'
+                        if opened else 'Website was blocked or unavailable.')
+                else:
+                    self.open_computer_dialog()
+                    if self.computer_dialog.offer_site(browser_request.url):
+                        self.append_message(
+                            'Status','Review the address, authorize a browser '
+                            'task and confirm opening it.')
             self.entry.clear()
             return
         # A typed request to open an installed program invokes a visible task
@@ -947,11 +1069,14 @@ class WebbiePanel(QWidget):
         # The workspace/tab owner uses the same worker guard before deletion.
         if ((self.worker and self.worker.isRunning()) or
                 (self.camera_worker and self.camera_worker.isRunning()) or
+                (self.console_worker and self.console_worker.isRunning()) or
                 self.face_controls.active()):
             event.ignore()
         else:
             self.unified_workflow.stop()
             if self.computer_dialog is not None:
-                self.computer_dialog.stop()
+                # Closing the UI never erases or pauses standing authorization.
+                # Active sessions are shut down; the next login rechecks it.
+                self.computer_dialog.stop(pause_authorization=False)
             self.stop_camera()
             event.accept()

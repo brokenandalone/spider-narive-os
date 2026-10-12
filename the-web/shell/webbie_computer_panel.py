@@ -22,6 +22,9 @@ from desktop_control import app_catalog, KEYS
 from window_safety import ConfinedDesktopOperator
 from task_grants import TaskGrant
 from owner_safe_access import safe_app_id
+from owner_authorization_store import (
+    DEFAULT_PATH,read_policy,update_policy,
+)
 from safe_service_status import read_local_service_status, status_summary
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
@@ -106,12 +109,15 @@ class WebbieComputerDialog(QDialog):
     authorizationRevoked = pyqtSignal()
 
     def __init__(self, parent=None, *, discover=None, run=None, launcher=None,
-                 browser_opener=None):
+                 browser_opener=None, authorization_path=None):
         super().__init__(parent)
         self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
         self.setObjectName('webbieComputerControl')
         self.resize(640, 730)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
+        self.authorization_path = (
+            DEFAULT_PATH if authorization_path is None else Path(authorization_path))
+
         # Resolve preferences against locally INSTALLED Ollama models in the
         # background worker. Never download or switch the owner's engine.
         self.vision_model = None
@@ -171,18 +177,27 @@ class WebbieComputerDialog(QDialog):
         self.stop_button.setStyleSheet('background:#6e1e55; color:white; font-weight:bold')
         auth_row.addWidget(self.stop_button)
         wide_row = QHBoxLayout(); layout.addLayout(wide_row)
-        self.wide_access_button = QPushButton('One click: Allow safe access across apps')
+        self.wide_access_button = QPushButton(
+            'One click: Permanently authorize safe app access')
         self.wide_access_button.setObjectName('webbieOneClickSafeAccess')
         self.wide_access_button.clicked.connect(self.authorize_wide_access)
         wide_row.addWidget(self.wide_access_button)
         self.wide_access_info = QLabel(
-            'For 30 minutes: open ordinary installed apps, view/focus a selected '
-            'window, and use harmless navigation keys without repeat approval. '
+            'Permanent owner approval: open ordinary installed apps, view/focus '
+            'a selected window and use harmless navigation keys without repeat approval. '
             'No clicks, text entry, downloads, deletions, shell/root, Kali '
             'operations, publishing, spending, messaging, system changes or '
             'external account actions. STOP revokes access immediately.')
         self.wide_access_info.setWordWrap(True)
         layout.addWidget(self.wide_access_info)
+        self.pause_access_button=QPushButton('Pause Webbie safe access')
+        self.pause_access_button.setObjectName('webbieOwnerPause')
+        self.pause_access_button.clicked.connect(self.stop)
+        layout.addWidget(self.pause_access_button)
+        self.remove_access_button=QPushButton('Remove permanent authorization')
+        self.remove_access_button.setObjectName('webbieOwnerRemovePermanent')
+        self.remove_access_button.clicked.connect(self.remove_permanent_authorization)
+        layout.addWidget(self.remove_access_button)
         self.service_button=QPushButton('Read approved local service status')
         self.service_button.setObjectName('webbieSafeServicesStatus')
         self.service_button.clicked.connect(self.inspect_safe_services)
@@ -298,6 +313,7 @@ class WebbieComputerDialog(QDialog):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh_status)
         self.timer.start(1000)
+        self.restore_owner_authorization()
         self.refresh_status()
 
     def status(self, message):
@@ -352,36 +368,66 @@ class WebbieComputerDialog(QDialog):
                                 'detail':'Local status unavailable'})
         self.status(status_summary(reports))
 
-    def authorize_wide_access(self):
-        """The labeled button IS the owner's deliberate consent, no extra prompts."""
-        if self.grant.status()['active']:
-            # Existing task grants are replaced by this bounded safe grant.
-            self.stop()
-        app_ids = [app.desktop_id for app in self.apps]
+    def restore_owner_authorization(self):
+        """Restore permanent, unpaused policy after UI construction/login."""
+        app_ids=[app.desktop_id for app in self.apps]
         try:
-            count = self.grant.activate_wide(
-                app_ids, owner_clicked=True, seconds=1800)
+            count=self.grant.restore_permanent(
+                app_ids,path=self.authorization_path)
+            if not count:
+                return False
             self.operator.begin_new_task()
-            self.bridge.activate()  # existing owner-only local app request channel
+            self.bridge.activate()
             self.autopilot.stop()
             self.nav_mission.stop()
-            self.pending_step = None
-            self.pending_step_target = None
-            selected = self.selected_app()
-            self.grant.select_wide_app(
-                selected.desktop_id if selected else '')
-        except (ValueError, PermissionError, InterruptedError, RuntimeError) as error:
+            self.pending_step=None
+            self.pending_step_target=None
+            app=self.selected_app()
+            self.grant.select_wide_app(app.desktop_id if app else '')
+            return True
+        except (PermissionError,ValueError,RuntimeError,OSError) as error:
             self.operator.stop()
             self.grant.stop()
-            self.status('Safe app access unavailable: ' + str(error))
+            self.status('Saved owner authorization could not be restored: '+str(error))
+            return False
+
+    def authorize_wide_access(self):
+        """One owner click authorizes forever, or resumes an existing grant."""
+        if self.grant.status()['active']:
+            self.stop(pause_authorization=False)
+        previous=read_policy(self.authorization_path)
+        action='resume' if previous['authorized'] else 'authorize'
+        try:
+            update_policy(
+                action,owner_clicked=True,path=self.authorization_path)
+            if not self.restore_owner_authorization():
+                self.status('Policy saved but local desktop control is unavailable.')
+                self.refresh_status()
+                return
+        except (ValueError,PermissionError,RuntimeError,OSError) as error:
+            self.operator.stop()
+            self.grant.stop()
+            self.status('Permanent authorization could not be saved: '+str(error))
             self.refresh_status()
             return
         self.record_activity('grant_started')
         self.status(
-            f'One-click safe access active: {count} eligible installed apps, '
-            '30-minute limit, 240 routine actions. '
-            'Risky changes are BLOCKED, not silently approved.')
+            'Permanent safe access enabled across eligible installed apps. '
+            'No expiration or per-action reapproval for routine allowed operations. '
+            'Forbidden actions remain blocked. STOP pauses the saved grant.')
         self.refresh_status()
+
+    def remove_permanent_authorization(self):
+        """Deliberate owner click clears the durable policy and live grant."""
+        try:
+            update_policy('revoke',owner_clicked=True,
+                          path=self.authorization_path)
+        except (OSError,PermissionError,ValueError) as error:
+            self.status('Could not remove saved authorization: '+str(error))
+            return False
+        self.stop(pause_authorization=False)
+        self.status('Permanent authorization removed. Webbie safe access is OFF.')
+        return True
 
     def authorize(self):
         app = self.selected_app()
@@ -417,7 +463,13 @@ class WebbieComputerDialog(QDialog):
         self.status(f'Authorized: {app.name}. No changes made yet.')
         self.refresh_status()
 
-    def stop(self):
+    def stop(self, *, pause_authorization=True):
+        if pause_authorization and read_policy(self.authorization_path)['authorized']:
+            try:
+                update_policy('pause',path=self.authorization_path)
+            except (OSError,PermissionError,ValueError):
+                # In-memory STOP still takes effect even if disk is unwritable.
+                pass
         self.autopilot.stop()
         self.nav_mission.stop()
         self.record_activity('stopped')
@@ -459,13 +511,27 @@ class WebbieComputerDialog(QDialog):
         active = data['active']
         if not active and self.autopilot.active:
             self.autopilot.stop()
-        self.state.setText(
-            (f"{'ONE-CLICK SAFE ACCESS' if data.get('wide') else 'AUTHORIZED'} | "
-             f"{data['remaining_seconds']} sec left | "
-             f"{data['remaining_actions']} actions | {data['task']}")
-            if active else 'OFF | Webbie cannot operate applications')
+        if active and data.get('permanent'):
+            text='PERMANENT SAFE ACCESS | No timer, no action cap | '+data['task']
+        elif active:
+            text=(f"{'SAFE ACCESS' if data.get('wide') else 'AUTHORIZED'} | "
+                  f"{data['remaining_seconds']} sec left | "
+                  f"{data['remaining_actions']} actions | {data['task']}")
+        else:
+            saved=read_policy(self.authorization_path)
+            text=('PAUSED | Permanent owner authorization saved. '
+                  'Click Resume to restore routine access.'
+                  if saved['authorized'] else
+                  'OFF | Webbie cannot operate applications')
+        self.state.setText(text)
         safe_wide=bool(active and data.get('wide'))
+        saved=read_policy(self.authorization_path)
+        self.wide_access_button.setText(
+            'Resume permanent safe access' if saved['authorized'] else
+            'One click: Permanently authorize safe app access')
         self.wide_access_button.setEnabled(not safe_wide)
+        self.pause_access_button.setEnabled(active)
+        self.remove_access_button.setEnabled(saved['authorized'])
         self.grant_button.setEnabled(not safe_wide)
         self.service_button.setEnabled(safe_wide)
         self.autopilot_start.setEnabled(
@@ -480,12 +546,12 @@ class WebbieComputerDialog(QDialog):
         for control in (self.close_button, self.click_button, self.type_button,
                         self.suggest_button):
             control.setEnabled(active and not safe_wide)
-        self.nav_preview_button.setEnabled(active)
-        self.nav_next_button.setEnabled(active and
+        self.nav_preview_button.setEnabled(active and not safe_wide)
+        self.nav_next_button.setEnabled(active and not safe_wide and
                                         self.nav_mission.plan is not None and
                                         self.nav_mission.clock() < self.nav_mission.expires)
         self.apply_step_button.setEnabled(
-            active and self.pending_step is not None and
+            active and not safe_wide and self.pending_step is not None and
             self.pending_step.get('action') in {'click', 'press'})
         if not active:
             self.nav_mission.stop()
@@ -568,6 +634,29 @@ class WebbieComputerDialog(QDialog):
         self.status('Review the URL and authorize this browser task before opening.')
         return True
 
+    def open_website_safe(self,url):
+        """Single explicitly requested public URL under owner standing policy."""
+        if (not self.grant.status().get('wide')
+                or self.operator.cancelled.is_set()):
+            self.receipt('website','denied')
+            return False
+        try:
+            destination=canonical_url(url)
+        except ValueError:
+            self.receipt('website','denied')
+            return False
+        if not self.grant.wide.authorize('web.open','url='+destination):
+            self.receipt('website','denied')
+            return False
+        if not self.browser_opener(QUrl(destination)):
+            self.receipt('website','failed')
+            self.status('Browser did not accept the public HTTPS link.')
+            return False
+        self.receipt('website','requested')
+        self.record_activity('website_requested')
+        self.status('Public HTTPS website open requested; page load not verified.')
+        return True
+
     def open_website(self, url=None):
         """Owner-confirmed website navigation; never starts a privileged command."""
         app = self.selected_app()
@@ -607,7 +696,8 @@ class WebbieComputerDialog(QDialog):
         return True
 
     def handle_voice_web(self, url):
-        opened = self.open_website(url)
+        opened=(self.open_website_safe(url) if self.grant.status().get('wide')
+                else self.open_website(url))
         if self.bridge.pending is not None:
             self.bridge.finish(
                 self.bridge.pending,
@@ -1041,7 +1131,8 @@ class WebbieComputerDialog(QDialog):
         self.refresh_status()
 
     def closeEvent(self, event):
-        self.stop()
+        # Closing is not a revocation of standing authorization.
+        self.stop(pause_authorization=False)
         if ((self.screen_worker and self.screen_worker.isRunning()) or
                 (self.step_worker and self.step_worker.isRunning())):
             self.hide()

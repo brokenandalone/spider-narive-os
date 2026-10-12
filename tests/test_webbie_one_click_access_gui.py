@@ -41,7 +41,8 @@ class OwnerOneClickUITests(unittest.TestCase):
                 return_value=Path(folder)):
             started=Mock()
             dialog=WebbieComputerDialog(
-                discover=self.apps,launcher=started,run=Mock())
+                discover=self.apps,launcher=started,run=Mock(),
+                authorization_path=Path(folder)/"private"/"owner.json")
             try:
                 button=dialog.findChild(QPushButton,"webbieOneClickSafeAccess")
                 self.assertIsNotNone(button)
@@ -68,7 +69,9 @@ class OwnerOneClickUITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{"DISPLAY":":0"}),patch(
                 "webbie_operator_bridge.private_socket_directory",
                 return_value=Path(folder)):
-            dialog=WebbieComputerDialog(discover=self.apps,run=Mock())
+            dialog=WebbieComputerDialog(
+                discover=self.apps,run=Mock(),
+                authorization_path=Path(folder)/"private"/"owner.json")
             try:
                 dialog.authorize_wide_access()
                 dialog.app_select.setCurrentIndex(1)
@@ -90,7 +93,8 @@ class OwnerOneClickUITests(unittest.TestCase):
                 return_value=Path(folder)):
             started=Mock()
             dialog=WebbieComputerDialog(
-                discover=self.apps,launcher=started,run=Mock())
+                discover=self.apps,launcher=started,run=Mock(),
+                authorization_path=Path(folder)/"private"/"owner.json")
             try:
                 dialog.authorize_wide_access()
                 with patch("desktop_control.app_catalog",return_value=
@@ -110,7 +114,9 @@ class OwnerOneClickUITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{"DISPLAY":":0"}),patch(
                 "webbie_operator_bridge.private_socket_directory",
                 return_value=Path(folder)):
-            dialog=WebbieComputerDialog(discover=self.apps,run=Mock())
+            dialog=WebbieComputerDialog(
+                discover=self.apps,run=Mock(),
+                authorization_path=Path(folder)/"private"/"owner.json")
             try:
                 self.assertFalse(dialog.grant.status()["wide"])
                 dialog.task.setText("Owner-chosen editing task")
