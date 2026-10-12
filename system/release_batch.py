@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_ROOT = Path('/usr/local/lib/spider-os')
@@ -597,6 +598,19 @@ def require_known_good_pc(source_root=PROJECT_ROOT):
     return report
 
 
+def daily_manifest_path(root=PROJECT_ROOT, today=None):
+    """Use today's plan, never silently approve a prior day's review."""
+    root = Path(root)
+    current = today or datetime.now(ZoneInfo("America/Indiana/Indianapolis")).date()
+    expected = root / "system" / ("daily_release_plan_" + current.strftime("%Y%m%d") + ".json")
+    if expected.is_file() or expected.is_symlink():
+        return expected
+    # An earlier plan is ONLY a diagnostic fallback. Its release_date must
+    # fail the independent day check in the continuity audit.
+    historical = sorted((root / "system").glob("daily_release_plan_????????.json"))
+    return historical[-1] if historical else expected
+
+
 def require_daily_continuity(backup_root, source_root=PROJECT_ROOT):
     """Fail closed unless the exact combined daily release is approved.
 
@@ -606,7 +620,7 @@ def require_daily_continuity(backup_root, source_root=PROJECT_ROOT):
     import importlib.util
     source_root = Path(source_root)
     audit_script = source_root / 'tools/daily_release_continuity.py'
-    manifest = source_root / 'system/daily_release_plan_20261011.json'
+    manifest = daily_manifest_path(source_root)
     if not audit_script.is_file() or not manifest.is_file():
         raise RuntimeError('Daily combined release audit or plan is missing')
     spec = importlib.util.spec_from_file_location(
