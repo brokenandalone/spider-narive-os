@@ -91,6 +91,19 @@ class OperatorBridge(QObject):
         if not data['active']:
             self.finish(peer, 'Desktop task authorization is not active')
             return
+        if data.get('wide'):
+            # Broad grants NEVER accept website navigation, arbitrary key
+            # commands, clipboard contents or LLM-directed task plans here.
+            if not packet.startswith('OPEN:'):
+                self.finish(peer, 'Safe access only accepts ordinary app launches')
+                return
+            app_id = packet[5:]
+            if not APP_ID.fullmatch(app_id) or not self.grant.can_open_wide(app_id):
+                self.finish(peer, 'Application is excluded from safe access')
+                return
+            self.pending = peer
+            self.openRequested.emit(app_id)
+            return
         if packet.startswith('PLAN:'):
             phrase = packet[5:]
             if parse_navigation_request(phrase) is None:

@@ -74,6 +74,8 @@ APP_FILES = (
     'webbie/actions/desktop_control.py', 'webbie/actions/window_safety.py',
     'webbie/actions/navigation_missions.py', 'webbie/actions/action_journal.py',
     'webbie/actions/action_receipts.py',
+    'webbie/actions/owner_safe_access.py',
+    'webbie/actions/safe_service_status.py',
     'webbie/agent/workspace_launchers.py', 'webbie/agent/jarvis_commands.py',
     'webbie/agent/voice_trust.py', 'webbie/agent/runtime_readiness.py',
     'webbie/agent/segment_speaker_gate.py',
