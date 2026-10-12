@@ -386,6 +386,8 @@ class TheWeb(QMainWindow):
 
     def setup_webbie_assistant(self):
         self.webbie_assistant = WebbiePanel(SPIDER_ROOT)
+        # Owner-clicked workflow steps can navigate only registered workspaces.
+        self.webbie_assistant.workspace_navigator = self.open_workspace
         self.webbie_dock = QDockWidget('WEBBIE | WORKSPACE ASSISTANT', self)
         self.webbie_dock.setObjectName('webbieWorkspaceDock')
         self.webbie_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
