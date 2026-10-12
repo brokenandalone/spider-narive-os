@@ -1,6 +1,7 @@
 """Wave Five protected release gates; tests never touch real PC hardware."""
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -27,6 +28,8 @@ class SystemwideReadinessTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("original fixture\n")
         self.source.joinpath("system").mkdir()
+        shutil.copyfile(ROOT / "system/daily_install_policy.py",
+                        self.source / "system/daily_install_policy.py")
         self.release = self.source / ready.BATCH
         self.plan = self.source / ready.PLAN
         self.save_manifest()
