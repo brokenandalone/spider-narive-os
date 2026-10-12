@@ -194,6 +194,9 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert 'webbie.service: running' in window.webbie_assistant.entry.text()
     assert 'spider-ai-dj.service: stopped' in window.webbie_assistant.entry.text()
     assert not window.webbie_assistant.pending
+    unsent = window.webbie_assistant.entry.text()
+    assert not window.prepare_webbie_service_question('webbie.service: failed')
+    assert window.webbie_assistant.entry.text() == unsent
     window.workspace_recovery.copy_safe_diagnostics()
     import json
     diagnostic = json.loads(QApplication.clipboard().text())
