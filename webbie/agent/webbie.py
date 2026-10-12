@@ -51,6 +51,7 @@ from proactive_checks import ProactiveMonitor, status_message, quiet_now, config
 from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
 from voice_metrics import VOICE_INTAKE
+from launch_intents import direct_launch_intent
 from workspace_launchers import workspace_command
 from jarvis_commands import is_capability_question, voice_guide
 from voice_trust import voice_permission, trust_status
@@ -330,6 +331,11 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    # Reject descriptions, indirect questions and NEGATED launch phrases.
+    # Only an exact direct request reaches the legacy launch branches.
+    if re.search(r"\b(?:open|launch|start|enter|run)\b", lower):
+        if direct_launch_intent(command) is None:
+            return None
     stripped = re.sub(
         r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
     if stripped in ("ai model health", "brain health",
