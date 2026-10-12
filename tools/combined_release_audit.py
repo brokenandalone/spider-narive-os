@@ -24,6 +24,7 @@ COMPONENTS = {
         "webbie/agent/voice_trust.py", "webbie/agent/runtime_readiness.py",
         "webbie/agent/segment_speaker_gate.py",
         "webbie/agent/speaker_provider_loader.py", "webbie/agent/voice_lab.py",
+        "webbie/agent/launch_intents.py", "tools/webbie_readiness_cli.py",
         "webbie/agent/voice_metrics.py",
         "webbie/voice/hearing_test.py",
         "webbie/brain/focus_tasks.py", "webbie/brain/privacy_controls.py",
@@ -89,7 +90,7 @@ WIRING = {
         "ProactiveMonitor", "ReminderScheduler",
         "focus_answer", "private_session_active",
         "voice_permission", "inspect_readiness", "speaker_gate_from_config",
-        "VOICE_INTAKE", "MODEL_GOVERNOR",
+        "VOICE_INTAKE", "MODEL_GOVERNOR", "direct_launch_intent",
     ),
     "the-web/shell/webbie_panel.py": (
         "show_proactive_checks", "open_reminders_dialog",
