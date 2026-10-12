@@ -594,24 +594,26 @@ def verified_workspace_voice_action(command, *, speaker_verified=False,
         return dispatch_verified_author_voice(
             command, speaker_verified=True, workspace='author'
         )
-    # Permanent on-demand Kali capability requires explicit owner authorization
-    # AND genuine speaker verification. The model never creates the command.
-    # Outside Kali Bay the user must explicitly say "Kali" in the request.
+    if workspace == 'kali-bay':
+        from kali_assistant import handle_kali_request
+        # The existing ten featured Kali GUI workbench launches retain their
+        # previously tested exact-command dispatch.
+        if "kali app " not in command.casefold():
+            return handle_kali_request(command)
+    elif 'kali' not in command.casefold().split():
+        return None
+    # New installed-app launch path requires saved owner permission AND
+    # trusted, verified speech; the model cannot create this instruction.
     from kali_assistant import handle_kali_request
-    saved=read_policy()
-    can_use=(saved.get("authorized") is True
-             and saved.get("paused") is False
-             and saved.get("kali_on_demand") is True)
-    if can_use and (workspace=='kali-bay' or
-                    re.search(r"\bkali\b",command,re.I)):
-        reply=handle_kali_request(command,allow_named_apps=True)
-        if reply is not None:
-            return reply
-    if workspace=='kali-bay':
-        # Preserve existing featured Kali Bay workbench behavior when a
-        # permanent grant has not been saved (still trusted voice only).
-        return handle_kali_request(command)
-    return None
+    from owner_authorization_store import read_policy as saved_auth
+    grant=saved_auth()
+    enabled=(grant.get('authorized') is True and
+             grant.get('paused') is False and
+             grant.get('kali_on_demand') is True)
+    if enabled:
+        return handle_kali_request(command,allow_named_apps=True)
+    return (handle_kali_request(command) if workspace=='kali-bay'
+            else None)
 
 
 def handle_command(command, voice=False, expected_turn=None,
