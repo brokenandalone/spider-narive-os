@@ -898,10 +898,21 @@ class WebbiePanel(QWidget):
                       else app_catalog().discover_apps())
         program = parse_open_request(text, candidates)
         if program is not None:
-            self.open_computer_dialog(program.desktop_id)
-            self.append_message(
-                'Status', 'Choose a task and authorize desktop control in the '
-                'local computer panel. Nothing was opened automatically.')
+            if (self.computer_dialog is not None and
+                    self.computer_dialog.grant.status().get('wide')):
+                # Already approved by owner's single safe-access click.
+                # The trusted GUI sends only a catalog-resolved app ID.
+                requested=self.computer_dialog.open_program_safe(
+                    program.desktop_id)
+                self.append_message(
+                    'Webbie', 'App launch requested; window load not verified.'
+                    if requested else
+                    'That application is excluded or unavailable in safe mode.')
+            else:
+                self.open_computer_dialog(program.desktop_id)
+                self.append_message(
+                    'Status', 'Choose a task and authorize desktop control in the '
+                    'local computer panel. Nothing was opened automatically.')
             self.entry.clear()
             return
         request = self.prepare_request(text)
