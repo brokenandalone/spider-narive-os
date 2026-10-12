@@ -19,6 +19,8 @@ FILES = {
     "The Web": "the-web/shell/main.py",
     "Webbie": "webbie/agent/webbie.py",
     "Webbie voice trust": "webbie/agent/voice_trust.py",
+    "Webbie workflow core": "webbie/agent/workflow_board.py",
+    "Webbie workflow dialog": "the-web/shell/webbie_workflow_dialog.py",
     "Webbie Voice Lab": "webbie/agent/voice_lab.py",
     "Webbie speaker gate": "webbie/agent/segment_speaker_gate.py",
     "Webbie speaker provider": "webbie/agent/speaker_provider_loader.py",
@@ -51,6 +53,7 @@ PLANNED_NEW = frozenset((
     "Webbie Voice Lab", "Webbie speaker gate", "Webbie speaker provider",
     "Webbie hearing test", "Author Master Canon", "Author canon panel",
     "Studio Production Board", "Studio board panel",
+    "Webbie workflow core", "Webbie workflow dialog",
 ))
 SERVICES = ("webbie.service", "spider-ai-dj.service")
 MAX_BYTES = 5 * 1024 * 1024
