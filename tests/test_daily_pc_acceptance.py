@@ -65,6 +65,32 @@ class DailyPCAcceptanceTests(unittest.TestCase):
                          "installed_unavailable")
         self.assertFalse(report.exists())
 
+    def test_exact_wave_three_new_module_can_be_planned_but_not_skipped_after(self):
+        fresh = self.installed / acceptance.FILES["Author Master Canon"]
+        fresh.unlink()
+        before = acceptance.inspect(
+            self.source, self.installed, phase="before", check_services=False
+        )
+        self.assertEqual(before["status"], "REVIEW REQUIRED")
+        self.assertEqual(before["files"]["Author Master Canon"]["state"], "pending_add")
+        self.assertEqual(before["blockers"], [])
+        after = acceptance.inspect(
+            self.source, self.installed, phase="after", check_services=False
+        )
+        self.assertEqual(after["status"], "BLOCKED")
+        self.assertTrue(any("Author Master Canon" in x for x in after["blockers"]))
+
+    def test_planned_module_symlink_is_never_treated_as_missing(self):
+        fresh = self.installed / acceptance.FILES["Webbie Voice Lab"]
+        fresh.unlink()
+        fresh.symlink_to(self.source / acceptance.FILES["Webbie Voice Lab"])
+        before = acceptance.inspect(
+            self.source, self.installed, phase="before", check_services=False
+        )
+        self.assertEqual(before["status"], "BLOCKED")
+        self.assertEqual(before["files"]["Webbie Voice Lab"]["state"],
+                         "installed_unavailable")
+
     def test_postinstall_rejects_unreconciled_code(self):
         (self.source / acceptance.FILES["Forage"]).write_text("new version")
         result = acceptance.inspect(self.source, self.installed,
