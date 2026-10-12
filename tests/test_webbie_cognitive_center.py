@@ -32,6 +32,7 @@ class CognitiveCenterTests(unittest.TestCase):
             for identifier in (
                 "webbieFocusTaskButton","webbieInspectModelsButton",
                 "webbieReadinessButton",
+                "webbieUnifiedWorkflowCognitiveButton",
                 "webbieVoiceLabButton", "webbieHearingTestButton",
                 "webbiePrivateSessionButton","webbieClearRecentChatButton",
                 "webbieSensitiveStopButton"):
@@ -46,6 +47,7 @@ class CognitiveCenterTests(unittest.TestCase):
         mock=SimpleNamespace(
             awareness=SimpleNamespace(sleep=Mock()),
             computer_dialog=SimpleNamespace(stop=Mock()),
+            unified_workflow=SimpleNamespace(stop=Mock()),
             stop_camera=Mock(),
             face=SimpleNamespace(sleeping=False,update=Mock()),
             refresh_state=Mock(),
@@ -53,6 +55,7 @@ class CognitiveCenterTests(unittest.TestCase):
         WebbiePanel.set_face_sleeping(mock,True)
         mock.computer_dialog.stop.assert_called_once()
         mock.stop_camera.assert_called_once()
+        mock.unified_workflow.stop.assert_called_once()
         mock.awareness.sleep.assert_called_once_with(True)
         self.assertTrue(mock.face.sleeping)
 
