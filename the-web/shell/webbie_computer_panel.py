@@ -511,13 +511,27 @@ class WebbieComputerDialog(QDialog):
         active = data['active']
         if not active and self.autopilot.active:
             self.autopilot.stop()
-        self.state.setText(
-            (f"{'ONE-CLICK SAFE ACCESS' if data.get('wide') else 'AUTHORIZED'} | "
-             f"{data['remaining_seconds']} sec left | "
-             f"{data['remaining_actions']} actions | {data['task']}")
-            if active else 'OFF | Webbie cannot operate applications')
+        if active and data.get('permanent'):
+            text='PERMANENT SAFE ACCESS | No timer, no action cap | '+data['task']
+        elif active:
+            text=(f"{'SAFE ACCESS' if data.get('wide') else 'AUTHORIZED'} | "
+                  f"{data['remaining_seconds']} sec left | "
+                  f"{data['remaining_actions']} actions | {data['task']}")
+        else:
+            saved=read_policy(self.authorization_path)
+            text=('PAUSED | Permanent owner authorization saved. '
+                  'Click Resume to restore routine access.'
+                  if saved['authorized'] else
+                  'OFF | Webbie cannot operate applications')
+        self.state.setText(text)
         safe_wide=bool(active and data.get('wide'))
+        saved=read_policy(self.authorization_path)
+        self.wide_access_button.setText(
+            'Resume permanent safe access' if saved['authorized'] else
+            'One click: Permanently authorize safe app access')
         self.wide_access_button.setEnabled(not safe_wide)
+        self.pause_access_button.setEnabled(active)
+        self.remove_access_button.setEnabled(saved['authorized'])
         self.grant_button.setEnabled(not safe_wide)
         self.service_button.setEnabled(safe_wide)
         self.autopilot_start.setEnabled(
@@ -532,12 +546,12 @@ class WebbieComputerDialog(QDialog):
         for control in (self.close_button, self.click_button, self.type_button,
                         self.suggest_button):
             control.setEnabled(active and not safe_wide)
-        self.nav_preview_button.setEnabled(active)
-        self.nav_next_button.setEnabled(active and
+        self.nav_preview_button.setEnabled(active and not safe_wide)
+        self.nav_next_button.setEnabled(active and not safe_wide and
                                         self.nav_mission.plan is not None and
                                         self.nav_mission.clock() < self.nav_mission.expires)
         self.apply_step_button.setEnabled(
-            active and self.pending_step is not None and
+            active and not safe_wide and self.pending_step is not None and
             self.pending_step.get('action') in {'click', 'press'})
         if not active:
             self.nav_mission.stop()
