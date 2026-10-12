@@ -10,6 +10,11 @@ from pathlib import Path
 import re
 
 try:
+    from .reading_passages import MAX_EXTRACTED, split_reading_passages
+except ImportError:
+    from reading_passages import MAX_EXTRACTED, split_reading_passages
+
+try:
     from .course_materials import read_course_document, SUPPORTED, MAX_FILE_BYTES
 except ImportError:
     from course_materials import read_course_document, SUPPORTED, MAX_FILE_BYTES
@@ -54,7 +59,9 @@ def import_course_reading(store, course_id, chosen_path):
     if original.stat().st_size > MAX_FILE_BYTES:
         raise ValueError("Document exceeds the 8 MB reader limit.")
     # Parse before writing anything, including scanned/image-only PDFs.
-    excerpt = read_course_document(original)
+    extracted = read_course_document(original, max_chars=MAX_EXTRACTED)
+    passages = split_reading_passages(extracted)
+    excerpt = extracted[:MAX_INDEXED_TEXT]
     checksum = file_digest(original)
     if store.find_course_reading_by_hash(course_id, checksum) is not None:
         return {"created": False, "name": name, "reason": "identical reading already indexed"}
@@ -97,7 +104,8 @@ def import_course_reading(store, course_id, chosen_path):
             raise ValueError("Document changed during copy; index was not saved.")
         relative = "Readings/" + copied.name
         created = store.add_course_reading(
-            course_id, name, relative, checksum, excerpt[:MAX_INDEXED_TEXT])
+            course_id, name, relative, checksum, excerpt[:MAX_INDEXED_TEXT],
+            passages=passages)
         if not created:
             copied.unlink(missing_ok=True)
             return {"created": False, "name": name, "reason": "reading already indexed"}
@@ -147,3 +155,34 @@ def selected_reading_excerpt(row, *, limit=9000):
     return ("OWNER-SELECTED LOCAL COURSE READING: " + str(row["title"]) +
             "\nThis is a text excerpt, NOT a verified reference or complete chapter.\n" +
             text)
+
+
+
+def reindex_course_reading(store, course_id, reading_id):
+    """Owner-triggered expansion of an earlier 12K-only reading.
+
+    The copied file must still have its original SHA-256 checksum. A failed
+    reindex does not modify the existing record or its previous text.
+    """
+    row = store.course_reading(course_id, reading_id)
+    if row is None:
+        raise ValueError("The selected reading was not found in this course.")
+    course = store.course_folder(course_id)
+    relative = str(row["relative_path"])
+    parts = Path(relative).parts
+    if (len(parts) != 2 or parts[0] != "Readings"
+            or parts[1] in ("", ".", "..")):
+        raise ValueError("Invalid original reading path.")
+    file = course / relative
+    if (file.is_symlink() or not file.is_file()
+            or not file.resolve().is_relative_to(course.resolve())):
+        raise ValueError("The saved reading file is unavailable or unsafe.")
+    checksum = file_digest(file)
+    if checksum != row["sha256"]:
+        raise ValueError("The reading file changed since import. Reimport deliberately.")
+    if store.reading_passages(course_id, reading_id):
+        return {"updated": False, "reason": "passages already indexed"}
+    extracted = read_course_document(file, max_chars=MAX_EXTRACTED)
+    chunks = split_reading_passages(extracted)
+    store.update_reading_passages(course_id, reading_id, checksum, chunks)
+    return {"updated": True, "passages": len(chunks)}
