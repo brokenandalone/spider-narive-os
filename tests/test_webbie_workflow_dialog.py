@@ -62,6 +62,19 @@ class WorkflowDialogTests(unittest.TestCase):
         self.assertEqual(opened.call_args.args, ("deep-forage",))
         self.assertEqual(opened.call_count, 2)
 
+    def test_direct_preview_selects_template_but_does_not_authorize_actions(self):
+        opened = Mock()
+        d = self.make_dialog(opened)
+        self.assertTrue(d.choose_template("canon"))
+        self.assertEqual(d.templates.currentData(), "canon")
+        self.assertFalse(d.session.status()["active"])
+        opened.assert_not_called()
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.Yes):
+            d.start_button.click()
+        self.assertFalse(d.choose_template("recording"))
+        self.assertEqual(d.session.status()["workspace"], "author")
+        opened.assert_not_called()
+
     def test_no_callback_means_no_program_open_and_no_false_success(self):
         d = self.make_dialog()
         with patch.object(QMessageBox, "question", return_value=QMessageBox.Yes):
