@@ -131,10 +131,13 @@ class QuickSettingsWorker(QThread):
 
 class QuickSettingsPanel(QWidget):
     """Fast-access status, while KDE retains all privileged device controls."""
-    def __init__(self, parent=None, appearance_reader=None, appearance_writer=None):
+    def __init__(self, parent=None, appearance_reader=None, appearance_writer=None,
+                 menu_size_reader=None, menu_size_writer=None):
         super().__init__(parent)
         self._appearance_reader = appearance_reader
         self._appearance_writer = appearance_writer
+        self._menu_size_reader = menu_size_reader
+        self._menu_size_writer = menu_size_writer
         self._portal_preference = 'Not checked yet'
         self.setWindowTitle('Spider OS · Quick Settings')
         self.setObjectName('spiderQuickSettings')
@@ -165,6 +168,22 @@ class QuickSettingsPanel(QWidget):
         self.appearance_selector.currentIndexChanged.connect(self.choose_appearance)
         appearance_row.addWidget(self.appearance_selector)
         layout.addLayout(appearance_row)
+        menu_row = QHBoxLayout()
+        menu_row.addWidget(QLabel('Menu text readability'))
+        self.menu_size_selector = QComboBox()
+        self.menu_size_selector.setAccessibleName('The Web menu text size')
+        for label, value in (('Comfortable (16 px)', 'comfortable'),
+                             ('Large (19 px)', 'large'),
+                             ('Extra large (22 px)', 'extra-large')):
+            self.menu_size_selector.addItem(label, value)
+        initial = menu_size_reader() if callable(menu_size_reader) else 'large'
+        self._menu_size_value = initial if initial in ('comfortable', 'large', 'extra-large') else 'large'
+        self.menu_size_selector.setCurrentIndex(
+            self.menu_size_selector.findData(self._menu_size_value))
+        self.menu_size_selector.setEnabled(callable(menu_size_writer))
+        self.menu_size_selector.currentIndexChanged.connect(self.choose_menu_size)
+        menu_row.addWidget(self.menu_size_selector)
+        layout.addLayout(menu_row)
         self.theme_sync_preview = QPushButton('Preview KDE / GTK coordination')
         self.theme_sync_preview.setAccessibleName('Preview system appearance synchronization')
         self.theme_sync_preview.setToolTip('Read-only. Checks the installed Breeze scheme, KDE and GTK settings without changing them.')
@@ -184,6 +203,22 @@ class QuickSettingsPanel(QWidget):
         layout.addWidget(self.help)
         self.worker = None
         self.refresh()
+
+    def choose_menu_size(self, index):
+        value = self.menu_size_selector.itemData(index)
+        if value not in ('comfortable', 'large', 'extra-large') or not callable(self._menu_size_writer):
+            return
+        try:
+            self._menu_size_writer(value)
+        except (OSError, ValueError, RuntimeError) as error:
+            self.help.setText('Menu text size not changed: ' + str(error))
+            self.menu_size_selector.blockSignals(True)
+            self.menu_size_selector.setCurrentIndex(
+                self.menu_size_selector.findData(self._menu_size_value))
+            self.menu_size_selector.blockSignals(False)
+        else:
+            self._menu_size_value = value
+            self.help.setText('Menu text preference saved for The Web. Other apps are unchanged.')
 
     def choose_appearance(self, index):
         candidate = self.appearance_selector.itemData(index)
