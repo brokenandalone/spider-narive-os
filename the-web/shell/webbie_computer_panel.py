@@ -471,7 +471,8 @@ class WebbieComputerDialog(QDialog):
         self.autopilot_start.setEnabled(
             active and not safe_wide and not self.autopilot.active)
         self.autopilot_pause.setEnabled(self.autopilot.active)
-        self.open_web_button.setEnabled(active and is_browser_app(self.selected_app())
+        self.open_web_button.setEnabled(active and not safe_wide and
+                                        is_browser_app(self.selected_app())
                                         if self.selected_app() is not None else False)
         for control in (self.open_button, self.refresh_button, self.bind_button,
                         self.focus_button, self.inspect_button, self.key_button):
