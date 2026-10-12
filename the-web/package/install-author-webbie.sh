@@ -36,6 +36,8 @@ managed=(
   author/atlas_widget.py
   author/master_canon.py
   author/master_canon_widget.py
+  author/canon_intelligence.py
+  author/canon_intelligence_widget.py
   the-web/shell/main.py
   the-web/shell/webbie_panel.py
   the-web/shell/webbie_overlay.py
