@@ -1,6 +1,6 @@
 """Single-click owner approval for routine Webbie app access.
 
-This is an ephemeral owner-GUI policy, NOT full device or cloud permission.
+This is an owner-persistent GUI policy, NOT full device or cloud permission.
 Permits discovering/launching selected ordinary installed XDG apps,
 inspecting/focusing a manually selected window, and benign navigation keys.
 Cannot authorize keyboard text, clicks, delete, saving, spending, messaging,
@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import threading
 import time
+from owner_authorization_store import read_policy, DEFAULT_PATH
 
 SESSION_SECONDS=1800
 MAX_ACTIONS=240
@@ -73,6 +74,7 @@ class OwnerSafeAccess:
         self._expires=0.0
         self._left=0
         self._apps=frozenset()
+        self._permanent=False
 
     def activate(self,app_ids,*,owner_clicked=False,seconds=SESSION_SECONDS):
         if owner_clicked is not True:
@@ -91,6 +93,30 @@ class OwnerSafeAccess:
             self._expires=self.clock()+seconds
             self._left=MAX_ACTIONS
             self._enabled=True
+            self._permanent=False
+        return len(approved)
+
+    def restore_permanent(self,app_ids,*,path=DEFAULT_PATH):
+        """Restore only after reading owner-private authorized/unpaused policy."""
+        record=read_policy(path)
+        if not record["authorized"] or record["paused"]:
+            self.revoke()
+            return 0
+        if (not isinstance(app_ids,(list,tuple,set,frozenset))
+                or not 1<=len(app_ids)<=MAX_APPS
+                or any(not isinstance(item,str) for item in app_ids)):
+            self.revoke()
+            return 0
+        approved=frozenset(item for item in app_ids if safe_app_id(item))
+        if not approved:
+            self.revoke()
+            return 0
+        with self._lock:
+            self._apps=approved
+            self._enabled=True
+            self._permanent=True
+            self._expires=0.0
+            self._left=0
         return len(approved)
 
     def revoke(self):
@@ -99,17 +125,25 @@ class OwnerSafeAccess:
             self._expires=0.0
             self._left=0
             self._apps=frozenset()
+            self._permanent=False
 
     def status(self):
         with self._lock:
             remaining=self._expires-self.clock()
-            active=self._enabled and remaining>0 and self._left>0
+            active=self._enabled and (
+                self._permanent or (remaining>0 and self._left>0))
             return {
                 "active":bool(active),
-                "remaining_seconds":max(0,int(remaining)) if active else 0,
-                "remaining_actions":self._left if active else 0,
+                "permanent":bool(active and self._permanent),
+                "remaining_seconds":(
+                    None if active and self._permanent else
+                    max(0,int(remaining)) if active else 0),
+                "remaining_actions":(
+                    None if active and self._permanent else self._left if active else 0),
                 "eligible_apps":len(self._apps) if active else 0,
-                "mode":"routine_apps_only" if active else "off",
+                "mode":(
+                    "permanent_routine_apps" if active and self._permanent
+                    else "routine_apps_only" if active else "off"),
             }
 
     def authorize_service(self,service,action):
@@ -119,7 +153,8 @@ class OwnerSafeAccess:
                     service not in ('webbie','nova','onedrive') or
                     action!='status.read'):
                 return False
-            self._left-=1
+            if not self._permanent:
+                self._left-=1
             return True
 
     def authorize(self,action,preview,*,selected_app_id=None):
@@ -160,5 +195,6 @@ class OwnerSafeAccess:
                 pass
             else:
                 return False
-            self._left-=1
+            if not self._permanent:
+                self._left-=1
             return True
