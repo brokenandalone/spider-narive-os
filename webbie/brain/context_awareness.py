@@ -35,7 +35,9 @@ def clean_text(text, limit=MAX_FIELD):
 
 def workspace_key(workspace):
     value = clean_text(workspace, 80).casefold().replace(' ', '-')
-    aliases = {'author-bay': 'author', 'study-bay': 'study',
+    aliases = {'the-web': 'default', 'author-workspace': 'author',
+               'spider-studio': 'studio', 'spider-media-center': 'media',
+               'school': 'study', 'author-bay': 'author', 'study-bay': 'study',
                'school-bay': 'study', 'kali': 'kali-bay',
                'kali-bay': 'kali-bay', 'studio-bay': 'studio',
                'media-center': 'media'}
