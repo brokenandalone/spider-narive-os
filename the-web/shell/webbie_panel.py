@@ -25,6 +25,7 @@ from webbie_cognitive_center import WebbieCognitiveDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
+from workflow_board import workflow_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
 from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
@@ -758,6 +759,25 @@ class WebbiePanel(QWidget):
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        # Direct, user-typed requests may preview fixed cross-workspace plans.
+        # The resident AI/model and any voice transcript cannot call this route.
+        # A preview cannot start or execute any workflow; owner clicks are still
+        # required in the JARVIS Workflow Board.
+        workflow_key = workflow_request(text)
+        if workflow_key is not None:
+            self.open_cognitive_center()
+            if self.cognitive_dialog.offer_workflow(workflow_key):
+                self.append_message(
+                    'Webbie workflow',
+                    'A reviewed workflow preview is open. Confirm its steps '
+                    'in the JARVIS Workflow Board; nothing started automatically.')
+            else:
+                self.append_message(
+                    'Webbie workflow',
+                    'A workflow is already active. Stop or finish it before '
+                    'switching to another template.')
+            self.entry.clear()
             return
         # Direct owner text can stage a deterministic window-bound navigation
         # mission. Neither the LLM nor a webpage can trigger this parser.
