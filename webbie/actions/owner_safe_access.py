@@ -112,6 +112,16 @@ class OwnerSafeAccess:
                 "mode":"routine_apps_only" if active else "off",
             }
 
+    def authorize_service(self,service,action):
+        """Only fixed, audited local status adapters are approved automatically."""
+        with self._lock:
+            if (not self.status()['active'] or
+                    service not in ('webbie','nova','onedrive') or
+                    action!='status.read'):
+                return False
+            self._left-=1
+            return True
+
     def authorize(self,action,preview,*,selected_app_id=None):
         """The human approved broad scope, never a particular model command.
 
