@@ -15,28 +15,40 @@ from PyQt5.QtCore import Qt
 
 if __package__:
     from .music_backend import LocalMusicClient, SongRequest, MusicError
+    from .music_resume import discover_resumable, resume_music_job
     from .tools import TOOLS, resolve_tool
     from .arrangement import VOICE_OPTIONS
     from .voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from .voice_conversion import convert_vocal, ConversionError
     from .voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
+    from .voice_quality import audit_voice_library
+    from .voice_training_split import training_split_plan, prepare_training_split
     from .song_mix import mix_vocals, MixError, valid_wav
     from .band_mix import mix_band_tracks, validate_tracks, ROLES
     from .stem_separation import separate, SeparationError
     from .owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
     from .multitrack_dialog import MultitrackDialog
+    from .session_mix_dialog import SessionMixDialog
+    from .mastering_dialog import MasteringDialog
+    from .voice_review_dialog import VoiceReviewDialog
 else:
     from music_backend import LocalMusicClient, SongRequest, MusicError
+    from music_resume import discover_resumable, resume_music_job
     from tools import TOOLS, resolve_tool
     from arrangement import VOICE_OPTIONS
     from voice_profile import (start_capture, finish_capture, import_sample, samples, VoiceSampleError)
     from voice_conversion import convert_vocal, ConversionError
     from voice_dataset import prepare_training_set, inspect_samples, MIN_TRAIN_SECONDS
+    from voice_quality import audit_voice_library
+    from voice_training_split import training_split_plan, prepare_training_split
     from song_mix import mix_vocals, MixError, valid_wav
     from band_mix import mix_band_tracks, validate_tracks, ROLES
     from stem_separation import separate, SeparationError
     from owner_voice_model import remember_owner_model, load_owner_model, forget_owner_model
     from multitrack_dialog import MultitrackDialog
+    from session_mix_dialog import SessionMixDialog
+    from mastering_dialog import MasteringDialog
+    from voice_review_dialog import VoiceReviewDialog
 
 BROKEN_SORROW = ('Dark Southern gothic metal, post-grunge and modern hard rock; '
     'deep baritone, intimate haunted verses, cracked-clean choruses, selective '
@@ -69,6 +81,27 @@ class MusicWorker(QThread):
         except Exception as error:
             self.result.emit('', str(error) if isinstance(error, (MusicError, ValueError))
                              else 'Music operation failed. Check the local engine and saved job status.')
+
+
+class MusicResumeWorker(QThread):
+    result = pyqtSignal(str, str)
+
+    def __init__(self, client, job, root):
+        super().__init__(QApplication.instance())
+        self.client, self.job, self.root = client, job, root
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            folder = resume_music_job(self.client, self.job, self.root, stop=self.stop)
+            self.result.emit(str(folder), "Existing local render recovered. Saved takes refreshed.")
+        except (MusicError, OSError, ValueError) as error:
+            self.result.emit("", str(error))
 
 
 class VoiceConvertWorker(QThread):
@@ -194,6 +227,51 @@ class TrainingReadinessWorker(QThread):
             self.result.emit({'error': str(error)})
 
 
+class VoiceQualityWorker(QThread):
+    result = pyqtSignal(object)
+
+    def __init__(self):
+        super().__init__(QApplication.instance())
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            self.result.emit(audit_voice_library(stop=self.stop))
+        except (VoiceSampleError, OSError) as error:
+            self.result.emit({"error": str(error)})
+
+
+class TrainingSplitWorker(QThread):
+    result = pyqtSignal(bool, str, object)
+
+    def __init__(self, dataset):
+        super().__init__(QApplication.instance())
+        self.dataset = Path(dataset)
+        self.stop = threading.Event()
+        QApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    def shutdown(self):
+        self.stop.set()
+        self.wait()
+
+    def run(self):
+        try:
+            plan = training_split_plan(self.dataset, stop=self.stop)
+            path = prepare_training_split(self.dataset, consent=True, stop=self.stop)
+            self.result.emit(True, str(path), {
+                "training_seconds": plan["training_seconds"],
+                "holdout_seconds": plan["holdout_seconds"],
+                "ready_for_ten_minute_training": plan["ready_for_ten_minute_training"],
+            })
+        except (VoiceSampleError, OSError) as error:
+            self.result.emit(False, str(error), {})
+
+
 class DatasetWorker(QThread):
     result = pyqtSignal(bool, str)
 
@@ -214,8 +292,12 @@ class StudioAIPanel(QWidget):
         super().__init__()
         self.output_root = Path(output_root) if output_root else Path.home() / 'Documents/Spider Studio/Music/AI Songs'
         self.worker = None
+        self.resume_worker = None
         self.rvc_worker = None
         self.dataset_worker = None
+        self.voice_quality_worker = None
+        self.training_split_worker = None
+        self.last_training_split = None
         self.readiness_worker = None
         self.engine_worker = None
         self.trainer = None
@@ -333,6 +415,15 @@ class StudioAIPanel(QWidget):
         layout.addLayout(voice_buttons)
         layout.addWidget(self.readiness_button)
         layout.addWidget(self.readiness_details)
+        self.voice_quality_button = QPushButton('Audit My Voice sample quality')
+        self.voice_quality_button.clicked.connect(self.check_voice_quality)
+        layout.addWidget(self.voice_quality_button)
+        self.voice_quality_details = QPlainTextEdit()
+        self.voice_quality_details.setReadOnly(True)
+        self.voice_quality_details.setMaximumHeight(115)
+        self.voice_quality_details.setPlainText(
+            'Review silence, clipping risk and duplicate samples. This checks a short preview, not full audio.')
+        layout.addWidget(self.voice_quality_details)
         trainer_header = QLabel('Private voice trainer')
         trainer_header.setStyleSheet('font-size:18px; color:#c4b5fd;')
         layout.addWidget(trainer_header)
@@ -363,6 +454,21 @@ class StudioAIPanel(QWidget):
         self.copy_dataset_button.clicked.connect(self.copy_dataset_path)
         training_set_actions.addWidget(self.copy_dataset_button)
         layout.addLayout(training_set_actions)
+        split_actions = QHBoxLayout()
+        self.split_button = QPushButton('Prepare separate train and holdout audio')
+        self.split_button.setEnabled(False)
+        self.split_button.clicked.connect(self.start_training_split)
+        self.open_split_button = QPushButton('Open separated training folders')
+        self.open_split_button.setEnabled(False)
+        self.open_split_button.clicked.connect(self.open_training_split)
+        split_actions.addWidget(self.split_button)
+        split_actions.addWidget(self.open_split_button)
+        layout.addLayout(split_actions)
+        self.split_status = QLabel(
+            'Evaluation audio stays physically separate from training. This does not train a model.')
+        self.split_status.setWordWrap(True)
+        self.split_status.setTextFormat(Qt.PlainText)
+        layout.addWidget(self.split_status)
         layout.addWidget(self.voice_status)
         QApplication.instance().aboutToQuit.connect(self.cancel_capture)
         self.update_voice_status()
@@ -501,6 +607,9 @@ class StudioAIPanel(QWidget):
         self.play_final_mix_button.setEnabled(False)
         self.play_final_mix_button.clicked.connect(self.play_final_mix)
         listening_actions.addWidget(self.play_final_mix_button)
+        self.voice_review_button = QPushButton('Compare My Voice A/B and record listener scores')
+        self.voice_review_button.clicked.connect(self.open_voice_review)
+        listening_actions.addWidget(self.voice_review_button)
         layout.addLayout(listening_actions)
         session_heading = QLabel('Editable band session: real multitrack DAW export')
         session_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
@@ -513,6 +622,12 @@ class StudioAIPanel(QWidget):
         self.open_session_button = QPushButton('Build multitrack DAW session')
         self.open_session_button.clicked.connect(self.open_multitrack_session)
         layout.addWidget(self.open_session_button)
+        self.session_mixing_button = QPushButton('Reopen, audition and mix saved session')
+        self.session_mixing_button.clicked.connect(self.open_saved_session_mix)
+        layout.addWidget(self.session_mixing_button)
+        self.mastering_button = QPushButton('Master a saved song or final mix')
+        self.mastering_button.clicked.connect(self.open_mastering_desk)
+        layout.addWidget(self.mastering_button)
         band_mix_heading = QLabel('Band mixer: real separate guitars, singers and instruments')
         band_mix_heading.setStyleSheet('font-size:18px; color:#c4b5fd;')
         layout.addWidget(band_mix_heading)
@@ -589,6 +704,19 @@ class StudioAIPanel(QWidget):
                               ('Refresh takes', self.refresh)):
             button = QPushButton(label); button.clicked.connect(action); actions.addWidget(button)
         layout.addLayout(actions)
+        layout.addWidget(QLabel("Unfinished local song jobs"))
+        self.pending_song_jobs = QListWidget()
+        self.pending_song_jobs.setMaximumHeight(120)
+        layout.addWidget(self.pending_song_jobs)
+        resume_actions = QHBoxLayout()
+        self.resume_song_button = QPushButton("Resume selected existing render")
+        self.resume_song_button.clicked.connect(self.resume_song)
+        self.stop_resume_button = QPushButton("Stop waiting on resumed render")
+        self.stop_resume_button.setEnabled(False)
+        self.stop_resume_button.clicked.connect(self.stop_resumed_job)
+        resume_actions.addWidget(self.resume_song_button)
+        resume_actions.addWidget(self.stop_resume_button)
+        layout.addLayout(resume_actions)
         self.refresh()
 
     def pick_conversion_file(self, field, pattern):
@@ -839,6 +967,15 @@ class StudioAIPanel(QWidget):
     def play_converted_voice(self):
         self._play_checked_wav(self.last_converted_vocal)
 
+    def open_voice_review(self):
+        """Owner-rated local A/B check after conversion, never self-certifies a model."""
+        original = self.rvc_vocal.text().strip() or None
+        candidate = (str(self.last_converted_vocal)
+                     if self.last_converted_vocal and self.last_converted_vocal.is_file()
+                     else None)
+        dialog = VoiceReviewDialog(original=original, converted=candidate, parent=self)
+        dialog.exec_()
+
     def play_final_mix(self):
         self._play_checked_wav(self.last_final_mix)
 
@@ -1079,17 +1216,110 @@ class StudioAIPanel(QWidget):
             self.voice_status.setText('Training set not available: ' + str(message))
         self.open_dataset_button.setEnabled(valid)
         self.copy_dataset_button.setEnabled(valid)
+        self.split_button.setEnabled(valid)
+        self.last_training_split = None
+        self.open_split_button.setEnabled(False)
+
+    def check_voice_quality(self):
+        """Run quick local-only first-12-second sample quality inspection."""
+        if self.voice_quality_worker is not None:
+            return
+        self.voice_quality_button.setEnabled(False)
+        self.voice_quality_details.setPlainText(
+            'Checking recording previews, duplicates and sample durations locally...')
+        self.voice_quality_worker = VoiceQualityWorker()
+        self.voice_quality_worker.result.connect(self.voice_quality_done)
+        self.voice_quality_worker.finished.connect(self.voice_quality_finished)
+        self.voice_quality_worker.start()
+
+    def voice_quality_done(self, report):
+        if "error" in report:
+            self.voice_quality_details.setPlainText("Voice audit unavailable: " + report["error"])
+            return
+        rows = [f"{report['total_recordings']} original recording(s); "
+                f"{report['unique_preview_accepted_seconds'] / 60:.1f} minutes "
+                "potentially usable after preview checks."]
+        for item in report["files"]:
+            flags = "; ".join(item["warnings"]) or "No obvious preview issue detected"
+            rows.append(f"{item['filename']}: {flags}")
+        rows.append(
+            "First 12 seconds only: review every full recording yourself. "
+            "A training model has not been created.")
+        self.voice_quality_details.setPlainText("\n".join(rows))
+
+    def voice_quality_finished(self):
+        worker, self.voice_quality_worker = self.voice_quality_worker, None
+        self.voice_quality_button.setEnabled(True)
+        if worker is not None:
+            worker.deleteLater()
+
+    def start_training_split(self):
+        if self.training_split_worker is not None:
+            return
+        dataset = self.last_training_set
+        if not dataset or dataset.is_symlink() or not (dataset / "manifest.json").is_file():
+            self.split_status.setText("Prepare a consented local training dataset first.")
+            return
+        answer = QMessageBox.question(
+            self, "Separate My Voice evaluation audio",
+            "I approve copying my consented voice recordings into separate training and "
+            "holdout folders. The holdout must NEVER be included when running RVC training. "
+            "No training or internet upload will begin. Continue?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self.split_button.setEnabled(False)
+        self.open_split_button.setEnabled(False)
+        self.split_status.setText("Checking hashes and staging separate local training/evaluation copies...")
+        self.training_split_worker = TrainingSplitWorker(dataset)
+        self.training_split_worker.result.connect(self.training_split_done)
+        self.training_split_worker.finished.connect(self.training_split_finished)
+        self.training_split_worker.start()
+
+    def training_split_done(self, success, message, details):
+        if success:
+            path = Path(message)
+            self.last_training_split = path
+            self.open_split_button.setEnabled(True)
+            self.split_status.setText(
+                f"Separate data created: {details['training_seconds'] / 60:.1f} minutes train, "
+                f"{details['holdout_seconds'] / 60:.1f} minutes evaluation. "
+                + ("Training duration meets the ten-minute reference."
+                   if details["ready_for_ten_minute_training"] else
+                   "Need more recordings to have ten full training minutes after holdout.")
+                + " Select ONLY train/audio in RVC. This has not trained a model.")
+        else:
+            self.split_status.setText("Training split unavailable: " + str(message))
+
+    def training_split_finished(self):
+        worker, self.training_split_worker = self.training_split_worker, None
+        self.split_button.setEnabled(bool(self.last_training_set))
+        if worker is not None:
+            worker.deleteLater()
+
+    def open_training_split(self):
+        if (self.last_training_split and not self.last_training_split.is_symlink()
+                and self.last_training_split.is_dir()):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_training_split)))
 
     def open_dataset(self):
         if self.last_training_set and self.last_training_set.is_dir():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_training_set)))
 
     def copy_dataset_path(self):
-        audio = self.last_training_set / 'audio' if self.last_training_set else None
+        if (self.last_training_split and not self.last_training_split.is_symlink()
+                and (self.last_training_split / 'train/audio').is_dir()
+                and not (self.last_training_split / 'train/audio').is_symlink()):
+            audio = self.last_training_split / 'train/audio'
+            status = ('TRAIN-ONLY RVC audio path copied. Held-out evaluation recordings '
+                      'are kept separate. No model training has started.')
+        else:
+            audio = self.last_training_set / 'audio' if self.last_training_set else None
+            status = ('Full dataset RVC audio path copied without an evaluation holdout. '
+                      'Separate evaluation data before training to avoid leakage.')
         if audio and audio.is_dir() and not audio.is_symlink():
             QApplication.clipboard().setText(str(audio))
-            self.voice_status.setText('RVC training audio folder copied. Paste it into the local training interface. '
-                                      'No model training has started.')
+            self.voice_status.setText(status)
 
     def dataset_finished(self):
         worker, self.dataset_worker = self.dataset_worker, None
@@ -1160,6 +1390,14 @@ class StudioAIPanel(QWidget):
 
     def refresh(self):
         self.library.clear()
+        if hasattr(self, "pending_song_jobs"):
+            self.pending_song_jobs.clear()
+            for task in discover_resumable(self.output_root):
+                item = QListWidgetItem(
+                    f"{task['title']} | {task['status']} | {Path(task['directory']).name}"
+                )
+                item.setData(Qt.UserRole, task["directory"])
+                self.pending_song_jobs.addItem(item)
         if not self.output_root.exists():
             return
         for path in sorted(self.output_root.glob('song-*/job.json'), reverse=True):
@@ -1175,6 +1413,50 @@ class StudioAIPanel(QWidget):
                     item.setData(Qt.UserRole, str(take)); self.library.addItem(item)
             except (OSError, ValueError, KeyError, TypeError):
                 continue
+
+    def resume_song(self):
+        """Resume only a saved task ID; never submit a duplicate song request."""
+        if self.resume_worker is not None or self.worker is not None:
+            return
+        selected = self.pending_song_jobs.currentItem()
+        if selected is None:
+            self.status.setText("Select one of the saved unfinished song jobs first.")
+            return
+        try:
+            client = LocalMusicClient(
+                os.environ.get("SPIDER_MUSIC_URL", "http://127.0.0.1:8001"),
+                os.environ.get("ACESTEP_API_KEY"))
+        except (ValueError, TypeError) as error:
+            self.status.setText(str(error))
+            return
+        self.resume_worker = MusicResumeWorker(
+            client, selected.data(Qt.UserRole), self.output_root)
+        self.resume_worker.result.connect(self.resumed_song_done)
+        self.resume_worker.finished.connect(self.resumed_song_finished)
+        self.resume_song_button.setEnabled(False)
+        self.generate.setEnabled(False)
+        self.stop_resume_button.setEnabled(True)
+        self.status.setText("Checking existing song task ID; not submitting another render.")
+        self.resume_worker.start()
+
+    def resumed_song_done(self, path, status):
+        self.status.setText(status)
+        self.refresh()
+
+    def resumed_song_finished(self):
+        worker, self.resume_worker = self.resume_worker, None
+        self.resume_song_button.setEnabled(True)
+        self.generate.setEnabled(self.worker is None)
+        self.stop_resume_button.setEnabled(False)
+        if worker is not None:
+            worker.deleteLater()
+
+    def stop_resumed_job(self):
+        if self.resume_worker is not None:
+            self.resume_worker.stop.set()
+            self.stop_resume_button.setEnabled(False)
+            self.status.setText(
+                "Stopped waiting on existing task; local generator may continue.")
 
     def use_take_for_separation(self):
         source = self.selected()
@@ -1237,6 +1519,21 @@ class StudioAIPanel(QWidget):
                 entries.append({'path': str(resolved), 'role': role, 'label': label})
                 seen.add(resolved)
         dialog = MultitrackDialog(entries, title=self.title.text().strip(), parent=self)
+        dialog.exec_()
+
+    def open_saved_session_mix(self):
+        """Open previously exported sessions without changing the active song."""
+        editor = SessionMixDialog(parent=self)
+        editor.exec_()
+
+    def open_mastering_desk(self):
+        """Source selection is a convenience; mastering is always user-started."""
+        choices = (self.last_final_mix, self.last_band_mix,
+                   self.selected())
+        selected = next((p for p in choices
+                         if p and Path(p).is_file()
+                         and not Path(p).is_symlink()), None)
+        dialog = MasteringDialog(source=selected, parent=self)
         dialog.exec_()
 
     def export(self):
