@@ -172,12 +172,18 @@ class WebbieCognitiveDialog(QDialog):
         self.focus_dialog.activateWindow()
 
     def open_workflows(self):
+        return self.offer_workflow(None)
+
+    def offer_workflow(self, key):
         if self.workflow_dialog is None:
             self.workflow_dialog=WebbieWorkflowDialog(
                 self, workspace_opener=self.workspace_opener)
+        if key is not None and not self.workflow_dialog.choose_template(key):
+            return False
         self.workflow_dialog.show()
         self.workflow_dialog.raise_()
         self.workflow_dialog.activateWindow()
+        return True
 
     def test_hearing(self):
         """Explicit owner's choice, not triggered by model/voice or startup."""
