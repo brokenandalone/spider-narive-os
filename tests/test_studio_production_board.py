@@ -7,7 +7,7 @@ import unittest
 import wave
 
 from studio.production_board import (
-    ProductionError, create_session, latest_status, list_sessions,
+    ProductionError, create_session, latest_status, latest_next_step, list_sessions,
     load_session, next_action, save_revision,
 )
 
@@ -123,6 +123,23 @@ class ProductionBoardTests(unittest.TestCase):
             library_link.symlink_to(library, target_is_directory=True)
             with self.assertRaises(ProductionError):
                 list_sessions(root=library_link)
+
+    def test_generic_next_step_never_reveals_song_metadata_or_file_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            library = root / 'sessions'
+            self.assertIn('Start a song', latest_next_step(root=library))
+            source = root / 'PrivateVoice.wav'
+            wav(source)
+            sid = create_session('Personal Track', notes='private lyrics', root=library)
+            save_revision(sid, 'Personal Track',
+                {'reference_mix': str(source)}, {}, notes='private lyrics', root=library)
+            advice = latest_next_step(root=library)
+            self.assertIn('Review separated', advice)
+            for private in ('Personal Track', 'private lyrics', 'PrivateVoice.wav', str(root)):
+                self.assertNotIn(private, advice)
+            source.unlink()
+            self.assertIn('Reselect missing', latest_next_step(root=library))
 
     def test_stage_progress_requires_real_reviewed_stems_and_final_wav(self):
         with tempfile.TemporaryDirectory() as folder:
