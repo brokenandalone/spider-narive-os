@@ -13,6 +13,7 @@ CACHE = Path.home() / ".cache" / "spider-os" / "ai-dj"
 CACHE.mkdir(parents=True, exist_ok=True)
 
 PERSONA = NovaHost()
+LAST_VOICE = {'engine': 'no-break-prepared', 'usedFallback': False}
 
 
 def track_text(track):
@@ -49,9 +50,10 @@ def ollama_script(body):
     return PERSONA.compose(body, generate)
 
 
-def make_audio(text, ident, profile=None):
-    """Render speech to Nova's existing cache; never play it on desktop speakers."""
-    return synthesize(text, ident, profile=profile, cache=CACHE)
+def make_audio(text, ident, profile=None, report=None):
+    """On-air Nova must use a neural voice or stay silent, never robotic eSpeak."""
+    return synthesize(text, ident, profile=profile, cache=CACHE,
+                      allow_espeak=False, report=report)
 
 
 def cleanup():
@@ -86,7 +88,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/dj/voices":
             self.send_json_headers(200)
-            self.wfile.write(json.dumps(available_profiles()).encode())
+            self.wfile.write(json.dumps({**available_profiles(), "lastVoice": dict(LAST_VOICE),
+                                          "robotVoiceAllowed": False}).encode())
             return
         self.send_json_headers(404)
         self.wfile.write(b'{"error":"not found"}')
@@ -109,7 +112,15 @@ class Handler(BaseHTTPRequestHandler):
             ident = f"dj-{int(time.time())}-{uuid.uuid4().hex[:8]}"
             context = body.get("context") if isinstance(body.get("context"), dict) else {}
             profile = normalize_voice(context.get("voiceProfile", configured_voice()))
-            audio = make_audio(script, ident, profile=profile)
+            voice_report = {}
+            try:
+                audio = make_audio(script, ident, profile=profile, report=voice_report)
+            except Exception as error:
+                LAST_VOICE.update({'engine': 'unavailable', 'error': str(error),
+                                   'voiceProfileRequested': profile})
+                raise
+            LAST_VOICE.update(voice_report or {'engine': 'unverified'})
+            LAST_VOICE.pop('error', None)
             cleanup()
             remaining = max(0.0, min(180.0, float(body.get("secondsRemaining") or 0)))
             response = {
@@ -119,6 +130,9 @@ class Handler(BaseHTTPRequestHandler):
                 "station": STATION_NAME,
                 "script": script,
                 "audioFile": audio.resolve().as_uri(),
+                "voiceEngine": voice_report.get("engine", "unverified"),
+                "voiceProfileRequested": profile,
+                "voiceFallback": voice_report.get("usedFallback", False),
                 "talkOver": {
                     "startSecondsBeforeEnd": min(9.0, max(3.0, remaining - 1)) if remaining else 6.0,
                     "duckLevel": 0.28,
