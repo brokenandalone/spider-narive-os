@@ -28,7 +28,8 @@
       ],
       "required_files": [
         "the-web/shell/main.py",
-        "the-web/shell/navigation_core.py"
+        "the-web/shell/navigation_core.py",
+        "the-web/shell/webbie_workflow_dialog.py"
       ]
     },
     {
@@ -50,7 +51,11 @@
         "webbie/agent/proactive_checks.py",
         "webbie/agent/voice_queue.py",
         "webbie/agent/voice_trust.py",
-        "webbie/agent/runtime_readiness.py"
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/workflow_board.py",
+        "webbie/agent/launch_intents.py",
+        "webbie/agent/voice_metrics.py",
+        "webbie/brain/model_resilience.py"
       ]
     },
     {
@@ -670,6 +675,7 @@
       "tools/webbie_readiness_cli.py"
     ],
     "status": "DRAFT ONLY. All nine workspaces combined; source CI, real PC customizations, recovery and owner approval must be checked against exact final commit.",
-    "installed_on_pc": false
+    "installed_on_pc": false,
+    "planned_gui_and_approval": "Direct owner-typed fixed phrases only open preview. A separate owner GUI click starts a bounded plan; every workspace navigation and completion requires its own click."
   }
 }
