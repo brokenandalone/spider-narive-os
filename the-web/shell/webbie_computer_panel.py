@@ -22,6 +22,9 @@ from desktop_control import app_catalog, KEYS
 from window_safety import ConfinedDesktopOperator
 from task_grants import TaskGrant
 from owner_safe_access import safe_app_id
+from owner_authorization_store import (
+    DEFAULT_PATH,read_policy,update_policy,
+)
 from safe_service_status import read_local_service_status, status_summary
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
@@ -106,12 +109,15 @@ class WebbieComputerDialog(QDialog):
     authorizationRevoked = pyqtSignal()
 
     def __init__(self, parent=None, *, discover=None, run=None, launcher=None,
-                 browser_opener=None):
+                 browser_opener=None, authorization_path=None):
         super().__init__(parent)
         self.setWindowTitle('WEBBIE | COMPUTER CONTROL')
         self.setObjectName('webbieComputerControl')
         self.resize(640, 730)
         self.apps = list(discover() if discover else app_catalog().discover_apps())
+        self.authorization_path = (
+            DEFAULT_PATH if authorization_path is None else Path(authorization_path))
+
         # Resolve preferences against locally INSTALLED Ollama models in the
         # background worker. Never download or switch the owner's engine.
         self.vision_model = None
@@ -171,18 +177,27 @@ class WebbieComputerDialog(QDialog):
         self.stop_button.setStyleSheet('background:#6e1e55; color:white; font-weight:bold')
         auth_row.addWidget(self.stop_button)
         wide_row = QHBoxLayout(); layout.addLayout(wide_row)
-        self.wide_access_button = QPushButton('One click: Allow safe access across apps')
+        self.wide_access_button = QPushButton(
+            'One click: Permanently authorize safe app access')
         self.wide_access_button.setObjectName('webbieOneClickSafeAccess')
         self.wide_access_button.clicked.connect(self.authorize_wide_access)
         wide_row.addWidget(self.wide_access_button)
         self.wide_access_info = QLabel(
-            'For 30 minutes: open ordinary installed apps, view/focus a selected '
-            'window, and use harmless navigation keys without repeat approval. '
+            'Permanent owner approval: open ordinary installed apps, view/focus '
+            'a selected window and use harmless navigation keys without repeat approval. '
             'No clicks, text entry, downloads, deletions, shell/root, Kali '
             'operations, publishing, spending, messaging, system changes or '
             'external account actions. STOP revokes access immediately.')
         self.wide_access_info.setWordWrap(True)
         layout.addWidget(self.wide_access_info)
+        self.pause_access_button=QPushButton('Pause Webbie safe access')
+        self.pause_access_button.setObjectName('webbieOwnerPause')
+        self.pause_access_button.clicked.connect(self.stop)
+        layout.addWidget(self.pause_access_button)
+        self.remove_access_button=QPushButton('Remove permanent authorization')
+        self.remove_access_button.setObjectName('webbieOwnerRemovePermanent')
+        self.remove_access_button.clicked.connect(self.remove_permanent_authorization)
+        layout.addWidget(self.remove_access_button)
         self.service_button=QPushButton('Read approved local service status')
         self.service_button.setObjectName('webbieSafeServicesStatus')
         self.service_button.clicked.connect(self.inspect_safe_services)
@@ -298,6 +313,7 @@ class WebbieComputerDialog(QDialog):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh_status)
         self.timer.start(1000)
+        self.restore_owner_authorization()
         self.refresh_status()
 
     def status(self, message):
