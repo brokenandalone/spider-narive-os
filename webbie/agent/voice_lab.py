@@ -10,13 +10,16 @@ from pathlib import Path
 import shutil
 import os
 import stat
+from runtime_readiness import DEFAULT_AGENT, _private_json
+from voice_metrics import display_meter
 
 DEFAULT_CONFIG=Path(__file__).resolve().parents[1]/"config/default.json"
 DEFAULT_MODEL=Path("/usr/local/share/spider-os/whisper/ggml-base.en.bin")
 DEFAULT_VOICE=Path(__file__).resolve().parents[1]/"voice"
 
 def inspect_voice_lab(*, config_path=DEFAULT_CONFIG, model_path=None,
-                      voice_path=DEFAULT_VOICE, executable=None, which=None):
+                      voice_path=DEFAULT_VOICE, executable=None, which=None,
+                      agent_path=DEFAULT_AGENT):
     which=which or shutil.which
     config={}
     try:
@@ -47,6 +50,7 @@ def inspect_voice_lab(*, config_path=DEFAULT_CONFIG, model_path=None,
         "voiceprint_file_present":bool(provider.is_file() and not provider.is_symlink()),
         "voiceprint_verified":False,
         "engine":"whisper.cpp",
+        "intake":_private_json(agent_path).get("voice_intake"),
         "message":"Presence checks only. No microphone audio was sampled.",
     }
 
@@ -63,5 +67,6 @@ def voice_lab_report(result):
         "Cory/Shayna speaker identity: NOT VERIFIED BY THIS CHECK",
         "Emergency STOP remains available even without speaker identity.",
         "The voice model provider is not bundled or auto-installed.",
-        "No microphone audio, voiceprints or conversations were read."]
+        "No microphone audio, voiceprints or conversations were read.",
+        "",display_meter(result.get("intake"))]
     return "\n".join(lines)
