@@ -912,5 +912,8 @@ class WebbiePanel(QWidget):
                 self.face_controls.active()):
             event.ignore()
         else:
+            self.unified_workflow.stop()
+            if self.computer_dialog is not None:
+                self.computer_dialog.stop()
             self.stop_camera()
             event.accept()
