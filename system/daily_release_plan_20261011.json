@@ -14,7 +14,8 @@
     {
       "name": "System/Recovery",
       "pull_requests": [
-        49
+        49,
+        97
       ],
       "required_files": [
         "system/release_batch.py",
@@ -42,7 +43,12 @@
         69,
         76,
         78,
-        88
+        88,
+        89,
+        90,
+        92,
+        95,
+        96
       ],
       "required_files": [
         "webbie/agent/webbie.py",
@@ -636,6 +642,87 @@
         "system/release_batch.py",
         "tools/combined_release_audit.py"
       ]
+    },
+    {
+      "pr": 89,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-hearing-speech-v3-20261011",
+      "observed_sha": "51f48ecbc469dce792cc057649aa07cdb22a91e3",
+      "integrated": false,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/brain/brain.py",
+        "webbie/voice/whisper_listener.py",
+        "webbie/voice/audio_gate.py"
+      ],
+      "review_note": "Wave Five includes source-only safe subset; conflicting resident Webbie/TTS/permanent authority still require live PC reconciliation"
+    },
+    {
+      "pr": 90,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-unified-workflow-brain-eyes-hands-autopilot-20261011",
+      "observed_sha": "8cae2d3cc0f309eae7001ca998c387b3dbda71dc",
+      "integrated": false,
+      "paths": [
+        "the-web/shell/webbie_panel.py",
+        "webbie/brain/unified_workflow.py",
+        "webbie/agent/webbie.py"
+      ],
+      "review_note": "Wave Five includes source-only safe subset; conflicting resident Webbie/TTS/permanent authority still require live PC reconciliation"
+    },
+    {
+      "pr": 92,
+      "workspace": "Webbie",
+      "branch": "release/webbie-jarvis-workflow-wave4-20261011",
+      "observed_sha": "01dec63430979f25747b80ae71304549433ad068",
+      "integrated": false,
+      "paths": [
+        "the-web/shell/webbie_panel.py",
+        "the-web/shell/webbie_cognitive_center.py",
+        "webbie/agent/workflow_board.py",
+        "system/release_batch.py"
+      ],
+      "review_note": "Wave Five includes source-only safe subset; conflicting resident Webbie/TTS/permanent authority still require live PC reconciliation"
+    },
+    {
+      "pr": 95,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-owner-wide-access-center-20261011",
+      "observed_sha": "2da68adf2917640ed698fde7c63c991184137cbd",
+      "integrated": false,
+      "paths": [
+        "the-web/shell/webbie_computer_panel.py",
+        "the-web/shell/webbie_panel.py",
+        "webbie/actions/owner_safe_access.py"
+      ],
+      "review_note": "Wave Five includes source-only safe subset; conflicting resident Webbie/TTS/permanent authority still require live PC reconciliation"
+    },
+    {
+      "pr": 96,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-permanent-owner-authorization-20261011",
+      "observed_sha": "c60fe47481a2b4c4c777b1b05ab75dd99d394bc9",
+      "integrated": false,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "the-web/shell/webbie_panel.py",
+        "the-web/shell/webbie_computer_panel.py",
+        "webbie/actions/owner_authorization_store.py"
+      ],
+      "review_note": "Wave Five includes source-only safe subset; conflicting resident Webbie/TTS/permanent authority still require live PC reconciliation"
+    },
+    {
+      "pr": 97,
+      "workspace": "System/Recovery",
+      "branch": "release/pc-readiness-reconciliation-20261011",
+      "observed_sha": "22ee43902139562c08f63199c769229fd10293c4",
+      "integrated": true,
+      "paths": [
+        "tools/daily_pc_acceptance.py",
+        "tools/pc_hardware_compatibility.py",
+        "tools/spider_pc_readiness.py"
+      ],
+      "review_note": "Read-only PR97 hardware and application-code preflight copied intact to Wave Five; actual PC outputs not available"
     }
   ],
   "resolved_shared_paths": [],
@@ -675,5 +762,30 @@
     "PR #92 JARVIS Workflow Board (separate Wave Four branch)",
     "PR #90 unified Webbie workflow 2.0 (dependent on PR #88)",
     "PR #89 hearing/speech v3 (separate branch); must reconcile with speaker authorization and live mic"
-  ]
+  ],
+  "release_wave": 5,
+  "wave5_scope": {
+    "basis": "Oct 11 Wave Four plus PR #94 installed model gate",
+    "source_staged": [
+      "Webbie workflow board #92 (GUI click preview)",
+      "unified workflow primitives #90 (not automatically enabled)",
+      "limited desktop access/diagnostics #95/#96 (no standing authorization enabled)",
+      "audio activity gate #89 (not connected to resident mic)",
+      "PC readiness and private hardware/source audit PR #97 (read-only)"
+    ],
+    "pending_risks": [
+      "Voiceprint enrollment, hardware real mic",
+      "TTS and whisper listener #89 conflict with Wave Four resident code",
+      "Permanent owner access #95/#96 changes GUI and agent privilege boundaries",
+      "Unified workflow #90 multi-file GUI and agent wiring",
+      "PC installed source and model differences",
+      "Nova radio/BCN and Media Center separate deployments"
+    ],
+    "next_gates": [
+      "Full combined source test on exact SHA",
+      "Read-only actual installed PC comparison",
+      "Source hashes/GUI/audio/boot smoke",
+      "Owner-approved one system-wide batch"
+    ]
+  }
 }
