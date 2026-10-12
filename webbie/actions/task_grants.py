@@ -68,6 +68,12 @@ class TaskGrant:
             self._wide_app_id = ''
             return count
 
+    def can_open_wide(self, desktop_id):
+        with self._lock:
+            return (self.wide.status()['active'] and
+                    safe_app_id(desktop_id) and
+                    desktop_id in self.wide._apps)
+
     def select_wide_app(self, desktop_id):
         with self._lock:
             if (not self.wide.status()['active'] or
