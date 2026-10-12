@@ -26,6 +26,7 @@ from voice_trust import trust_status
 from voice_lab import inspect_voice_lab, voice_lab_report
 from hearing_test import run_hearing_test
 from webbie_focus_dialog import WebbieFocusDialog
+from webbie_workflow_dialog import WebbieWorkflowDialog
 
 
 class ModelInventoryWorker(QThread):
@@ -57,7 +58,7 @@ class HearingTestWorker(QThread):
 
 class WebbieCognitiveDialog(QDialog):
     def __init__(self,parent=None,*,workspace_callback=None,
-                 emergency_callback=None):
+                 emergency_callback=None, workspace_opener=None):
         super().__init__(parent)
         self.setWindowTitle("Webbie · Jarvis Control Center")
         self.setMinimumWidth(600)
@@ -72,6 +73,8 @@ class WebbieCognitiveDialog(QDialog):
         """)
         self.workspace_callback=workspace_callback or (lambda:"default")
         self.emergency_callback=emergency_callback
+        self.workspace_opener=workspace_opener
+        self.workflow_dialog=None
         self.focus_dialog=None
         self.model_worker=None
         self.hearing_worker=None
@@ -94,6 +97,10 @@ class WebbieCognitiveDialog(QDialog):
         focus.setObjectName("webbieFocusTaskButton")
         focus.clicked.connect(self.open_focus)
         actions.addWidget(focus)
+        workflows=QPushButton("JARVIS Workflow Board")
+        workflows.setObjectName("webbieWorkflowBoardButton")
+        workflows.clicked.connect(self.open_workflows)
+        actions.addWidget(workflows)
         inspect=QPushButton("Inspect local AI models")
         inspect.setObjectName("webbieInspectModelsButton")
         inspect.clicked.connect(self.inspect_models)
@@ -163,6 +170,14 @@ class WebbieCognitiveDialog(QDialog):
         self.focus_dialog.show()
         self.focus_dialog.raise_()
         self.focus_dialog.activateWindow()
+
+    def open_workflows(self):
+        if self.workflow_dialog is None:
+            self.workflow_dialog=WebbieWorkflowDialog(
+                self, workspace_opener=self.workspace_opener)
+        self.workflow_dialog.show()
+        self.workflow_dialog.raise_()
+        self.workflow_dialog.activateWindow()
 
     def test_hearing(self):
         """Explicit owner's choice, not triggered by model/voice or startup."""
