@@ -38,6 +38,15 @@ BASELINES = (
 # Files only. No passwords, auth files, models, service state, databases,
 # manuscripts, user preferences or original source documents are in this list.
 APP_FILES = (
+    # Wave-three modules: new files only, in the single guarded batch.
+    'author/master_canon.py',
+    'author/master_canon_widget.py',
+    'studio/production_board.py',
+    'studio/production_board_panel.py',
+    'webbie/agent/voice_lab.py',
+    'webbie/agent/segment_speaker_gate.py',
+    'webbie/agent/speaker_provider_loader.py',
+    'webbie/voice/hearing_test.py',
     'author/main.py', 'author/store.py', 'author/web_features.py',
     'author/speech.py', 'author/publishing.py',
     'the-web/shell/main.py', 'the-web/shell/volume_panel.py',
