@@ -53,9 +53,15 @@ FILES = {
 # Only these exact paths are allowed the pending-add status. A symlink,
 # damaged source, or unexpected missing legacy code still blocks.
 PLANNED_NEW = frozenset((
-    "Webbie Voice Lab", "Webbie speaker gate", "Webbie speaker provider",
-    "Webbie hearing test", "Author Master Canon", "Author canon panel",
-    "Studio Production Board", "Studio board panel",
+    "Webbie voice trust", "Webbie Voice Lab", "Webbie speaker gate",
+    "Webbie speaker provider", "Webbie hearing test", "Webbie readiness",
+    "Webbie model resilience", "Webbie voice metrics",
+    "Study coach", "Study readings", "Study reading passages",
+    "Author Story Atlas", "Author Master Canon", "Author canon panel",
+    "Author canon intelligence",
+    "Studio Release Desk", "Studio Production Board", "Studio board panel",
+    "Studio PCM quality",
+    "Kali evidence chain", "Kali report engine", "Kali upgrade audit",
 ))
 SERVICES = ("webbie.service", "spider-ai-dj.service")
 MAX_BYTES = 5 * 1024 * 1024
