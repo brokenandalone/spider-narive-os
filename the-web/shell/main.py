@@ -386,6 +386,8 @@ class TheWeb(QMainWindow):
 
     def setup_webbie_assistant(self):
         self.webbie_assistant = WebbiePanel(SPIDER_ROOT)
+        # Only an owner GUI click may navigate; never give the agent this callback.
+        self.webbie_assistant.workspace_navigator = self.open_workspace
         self.webbie_dock = QDockWidget('WEBBIE | WORKSPACE ASSISTANT', self)
         self.webbie_dock.setObjectName('webbieWorkspaceDock')
         self.webbie_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)

@@ -50,6 +50,20 @@ class VoiceLabTests(unittest.TestCase):
         self.assertTrue(item["voiceprint_file_present"])
         self.assertFalse(item["voiceprint_verified"])
 
+    def test_owner_pinned_provider_code_reports_hash_match_only(self):
+        import hashlib
+        provider=self.voice/"speaker_voice_provider.py"
+        provider.write_text("# audited placeholder")
+        digest=hashlib.sha256(provider.read_bytes()).hexdigest()
+        item=self.inspect({"speaker_verification":{
+            "enabled":True,"provider_sha256":digest}})
+        self.assertTrue(item["voiceprint_source_pinned"])
+        self.assertFalse(item["voiceprint_verified"])
+        provider.write_text("# changed without approval")
+        result=self.inspect({"speaker_verification":{
+            "enabled":True,"provider_sha256":digest}})
+        self.assertFalse(result["voiceprint_source_pinned"])
+
     def test_missing_files_report_unconfirmed(self):
         self.model.unlink()
         self.binary.unlink()

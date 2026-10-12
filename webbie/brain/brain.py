@@ -10,6 +10,9 @@ import threading
 import urllib.error
 import urllib.request
 from privacy_controls import private_session_active
+from model_resilience import (
+    MODEL_GOVERNOR, response_timeout, model_health_message,
+)
 
 
 DEFAULT_MODEL = "qwen3:1.7b"
@@ -672,37 +675,39 @@ def ask_ollama(message, context_name="Cory", model=None, advisory_context=None):
         ),
     }
 
+    if not MODEL_GOVERNOR.acquire():
+        return None
+
+    # Bounded localhost-only response: no implicit retries, endpoint swaps,
+    # prompts in telemetry, cloud fallback, or auto-pulled models.
     request = urllib.request.Request(
         OLLAMA_URL,
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json"
-        },
+        headers={"Content-Type": "application/json"},
         method="POST",
     )
-
+    success = False
     try:
         with urllib.request.urlopen(
-            request,
-            timeout=180,
-        ) as response:
-            data = json.loads(
-                response.read().decode("utf-8")
-            )
-
-        return (
-            data.get("message", {})
-            .get("content", "")
-            .strip()
-        )
-
-    except (
-        urllib.error.URLError,
-        TimeoutError,
-        ValueError,
-        KeyError,
-    ):
+                request, timeout=response_timeout()) as response:
+            packet = response.read(2_000_001)
+            if len(packet) > 2_000_000:
+                raise ValueError("Oversized local model response")
+            data = json.loads(packet.decode("utf-8"))
+        if not isinstance(data, dict):
+            return None
+        message = data.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, str):
+            return None
+        answer = content.strip()
+        success = bool(answer)
+        return answer if success else None
+    except (urllib.error.URLError, OSError, TimeoutError, ValueError,
+            UnicodeError, TypeError, KeyError):
         return None
+    finally:
+        MODEL_GOVERNOR.finish(succeeded=success)
 
 
 
@@ -889,6 +894,11 @@ def respond(message, context_name="Cory", advisory_context=None):
         )
 
         return answer
+
+    if MODEL_GOVERNOR.status()["last_outcome"] == "unavailable":
+        # Connection/model failure is not normal dialogue history. Avoid
+        # repeatedly giving the misleading "model is not online yet" reply.
+        return model_health_message(MODEL_GOVERNOR.status())
 
     fallback = built_in_response(
         message,

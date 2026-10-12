@@ -1,6 +1,7 @@
 """Offline, no-device tests of Webbie audio-bound voice identity gating."""
 import hashlib
 from pathlib import Path
+from unittest.mock import Mock
 import os
 import sys
 import tempfile
@@ -75,15 +76,33 @@ class VoiceSegmentTests(unittest.TestCase):
             voice_root=self.root,importer=mod)
         self.assertFalse(gate.configured)
         mod.assert_not_called()
-        (self.root/"speaker_voice_provider.py").write_text("# trusted in isolated tests")
+        provider=self.root/"speaker_voice_provider.py"
+        provider.write_text("# trusted in isolated tests")
+        pinned=hashlib.sha256(provider.read_bytes()).hexdigest()
         gate=speaker_gate_from_config(
-            {"speaker_verification":{"enabled":True}},
+            {"speaker_verification":{"enabled":True,"provider_sha256":pinned}},
             voice_root=self.root,
             clock=lambda:100,
             importer=lambda name:__import__("types").SimpleNamespace(
                 verify_audio_segment=lambda path:self.evidence()))
         self.assertTrue(gate.configured)
         self.assertEqual(gate.verify_file(self.audio).name,"cory")
+
+    def test_modified_or_unpinned_provider_cannot_load(self):
+        provider=self.root/"speaker_voice_provider.py"
+        provider.write_text("# approved source")
+        pinned=hashlib.sha256(provider.read_bytes()).hexdigest()
+        mocked=Mock()
+        disabled=speaker_gate_from_config(
+            {"speaker_verification":{"enabled":True}},voice_root=self.root,
+            importer=mocked)
+        self.assertFalse(disabled.configured)
+        provider.write_text("# unreviewed replacement")
+        changed=speaker_gate_from_config(
+            {"speaker_verification":{"enabled":True,"provider_sha256":pinned}},
+            voice_root=self.root,importer=mocked)
+        self.assertFalse(changed.configured)
+        mocked.assert_not_called()
 
     def test_verifier_not_enabled_from_truthy_config_string(self):
         (self.root/"speaker_voice_provider.py").write_text("# test")

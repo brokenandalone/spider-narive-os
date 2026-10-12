@@ -30,6 +30,7 @@
   },
   "speaker_verification": {
     "enabled": false,
+    "provider_sha256": "",
     "note": "Requires separately installed and owner-audited offline verifier; do not enable without enrollment and live testing"
   },
   "speech_recognition": {

@@ -28,7 +28,8 @@
       ],
       "required_files": [
         "the-web/shell/main.py",
-        "the-web/shell/navigation_core.py"
+        "the-web/shell/navigation_core.py",
+        "the-web/shell/webbie_workflow_dialog.py"
       ]
     },
     {
@@ -41,14 +42,20 @@
         68,
         69,
         76,
-        78
+        78,
+        88,
+        92
       ],
       "required_files": [
         "webbie/agent/webbie.py",
         "webbie/agent/proactive_checks.py",
         "webbie/agent/voice_queue.py",
         "webbie/agent/voice_trust.py",
-        "webbie/agent/runtime_readiness.py"
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/workflow_board.py",
+        "webbie/agent/launch_intents.py",
+        "webbie/agent/voice_metrics.py",
+        "webbie/brain/model_resilience.py"
       ]
     },
     {
@@ -559,6 +566,71 @@
         "webbie/agent/webbie.py"
       ],
       "integrated": false
+    },
+    {
+      "pr": 88,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-resilience-control-20261011",
+      "observed_sha": "4f1fbf50571514ce7472a9ac8bac76be6e02595e",
+      "paths": [
+        "docs/WEBBIE-JARVIS-RESILIENCE-2026-10-11.md",
+        "system/release_batch.py",
+        "tests/test_webbie_launch_intents.py",
+        "tests/test_webbie_model_resilience.py",
+        "tests/test_webbie_readiness_cli.py",
+        "tests/test_webbie_segment_speaker_gate.py",
+        "tests/test_webbie_voice_lab.py",
+        "tests/test_webbie_voice_metrics.py",
+        "tools/combined_release_audit.py",
+        "tools/webbie_readiness_cli.py",
+        "webbie/agent/launch_intents.py",
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/speaker_provider_loader.py",
+        "webbie/agent/voice_lab.py",
+        "webbie/agent/voice_metrics.py",
+        "webbie/agent/webbie.py",
+        "webbie/brain/brain.py",
+        "webbie/brain/model_resilience.py",
+        "webbie/config/default.json"
+      ],
+      "integrated": false
+    },
+    {
+      "pr": 92,
+      "workspace": "Webbie",
+      "branch": "release/webbie-jarvis-workflow-wave4-20261011",
+      "observed_sha": "5655122cbb4ff30341282e946fd8c47ef7d08782",
+      "paths": [
+        "docs/DAILY-CROSS-WORKSPACE-WAVE4-20261011.md",
+        "docs/WEBBIE-JARVIS-RESILIENCE-2026-10-11.md",
+        "system/release_batch.py",
+        "tests/test_studio_webbie_bridge.py",
+        "tests/test_webbie_launch_intents.py",
+        "tests/test_webbie_model_resilience.py",
+        "tests/test_webbie_readiness_cli.py",
+        "tests/test_webbie_segment_speaker_gate.py",
+        "tests/test_webbie_voice_lab.py",
+        "tests/test_webbie_voice_metrics.py",
+        "tests/test_webbie_workflow_board.py",
+        "tests/test_webbie_workflow_dialog.py",
+        "the-web/shell/main.py",
+        "the-web/shell/webbie_cognitive_center.py",
+        "the-web/shell/webbie_panel.py",
+        "the-web/shell/webbie_workflow_dialog.py",
+        "tools/daily_pc_acceptance.py",
+        "tools/webbie_readiness_cli.py",
+        "webbie/agent/launch_intents.py",
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/speaker_provider_loader.py",
+        "webbie/agent/voice_lab.py",
+        "webbie/agent/voice_metrics.py",
+        "webbie/agent/webbie.py",
+        "webbie/agent/workflow_board.py",
+        "webbie/brain/brain.py",
+        "webbie/brain/model_resilience.py",
+        "webbie/config/default.json"
+      ],
+      "integrated": false
     }
   ],
   "resolved_shared_paths": [],
@@ -589,5 +661,21 @@
     ],
     "source_ci_verified": false,
     "pc_install_performed": false
+  },
+  "wave4_staging": {
+    "stacked_on": "release/cross-workspace-oct11-wave3",
+    "source_pr": 92,
+    "additional_integrated_source_pr": 88,
+    "new_modules": [
+      "webbie/agent/workflow_board.py",
+      "the-web/shell/webbie_workflow_dialog.py",
+      "webbie/agent/launch_intents.py",
+      "webbie/agent/voice_metrics.py",
+      "webbie/brain/model_resilience.py",
+      "tools/webbie_readiness_cli.py"
+    ],
+    "status": "DRAFT ONLY. All nine workspaces combined; source CI, real PC customizations, recovery and owner approval must be checked against exact final commit.",
+    "installed_on_pc": false,
+    "planned_gui_and_approval": "Direct owner-typed fixed phrases only open preview. A separate owner GUI click starts a bounded plan; every workspace navigation and completion requires its own click."
   }
 }

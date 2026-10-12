@@ -38,6 +38,14 @@ BASELINES = (
 # Files only. No passwords, auth files, models, service state, databases,
 # manuscripts, user preferences or original source documents are in this list.
 APP_FILES = (
+    # Wave Four: owner-controlled, bounded cross-workspace task board.
+    'webbie/agent/workflow_board.py',
+    'the-web/shell/webbie_workflow_dialog.py',
+    # Wave Four: local voice diagnostics and model resilience; no cloud fallback.
+    'webbie/agent/launch_intents.py',
+    'webbie/agent/voice_metrics.py',
+    'webbie/brain/model_resilience.py',
+    'tools/webbie_readiness_cli.py',
     # Wave-three modules: new files only, in the single guarded batch.
     'author/master_canon.py',
     'author/master_canon_widget.py',
