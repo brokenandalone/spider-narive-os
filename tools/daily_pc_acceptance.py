@@ -19,14 +19,22 @@ FILES = {
     "The Web": "the-web/shell/main.py",
     "Webbie": "webbie/agent/webbie.py",
     "Webbie voice trust": "webbie/agent/voice_trust.py",
+    "Webbie Voice Lab": "webbie/agent/voice_lab.py",
+    "Webbie speaker gate": "webbie/agent/segment_speaker_gate.py",
+    "Webbie speaker provider": "webbie/agent/speaker_provider_loader.py",
+    "Webbie hearing test": "webbie/voice/hearing_test.py",
     "Webbie readiness": "webbie/agent/runtime_readiness.py",
     "Study": "study/study.py",
     "Study coach": "study/study_coach.py",
     "Study readings": "study/reading_library.py",
     "Author": "author/main.py",
     "Author Story Atlas": "author/story_atlas.py",
+    "Author Master Canon": "author/master_canon.py",
+    "Author canon panel": "author/master_canon_widget.py",
     "Studio": "studio/main.py",
     "Studio Release Desk": "studio/release_panel.py",
+    "Studio Production Board": "studio/production_board.py",
+    "Studio board panel": "studio/production_board_panel.py",
     "Kali Bay": "kali-bay/ui/kali_bay.py",
     "Kali manager": "kali-bay/bin/kali-bay",
     "Kali evidence chain": "kali-bay/runtime/evidence_ledger.py",
@@ -36,6 +44,14 @@ FILES = {
     "Deep Forage": "forage/deep-forage/deep_forage.py",
     "Nova": "media/ai-dj/nova_host.py",
 }
+# New modules may be absent BEFORE the first reviewed daily installation.
+# Only these exact paths are allowed the pending-add status. A symlink,
+# damaged source, or unexpected missing legacy code still blocks.
+PLANNED_NEW = frozenset((
+    "Webbie Voice Lab", "Webbie speaker gate", "Webbie speaker provider",
+    "Webbie hearing test", "Author Master Canon", "Author canon panel",
+    "Studio Production Board", "Studio board panel",
+))
 SERVICES = ("webbie.service", "spider-ai-dj.service")
 MAX_BYTES = 5 * 1024 * 1024
 DEFAULT_INSTALL = Path("/usr/local/lib/spider-os")
@@ -54,6 +70,8 @@ def digest_safe(root, relative):
         if target.is_symlink():
             return {"status": "unavailable", "reason": "symlinked source"}
     try:
+        if not target.exists():
+            return {"status": "unavailable", "reason": "file not installed"}
         st = target.stat()
         if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_BYTES:
             return {"status": "unavailable", "reason": "not a bounded regular file"}
@@ -77,6 +95,9 @@ def inspect_files(source_root, install_root):
         installed = digest_safe(install_root, relative)
         if source["status"] != "ok":
             state = "source_unavailable"
+        elif (installed["status"] != "ok" and label in PLANNED_NEW
+              and installed.get("reason") == "file not installed"):
+            state = "pending_add"
         elif installed["status"] != "ok":
             state = "installed_unavailable"
         elif source["sha256"] == installed["sha256"]:
@@ -129,6 +150,9 @@ def inspect(source_root, install_root, *, phase="before", check_services=True):
     for name, entry in files.items():
         if entry["state"] in ("source_unavailable", "installed_unavailable"):
             blocking.append(f"{name}: code unavailable or unsafe")
+        elif entry["state"] == "pending_add":
+            if phase == "after":
+                blocking.append(f"{name}: planned new module not installed")
         elif phase == "after" and entry["state"] != "matching":
             blocking.append(f"{name}: candidate and installed code differ")
     if check_services and phase == "after":
