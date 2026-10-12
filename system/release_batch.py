@@ -48,6 +48,7 @@ APP_FILES = (
     'author/project_map.py', 'author/story_atlas.py',
     'author/atlas_widget.py', 'author/master_canon.py',
     'author/master_canon_widget.py',
+    'author/canon_intelligence.py', 'author/canon_intelligence_widget.py',
     'the-web/shell/main.py', 'the-web/shell/volume_panel.py',
     'the-web/shell/quick_settings.py',
     'the-web/shell/appearance.py',
