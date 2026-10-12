@@ -562,5 +562,7 @@
     "result": "failed",
     "tested_commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
     "reason": "Mixed Study, Author, Studio, Kali, and Webbie tests expose incompatible shared entrypoints."
-  }
+  },
+  "voice_pipeline_verified": false,
+  "voice_pipeline_evidence": "Missing: installed PC hearing tests with Cory and Shayna, audited audio-bound verifier, non-owner/TV rejection, STOP, wake, sleep, speaking loop and rollback. No provider bundled in PR #78."
 }
