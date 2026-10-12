@@ -157,6 +157,11 @@ class WebbieUnifiedWorkflowDialog(QDialog):
         self.retry_button.setEnabled(state["phase"]=="verify")
         self.start_button.setEnabled(True)
 
+    def showEvent(self,event):
+        if not self.timer.isActive():
+            self.timer.start(1000)
+        super().showEvent(event)
+
     def closeEvent(self,event):
         self.timer.stop()
         self.session.stop()
