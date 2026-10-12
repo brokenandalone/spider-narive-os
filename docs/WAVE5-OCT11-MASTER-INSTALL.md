@@ -14,6 +14,7 @@
 - **Author:** Story Atlas, Master Canon ledger and review-only Canon Intelligence.
 - **Study:** SNHU planner, coach, reading provenance and local search.
 - **Forage, Kali Bay, The Web System and Recovery:** preserve all prior integrated modules and wallpapers.
+- **PC acceptance:** integrated PR #97 private read-only hardware, service, installer source and daily receipt checks. No camera/microphone activation or account changes.
 - **Nova and Media Center:** preserve local AI DJ `127.0.0.1:9876` and existing media source. V7 GPU visualizer installation is a **separate application** transaction after PC GPU testing.
 - **BCN website:** visitor/owner source and newsroom updates are a **separate web deployment**. This Spider OS installer cannot deploy the website/backend.
 
@@ -27,7 +28,7 @@ cd Spider_OS_Wave5
 bash tools/prep_oct11_release.sh
 ```
 
-This reports source hashes, fixed installed-file differences, chosen local model, Nova status and one-batch release blockers. It writes **only a new private reports directory** in `~/Downloads`. The user must review/return these reports. It does not alter services, applications, private projects, voiceprints or OS boot.
+This reports share-safe hardware states, source hashes, fixed installed-file differences, chosen local model, Nova status and one-batch release blockers. It writes **only a new private reports directory** in `~/Downloads`. The user must review/return these reports. It does not alter services, applications, private projects, voiceprints or OS boot.
 
 **After reviewing source and live PC evidence**, separately run one opt-in model smoke:
 
