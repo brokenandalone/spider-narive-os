@@ -160,9 +160,9 @@ def inspect(source=ROOT, installed=INSTALLED, *, scan_pc=False,
     else:
         model_status = "NOT_CHECKED"
         warnings.append("Installed PC never inspected; use --pc on Spider OS")
-    release_ready = (not problems and not warnings and model_status != "BLOCKED")
+    # No file-only report may certify hardware, ownership or the install slot.
     return {"status": "REVIEW_ONLY" if not problems else "BLOCKED",
-            "installation_ready": bool(release_ready and scan_pc),
+            "installation_ready": False,
             "blockers": problems, "warnings": warnings,
             "counts": counts, "gates": gates,
             "model_status": model_status, "critical_files": states,
