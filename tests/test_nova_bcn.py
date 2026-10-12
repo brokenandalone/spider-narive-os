@@ -163,7 +163,7 @@ class NativeHTTPTests(unittest.TestCase):
         self.assertIn("tts unavailable", body["error"])
 
 
-class ProductionStudioTests(unittest.TestCase):
+class ProductionStudioTests(NativeHTTPTests):
     def test_production_drafts_have_no_audio(self):
         service = importlib.import_module("service")
         with patch.object(service, "ollama_script", return_value="Nova here on BCN"), patch.object(service, "make_audio") as audio:
