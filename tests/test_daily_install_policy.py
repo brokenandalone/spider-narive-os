@@ -60,6 +60,17 @@ class OneSystemInstallPerDayTests(unittest.TestCase):
             with policy.daily_install_guard(self.root, CLOCK):
                 pass
 
+    def test_crashed_batch_without_manifest_still_uses_daily_slot(self):
+        crash = self.root / "spider-batch-20261011-160000-500000"
+        crash.mkdir(parents=True)
+        (crash / "original-0000").write_text("backup copy before receipt")
+        self.assertFalse((crash / "manifest.json").exists())
+        found = policy.existing_batch_receipts(self.root, policy.local_day(CLOCK))
+        self.assertEqual(found, [crash])
+        with self.assertRaisesRegex(RuntimeError, "receipt already exists"):
+            with policy.daily_install_guard(self.root, CLOCK):
+                self.fail("Never retry a partially staged same-day batch")
+
     def test_symlink_backups_and_receipts_are_rejected(self):
         outside = Path(self.tmp.name) / "outside"
         outside.mkdir()
