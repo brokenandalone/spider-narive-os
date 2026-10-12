@@ -512,13 +512,30 @@ def handle_builtin(command):
 
         return "Opening Study."
 
+    # Studio v11 reads generic next-step advice only, without song names,
+    # lyrics, private WAV paths, recordings or unattended audio actions.
+    if lower in (
+        "studio next step", "what is next in studio",
+        "what should i do next in studio", "webbie studio next step",
+    ):
+        summary_script = workspace_path("studio", "production_board.py")
+        try:
+            result = subprocess.run(
+                ["python3", summary_script, "--next"],
+                capture_output=True, text=True, timeout=4, check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()[:240]
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return "Studio's production advice is unavailable right now."
+
     # Studio v10 exposes a small, read-only status from owner-selected
     # production checkpoints. Never put lyrics, notes, voice recordings
     # or absolute file paths into a spoken status response.
     if lower in (
         "studio progress", "studio status", "spider studio status",
         "studio production status", "how is my studio song",
-        "what is next in studio",
     ):
         summary_script = workspace_path("studio", "production_board.py")
         try:
