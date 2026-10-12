@@ -287,3 +287,40 @@ Recovery controls on the Spider OS computer before installing.
 Known limitation: restoring a large native workspace can still block the
 UI while *that particular workspace* is initialized. The per-workspace queue
 gives control between loads, not during a single synchronous constructor.
+
+## Round 7: local user-service health and owner-reviewed Webbie advice
+
+Recovery now includes a separate **System Services** section. It checks four
+allowlisted user services: `webbie.service`, `spider-ai-dj.service`,
+`webbie-proactive.service`, and `webbie-research.service`.
+
+- A Qt worker reads only the `LoadState`, `ActiveState`, and `SubState`
+  fields via `systemctl --user show`. Each probe has a bounded timeout;
+  no shell string interpolation or privileged commands are used.
+- The Recovery interface stays responsive while checking systemd. Statuses
+  are normalized to `running`, `starting`, `stopped`, `failed`,
+  `masked`, `not-installed` or `unavailable`. Raw systemd output and
+  journal logs are neither displayed nor sent to Webbie.
+- Service checks refresh on demand and at most once per 60 seconds while
+  Recovery is visible. Missing/unavailable units are informational only.
+  A stopped optional unit does not automatically mean the OS is broken.
+- A separate **Ask Webbie about status** button prepares a *draft* in the
+  existing Webbie input box containing only allowlisted unit names and
+  normalized states. The user reviews and sends it. If Webbie is busy or
+  already has an unsent draft, the button leaves it untouched.
+- No command is run on Webbie's behalf, no auto-repair/restart/enable occurs,
+  and existing voice authentication and desktop-control grants are unchanged.
+- The host shell guards against destroying the Recovery widget while the
+  systemd probe worker is running.
+
+### Round 7 tests
+
+```bash
+python3 -m unittest discover -s tests -p 'test_web_service_health.py' -v
+QT_QPA_PLATFORM=offscreen dbus-run-session -- python3 -u tests/check-the-web.py .
+```
+
+Tests cover the service allowlist, read-only argument vector, timeouts,
+missing/masked/failed states, rejected untrusted state text, the desktop UI
+worker result rendering, and no-send Webbie draft preparation. Live PC service
+status has **not** been queried or changed from ChatGPT.
