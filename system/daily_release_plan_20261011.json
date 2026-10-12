@@ -668,5 +668,12 @@
     "pc_install_performed": false
   },
   "voice_pipeline_verified": false,
-  "voice_pipeline_evidence": "Required before any physical install: confirm owner-authorized speaker model/provider, Cory/Shayna enrollment with false-acceptance tests including TV voices, audible STOP/wake/sleep and TTS echo, real microphone acceptance, and documented fallback for unverified voice. Neither local source tests nor source-only status qualifies."
+  "voice_pipeline_evidence": "Required before any physical install: confirm owner-authorized speaker model/provider, Cory/Shayna enrollment with false-acceptance tests including TV voices, audible STOP/wake/sleep and TTS echo, real microphone acceptance, and documented fallback for unverified voice. Neither local source tests nor source-only status qualifies.",
+  "model_compatibility_verified": false,
+  "model_compatibility_evidence": "Required on actual installed Spider OS: compare installed Webbie config & brain to candidate; confirm exact configured chat model exists in Ollama and responds using tools/webbie_model_compatibility.py --smoke; preserve configurations and models; inspect systemd runtime model overrides and voice separately. Green CI is insufficient.",
+  "follow_on_wave_four_pending": [
+    "PR #92 JARVIS Workflow Board (separate Wave Four branch)",
+    "PR #90 unified Webbie workflow 2.0 (dependent on PR #88)",
+    "PR #89 hearing/speech v3 (separate branch); must reconcile with speaker authorization and live mic"
+  ]
 }
