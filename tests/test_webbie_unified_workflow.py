@@ -112,6 +112,33 @@ class UnifiedWorkflowTests(unittest.TestCase):
         state=self.flow.snapshot(workspace="studio")
         self.assertEqual(state["task_title"],"Private project 123456")
 
+    def test_four_reviewed_steps_require_new_observation_each_time(self):
+        self.flow.begin(TASK,workspace="studio")
+        for number in range(1,5):
+            current=self.flow.snapshot(workspace="studio")
+            self.assertEqual(current["step_number"],number)
+            self.assertEqual(current["phase"],"observe")
+            self.assertFalse(current["observation_reported"])
+            self.assertFalse(self.flow.record_action(
+                "navigation","requested",from_control_gui=True,
+                workspace="studio"))
+            self.assertTrue(self.flow.observed_window(
+                from_consented_gui=True,workspace="studio"))
+            self.assertTrue(self.flow.record_action(
+                "navigation","requested",from_control_gui=True,
+                workspace="studio"))
+            self.assertEqual(self.flow.snapshot()["phase"],"verify")
+            self.assertTrue(self.flow.confirm_result(
+                owner_confirmed=True,workspace="studio"))
+            self.assertEqual(self.flow.snapshot()["confirmed_steps"],number)
+            if number<4:
+                self.assertTrue(self.flow.next_reviewed_step(
+                    owner_clicked=True,workspace="studio"))
+        self.assertFalse(self.flow.next_reviewed_step(
+            owner_clicked=True,workspace="studio"))
+        self.assertEqual(self.flow.snapshot()["phase"],"done")
+        self.assertEqual(self.flow.snapshot()["confirmed_steps"],4)
+
     def test_denied_gui_cancel_revokes_workflow(self):
         self.flow.begin(TASK,workspace="studio")
         self.flow.observed_window(from_consented_gui=True,workspace="studio")
