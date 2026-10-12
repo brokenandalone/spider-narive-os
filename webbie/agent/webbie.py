@@ -33,8 +33,9 @@ sys.path.insert(
     0,
     str(WEBBIE_ROOT / "voice")
 )
+sys.path.insert(0,str(WEBBIE_ROOT / "actions"))
 
-
+from owner_authorization_store import read_policy
 from brain import respond
 from model_resilience import MODEL_GOVERNOR, model_health_message
 from jarvis_context import read_context, context_summary, advisory_context
@@ -592,8 +593,22 @@ def verified_workspace_voice_action(command, *, speaker_verified=False,
         return dispatch_verified_author_voice(
             command, speaker_verified=True, workspace='author'
         )
-    if workspace == 'kali-bay':
-        from kali_assistant import handle_kali_request
+    # Permanent on-demand Kali capability requires explicit owner authorization
+    # AND genuine speaker verification. The model never creates the command.
+    # Outside Kali Bay the user must explicitly say "Kali" in the request.
+    from kali_assistant import handle_kali_request
+    saved=read_policy()
+    can_use=(saved.get("authorized") is True
+             and saved.get("paused") is False
+             and saved.get("kali_on_demand") is True)
+    if can_use and (workspace=='kali-bay' or
+                    re.search(r"\bkali\b",command,re.I)):
+        reply=handle_kali_request(command,allow_named_apps=True)
+        if reply is not None:
+            return reply
+    if workspace=='kali-bay':
+        # Preserve existing featured Kali Bay workbench behavior when a
+        # permanent grant has not been saved (still trusted voice only).
         return handle_kali_request(command)
     return None
 
