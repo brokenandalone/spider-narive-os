@@ -273,6 +273,18 @@ class CanonIntelligenceWidget(QWidget):
                 'The source changed after review. Nothing saved; review it again.'
             )
             return
+        proposal = {
+            'book_id': row['book_id'], 'chapter_id': row['chapter_id'],
+            'title': row['title'], 'statement': row['statement'],
+            'source_quote': row['quote']
+        }
+        existing = self.store.master_canon.proposed_duplicate(**proposal)
+        if existing is not None:
+            self.status.setText(
+                f'Already saved as Proposed canon #{existing}; no duplicate made.'
+            )
+            self.propose_button.setEnabled(False)
+            return
         if QMessageBox.question(
             self, 'Save only as Proposed',
             'Save this unverified AI idea in Master Canon as PROPOSED? '
@@ -287,6 +299,13 @@ class CanonIntelligenceWidget(QWidget):
             )
             return
         try:
+            existing = self.store.master_canon.proposed_duplicate(**proposal)
+            if existing is not None:
+                self.status.setText(
+                    f'Already saved as Proposed canon #{existing}; no duplicate made.'
+                )
+                self.propose_button.setEnabled(False)
+                return
             claim_id = self.store.master_canon.add(
                 title=row['title'], statement=row['statement'],
                 book_id=row['book_id'], chapter_id=row['chapter_id'],
