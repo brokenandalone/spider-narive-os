@@ -1,0 +1,1112 @@
+{
+  "schema": 1,
+  "recorded_date": "2026-10-12",
+  "status": "AUDIT_ONLY_NO_INSTALL",
+  "live_pc_source_of_truth": "owner ZIP: 31 blocked installed application source files; owner PC remains unchanged",
+  "applicant": "brokenandalone/spider-narive-os",
+  "candidate_sha": "a7f90eea9717ba80f19863f4eb6aa83efd05eb1c",
+  "disclaimer": "The status and references are an audit snapshot, not proof feature code is integrated, merged PRs are installed, or real hardware works. Open PRs include stacked ancestors and competing changes; do not merge them all unreviewed.",
+  "repos": {
+    "spider_os": {
+      "repository": "brokenandalone/spider-narive-os",
+      "default_branch": "main",
+      "main_commit_at_audit": "b0099290f9618b47a22342b43ca25bb856852a9e",
+      "scope": "last 102 PRs returned",
+      "total_prs_returned": 102,
+      "open_count": 94,
+      "closed_count": 8,
+      "open_prs": [
+        {
+          "n": 101,
+          "title": "Wave Six | Preserve all 31 owner-installed Spider OS files during offline staging",
+          "head": "reconciliation/oct12-owner-preserving-stage",
+          "base": "safety/known-good-daily-release-lock-20261011",
+          "updated": "2026-10-12T16:35:09Z"
+        },
+        {
+          "n": 100,
+          "title": "Draft: retain October upgrades and Matilda fallback without reinstalling",
+          "head": "docs/webbie-matilda-voice-daily-register-2026-10-12",
+          "base": "main",
+          "updated": "2026-10-12T05:51:49Z"
+        },
+        {
+          "n": 99,
+          "title": "Permanent Spider OS anti-regression lock: known-good PC baseline and exact CI commit",
+          "head": "safety/known-good-daily-release-lock-20261011",
+          "base": "release/oct11-wave5-all-systems-compatibility",
+          "updated": "2026-10-12T03:29:50Z"
+        },
+        {
+          "n": 98,
+          "title": "Wave Five Spider OS: cross-workspace integration, JARVIS board and downgrade-safe single install staging",
+          "head": "release/oct11-wave5-all-systems-compatibility",
+          "base": "safety/webbie-installed-model-compatibility-20261011",
+          "updated": "2026-10-12T03:10:55Z"
+        },
+        {
+          "n": 97,
+          "title": "Spider OS PC acceptance: private read-only hardware and installed-code reconciliation",
+          "head": "release/pc-readiness-reconciliation-20261011",
+          "base": "release/cross-workspace-oct11-wave4",
+          "updated": "2026-10-12T02:59:53Z"
+        },
+        {
+          "n": 96,
+          "title": "Webbie JARVIS: permanent owner access, Kali tool requests, Konsole diagnostics and websites",
+          "head": "feature/webbie-permanent-owner-authorization-20261011",
+          "base": "feature/webbie-owner-wide-access-center-20261011",
+          "updated": "2026-10-12T02:38:08Z"
+        },
+        {
+          "n": 95,
+          "title": "Webbie One-Click Owner Safe Access: routine apps, constrained services, instant revoke",
+          "head": "feature/webbie-owner-wide-access-center-20261011",
+          "base": "feature/webbie-unified-workflow-brain-eyes-hands-autopilot-20261011",
+          "updated": "2026-10-12T02:06:42Z"
+        },
+        {
+          "n": 94,
+          "title": "Block daily PC install on unverified Webbie model compatibility with installed October 10 AI",
+          "head": "safety/webbie-installed-model-compatibility-20261011",
+          "base": "release/cross-workspace-oct11-wave4",
+          "updated": "2026-10-12T01:57:35Z"
+        },
+        {
+          "n": 93,
+          "title": "Spider OS Wave 4: Studio PCM QC, Canon Intelligence, Study provenance and resilient Webbie",
+          "head": "release/cross-workspace-oct11-wave4",
+          "base": "release/cross-workspace-oct11-wave3",
+          "updated": "2026-10-12T00:23:57Z"
+        },
+        {
+          "n": 92,
+          "title": "Wave Four Spider OS: JARVIS workflow board, typed task previews and resilient local Webbie",
+          "head": "release/webbie-jarvis-workflow-wave4-20261011",
+          "base": "release/cross-workspace-oct11-wave3",
+          "updated": "2026-10-12T00:28:41Z"
+        },
+        {
+          "n": 91,
+          "title": "Oct 11 master Spider OS checklist: inventory latest branches and guard one daily installation",
+          "head": "release/oct11-consolidated-pc-review",
+          "base": "release/cross-workspace-oct11-wave3",
+          "updated": "2026-10-12T01:58:11Z"
+        },
+        {
+          "n": 90,
+          "title": "Webbie Brain/Eyes/Hands/Autopilot 2.0: unified supervised multistep workflows",
+          "head": "feature/webbie-unified-workflow-brain-eyes-hands-autopilot-20261011",
+          "base": "feature/webbie-resilience-control-20261011",
+          "updated": "2026-10-12T00:22:31Z"
+        },
+        {
+          "n": 89,
+          "title": "Webbie Hearing + Speech v3: audio gate, interruptible TTS, speaker-scoped context",
+          "head": "feature/webbie-hearing-speech-v3-20261011",
+          "base": "main",
+          "updated": "2026-10-12T00:17:04Z"
+        },
+        {
+          "n": 88,
+          "title": "Webbie Jarvis: resilient local AI, private voice metrics, pinned speaker verifier and safe launch intents",
+          "head": "feature/webbie-resilience-control-20261011",
+          "base": "feature/webbie-voice-lab-diagnostics-20261011",
+          "updated": "2026-10-12T00:09:39Z"
+        },
+        {
+          "n": 87,
+          "title": "Wave Three daily Spider OS: Webbie Voice Lab, Master Canon, Studio Production Board, crash-safe installer",
+          "head": "release/cross-workspace-oct11-wave3",
+          "base": "release/cross-workspace-oct11-wave2",
+          "updated": "2026-10-12T00:11:26Z"
+        },
+        {
+          "n": 86,
+          "title": "Spider OS wave 3: Author Master Canon, Studio v10, Webbie Voice Lab and strict voice deployment hold",
+          "head": "release/voice-canon-production-wave3-20261011",
+          "base": "release/cross-workspace-oct11-wave2",
+          "updated": "2026-10-12T00:05:51Z"
+        },
+        {
+          "n": 85,
+          "title": "Webbie Hearing v2: speaker-aware wake and follow-up commands",
+          "head": "feature/webbie-speaker-aware-hearing-v2-20261011",
+          "base": "main",
+          "updated": "2026-10-12T00:04:22Z"
+        },
+        {
+          "n": 84,
+          "title": "Study: full-length passage search, document provenance and safe legacy reindex",
+          "head": "feature/study-passage-search-20261011",
+          "base": "feature/study-course-reading-library-20261011",
+          "updated": "2026-10-12T00:06:09Z"
+        },
+        {
+          "n": 83,
+          "title": "Author: local Webbie Canon Intelligence with exact source anchors and author-approved proposals",
+          "head": "feature/author-canon-intelligence-20261011",
+          "base": "feature/author-master-canon-ledger-20261011",
+          "updated": "2026-10-12T00:04:38Z"
+        },
+        {
+          "n": 82,
+          "title": "Studio v11: real PCM audio checks, DAW handoff and Webbie next step",
+          "head": "feature/studio-audio-qc-daw-v11-20261011",
+          "base": "feature/studio-production-board-v10-20261011",
+          "updated": "2026-10-12T00:03:09Z"
+        },
+        {
+          "n": 81,
+          "title": "Spider OS daily release wave 2: integrate Author Atlas, Studio v9, Study and trusted Webbie",
+          "head": "release/cross-workspace-oct11-wave2",
+          "base": "release/kali-ledger-one-batch-integration-20261011",
+          "updated": "2026-10-11T23:52:15Z"
+        },
+        {
+          "n": 80,
+          "title": "Studio v10: versioned Production Board, real cross-tab handoffs and Webbie status",
+          "head": "feature/studio-production-board-v10-20261011",
+          "base": "feature/studio-release-export-v9-20261011",
+          "updated": "2026-10-11T23:49:28Z"
+        },
+        {
+          "n": 79,
+          "title": "Author: Broken World Master Canon with approvals, histories, dossiers and cited source links",
+          "head": "feature/author-master-canon-ledger-20261011",
+          "base": "feature/author-story-atlas-timeline-20261011",
+          "updated": "2026-10-11T23:47:39Z"
+        },
+        {
+          "n": 78,
+          "title": "Webbie Jarvis Voice Lab: audio-bound speaker verification, listening indicator, consented hearing test",
+          "head": "feature/webbie-voice-lab-diagnostics-20261011",
+          "base": "feature/webbie-jarvis-trust-readiness-receipts-20261011",
+          "updated": "2026-10-11T23:46:47Z"
+        },
+        {
+          "n": 77,
+          "title": "Study: private course Reading Library, local search and Webbie-selected materials",
+          "head": "feature/study-course-reading-library-20261011",
+          "base": "feature/study-webbie-coach-apa-preflight-20261011",
+          "updated": "2026-10-11T23:41:17Z"
+        },
+        {
+          "n": 76,
+          "title": "Webbie Jarvis: trusted voice boundaries, live readiness and truthful desktop receipts",
+          "head": "feature/webbie-jarvis-trust-readiness-receipts-20261011",
+          "base": "feature/webbie-jarvis-cognitive-control-center-20261011",
+          "updated": "2026-10-11T22:43:38Z"
+        },
+        {
+          "n": 75,
+          "title": "Author: native Story Atlas timelines, character network, and evidence-linked canon audit",
+          "head": "feature/author-story-atlas-timeline-20261011",
+          "base": "feature/author-project-map-progress-20261011",
+          "updated": "2026-10-11T22:41:00Z"
+        },
+        {
+          "n": 74,
+          "title": "Studio v9: Release Desk, production export profiles, mix A/B and presets",
+          "head": "feature/studio-release-export-v9-20261011",
+          "base": "feature/studio-production-workflow-v8-20261011",
+          "updated": "2026-10-11T22:38:58Z"
+        },
+        {
+          "n": 73,
+          "title": "Study: Webbie Learning Coach, practice quizzes and offline APA source checks",
+          "head": "feature/study-webbie-coach-apa-preflight-20261011",
+          "base": "feature/study-milestones-sources-weekly-20261011",
+          "updated": "2026-10-11T22:43:03Z"
+        },
+        {
+          "n": 72,
+          "title": "Daily Spider OS candidate: integrate Kali Evidence Ledger without bypassing one-install safeguards",
+          "head": "release/kali-ledger-one-batch-integration-20261011",
+          "base": "release/daily-continuity-gate-20261011",
+          "updated": "2026-10-11T22:40:10Z"
+        },
+        {
+          "n": 71,
+          "title": "Study: weekly planner, milestones, research sources, and verified private backups",
+          "head": "feature/study-milestones-sources-weekly-20261011",
+          "base": "feature/study-assignment-workspaces-20261011",
+          "updated": "2026-10-11T21:32:15Z"
+        },
+        {
+          "n": 70,
+          "title": "Kali Bay: evidence ledger, verified reports and protected one-batch upgrade audit",
+          "head": "upgrades/kali-bay-evidence-ledger-20261011",
+          "base": "upgrades/kali-bay-reports-playbooks-20261011",
+          "updated": "2026-10-11T21:29:14Z"
+        },
+        {
+          "n": 69,
+          "title": "Webbie Jarvis major cognitive upgrade: focus memory, private sessions, Ollama diagnostics and voice recovery",
+          "head": "feature/webbie-jarvis-cognitive-control-center-20261011",
+          "base": "feature/webbie-jarvis-navigation-missions-20261011",
+          "updated": "2026-10-11T21:25:29Z"
+        },
+        {
+          "n": 68,
+          "title": "Webbie Jarvis major upgrade: supervised multi-step missions, action timeline, Studio and Media fixes",
+          "head": "feature/webbie-jarvis-navigation-missions-20261011",
+          "base": "feature/webbie-jarvis-context-browser-20261011",
+          "updated": "2026-10-11T21:11:30Z"
+        },
+        {
+          "n": 67,
+          "title": "Webbie Jarvis: contextual task awareness and approved browser control",
+          "head": "feature/webbie-jarvis-context-browser-20261011",
+          "base": "feature/webbie-proactive-reliability-20261011",
+          "updated": "2026-10-11T20:43:27Z"
+        },
+        {
+          "n": 66,
+          "title": "Daily Spider OS consolidation: integrated 9 workspaces, one-install guard and read-only PC acceptance",
+          "head": "release/daily-continuity-gate-20261011",
+          "base": "feature/forage-deep-research-20261011",
+          "updated": "2026-10-11T22:38:14Z"
+        },
+        {
+          "n": 65,
+          "title": "Kali Bay: guided labs, private reports and local evidence fingerprinting",
+          "head": "upgrades/kali-bay-reports-playbooks-20261011",
+          "base": "upgrades/kali-bay-command-center-20261011",
+          "updated": "2026-10-11T20:34:04Z"
+        },
+        {
+          "n": 64,
+          "title": "Study: assignment workspaces, Webbie handoff, flashcards, grades and study-time journal",
+          "head": "feature/study-assignment-workspaces-20261011",
+          "base": "feature/study-school-planner-20261011",
+          "updated": "2026-10-11T20:30:01Z"
+        },
+        {
+          "n": 62,
+          "title": "Studio v8: revisioned projects, solo, track sync, auditions and DAW handoff",
+          "head": "feature/studio-production-workflow-v8-20261011",
+          "base": "feature/studio-band-pan-mute-20261011",
+          "updated": "2026-10-11T20:25:30Z"
+        },
+        {
+          "n": 61,
+          "title": "Webbie major upgrade: real proactive checks, quiet alerts and reliability diagnostics",
+          "head": "feature/webbie-proactive-reliability-20261011",
+          "base": "feature/webbie-voice-corrections-20261011",
+          "updated": "2026-10-11T20:26:57Z"
+        },
+        {
+          "n": 60,
+          "title": "Kali Bay major round: Command Center, private labs, Kali Purple, Webbie and async catalog",
+          "head": "upgrades/kali-bay-command-center-20261011",
+          "base": "upgrades/kali-bay-readiness-legibility-20261011",
+          "updated": "2026-10-11T20:24:47Z"
+        },
+        {
+          "n": 59,
+          "title": "Studio: 24-track production, recording comp lab, mastering and My Voice QA",
+          "head": "feature/studio-session-mixing-20261011",
+          "base": "feature/studio-local-engine-setup-20261010",
+          "updated": "2026-10-12T00:06:41Z"
+        },
+        {
+          "n": 58,
+          "title": "Fix Webbie proactive check-ins skipped by desktop-session detection",
+          "head": "fix/webbie-proactive-checkins-20261011",
+          "base": "main",
+          "updated": "2026-10-11T20:14:51Z"
+        },
+        {
+          "n": 57,
+          "title": "Studio v7: dedicated band mixer with per-track pan, mute and AI stem import",
+          "head": "feature/studio-band-pan-mute-20261011",
+          "base": "feature/studio-local-engine-setup-20261010",
+          "updated": "2026-10-11T20:09:38Z"
+        },
+        {
+          "n": 56,
+          "title": "Author: Project Map for novel chapters, revision stages and private scene plans",
+          "head": "feature/author-project-map-progress-20261011",
+          "base": "feature/author-docx-import-preview-20261011",
+          "updated": "2026-10-11T20:10:58Z"
+        },
+        {
+          "n": 55,
+          "title": "Major Forage + Deep Forage: multi-engine search, research depth, Webbie voice gate and document indexing",
+          "head": "feature/forage-deep-research-20261011",
+          "base": "release/combined-20261010-audit-gate",
+          "updated": "2026-10-11T20:21:04Z"
+        },
+        {
+          "n": 54,
+          "title": "Webbie: reliable STOP and queued voice corrections without downgrading PC build",
+          "head": "feature/webbie-voice-corrections-20261011",
+          "base": "release/combined-20261010-audit-gate",
+          "updated": "2026-10-11T20:03:15Z"
+        },
+        {
+          "n": 53,
+          "title": "Study: reviewable assignment import, calendar export and deadline dashboard",
+          "head": "feature/study-school-planner-20261011",
+          "base": "feature/studio-v6-workflow-20261010",
+          "updated": "2026-10-11T20:02:51Z"
+        },
+        {
+          "n": 52,
+          "title": "The Web: recovery, staged startup, read-only service health and Webbie integration",
+          "head": "upgrades/the-web-menu-readability-20261011",
+          "base": "release/combined-20261010-audit-gate",
+          "updated": "2026-10-12T00:07:08Z"
+        },
+        {
+          "n": 51,
+          "title": "Author: safe DOCX manuscript import with chapter preview and no overwrite",
+          "head": "feature/author-docx-import-preview-20261011",
+          "base": "feature/author-cross-book-continuity-ledger-20261010",
+          "updated": "2026-10-11T20:00:54Z"
+        },
+        {
+          "n": 50,
+          "title": "Kali Bay: readable native menus and non-mutating readiness report",
+          "head": "upgrades/kali-bay-readiness-legibility-20261011",
+          "base": "integration/kali-native-app-catalog-20261010",
+          "updated": "2026-10-11T20:00:12Z"
+        },
+        {
+          "n": 49,
+          "title": "Restore missing Study modules and gate Spider OS single-batch installation",
+          "head": "release/combined-20261010-audit-gate",
+          "base": "integration/afternoon-20261010-source-staging",
+          "updated": "2026-10-11T09:00:45Z"
+        },
+        {
+          "n": 48,
+          "title": "Draft: consolidate October 10 Spider OS source stacks and inventory install gaps",
+          "head": "integration/afternoon-20261010-source-staging",
+          "base": "feature/webbie-context-presence-20261010",
+          "updated": "2026-10-10T20:05:24Z"
+        },
+        {
+          "n": 47,
+          "title": "Webbie: contextual awareness, reliable conversation continuity and local-model compatibility",
+          "head": "feature/webbie-context-presence-20261010",
+          "base": "feature/webbie-desktop-operator-sleep-eyes-20261010",
+          "updated": "2026-10-10T19:34:22Z"
+        },
+        {
+          "n": 46,
+          "title": "Expand native Kali Bay with real installed app catalog and Webbie workspace chat",
+          "head": "integration/kali-native-app-catalog-20261010",
+          "base": "integration/kali-native-spider-webbie-20261010",
+          "updated": "2026-10-10T19:33:09Z"
+        },
+        {
+          "n": 45,
+          "title": "Author: evidence-grounded Broken World cross-book continuity checks",
+          "head": "feature/author-cross-book-continuity-ledger-20261010",
+          "base": "feature/author-audiobook-bookmarks-review-anchors-20261010",
+          "updated": "2026-10-10T19:24:50Z"
+        },
+        {
+          "n": 44,
+          "title": "Author: resumable Webbie audiobooks and exact review section links",
+          "head": "feature/author-audiobook-bookmarks-review-anchors-20261010",
+          "base": "feature/author-saved-reviews-chapter-navigation-20261010",
+          "updated": "2026-10-10T17:58:42Z"
+        },
+        {
+          "n": 43,
+          "title": "Make Kali Bay a VM-free native Kali tool environment with Webbie",
+          "head": "integration/kali-native-spider-webbie-20261010",
+          "base": "integration/webbie-kali-bay-controls-20261010",
+          "updated": "2026-10-10T17:02:14Z"
+        },
+        {
+          "n": 42,
+          "title": "Author: save full-book reviews, detect outdated findings and navigate chapters",
+          "head": "feature/author-saved-reviews-chapter-navigation-20261010",
+          "base": "feature/author-full-review-webbie-narration-20261010",
+          "updated": "2026-10-10T17:00:43Z"
+        },
+        {
+          "n": 41,
+          "title": "Add full Kali Linux desktop VM inside Kali Bay with Webbie controls",
+          "head": "integration/kali-real-desktop-webbie-20261010",
+          "base": "integration/webbie-kali-bay-controls-20261010",
+          "updated": "2026-10-10T16:54:47Z"
+        },
+        {
+          "n": 40,
+          "title": "Build Kali-style desktop hub inside Spider OS Kali Bay",
+          "head": "upgrades/kali-bay-hybrid-desktop-20261010",
+          "base": "upgrades/kali-bay-security-tool-launchers",
+          "updated": "2026-10-10T16:42:18Z"
+        },
+        {
+          "n": 39,
+          "title": "Integrate Webbie and Kali-style hybrid desktop into Spider OS Kali Bay",
+          "head": "integration/webbie-kali-bay-controls-20261010",
+          "base": "integration/webbie-author-camera-sleep-20261009",
+          "updated": "2026-10-10T16:45:18Z"
+        },
+        {
+          "n": 37,
+          "title": "Author: review entire chapters and books; narrate with Webbie's own voice",
+          "head": "feature/author-full-review-webbie-narration-20261010",
+          "base": "integration/webbie-author-camera-sleep-20261009",
+          "updated": "2026-10-10T16:54:16Z"
+        },
+        {
+          "n": 36,
+          "title": "Webbie: supervised Autopilot, live-voice stop and owner-safe desktop control",
+          "head": "feature/webbie-desktop-operator-sleep-eyes-20261010",
+          "base": "feature/webbie-fullscreen-clickthrough-20261010",
+          "updated": "2026-10-10T17:01:46Z"
+        },
+        {
+          "n": 35,
+          "title": "Studio AI: My Voice training foundation, vocal roles and final-mix workflow",
+          "head": "feature/studio-local-engine-setup-20261010",
+          "base": "feature/studio-v6-workflow-20261010",
+          "updated": "2026-10-11T20:02:14Z"
+        },
+        {
+          "n": 34,
+          "title": "Studio: local song generation; Study: embedded My SNHU workspace",
+          "head": "feature/studio-v6-workflow-20261010",
+          "base": "feature/studio-ai-own-voice-20261009",
+          "updated": "2026-10-10T19:28:04Z"
+        },
+        {
+          "n": 33,
+          "title": "Add optional full-screen, click-through Webbie portrait mode",
+          "head": "feature/webbie-fullscreen-clickthrough-20261010",
+          "base": "feature/webbie-caption-below-portrait-20261009",
+          "updated": "2026-10-10T04:26:11Z"
+        },
+        {
+          "n": 32,
+          "title": "Anchor Webbie's heard-speech popup beneath her portrait",
+          "head": "feature/webbie-caption-below-portrait-20261009",
+          "base": "feature/webbie-face-bottom-right-20261009",
+          "updated": "2026-10-10T04:16:07Z"
+        },
+        {
+          "n": 31,
+          "title": "Recognize 'Webby' as a Webbie wake and sleep alias",
+          "head": "fix/webbie-webby-wake-alias-20261009",
+          "base": "release/combined-20261009-7f2de4c",
+          "updated": "2026-10-10T03:41:34Z"
+        },
+        {
+          "n": 30,
+          "title": "Preserve PC memory repairs, guard Forage evidence, and reorder upgrade priorities",
+          "head": "fix/pc-reconciliation-forage-evidence-20261010",
+          "base": "fix/webbie-camera-640x480-mjpeg-20261009",
+          "updated": "2026-10-10T15:27:43Z"
+        },
+        {
+          "n": 29,
+          "title": "Fix Webbie webcam: 640×480 MJPEG capture on onn 4K",
+          "head": "fix/webbie-camera-640x480-mjpeg-20261009",
+          "base": "release/combined-20261009-7f2de4c",
+          "updated": "2026-10-10T02:42:05Z"
+        },
+        {
+          "n": 28,
+          "title": "Position Webbie floating portrait at lower-right",
+          "head": "feature/webbie-face-bottom-right-20261009",
+          "base": "release/combined-20261009-7f2de4c",
+          "updated": "2026-10-09T23:35:09Z"
+        },
+        {
+          "n": 27,
+          "title": "Studio AI: own-voice Suno v6 benchmark and validated creative controls",
+          "head": "feature/studio-ai-own-voice-20261009",
+          "base": "release/combined-20261009-7f2de4c",
+          "updated": "2026-10-09T22:51:05Z"
+        },
+        {
+          "n": 26,
+          "title": "Integrate Spider OS Author, Webbie X11 face, quiet sleep, optional OneDrive and consented room vision",
+          "head": "integration/webbie-author-camera-sleep-20261009",
+          "base": "upgrades/webbie-quiet-visual-sleep",
+          "updated": "2026-10-09T22:00:02Z"
+        },
+        {
+          "n": 25,
+          "title": "Keep Webbie visibly asleep and ignore conversation until explicit wake",
+          "head": "upgrades/webbie-quiet-visual-sleep",
+          "base": "upgrades/webbie-author-context",
+          "updated": "2026-10-09T14:13:42Z"
+        },
+        {
+          "n": 24,
+          "title": "Privacy-first Webbie single-frame webcam and local vision foundation",
+          "head": "upgrades/webbie-local-vision-snapshot",
+          "base": "upgrades/webbie-author-context",
+          "updated": "2026-10-09T14:14:16Z"
+        },
+        {
+          "n": 23,
+          "title": "Add Webbie voice-driven webcam vision and optional Cory/Shayna face recognition",
+          "head": "upgrades/webbie-camera-room-awareness",
+          "base": "upgrades/author-webbie-every-workspace",
+          "updated": "2026-10-09T14:26:11Z"
+        },
+        {
+          "n": 22,
+          "title": "Webbie Author Bay Writer context and local Ollama model preferences",
+          "head": "upgrades/webbie-author-context",
+          "base": "upgrades/webbie-transparent-overlay",
+          "updated": "2026-10-09T07:19:45Z"
+        },
+        {
+          "n": 21,
+          "title": "Add click-through always-visible Webbie face and optional deferred OneDrive integration",
+          "head": "upgrades/webbie-transparent-overlay",
+          "base": "upgrades/webbie-face-window-controls",
+          "updated": "2026-10-09T07:11:21Z"
+        },
+        {
+          "n": 20,
+          "title": "Port Author website features and embed Webbie throughout The Web",
+          "head": "upgrades/author-webbie-every-workspace",
+          "base": "upgrades/webbie-face-window-controls",
+          "updated": "2026-10-09T06:36:20Z"
+        },
+        {
+          "n": 17,
+          "title": "Batch The Web desktop essentials, Webbie speaking face and health reporting",
+          "head": "upgrades/webbie-face-window-controls",
+          "base": "upgrades/desktop-system-controls",
+          "updated": "2026-10-09T06:18:07Z"
+        },
+        {
+          "n": 16,
+          "title": "Add System and Recovery diagnostics without blocking the desktop",
+          "head": "upgrades/desktop-system-controls",
+          "base": "upgrades/the-web-desktop",
+          "updated": "2026-10-09T01:26:42Z"
+        },
+        {
+          "n": 13,
+          "title": "Restore Kali Purple workspace and add approved Kali tool launchers",
+          "head": "upgrades/kali-bay-security-tool-launchers",
+          "base": "upgrades/desktop-install-reconciliation",
+          "updated": "2026-10-09T00:27:57Z"
+        },
+        {
+          "n": 11,
+          "title": "Build The Web X11 desktop with native workspaces and wallpaper collection",
+          "head": "upgrades/the-web-desktop",
+          "base": "upgrades/ai-dj-http-reliability",
+          "updated": "2026-10-09T00:57:37Z"
+        },
+        {
+          "n": 10,
+          "title": "Repair AI DJ HTTP endpoints and record upgrade installation checks",
+          "head": "upgrades/ai-dj-http-reliability",
+          "base": "upgrades/studio-installed-tools",
+          "updated": "2026-10-08T18:40:50Z"
+        },
+        {
+          "n": 9,
+          "title": "Expose installed Ubuntu Studio tools inside Spider Studio",
+          "head": "upgrades/studio-installed-tools",
+          "base": "upgrades/school-dashboard",
+          "updated": "2026-10-08T15:03:01Z"
+        },
+        {
+          "n": 8,
+          "title": "Add School dashboard, APA student papers and SNHU links",
+          "head": "upgrades/school-dashboard",
+          "base": "upgrades/author-library",
+          "updated": "2026-10-08T14:58:51Z"
+        },
+        {
+          "n": 7,
+          "title": "Add native Author library, autosave, snapshots and private imports",
+          "head": "upgrades/author-library",
+          "base": "upgrades/kali-bay-wallpaper-reliability",
+          "updated": "2026-10-08T14:52:15Z"
+        },
+        {
+          "n": 6,
+          "title": "Show workspace wallpapers and harden Kali Bay status/updates",
+          "head": "upgrades/kali-bay-wallpaper-reliability",
+          "base": "upgrades/forage-local-index",
+          "updated": "2026-10-08T14:37:31Z"
+        },
+        {
+          "n": 5,
+          "title": "Add selected-source Forage search and mark completed source upgrades",
+          "head": "upgrades/forage-local-index",
+          "base": "upgrades/webbie-action-gateway",
+          "updated": "2026-10-08T02:50:25Z"
+        },
+        {
+          "n": 4,
+          "title": "Add Webbie fixed actions, request-bound approvals and mode context",
+          "head": "upgrades/webbie-action-gateway",
+          "base": "upgrades/workspace-launchers",
+          "updated": "2026-10-08T02:43:51Z"
+        },
+        {
+          "n": 3,
+          "title": "Repair Studio and Author launchers and Media Center compatibility",
+          "head": "upgrades/workspace-launchers",
+          "base": "upgrades/guardian-vault-source-checks",
+          "updated": "2026-10-08T02:28:18Z"
+        },
+        {
+          "n": 2,
+          "title": "Add Spider Guardian diagnostics and opt-in encrypted OneDrive backups",
+          "head": "upgrades/guardian-vault-source-checks",
+          "base": "main",
+          "updated": "2026-10-08T02:12:19Z"
+        },
+        {
+          "n": 1,
+          "title": "Add CodeQL analysis workflow configuration",
+          "head": "brokenandalone-patch-1",
+          "base": "main",
+          "updated": "2026-09-13T09:21:45Z"
+        }
+      ],
+      "recent_closed": [
+        {
+          "n": 102,
+          "title": "Nova: share Webbie Australian neural voices with native BCN DJ",
+          "updated": "2026-10-12T17:09:57Z"
+        },
+        {
+          "n": 63,
+          "title": "Fix Nova HTTPMessage collision crashing /health and DJ responses",
+          "updated": "2026-10-11T20:24:22Z"
+        },
+        {
+          "n": 38,
+          "title": "BCN Radio: native Nova host personality, station IDs, fallback and tests",
+          "updated": "2026-10-10T16:27:34Z"
+        },
+        {
+          "n": 19,
+          "title": "Distinguish extracted Word originals and legacy BIOS in installed audit",
+          "updated": "2026-10-09T06:18:05Z"
+        },
+        {
+          "n": 18,
+          "title": "Read-only installed Spider OS audit after outage, with private Author and Kali inventory",
+          "updated": "2026-10-09T06:10:06Z"
+        },
+        {
+          "n": 15,
+          "title": "Connect real local project content folders inside The Web workspaces",
+          "updated": "2026-10-09T00:57:35Z"
+        },
+        {
+          "n": 14,
+          "title": "Prevent black desktop when launching Firefox from The Web",
+          "updated": "2026-10-09T00:48:44Z"
+        },
+        {
+          "n": 12,
+          "title": "Complete safe desktop installation for existing Author and Studio workspaces",
+          "updated": "2026-10-09T00:17:20Z"
+        }
+      ],
+      "special": {
+        "nova_voice_merged_to_main_pr": 102,
+        "known_good_pr": 99,
+        "owner_first_pr": 101,
+        "matilda_doc_pr": 100,
+        "merged_voice_module_missing_from_wave_six": true
+      }
+    },
+    "legacy_spider_os1": {
+      "repository": "brokenandalone/Spider-OS1",
+      "default_branch": "main",
+      "main_commit_at_audit": "d7c057fcbc53ee494ebef04b93e8e30c1462ae5c",
+      "scope": "last 10 PRs returned",
+      "total_prs_returned": 10,
+      "open_count": 9,
+      "closed_count": 1,
+      "open_prs": [
+        {
+          "n": 10,
+          "title": "Stage repaired AI DJ service and upgrade installation checks",
+          "head": "upgrades/ai-dj-http-reliability",
+          "base": "upgrades/studio-installed-tools",
+          "updated": "2026-10-08T18:40:51Z"
+        },
+        {
+          "n": 9,
+          "title": "Sync Ubuntu Studio tool integration",
+          "head": "upgrades/studio-installed-tools",
+          "base": "upgrades/school-dashboard",
+          "updated": "2026-10-08T15:03:15Z"
+        },
+        {
+          "n": 8,
+          "title": "Stage School dashboard and APA tools",
+          "head": "upgrades/school-dashboard",
+          "base": "upgrades/author-library",
+          "updated": "2026-10-08T14:59:47Z"
+        },
+        {
+          "n": 7,
+          "title": "Sync native Author library and private content imports",
+          "head": "upgrades/author-library",
+          "base": "upgrades/forage-local-index",
+          "updated": "2026-10-08T14:53:02Z"
+        },
+        {
+          "n": 6,
+          "title": "Sync Forage text-index backend and completed source checklist",
+          "head": "upgrades/forage-local-index",
+          "base": "upgrades/webbie-action-gateway",
+          "updated": "2026-10-08T02:49:29Z"
+        },
+        {
+          "n": 5,
+          "title": "Sync Webbie action registry, request approvals and workspace modes",
+          "head": "upgrades/webbie-action-gateway",
+          "base": "upgrades/workspace-launchers",
+          "updated": "2026-10-08T02:43:52Z"
+        },
+        {
+          "n": 4,
+          "title": "Sync independent Author, native Studio and Media Center launchers",
+          "head": "upgrades/workspace-launchers",
+          "base": "upgrades/guardian-vault-source-checks",
+          "updated": "2026-10-08T02:28:19Z"
+        },
+        {
+          "n": 3,
+          "title": "Sync Guardian diagnostics and encrypted OneDrive vault tools",
+          "head": "upgrades/guardian-vault-source-checks",
+          "base": "main",
+          "updated": "2026-10-08T02:12:20Z"
+        },
+        {
+          "n": 2,
+          "title": "Add live-session boot identity and branding autostart",
+          "head": "fix/live-boot-branding",
+          "base": "main",
+          "updated": "2026-09-27T01:36:17Z"
+        }
+      ],
+      "recent_closed": [
+        {
+          "n": 1,
+          "title": "Add GitHub Actions workflow for Spider OS build",
+          "updated": "2026-09-20T06:11:57Z"
+        }
+      ]
+    },
+    "media_center": {
+      "repository": "brokenandalone/Spider-Media-Center",
+      "default_branch": "main",
+      "main_commit_at_audit": "3f9a4af99d17fa1c50830cbdc9e007908760e9db",
+      "scope": "last 23 PRs returned",
+      "total_prs_returned": 23,
+      "open_count": 2,
+      "closed_count": 21,
+      "open_prs": [
+        {
+          "n": 23,
+          "title": "Media Center: Nova Australian voices, invalid-library cleanup, and BCN cue rotation",
+          "head": "upgrade/nova-new-voice-selector-20261012",
+          "base": "main",
+          "updated": "2026-10-12T17:13:02Z"
+        },
+        {
+          "n": 11,
+          "title": "Next Media Center round: bounded BCN radio shutdown for stalled listeners",
+          "head": "upgrades/v6-bcn-bounded-shutdown",
+          "base": "main",
+          "updated": "2026-10-11T11:13:31Z"
+        }
+      ],
+      "recent_closed": [
+        {
+          "n": 22,
+          "title": "BCN Radio: four-artist show generator including J-Cold",
+          "updated": "2026-10-12T15:43:58Z"
+        },
+        {
+          "n": 21,
+          "title": "Media Center V7: bulk playlists and BCN show playlist generator",
+          "updated": "2026-10-12T15:32:32Z"
+        },
+        {
+          "n": 20,
+          "title": "Pin repaired Nova HTTP service and preflight real requests before V7 installation",
+          "updated": "2026-10-11T20:27:32Z"
+        },
+        {
+          "n": 19,
+          "title": "Repair Nova combined V7 installer health diagnostics and verify rollback",
+          "updated": "2026-10-11T20:13:42Z"
+        },
+        {
+          "n": 18,
+          "title": "One installer for V7 Media Center and existing V6 Nova/BCN features",
+          "updated": "2026-10-11T20:02:04Z"
+        },
+        {
+          "n": 17,
+          "title": "V7 opt-in preview installer with manifest checks, atomic backup and rollback",
+          "updated": "2026-10-11T17:29:44Z"
+        },
+        {
+          "n": 16,
+          "title": "Massive V7 visualizer upgrade: eight cinema presets, custom scene bank and GPU health",
+          "updated": "2026-10-11T15:36:00Z"
+        },
+        {
+          "n": 15,
+          "title": "V7 hardening: stop fullscreen per-frame resource leak and safely yield to video",
+          "updated": "2026-10-11T15:30:52Z"
+        },
+        {
+          "n": 14,
+          "title": "V7 Cinema: immersive fullscreen GPU visualizer with accessible controls",
+          "updated": "2026-10-11T14:34:28Z"
+        },
+        {
+          "n": 13,
+          "title": "Immersive Performance Studio: adaptive 3D, themes, motion, diagnostics",
+          "updated": "2026-10-11T13:59:58Z"
+        },
+        {
+          "n": 12,
+          "title": "V7 preview: real GPU 3D audio visualizer and four immersive scenes",
+          "updated": "2026-10-11T11:46:39Z"
+        },
+        {
+          "n": 10,
+          "title": "V6: serialize Nova requests, preserve listener approvals, and roll back both installer components",
+          "updated": "2026-10-11T09:07:20Z"
+        },
+        {
+          "n": 9,
+          "title": "V6 functional upgrade: public BCN relay health, version consistency and release safeguards",
+          "updated": "2026-10-11T03:04:40Z"
+        },
+        {
+          "n": 8,
+          "title": "Release v5.0 upgrade bundle",
+          "updated": "2026-10-11T03:00:38Z"
+        },
+        {
+          "n": 7,
+          "title": "BCN: supervised public relay recovery with safe restart limits",
+          "updated": "2026-10-10T19:52:28Z"
+        },
+        {
+          "n": 6,
+          "title": "BCN Radio: listener audio-delivery diagnostics and stream backpressure protection",
+          "updated": "2026-10-10T19:27:17Z"
+        },
+        {
+          "n": 5,
+          "title": "BCN Radio: real moderated listener submissions and session-only continuity guard",
+          "updated": "2026-10-10T16:58:57Z"
+        },
+        {
+          "n": 4,
+          "title": "BCN Radio: weekly show clock and operator-reviewed listener requests",
+          "updated": "2026-10-10T16:46:25Z"
+        },
+        {
+          "n": 3,
+          "title": "BCN: on-air Nova station IDs, show context, and reliable voice preparation",
+          "updated": "2026-10-10T16:33:35Z"
+        },
+        {
+          "n": 2,
+          "title": "Repair embedded playback and package the Linux Media Center upgrade",
+          "updated": "2026-10-10T16:10:01Z"
+        },
+        {
+          "n": 1,
+          "title": "BCN network media, Spider-native media core, and portable live AI DJ",
+          "updated": "2026-10-05T00:23:21Z"
+        }
+      ],
+      "special": {
+        "playlist_workshop_merged_pr": 21,
+        "four_artist_merged_pr": 22,
+        "open_shutdown_pr": 11
+      }
+    },
+    "bcn_network": {
+      "repository": "brokenandalone/bcn-network",
+      "default_branch": "main",
+      "main_commit_at_audit": "e5fd367add03d6418962c62bb4afa7e0efa12b6b",
+      "scope": "last 14 PRs returned",
+      "total_prs_returned": 14,
+      "open_count": 1,
+      "closed_count": 13,
+      "open_prs": [
+        {
+          "n": 14,
+          "title": "BCN: Dedicated multipage Broken World story hub",
+          "head": "feature/bcn-broken-world-24-7-ready",
+          "base": "main",
+          "updated": "2026-10-12T05:56:48Z"
+        }
+      ],
+      "recent_closed": [
+        {
+          "n": 13,
+          "title": "BCN v15: link the public site to the deployed secure Command Center",
+          "updated": "2026-10-12T01:51:25Z"
+        },
+        {
+          "n": 12,
+          "title": "BCN v14: public newsroom and audited owner publishing workflow",
+          "updated": "2026-10-12T00:04:16Z"
+        },
+        {
+          "n": 11,
+          "title": "BCN v13: secure admin activation checks and end-to-end owner API tests",
+          "updated": "2026-10-11T22:37:08Z"
+        },
+        {
+          "n": 10,
+          "title": "BCN v12: dedicate separate pages to characters, locations, Thirteen-Mile Road and Broken Sorrow",
+          "updated": "2026-10-11T20:10:06Z"
+        },
+        {
+          "n": 9,
+          "title": "BCN v11: 14-image Broken World and Broken Sorrow artwork gallery",
+          "updated": "2026-10-11T20:03:21Z"
+        },
+        {
+          "n": 8,
+          "title": "BCN v10: separate visitor website and authenticated owner Command Center",
+          "updated": "2026-10-11T17:52:18Z"
+        },
+        {
+          "n": 7,
+          "title": "BCN v9: secure public Spider Media Center and Webbie bridge contract",
+          "updated": "2026-10-11T17:39:23Z"
+        },
+        {
+          "n": 6,
+          "title": "BCN v8: Nova producer bridge, media catalog and community/TV foundations",
+          "updated": "2026-10-11T17:36:33Z"
+        },
+        {
+          "n": 5,
+          "title": "BCN v7: Broadcast Operations foundation and Nova show desk",
+          "updated": "2026-10-11T17:33:58Z"
+        },
+        {
+          "n": 4,
+          "title": "BCN v6: Listener Control Center, accessible reading and private field notes",
+          "updated": "2026-10-11T17:08:32Z"
+        },
+        {
+          "n": 3,
+          "title": "BCN v5: investigative bureau and personal transmission reading queue",
+          "updated": "2026-10-11T15:32:57Z"
+        },
+        {
+          "n": 2,
+          "title": "BCN v4: Field Desk, guided investigations, narration and receiver diagnostics",
+          "updated": "2026-10-11T14:44:05Z"
+        },
+        {
+          "n": 1,
+          "title": "BCN v3: Signal Atlas, global search, dossiers and reader upgrades",
+          "updated": "2026-10-11T14:12:07Z"
+        }
+      ],
+      "special": {
+        "merged_command_center_pr": 13,
+        "draft_story_pages_pr": 14
+      }
+    }
+  },
+  "requirements": [
+    "Reconcile installed owner Webbie agent, Whisper listener, brain and 28 additional custom source files; do not replace their live bytes without explicit diff, regression and hardware tests.",
+    "Keep Qwen3 8B installed/configured model, voice trust only Cory and Shayna, Matilda voice choice, wake/STOP/echo and hearing protections. Preserve uninterrupted desktop/audio.",
+    "Include latest Nova Australian-voices PR 102 merged to Spider OS main AFTER frozen Wave Six snapshot; main files media/ai-dj/nova_voice.py and media/ai-dj/service.py must be reconciled with customized live service.",
+    "Keep Media Center V7 bulk playlists and four-artist show generator (merged PRs 21,22); verify player, playlist selection, visualizer, actual BCN live audio and Nova bridge.",
+    "Audit unresolved Media Center PR 11 bounded radio shutdown; do not assume implemented.",
+    "Keep BCN network v3-v15 site and owner Command Center from main; separate deployment pipeline, test admin access, broadcast security; review draft PR14 Broken World multipage.",
+    "Spider-OS1 is a legacy mirror/build source; avoid installing it alongside the native spider-narive-os system or mixing boot changes blindly.",
+    "Run one coordinated change window with separate native OS batch + Media Center installer + BCN site deployment, each with own independent validation/rollback and owners' explicit approval.",
+    "Do not claim readiness when any candidate code changes after last CI, any known-good owner fingerprint differs, local model/voice tests fail, same-day install slot is used, or pending overlaps are unresolved."
+  ],
+  "priority_pulls": {
+    "spider_os": [
+      100,
+      101,
+      102,
+      99,
+      98,
+      97,
+      96,
+      95,
+      94,
+      93,
+      92,
+      90,
+      89,
+      88
+    ],
+    "media_center": [
+      22,
+      21,
+      20,
+      18,
+      16,
+      11
+    ],
+    "bcn_network": [
+      14,
+      13,
+      12,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+    ],
+    "legacy_spider_os1": [
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2
+    ]
+  },
+  "acceptance": {
+    "code_merge_complete": false,
+    "new_nova_voice_integrated_into_owner_preserving_candidate": false,
+    "media_center_code_installed": false,
+    "bcn_website_deployed": false,
+    "all_31_owner_files_semantically_merged": false,
+    "webbie_model_smoke_passed": false,
+    "voice_hardware_verified": false,
+    "pc_known_good_confirmed": false,
+    "physical_rollback_validated": false,
+    "one_session_owner_approval": false
+  }
+}
