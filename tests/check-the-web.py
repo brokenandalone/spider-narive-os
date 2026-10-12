@@ -174,10 +174,26 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert checkpoint['open'][0] == 'default'
     assert window.restore_layout_checkpoint()
     assert window.current_workspace == 'author'
-    window.toggle_workspace_recovery()
-    assert window.workspace_recovery.isVisible()
+    from desktop_service_health import ServiceHealth
+    sample_services = [
+        ServiceHealth('webbie.service', 'Webbie resident assistant', 'running',
+                      'Service is active'),
+        ServiceHealth('spider-ai-dj.service', 'Nova / Spider AI DJ', 'stopped',
+                      'Service is not active')]
+    with patch('workspace_recovery.probe_user_services', return_value=sample_services):
+        window.toggle_workspace_recovery()
+        assert window.workspace_recovery.isVisible()
+        worker = window.workspace_recovery.service_worker
+        assert worker is not None and worker.wait(7000)
+        app.processEvents()
+        assert window.workspace_recovery.service_health.count() == 2
     window.workspace_recovery.refresh()
     assert window.workspace_recovery.list.count() == len(main.WORKSPACES) - 1
+    assert not window.webbie_assistant.entry.text()
+    window.workspace_recovery.prepare_webbie_status()
+    assert 'webbie.service: running' in window.webbie_assistant.entry.text()
+    assert 'spider-ai-dj.service: stopped' in window.webbie_assistant.entry.text()
+    assert not window.webbie_assistant.pending
     window.workspace_recovery.copy_safe_diagnostics()
     import json
     diagnostic = json.loads(QApplication.clipboard().text())
