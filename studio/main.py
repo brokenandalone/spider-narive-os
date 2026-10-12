@@ -169,6 +169,8 @@ class SpiderStudio(QMainWindow):
         quality_scroll.setWidgetResizable(True)
         quality_scroll.setWidget(self.quality_panel)
         self.tool_tabs.addTab(quality_scroll, 'Audio Quality')
+        self.production_board_panel.quality_panel = self.quality_panel
+        self.production_board_panel.quality_tab = quality_scroll
         self.tool_buttons = []
         for category, tools in TOOLS.items():
             page = QWidget(); grid = QGridLayout(page)
