@@ -444,6 +444,24 @@ class TheWeb(QMainWindow):
         )
         self.update_webbie_context()
 
+    def prepare_webbie_service_question(self, brief):
+        """Owner-reviewed status draft. Never automatically send or grant control."""
+        panel = self.webbie_assistant
+        if getattr(panel, 'pending', False) or not panel.entry.isEnabled():
+            return False
+        if panel.entry.text().strip():
+            return False
+        text = ('Explain these Spider OS service states and suggest safe manual '
+                'diagnostics. Do not change services or run commands without '
+                'my separate approval.\n' + str(brief)[:450])
+        panel.entry.setText(text[:750])
+        self.update_webbie_context()
+        self.webbie_dock.show()
+        self.webbie_dock.raise_()
+        panel.entry.setFocus()
+        self.status.setText('Review the Webbie service-health draft before sending.')
+        return True
+
     def toggle_webbie_assistant(self):
         if self.webbie_dock.isVisible():
             self.webbie_dock.hide()
@@ -1391,6 +1409,17 @@ class TheWeb(QMainWindow):
         self.command_palette.close()
         recovery = getattr(self, 'workspace_recovery', None)
         if recovery is not None:
+            service_worker = getattr(recovery, 'service_worker', None)
+            if service_worker is not None and service_worker.isRunning():
+                # The bounded read-only systemctl query is never left holding
+                # a live QThread while the parent Qt window is destroyed.
+                if not service_worker.wait(8000):
+                    self.status.setText('The service health check is finishing. '
+                                        'Close again afterward.')
+                    event.ignore()
+                    return
+            recovery.service_timer.stop()
+            recovery.restore_timer.stop()
             recovery.close()
         self.taskbar.close()
         self.start_menu.close()
