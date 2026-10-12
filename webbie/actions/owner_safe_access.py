@@ -32,7 +32,7 @@ BLOCK_TOKENS=frozenset((
 ))
 BENIGN_KEYS=frozenset((
     "Escape","Tab","Up","Down","Left","Right","Home","End",
-    "Page_Up","Page_Down","space","alt+Left","alt+Right",
+    "Page_Up","Page_Down","alt+Left","alt+Right",
     "ctrl+Page_Up","ctrl+Page_Down",
 ))
 ROUTINE_ACTIONS=frozenset((
