@@ -13,9 +13,11 @@ from PyQt5.QtWidgets import (
 if __package__:
     from .multitrack import ROLES, SessionError
     from .take_comp import _read_layout, render_take_comp, PRESETS, NON_PERFORMANCE
+    from .take_comp_library import inspect_take_comp
 else:
     from multitrack import ROLES, SessionError
     from take_comp import _read_layout, render_take_comp, PRESETS, NON_PERFORMANCE
+    from take_comp_library import inspect_take_comp
 
 
 class CompWorker(QThread):
@@ -128,9 +130,38 @@ class TakeCompDialog(QDialog):
         self.accept = QPushButton("Add this comp to session")
         self.accept.clicked.connect(self.accept_comp)
         self.accept.setEnabled(False)
-        for button in (self.build, self.stop, self.listen, self.accept):
+        self.reopen = QPushButton("Reopen saved Take Comp")
+        self.reopen.clicked.connect(self.reopen_comp)
+        for button in (self.build, self.stop, self.reopen, self.listen, self.accept):
             actions.addWidget(button)
         outer.addLayout(actions)
+
+    def reopen_comp(self):
+        """Only a hash-verified previous comp is eligible for further listening/import."""
+        if self.worker is not None:
+            return
+        folder = QFileDialog.getExistingDirectory(
+            self, "Reopen a saved Take Comp", str(Path.home() / "Documents/Spider Studio/Music"))
+        if not folder:
+            return
+        try:
+            data = inspect_take_comp(folder)
+        except (SessionError, OSError, ValueError) as error:
+            self.status.setText("Cannot reopen this saved comp: " + str(error))
+            return
+        self.output = data["path"]
+        self.completed_role = data["role"]
+        self.role.setCurrentIndex(self.role.findData(data["role"]))
+        self.edits.clear()
+        self.regions.clear()
+        self.listen.setEnabled(True)
+        self.accept.setEnabled(True)
+        self.status.setText(
+            f"Verified {data['edits']} saved region(s), "
+            f"{data['duration_seconds']:.1f} seconds in the {data['role']} recording. "
+            "Original recording files were not read. Listen before importing. "
+            "To change the edit, create a NEW comp from the source takes."
+        )
 
     def choose_file(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -190,6 +221,7 @@ class TakeCompDialog(QDialog):
         self.add.setEnabled(False)
         self.remove.setEnabled(False)
         self.choose.setEnabled(False)
+        self.reopen.setEnabled(False)
         self.role.setEnabled(False)
         self.stop.setEnabled(True)
         self.listen.setEnabled(False)
@@ -216,6 +248,7 @@ class TakeCompDialog(QDialog):
         self.add.setEnabled(True)
         self.remove.setEnabled(True)
         self.choose.setEnabled(True)
+        self.reopen.setEnabled(True)
         self.role.setEnabled(True)
         self.stop.setEnabled(False)
         if worker is not None:
