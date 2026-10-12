@@ -8,6 +8,12 @@ This is a process-local permission cache, not an authentication service.
 from __future__ import annotations
 import threading
 import time
+import sys
+from pathlib import Path
+# Also supports isolated regression tests loading this module from a file.
+_ACTIONS=Path(__file__).resolve().parent
+if str(_ACTIONS) not in sys.path:
+    sys.path.insert(0,str(_ACTIONS))
 from owner_safe_access import OwnerSafeAccess, safe_app_id
 
 ROUTINE = frozenset({
