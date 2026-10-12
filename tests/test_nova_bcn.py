@@ -163,6 +163,49 @@ class NativeHTTPTests(unittest.TestCase):
         self.assertIn("tts unavailable", body["error"])
 
 
+class ProductionStudioTests(unittest.TestCase):
+    def test_production_drafts_have_no_audio(self):
+        service = importlib.import_module("service")
+        with patch.object(service, "ollama_script", return_value="Nova here on BCN"), patch.object(service, "make_audio") as audio:
+            status, _, body = NativeHTTPTests.request(self, "/dj/draft", "POST", {"type": "show_id", "context":{"showName":"Nightwatch"}})
+            self.assertEqual(status, 200)
+            self.assertTrue(body["draft"])
+            self.assertFalse(body["approved"])
+            self.assertIsNone(body["audioFile"])
+            audio.assert_not_called()
+
+    def test_commercial_requires_known_sponsor_and_operator_approval(self):
+        service = importlib.import_module("service")
+        self.assertRaisesRegex(ValueError, "sponsor", service.production_context,
+                               {"type":"commercial","context":{}})
+        status, _, body = NativeHTTPTests.request(self, "/dj/prepare", "POST", {"type":"commercial",
+            "context":{"productionMode":True,"sponsor":"Example Sponsor",
+                       "approvedCopy":"Example Sponsor supports BCN today."}})
+        self.assertEqual(status, 500)
+        self.assertIn("Approve production copy",body["error"])
+
+    def test_produced_voice_speaks_approved_copy_without_rewriting(self):
+        service = importlib.import_module("service")
+        script="This is Broken City Network. You are tuned into Nightwatch."
+        with patch.object(service,"ollama_script") as model, patch.object(service,"make_audio",return_value=Path("/tmp/bcn.wav")) as voice, patch.object(service,"cleanup"):
+            status, _, body = NativeHTTPTests.request(self, "/dj/prepare", "POST", {"type":"show_id",
+                "context":{"productionMode":True,"copyApproved":True,"approvedCopy":script,
+                           "voiceProfile":"matilda","showName":"Nightwatch"}})
+            self.assertEqual(status,200)
+            self.assertEqual(body["script"],script)
+            voice.assert_called_once()
+            model.assert_not_called()
+
+    def test_production_categories_have_safe_fallback_copy(self):
+        host=NovaHost(rng=random.Random(3))
+        for kind in ("show_id","station_id","commercial","promo","sweeper","bumper"):
+            message=host.compose({"type":kind,"context":{"showName":"Nightwatch","sponsor":"Example Sponsor"}},generate=lambda _: "")
+            self.assertTrue(message)
+        message=host.fallback_script({"type":"commercial","context":{"sponsor":"Example Sponsor"}})
+        self.assertIn("Example Sponsor",message)
+        self.assertNotIn("50 percent",message)
+
+
 class SharedAustralianVoiceTests(unittest.TestCase):
     def test_profiles_are_a_fixed_safe_allowlist(self):
         from nova_voice import SPEAKERS, VOICES, normalize_voice
