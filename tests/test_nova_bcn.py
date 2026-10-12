@@ -267,5 +267,58 @@ class SharedAustralianVoiceTests(unittest.TestCase):
                 thread.join(timeout=3)
 
 
+
+class NovaNeuralOnlyTests(unittest.TestCase):
+    def test_on_air_refuses_robotic_espeak_even_if_it_is_installed(self):
+        import tempfile
+        from nova_voice import synthesize
+        with tempfile.TemporaryDirectory() as tmp:
+            attempted = []
+            def fail_run(args, **kwargs):
+                attempted.append(args[0])
+                raise OSError("offline")
+            with self.assertRaisesRegex(RuntimeError, "robotic eSpeak was not used"):
+                synthesize("A short BCN liner", "nova-test-voice",
+                           profile="auto", cache=Path(tmp), home=Path(tmp),
+                           runner=fail_run, which=lambda name:"/usr/bin/"+name,
+                           allow_espeak=False)
+            self.assertNotIn("/usr/bin/espeak-ng", attempted)
+
+    def test_auto_prefers_matilda_when_installed_and_reports_engine(self):
+        import tempfile, wave
+        from nova_voice import synthesize
+        with tempfile.TemporaryDirectory() as tmp:
+            home=Path(tmp)
+            directory=home/".local/share/spider-os/webbie-neural-preview"
+            python=directory/"venv/bin/python3"
+            model=directory/"models/en_AU-librivox-medium.onnx"
+            python.parent.mkdir(parents=True)
+            model.parent.mkdir(parents=True)
+            python.write_text("python")
+            python.chmod(0o700)
+            model.write_bytes(b"model")
+            Path(str(model)+".json").write_text("{}")
+            def fake_run(args, **kwargs):
+                if args[0]!=str(python):
+                    raise AssertionError("Matilda should be tried first")
+                with wave.open(args[args.index("-f")+1], "wb") as writer:
+                    writer.setnchannels(1)
+                    writer.setsampwidth(2)
+                    writer.setframerate(22050)
+                    writer.writeframes(b"\\x00\\x00"*800)
+            result={}
+            audio=synthesize("BCN voice test", "matilda-test", profile="auto",
+                             home=home, cache=home/"cache", runner=fake_run,
+                             which=lambda _:None, allow_espeak=False,report=result)
+            self.assertTrue(audio.is_file())
+            self.assertEqual(result["engine"],"matilda")
+            self.assertEqual(result["voiceProfileRequested"],"auto")
+            self.assertFalse(result["usedFallback"])
+
+    def test_native_service_explicitly_forbids_espeak_and_reports_status(self):
+        import inspect, service
+        self.assertIn("allow_espeak=False",inspect.getsource(service.make_audio))
+        self.assertFalse(service.LAST_VOICE.get("usedFallback"))
+
 if __name__ == "__main__":
     unittest.main()

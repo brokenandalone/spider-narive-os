@@ -59,11 +59,13 @@ def valid_wav(file):
         return False
 
 
-def synthesize(text, ident, profile=None, cache=None, home=None, runner=None, which=None):
+def synthesize(text, ident, profile=None, cache=None, home=None, runner=None, which=None, allow_espeak=True, report=None):
     """Try chosen voice, then recover safely. Return validated audio Path.
 
-    'auto': Natasha online, then Matilda offline, then original eSpeak.
-    Piper name: chosen speaker, Matilda fallback, Natasha, eSpeak.
+    'auto': Matilda offline first, then Natasha online.
+    Piper name: chosen speaker, Matilda fallback, then Natasha.
+    When allow_espeak=False, NEVER output the robotic eSpeak voice.
+    The report dictionary records the engine actually used, if provided.
     """
     text = str(text or "").strip()
     if not text or len(text) > 1200:
@@ -128,15 +130,22 @@ def synthesize(text, ident, profile=None, cache=None, home=None, runner=None, wh
         return None
 
     if choice in SPEAKERS:
-        order = [lambda: piper(choice)]
+        order = [(choice, lambda: piper(choice))]
         if choice != "matilda":
-            order.append(lambda: piper("matilda"))
-        order.extend([natasha, espeak])
+            order.append(("matilda", lambda: piper("matilda")))
+        order.append(("natasha", natasha))
+    elif choice == "natasha":
+        order = [("natasha", natasha), ("matilda", lambda: piper("matilda"))]
     else:
-        order = [natasha, lambda: piper("matilda"), espeak]
+        order = [("matilda", lambda: piper("matilda")), ("natasha", natasha)]
+    if allow_espeak:
+        order.append(("espeak-ng", espeak))
 
-    for engine in order:
+    for engine_name, engine in order:
         result = engine()
         if result is not None:
+            if isinstance(report, dict):
+                report.update({"engine": engine_name, "voiceProfileRequested": choice,
+                               "usedFallback": engine_name != (choice if choice != "auto" else "matilda")})
             return result
-    raise RuntimeError("No working Nova TTS engine: Natasha, Matilda Piper, and eSpeak unavailable")
+    raise RuntimeError("Nova neural voices unavailable: verify Webbie's Australian Piper voice installation or Natasha network access; robotic eSpeak was not used.")
