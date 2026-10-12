@@ -330,7 +330,8 @@ class WebbieComputerDialog(QDialog):
             self.operator.target_window = None
             app = self.selected_app()
             self.grant.select_wide_app(app.desktop_id if app else '')
-        self.refresh_status()
+        if hasattr(self, 'state'):
+            self.refresh_status()
 
     def authorize_wide_access(self):
         """The labeled button IS the owner's deliberate consent, no extra prompts."""
@@ -593,12 +594,17 @@ class WebbieComputerDialog(QDialog):
         if not target:
             self.status('Choose an open window first.'); return
         chosen = self.windows.currentText()
-        choice = QMessageBox.question(
-            self, 'Authorize this program window?',
-            f'Allow Webbie to operate this exact window?\n\n{chosen[:200]}\n\n'
-            'The currently selected application is not automatically proof of '
-            'the window owner. Verify its title and contents yourself.',
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if self.grant.status().get('wide'):
+            # One-click broad consent already covers a MANUALLY selected
+            # ordinary window; no redundant per-window authorization popup.
+            choice = QMessageBox.Yes
+        else:
+            choice = QMessageBox.question(
+                self, 'Authorize this program window?',
+                f'Allow Webbie to operate this exact window?\n\n{chosen[:200]}\n\n'
+                'The currently selected application is not automatically proof of '
+                'the window owner. Verify its title and contents yourself.',
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if choice == QMessageBox.Yes:
             self.pause_autopilot()
             if self.action(self.operator.bind_window, target):
