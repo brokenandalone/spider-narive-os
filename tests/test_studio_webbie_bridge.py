@@ -14,6 +14,7 @@ def load_builtin():
               if isinstance(node, ast.FunctionDef) and node.name == 'handle_builtin')
     global_vars = {
         're': re,
+        'is_capability_question': lambda _: False,
         'set_workspace': Mock(),
         'workspace_path': lambda *items: '/usr/local/lib/spider-os/' + '/'.join(items),
         'launch': Mock(return_value=True),
