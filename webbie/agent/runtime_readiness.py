@@ -92,6 +92,34 @@ def inspect_readiness(*, agent_path=DEFAULT_AGENT,
                   "Normal local chat-memory mode"))
     from voice_trust import trust_status
     items.append(Observation("speaker_identity","unavailable",trust_status()))
+    model=agent.get("local_model")
+    allowed=("normal","ready_to_try","temporarily_paused")
+    status=model.get("status") if isinstance(model,dict) else None
+    if fresh and status in allowed:
+        label=("temporarily_paused" if status=="temporarily_paused"
+               else "recent_failure" if status=="ready_to_try"
+               else "normal")
+        items.append(Observation(
+            "local_ai","warning" if status!="normal" else "reported",
+            "Local AI request governor: "+label+
+            " (does not verify model quality or active inference)"))
+    else:
+        items.append(Observation(
+            "local_ai","unknown",
+            "No fresh local AI request status reported"))
+    intake=agent.get("voice_intake")
+    keys=("heard_transcript","rejected_unverified",
+          "verified_input","emergency_stop")
+    if fresh and isinstance(intake,dict) and all(
+            type(intake.get(key)) is int and 0<=intake[key]<=1_000_000
+            for key in keys):
+        items.append(Observation(
+            "voice_intake","reported",
+            "Coarse speech counters available; open Voice Lab for details"))
+    else:
+        items.append(Observation(
+            "voice_intake","unknown",
+            "No fresh voice intake counters reported"))
     return tuple(items)
 
 def render_report(items):
