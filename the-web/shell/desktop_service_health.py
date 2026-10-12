@@ -79,8 +79,11 @@ def service_brief(rows):
     """Short, trusted status-only context for an explicitly drafted Webbie message."""
     verified = {item.unit: item for item in rows
                 if item.unit in {unit for unit, _ in USER_SERVICES}}
+    safe_states = {'running', 'failed', 'starting', 'stopped',
+                   'masked', 'not-installed', 'unavailable'}
     entries = [unit + ': ' + verified[unit].status
-               for unit, _ in USER_SERVICES if unit in verified]
+               for unit, _ in USER_SERVICES
+               if unit in verified and verified[unit].status in safe_states]
     return 'Spider OS user-service health: ' + '; '.join(entries)
 
 
