@@ -34,7 +34,8 @@ class GuidedWorkflowUITests(unittest.TestCase):
             computer_callback=open_pc,stop_callback=stop)
         try:
             for name in ("webbieWorkflowStart","webbieWorkflowComputer",
-                         "webbieWorkflowVerify","webbieWorkflowStop"):
+                         "webbieWorkflowVerify","webbieWorkflowNextStep",
+                         "webbieWorkflowStop"):
                 self.assertIsNotNone(dialog.findChild(QPushButton,name))
             self.assertFalse(dialog.confirm_button.isEnabled())
             self.assertFalse(dialog.open_button.isEnabled())
@@ -52,7 +53,7 @@ class GuidedWorkflowUITests(unittest.TestCase):
                                 from_control_gui=True,workspace="studio")
             dialog.refresh()
             self.assertTrue(dialog.confirm_button.isEnabled())
-            self.assertIn("Owner confirmed completion: NO",dialog.report.toPlainText())
+            self.assertIn("Owner confirmed this step: NO",dialog.report.toPlainText())
             with patch("webbie_unified_workflow.QMessageBox.question",
                        return_value=QMessageBox.No):
                 dialog.confirm()
@@ -61,6 +62,11 @@ class GuidedWorkflowUITests(unittest.TestCase):
                        return_value=QMessageBox.Yes):
                 dialog.confirm()
             self.assertEqual(state.snapshot()["phase"],"done")
+            self.assertTrue(dialog.next_button.isEnabled())
+            dialog.next_step()
+            self.assertEqual(state.snapshot()["phase"],"observe")
+            self.assertEqual(state.snapshot()["step_number"],2)
+            self.assertFalse(state.snapshot()["completed"])
         finally:
             dialog.close()
         stop.assert_called_once()
