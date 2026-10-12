@@ -10,7 +10,9 @@ Connected services require their own pre-existing app authentication and
 a separately audited, read-only adapter. None is silently installed.
 """
 from __future__ import annotations
+import ipaddress
 import re
+from urllib.parse import urlsplit
 import threading
 import time
 from owner_authorization_store import read_policy, DEFAULT_PATH
@@ -37,7 +39,7 @@ BENIGN_KEYS=frozenset((
     "ctrl+Page_Up","ctrl+Page_Down",
 ))
 ROUTINE_ACTIONS=frozenset((
-    "observe.apps","observe.windows","app.open",
+    "observe.apps","observe.windows","app.open","web.open",
     "window.focus","window.target","keyboard.key","task.begin",
 ))
 # No service permission is granted by this module. Service adapters
@@ -174,6 +176,30 @@ class OwnerSafeAccess:
                 if not preview.startswith("app_id="):
                     return False
                 if preview[7:] not in self._apps:
+                    return False
+            elif action=="web.open":
+                # Double-check the URL even after GUI/bridge canonicalization.
+                if not preview.startswith("url=") or len(preview)>1504:
+                    return False
+                try:
+                    url=urlsplit(preview[4:])
+                    host=(url.hostname or "").lower()
+                    if (url.scheme!="https" or not url.netloc or
+                            url.port not in (None,443) or
+                            url.username is not None or url.password is not None
+                            or "." not in host or len(host)>253
+                            or not re.fullmatch(r"[a-z0-9.-]+",host)
+                            or host.endswith((
+                                ".localhost",".local",".internal",".test",
+                                ".invalid",".example"))
+                            or url.hostname!=host):
+                        return False
+                    try:
+                        ipaddress.ip_address(host)
+                        return False
+                    except ValueError:
+                        pass
+                except ValueError:
                     return False
             elif action=="keyboard.key":
                 # Only harmless navigation keys, never arbitrary keystrokes.
