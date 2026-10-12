@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-import json, os, re, shutil, subprocess, sys, time, urllib.request, uuid
+import json, os, re, shutil, subprocess, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-
-# Also work when test harnesses load this source directly by file path.
-# Keep the one Nova host module alongside the service, never in cloud packages.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nova_host import NovaHost, HOST as ON_AIR_HOST, STATION as STATION_NAME
+from nova_voice import synthesize, available_profiles, normalize_voice, configured_voice
 
 HOST = "127.0.0.1"
 PORT = 9876
 MODEL = "qwen3:1.7b"
 OLLAMA = "http://127.0.0.1:11434/api/chat"
-VOICE = "en-AU-NatashaNeural"
 CACHE = Path.home() / ".cache" / "spider-os" / "ai-dj"
 CACHE.mkdir(parents=True, exist_ok=True)
 
@@ -53,32 +49,9 @@ def ollama_script(body):
     return PERSONA.compose(body, generate)
 
 
-def make_audio(text, ident):
-    edge = Path("/opt/spider-webbie/bin/edge-tts")
-    mp3 = CACHE / f"{ident}.mp3"
-    wav = CACHE / f"{ident}.wav"
-    if edge.exists():
-        try:
-            subprocess.run(
-                [str(edge), "--voice", VOICE, "--text", text, "--write-media", str(mp3)],
-                check=True,
-                timeout=22,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if mp3.exists() and mp3.stat().st_size:
-                return mp3
-        except Exception:
-            pass
-    espeak = shutil.which("espeak-ng")
-    if espeak:
-        try:
-            subprocess.run([espeak, "-v", "en-au+f3", "-s", "165", "-w", str(wav), text], check=True, timeout=10)
-            if wav.exists() and wav.stat().st_size:
-                return wav
-        except Exception:
-            pass
-    raise RuntimeError("No working TTS engine is available")
+def make_audio(text, ident, profile=None):
+    """Render speech to Nova's existing cache; never play it on desktop speakers."""
+    return synthesize(text, ident, profile=profile, cache=CACHE)
 
 
 def cleanup():
@@ -111,6 +84,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json_headers(200)
             self.wfile.write(json.dumps({"ok": True, "service": "Spider AI DJ", "host": ON_AIR_HOST, "station": STATION_NAME, "port": PORT}).encode())
             return
+        if self.path == "/dj/voices":
+            self.send_json_headers(200)
+            self.wfile.write(json.dumps(available_profiles()).encode())
+            return
         self.send_json_headers(404)
         self.wfile.write(b'{"error":"not found"}')
 
@@ -125,19 +102,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json_headers(413)
                 self.wfile.write(b'{"error":"Invalid Nova request size"}')
                 return
-            try:
-                body = json.loads(self.rfile.read(length).decode("utf-8"))
-            except (ValueError, UnicodeError):
-                self.send_json_headers(400)
-                self.wfile.write(b'{"error":"Invalid JSON request"}')
-                return
+            body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
             if not isinstance(body, dict):
-                self.send_json_headers(400)
-                self.wfile.write(b'{"error":"Nova expects a JSON object"}')
-                return
+                raise ValueError("Nova expects a JSON object")
             script = ollama_script(body)
             ident = f"dj-{int(time.time())}-{uuid.uuid4().hex[:8]}"
-            audio = make_audio(script, ident)
+            context = body.get("context") if isinstance(body.get("context"), dict) else {}
+            profile = normalize_voice(context.get("voiceProfile", configured_voice()))
+            audio = make_audio(script, ident, profile=profile)
             cleanup()
             remaining = max(0.0, min(180.0, float(body.get("secondsRemaining") or 0)))
             response = {
