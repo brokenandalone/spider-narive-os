@@ -35,7 +35,7 @@ sys.path.insert(
 )
 sys.path.insert(0,str(WEBBIE_ROOT / "actions"))
 
-from owner_authorization_store import read_policy
+from owner_authorization_store import read_policy,update_policy
 from brain import respond
 from model_resilience import MODEL_GOVERNOR, model_health_message
 from jarvis_context import read_context, context_summary, advisory_context
@@ -625,6 +625,13 @@ def handle_command(command, voice=False, expected_turn=None,
     if is_direct_stop(command):
         voice_turns.interrupted()
         speech_playback.stop()
+        # A STOP received by the resident agent must pause saved standing
+        # authorization even if The Web GUI isn't running.
+        try:
+            if read_policy().get("authorized"):
+                update_policy("pause")
+        except (OSError,PermissionError,ValueError):
+            pass
         try:
             request_stop()
         except (OSError, PermissionError):
