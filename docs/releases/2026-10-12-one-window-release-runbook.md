@@ -78,3 +78,53 @@ The external-project reference does not determine release readiness.
 **Release gates remain closed.** The previous 1,165 passing source tests
 belong to the earlier owner-preserving staging commit, not this revised
 scope or a functional installed OS candidate.
+
+
+## October 12 source integration progress (still no installation)
+
+The native OS owner ZIP has exactly 31 guarded customized installed source files.
+
+- `tools/owner_source_semantic_audit.py` inventories owner-only APIs,
+  candidate-only APIs, changed common implementation ASTs, changed function
+  signatures, constructor wiring differences and module imports without
+  importing/executing the uploaded owner Python. The JSON contains no
+  source code.
+- `tools/patch_owner_session_detection.py` creates an owner-hash-pinned
+  PRIVATE proposal for the existing `webbie/agent/webbie.py` that fixes
+  desktop session detection (do not return early on inactive TTY).
+  Firefox/research/microphone/voice callpaths remain unchanged in this patch.
+- `media/ai-dj/nova_voice.py` is included from native Spider OS merged
+  PR #102 for Australian neural voice availability and validated audio.
+  The installed Nova source remains the baseline.
+- `tools/patch_owner_nova_voices.py` builds a PRIVATE proposal using the
+  real owner `media/ai-dj/service.py` hash and only adding the reviewed
+  native voices route / selection / synthesis interface, preserving the
+  original on-air backend/host and DJ scheduling methods. It does not
+  install or update the separate Spider Media Center.
+- `tools/run_private_os_reconciliation.sh` runs all above offline,
+  staging the initial 31 byte-for-byte originals, two proposals and a
+  metadata report under an owner-private folder. It does **not** copy
+  experimental proposals into the installable source.
+
+Run this **only with the exact successfully tested SHA for this branch**,
+after cloning/fetching into a fresh detached checkout. The owner archive
+must still match the actual installed files:
+
+```bash
+bash tools/run_private_os_reconciliation.sh \
+  ~/Downloads/Spider_OS_Conflict_Source_Review.zip \
+  ~/Downloads/Spider_OS_Full_OS_Review_20261012 \
+  <EXACT_40_CHARACTER_CI_VERIFIED_SHA>
+```
+
+The third argument is the complete pinned commit, NOT literally the
+placeholder. A changed source file, unmatched model, missing helper, or
+already-existing review folder blocks staging. No sudo. Do not install or
+restart any services from this folder. Upload `semantic-reconciliation.json`
+for follow-up owner-safe semantic merge review.
+
+**Progress is limited:** Two specifically reviewed native source proposals
+are drafted, *not* deployed or hardware-tested. Remaining conflicts and new
+GUI workflows still require manual merge and integration, then a fresh
+exact-SHA full source/PC test and approval. CI on the staging script does
+not prove all 31 conflicts are resolved or authorize release.
