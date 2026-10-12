@@ -15,6 +15,7 @@ def load_builtin():
     global_vars = {
         're': re,
         'set_workspace': Mock(),
+        'is_capability_question': lambda command: False,
         'workspace_path': lambda *items: '/usr/local/lib/spider-os/' + '/'.join(items),
         'launch': Mock(return_value=True),
         'subprocess': SimpleNamespace(run=Mock(
