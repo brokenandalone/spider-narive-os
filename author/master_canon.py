@@ -123,6 +123,16 @@ class MasterCanon:
                 VALUES(?,?,?,?,?,?,?,?,?,?)
             """, fields).lastrowid
 
+    def proposed_duplicate(self, *, book_id, chapter_id, title, statement, source_quote):
+        """Strict exact-match safeguard for repeated AI suggestions."""
+        row = self.db.execute("""
+            SELECT id FROM canon_claims
+             WHERE status='proposed' AND book_id=? AND chapter_id=?
+               AND title=? AND statement=? AND source_quote=?
+             LIMIT 1
+        """, (book_id, chapter_id, title, statement, source_quote)).fetchone()
+        return row['id'] if row else None
+
     def edit(self, claim_id, *, book_id=None, entity_id=None, chapter_id=None,
              category='Rule', fact_key='', title='', statement='',
              status='proposed', source_quote=''):

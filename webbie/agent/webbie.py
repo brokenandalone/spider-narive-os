@@ -37,6 +37,7 @@ sys.path.insert(
 
 
 from brain import respond
+from model_resilience import MODEL_GOVERNOR, model_health_message
 from jarvis_context import read_context, context_summary, advisory_context
 from focus_tasks import focus_answer, advisory_focus, WORKSPACES
 from privacy_controls import private_session_active, privacy_explanation
@@ -50,6 +51,8 @@ from voice_queue import VoiceTurnCoordinator
 from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
 from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
+from voice_metrics import VOICE_INTAKE
+from launch_intents import direct_launch_intent
 from workspace_launchers import workspace_command
 from jarvis_commands import is_capability_question, voice_guide
 from voice_trust import voice_permission, trust_status
@@ -198,6 +201,10 @@ def write_state(**updates):
         except (OSError, ValueError, TypeError):
             pass
         state.update(updates)
+        # Only redacted coarse counters and local model state are persisted.
+        # No microphone transcript, model prompt, or speaker name is added.
+        state["voice_intake"] = VOICE_INTAKE.snapshot()
+        state["local_model"] = MODEL_GOVERNOR.status()
         if private_session_active():
             # The resident status file must not persist new private exchanges.
             state.pop("last_heard", None)
@@ -325,8 +332,16 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    # Reject descriptions, indirect questions and NEGATED launch phrases.
+    # Only an exact direct request reaches the legacy launch branches.
+    if re.search(r"\b(?:open|launch|start|enter|run)\b", lower):
+        if direct_launch_intent(command) is None:
+            return None
     stripped = re.sub(
         r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
+    if stripped in ("ai model health", "brain health",
+                    "is your ai stuck", "how is your brain doing"):
+        return model_health_message(MODEL_GOVERNOR.status())
     if stripped in ("readiness status", "jarvis readiness",
                     "what is working right now", "diagnose your systems",
                     "diagnose webbie", "what is your health status"):
@@ -497,13 +512,30 @@ def handle_builtin(command):
 
         return "Opening Study."
 
+    # Studio v11 reads generic next-step advice only, without song names,
+    # lyrics, private WAV paths, recordings or unattended audio actions.
+    if lower in (
+        "studio next step", "what is next in studio",
+        "what should i do next in studio", "webbie studio next step",
+    ):
+        summary_script = workspace_path("studio", "production_board.py")
+        try:
+            result = subprocess.run(
+                ["python3", summary_script, "--next"],
+                capture_output=True, text=True, timeout=4, check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()[:240]
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return "Studio's production advice is unavailable right now."
+
     # Studio v10 exposes a small, read-only status from owner-selected
     # production checkpoints. Never put lyrics, notes, voice recordings
     # or absolute file paths into a spoken status response.
     if lower in (
         "studio progress", "studio status", "spider studio status",
         "studio production status", "how is my studio song",
-        "what is next in studio",
     ):
         summary_script = workspace_path("studio", "production_board.py")
         try:
@@ -802,12 +834,15 @@ def voice_listener():
     def start_voice_turn(command, evidence):
         result = coordinator.submit(
             command, speaker_verified=True, speaker_evidence=evidence)
+        if result == "queued":
+            VOICE_INTAKE.count("queued_command")
         write_state(voice_turn_status=result)
 
     def on_interrupt(phrase):
         global awaiting_command_until
         if not is_direct_stop(phrase):
             return
+        VOICE_INTAKE.count("emergency_stop")
         awaiting_command_until = next_window(
             awaiting_command_until, 'stop', time.time())
         coordinator.cancel()
@@ -826,6 +861,7 @@ def voice_listener():
         phrase = clean_phrase(original_phrase)
         if not phrase:
             return
+        VOICE_INTAKE.count("heard_transcript")
         # Emergency STOP is universal even when audio cannot identify a user.
         if is_direct_stop(phrase):
             on_interrupt(phrase)
@@ -836,13 +872,16 @@ def voice_listener():
         if not voice_permission(
                 voice=True, speaker_verified=evidence is not None,
                 evidence=evidence):
+            VOICE_INTAKE.count("rejected_unverified")
             return
+        VOICE_INTAKE.count("verified_input")
 
         # Stay operational at night without answering TV, casual speech or
         # wake words alone. Only an exact, deliberate wake phrase reopens chat.
         sleeping = quiet_asleep()
         mode = spoken_mode(phrase, sleeping=sleeping)
         if sleeping:
+            VOICE_INTAKE.count("ignored_sleeping")
             awaiting_command_until = 0
             if mode == 'wake':
                 set_quiet_mode('wake')

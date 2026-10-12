@@ -27,13 +27,16 @@ REQUIRED_WIRING = {
     "study/store.py": (
         "assignment_record", "add_flashcards", "set_assignment_score",
     ),
-    "author/main.py": ("project_map_status", "import_docx", "AuthorWindow", "AtlasWidget"),
+    "author/main.py": ("project_map_status", "import_docx", "AuthorWindow", "AtlasWidget", "CanonIntelligenceWidget"),
     "author/store.py": ("chapter_plan", "import_docx", "AuthorStore"),
     "studio/ai_panel.py": (
         "open_multitrack_session", "open_saved_session_mix", "open_mastering_desk",
     ),
-    "studio/main.py": ("BandMixerPanel", "StudioAIPanel", "ReleasePanel"),
+    "studio/main.py": ("BandMixerPanel", "StudioAIPanel", "ReleasePanel", "AudioQualityPanel"),
     "study/reading_library.py": ("search", "MAX_",),
+    "study/reading_passages.py": ("search_reading_passages",),
+    "webbie/brain/model_resilience.py": ("ModelResilience",),
+    "webbie/agent/launch_intents.py": ("direct_launch_intent",),
     "webbie/agent/voice_trust.py": ("voice_permission",),
     "studio/release_export.py": ("export",),
     "author/story_atlas.py": ("timeline",),
@@ -76,6 +79,8 @@ class DailyCrossWorkspaceSmoke(unittest.TestCase):
         self.assertTrue(set(REQUIRED_WIRING).issubset(installed))
         self.assertNotIn("study/notes.sqlite", installed)
         self.assertNotIn("webbie/private_memory.db", installed)
+        self.assertNotIn("webbie/config/default.json", installed)
+        self.assertNotIn("webbie/voice/speaker_voice_provider.py", installed)
         self.assertIn("require_daily_continuity(backup_root)", source)
         self.assertIn("daily_install_guard(backup_root)", source)
 

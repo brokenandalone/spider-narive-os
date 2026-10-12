@@ -29,12 +29,14 @@ if __package__:
     from .band_mixer_panel import BandMixerPanel
     from .release_panel import ReleasePanel
     from .production_board_panel import ProductionBoardPanel
+    from .audio_quality_panel import AudioQualityPanel
 else:
     from tools import TOOLS, resolve_tool
     from ai_panel import StudioAIPanel
     from band_mixer_panel import BandMixerPanel
     from release_panel import ReleasePanel
     from production_board_panel import ProductionBoardPanel
+    from audio_quality_panel import AudioQualityPanel
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 
@@ -162,6 +164,13 @@ class SpiderStudio(QMainWindow):
         production_scroll.setWidgetResizable(True)
         production_scroll.setWidget(self.production_board_panel)
         self.tool_tabs.addTab(production_scroll, 'Production Board')
+        self.quality_panel = AudioQualityPanel(production_board=self.production_board_panel)
+        quality_scroll = QScrollArea()
+        quality_scroll.setWidgetResizable(True)
+        quality_scroll.setWidget(self.quality_panel)
+        self.tool_tabs.addTab(quality_scroll, 'Audio Quality')
+        self.production_board_panel.quality_panel = self.quality_panel
+        self.production_board_panel.quality_tab = quality_scroll
         self.tool_buttons = []
         for category, tools in TOOLS.items():
             page = QWidget(); grid = QGridLayout(page)

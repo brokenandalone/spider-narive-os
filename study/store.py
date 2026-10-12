@@ -154,6 +154,18 @@ class StudyStore:
                 UNIQUE(course_id, sha256),
                 UNIQUE(course_id, relative_path)
             );
+            CREATE TABLE IF NOT EXISTS course_reading_passages (
+                reading_id INTEGER NOT NULL,
+                passage_index INTEGER NOT NULL CHECK(passage_index BETWEEN 1 AND 90),
+                start_char INTEGER NOT NULL,
+                end_char INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                PRIMARY KEY(reading_id, passage_index),
+                FOREIGN KEY(reading_id) REFERENCES course_readings(id) ON DELETE CASCADE,
+                CHECK(start_char >= 0 AND end_char > start_char)
+            );
+            CREATE INDEX IF NOT EXISTS course_reading_passages_index
+                ON course_reading_passages(reading_id, passage_index);
             """
         )
 
@@ -677,7 +689,7 @@ class StudyStore:
             (course_id, checksum),
         ).fetchone()
 
-    def add_course_reading(self, course_id, title, relative_path, checksum, excerpt):
+    def add_course_reading(self, course_id, title, relative_path, checksum, excerpt, *, passages=None):
         """Private metadata for a successfully copied, user-selected document."""
         from pathlib import PurePosixPath
         from string import hexdigits
@@ -692,13 +704,88 @@ class StudyStore:
                 or any(part in ("", ".", "..") or "\\" in part
                        for part in path.parts)):
             raise ValueError("Invalid course reading record.")
+        passages = list(passages or [])
+        self._validate_reading_passages(passages)
         with self.db:
-            return self.db.execute(
+            cursor = self.db.execute(
                 "INSERT OR IGNORE INTO course_readings"
                 "(course_id, title, relative_path, sha256, excerpt) "
                 "VALUES (?, ?, ?, ?, ?)",
                 (course_id, title, relative_path, checksum.lower(), excerpt),
-            ).rowcount == 1
+            )
+            if cursor.rowcount != 1:
+                return False
+            if passages:
+                self.db.executemany(
+                    "INSERT INTO course_reading_passages "
+                    "(reading_id, passage_index, start_char, end_char, body) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    [(cursor.lastrowid, number, first, end, body)
+                     for number, first, end, body in passages])
+            return True
+
+    @staticmethod
+    def _validate_reading_passages(passages):
+        if len(passages) > 90:
+            raise ValueError("Only 90 reading passages can be indexed.")
+        for i, row in enumerate(passages, 1):
+            if (not isinstance(row, (tuple, list)) or len(row) != 4
+                    or type(row[0]) is not int or row[0] != i
+                    or type(row[1]) is not int or type(row[2]) is not int
+                    or row[1] < 0 or row[2] <= row[1] or row[2] > 240000
+                    or not isinstance(row[3], str) or not row[3].strip()
+                    or len(row[3]) > 5000 or len(row[3]) != row[2] - row[1]):
+                raise ValueError("Invalid indexed reading passage.")
+
+    def reading_passages(self, course_id, reading_id):
+        return self.db.execute(
+            "SELECT p.reading_id, p.passage_index, p.start_char, p.end_char, "
+            "p.body FROM course_reading_passages p JOIN course_readings r "
+            "ON r.id=p.reading_id WHERE r.course_id=? AND p.reading_id=? "
+            "ORDER BY p.passage_index", (course_id, reading_id),
+        ).fetchall()
+
+    def reading_passage(self, course_id, reading_id, passage_index):
+        return self.db.execute(
+            "SELECT p.reading_id, p.passage_index, p.start_char, p.end_char, "
+            "p.body FROM course_reading_passages p JOIN course_readings r "
+            "ON r.id=p.reading_id WHERE r.course_id=? "
+            "AND p.reading_id=? AND p.passage_index=?",
+            (course_id, reading_id, passage_index),
+        ).fetchone()
+
+    def reading_passage_candidates(self, course_id):
+        """Local text only, scoped to the current course; never network access."""
+        return self.db.execute(
+            "SELECT p.reading_id, r.title, p.passage_index, "
+            "p.start_char, p.end_char, p.body "
+            "FROM course_reading_passages p JOIN course_readings r "
+            "ON r.id=p.reading_id WHERE r.course_id=? "
+            "ORDER BY r.title COLLATE NOCASE, p.passage_index",
+            (course_id,),
+        ).fetchall()
+
+    def update_reading_passages(self, course_id, reading_id, checksum, passages):
+        """Reindex only the owner-selected original; no change on failed validation."""
+        passages = list(passages)
+        self._validate_reading_passages(passages)
+        row = self.course_reading(course_id, reading_id)
+        if row is None or row["sha256"] != checksum:
+            raise ValueError("Reading identity changed during the reindex.")
+        with self.db:
+            previous = self.db.execute(
+                "SELECT COUNT(*) FROM course_reading_passages WHERE reading_id=?",
+                (reading_id,),
+            ).fetchone()[0]
+            if previous:
+                raise ValueError("The reading already has passages indexed.")
+            self.db.executemany(
+                "INSERT INTO course_reading_passages "
+                "(reading_id, passage_index, start_char, end_char, body) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(reading_id, n, first, end, body)
+                 for n, first, end, body in passages],
+            )
 
     def all_assignments(self):
         return self.db.execute(

@@ -50,7 +50,7 @@ class DailyContinuityTests(unittest.TestCase):
         self.plan["candidate_commit"] = "a" * 40
         for flag in ("source_ci_verified", "installed_pc_reconciled",
                      "rollback_validated", "owner_approved_install",
-                     "installer_daily_guard_connected"):
+                     "installer_daily_guard_connected", "voice_pipeline_verified"):
             self.plan[flag] = True
         for entry in self.plan["pull_requests"]:
             entry["integrated"] = True
@@ -74,6 +74,13 @@ class DailyContinuityTests(unittest.TestCase):
         blocked, _ = gate.audit(self.plan, self.staged, self.backups, TODAY)
         self.assertEqual(blocked, [])
 
+    def test_voice_check_is_independent_of_full_ci_and_hashes(self):
+        self.ready_plan()
+        self.plan["voice_pipeline_verified"] = False
+        errors, _ = gate.audit(self.plan, self.staged, self.backups, TODAY)
+        self.assertIn("OWNER VOICE AUTHENTICATION AND MICROPHONE CONTINUITY NOT VERIFIED", errors)
+        self.assertNotIn("FULL COMBINED SOURCE TESTS NOT VERIFIED", errors)
+
     def test_missing_workspace_or_unmerged_branch_blocks(self):
         self.ready_plan()
         self.plan["workspaces"] = [
@@ -90,7 +97,7 @@ class DailyContinuityTests(unittest.TestCase):
         self.ready_plan()
         self.assertEqual(
             gate.overlapping_paths(self.plan)["webbie/agent/webbie.py"],
-            [54, 55, 58, 61, 67, 68, 69, 76, 78, 80],
+            [54, 55, 58, 61, 67, 68, 69, 76, 78, 80, 82, 88],
         )
         self.plan["resolved_shared_paths"] = []
         errors, _ = gate.audit(self.plan, self.staged, self.backups, TODAY)

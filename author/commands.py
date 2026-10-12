@@ -33,6 +33,11 @@ def parse_author_command(value):
         r"(?:master canon|canon ledger|character dossiers|canon dashboard)", text
     ):
         return {"action": "open_master_canon"}
+    if re.fullmatch(
+        r"(?:please\s+)?(?:show|open)(?:\s+(?:me|the|my))?\s+"
+        r"(?:canon intelligence|canon insights|canon review dashboard)", text
+    ):
+        return {"action": "open_canon_intelligence"}
     # Commands target only the active selection. No guessed book/chapter.
     if re.fullmatch(r"(?:please\s+)?(?:stop|cancel)(?:\s+(?:the|my))?\s+(?:review|reviewing)", text):
         return {"action": "cancel_review"}

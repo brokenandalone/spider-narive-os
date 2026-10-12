@@ -41,14 +41,19 @@
         68,
         69,
         76,
-        78
+        78,
+        88
       ],
       "required_files": [
         "webbie/agent/webbie.py",
         "webbie/agent/proactive_checks.py",
         "webbie/agent/voice_queue.py",
         "webbie/agent/voice_trust.py",
-        "webbie/agent/runtime_readiness.py"
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/launch_intents.py",
+        "webbie/agent/voice_metrics.py",
+        "webbie/brain/model_resilience.py",
+        "tools/webbie_readiness_cli.py"
       ]
     },
     {
@@ -58,7 +63,8 @@
         64,
         71,
         73,
-        77
+        77,
+        84
       ],
       "required_files": [
         "study/study.py",
@@ -68,7 +74,8 @@
         "study/study_coach.py",
         "study/apa_preflight.py",
         "study/reading_library.py",
-        "study/reading_library_ui.py"
+        "study/reading_library_ui.py",
+        "study/reading_passages.py"
       ]
     },
     {
@@ -78,14 +85,17 @@
         59,
         62,
         74,
-        80
+        80,
+        82
       ],
       "required_files": [
         "studio/main.py",
         "studio/session_mix.py",
         "studio/band_mix.py",
         "studio/release_export.py",
-        "studio/release_panel.py"
+        "studio/release_panel.py",
+        "studio/audio_quality.py",
+        "studio/audio_quality_panel.py"
       ]
     },
     {
@@ -94,13 +104,16 @@
         51,
         56,
         75,
-        79
+        79,
+        83
       ],
       "required_files": [
         "author/main.py",
         "author/project_map.py",
         "author/story_atlas.py",
-        "author/atlas_widget.py"
+        "author/atlas_widget.py",
+        "author/canon_intelligence.py",
+        "author/canon_intelligence_widget.py"
       ]
     },
     {
@@ -559,10 +572,74 @@
         "webbie/agent/webbie.py"
       ],
       "integrated": false
+    },
+    {
+      "pr": 82,
+      "workspace": "Studio",
+      "branch": "feature/studio-audio-qc-daw-v11-20261011",
+      "observed_sha": "6fb447b2459ed9949a21cf9ff37d3f4b87d74805",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "studio/main.py",
+        "studio/production_board.py",
+        "studio/production_board_panel.py",
+        "studio/package/inspect-studio-install.py",
+        "webbie/agent/webbie.py",
+        "the-web/package/reconcile-native.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 83,
+      "workspace": "Author",
+      "branch": "feature/author-canon-intelligence-20261011",
+      "observed_sha": "45ba64efbff14354f807f11fb5fe7a2d376f1624",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "author/main.py",
+        "author/commands.py",
+        "author/control_socket.py",
+        "author/master_canon.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 84,
+      "workspace": "Study",
+      "branch": "feature/study-passage-search-20261011",
+      "observed_sha": "42ab71c6f060ef6d2b53e5aeb9f3b4b6b848750d",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "study/store.py",
+        "study/reading_library.py",
+        "study/reading_library_ui.py",
+        "study/course_materials.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 88,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-resilience-control-20261011",
+      "observed_sha": "4f1fbf50571514ce7472a9ac8bac76be6e02595e",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/brain/brain.py",
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/voice_lab.py",
+        "webbie/agent/speaker_provider_loader.py",
+        "system/release_batch.py",
+        "tools/combined_release_audit.py"
+      ]
     }
   ],
   "resolved_shared_paths": [],
-  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations. Kali Evidence Ledger PR #70 is additionally staged for integration review in the downstream release candidate; its source checks do not replace installed-PC audit or owner approval. Candidate remains intentionally BLOCKED. October 11 evening: PRs #71, #73, #74, #75, #76, #77 have source features staged in the downstream candidate after exact-base or unique-hunk reconciliation; do not confuse source-staged with approved integration. Owner PC acceptance, overlapping shared entrypoint reviews and daily final install approval still pending.",
+  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations. Kali Evidence Ledger PR #70 is additionally staged for integration review in the downstream release candidate; its source checks do not replace installed-PC audit or owner approval. Candidate remains intentionally BLOCKED. October 11 evening: PRs #71, #73, #74, #75, #76, #77 have source features staged in the downstream candidate after exact-base or unique-hunk reconciliation; do not confuse source-staged with approved integration. Owner PC acceptance, overlapping shared entrypoint reviews and daily final install approval still pending. Wave4 source-stages Studio v11 audio QC (PR82), Author canon intelligence (PR83), Study provenance-aware passages (PR84), and Webbie offline resilience (PR88) on top of the crash-safe daily release PR87; all stages still require per-PR collision reconciliation, verified local voice, hardware checks and owner approval.",
   "additive_source_stage": {
     "commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
     "total_files": 107,
@@ -589,5 +666,7 @@
     ],
     "source_ci_verified": false,
     "pc_install_performed": false
-  }
+  },
+  "voice_pipeline_verified": false,
+  "voice_pipeline_evidence": "Required before any physical install: confirm owner-authorized speaker model/provider, Cory/Shayna enrollment with false-acceptance tests including TV voices, audible STOP/wake/sleep and TTS echo, real microphone acceptance, and documented fallback for unverified voice. Neither local source tests nor source-only status qualifies."
 }
