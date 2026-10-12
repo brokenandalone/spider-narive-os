@@ -28,6 +28,7 @@ from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
 from kali_assistant import handle_kali_request
 from kali_named_app import parse_named_app_request
+from console_bridge import parse_console_request,perform_console_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
 from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
@@ -103,6 +104,20 @@ class ReplyWorker(QThread):
         except (OSError, ValueError) as error:
             self.failed.emit('Unable to reach Webbie: ' + str(error))
 
+
+class ConsoleWorker(QThread):
+    """Bounded read-only shell-free diagnostic off the GUI thread."""
+    reported=pyqtSignal(str)
+
+    def __init__(self,request,authorized,parent=None):
+        super().__init__(parent)
+        self.request=request
+        self.authorized=authorized
+
+    def run(self):
+        result=perform_console_request(
+            self.request,authorized=self.authorized)
+        self.reported.emit(result or 'Unsupported console request.')
 
 class CameraWorker(QThread):
     """One in-memory camera frame, analyzed by local Ollama off the GUI thread."""
@@ -255,6 +270,7 @@ class WebbiePanel(QWidget):
         self.face_sleeping = face_asleep()
         self._observed_sleep = self.face_sleeping
         self.camera_worker = None
+        self.console_worker = None
         self.vision_bridge = None
         self.computer_dialog = None
         self.reminders_dialog = None
@@ -883,9 +899,36 @@ class WebbiePanel(QWidget):
         self.computer_dialog.raise_()
         self.computer_dialog.activateWindow()
 
+    def _console_reply(self,message):
+        record=read_policy()
+        if record.get('authorized') and not record.get('paused'):
+            self.append_message('Webbie Console',message)
+        else:
+            self.append_message('Webbie Console','Console response discarded after STOP.')
+
+    def _console_finished(self):
+        self.pending=False
+        self.send_button.setEnabled(True)
+        self.entry.setEnabled(True)
+        self.refresh_state()
+
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        console=parse_console_request(text)
+        if console is not None:
+            record=read_policy()
+            allowed=record.get('authorized') is True and record.get('paused') is False
+            self.append_message('You',text)
+            self.entry.clear()
+            self.pending=True
+            self.send_button.setEnabled(False)
+            self.entry.setEnabled(False)
+            self.console_worker=ConsoleWorker(text,allowed,self)
+            self.console_worker.reported.connect(self._console_reply)
+            self.console_worker.finished.connect(self._console_finished)
+            self.console_worker.start()
             return
         # Only literal typed owner requests can request launching named Kali
         # desktop applications, and only under the saved unpaused policy.
@@ -923,10 +966,19 @@ class WebbiePanel(QWidget):
                 self.append_message('Status',
                     'That address is blocked. Only public HTTPS sites are allowed.')
             else:
+                # One permanent approval permits direct owner-requested
+                # public HTTPS opens without repeating a modal confirmation.
                 self.open_computer_dialog()
-                if self.computer_dialog.offer_site(browser_request.url):
-                    self.append_message('Status',
-                        'Review the address, authorize a browser task and confirm opening it.')
+                if self.computer_dialog.grant.status().get('wide'):
+                    opened=self.computer_dialog.open_website_safe(
+                        browser_request.url)
+                    self.append_message(
+                        'Webbie','Website opening requested; page load not verified.'
+                        if opened else 'Website was blocked or unavailable.')
+                elif self.computer_dialog.offer_site(browser_request.url):
+                    self.append_message(
+                        'Status','Review the address, authorize a browser task '
+                        'and confirm opening it.')
             self.entry.clear()
             return
         # A typed request to open an installed program invokes a visible task
@@ -984,6 +1036,7 @@ class WebbiePanel(QWidget):
         # The workspace/tab owner uses the same worker guard before deletion.
         if ((self.worker and self.worker.isRunning()) or
                 (self.camera_worker and self.camera_worker.isRunning()) or
+                (self.console_worker and self.console_worker.isRunning()) or
                 self.face_controls.active()):
             event.ignore()
         else:
