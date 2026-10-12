@@ -21,11 +21,12 @@ from unified_workflow import UnifiedWorkflow
 
 class WebbieUnifiedWorkflowDialog(QDialog):
     def __init__(self,parent=None,*,session=None,workspace_callback=None,
-                 computer_callback=None):
+                 computer_callback=None,stop_callback=None):
         super().__init__(parent)
         self.session=session or UnifiedWorkflow()
         self.workspace_callback=workspace_callback or (lambda:"default")
         self.computer_callback=computer_callback
+        self.stop_callback=stop_callback
         self.setWindowTitle("Webbie · Unified Workflow")
         self.setObjectName("webbieUnifiedWorkflow")
         self.resize(615,530)
@@ -129,6 +130,8 @@ class WebbieUnifiedWorkflowDialog(QDialog):
 
     def cancel(self):
         self.session.stop()
+        if callable(self.stop_callback):
+            self.stop_callback()
         self.refresh()
 
     def refresh(self):
@@ -146,7 +149,7 @@ class WebbieUnifiedWorkflowDialog(QDialog):
             "",
             "No workspace, model, webcam, browser or page can authorize an action.",
             "Computer Control requires its own task grant and window permission.",
-            "Closing this panel cancels the in-memory workflow.",
+            "STOP revokes desktop approvals. Closing this panel also stops active control.",
         ]
         self.report.setPlainText("\n".join(lines))
         self.open_button.setEnabled(state["phase"] in ("observe","review_action"))
@@ -157,4 +160,6 @@ class WebbieUnifiedWorkflowDialog(QDialog):
     def closeEvent(self,event):
         self.timer.stop()
         self.session.stop()
+        if callable(self.stop_callback):
+            self.stop_callback()
         super().closeEvent(event)
