@@ -70,16 +70,40 @@ python3 "$script_dir/owner_source_semantic_audit.py" \
   --output "$dest/semantic-reconciliation.json"
 
 mkdir -p -- "$dest/private-proposals/webbie/agent" "$dest/private-proposals/media/ai-dj"
-python3 "$script_dir/patch_owner_session_detection.py" \
-  --owner-archive "$archive" \
-  --installed-root "$live_root" \
-  --output "$dest/private-proposals/webbie/agent/webbie.py"
+# Proposals have ORIGINAL live-source pins. If a service has legitimately
+# changed since that reviewed baseline, do not silently patch new code.
+# Continue the SOURCE AUDIT, but put that proposed patch explicitly on hold.
+webbie_pin="08673fb0080d2974a0310e462a9f8d29a19d798a0f0cb74ff699dd271e67258c"
+nova_pin="5a59dca3f83a4cc7b9c49af5b3fa5a1cf0d4eb2c3652445cf17ae4898dc96089"
+webbie_now="$(sha256sum -- "$live_root/webbie/agent/webbie.py" | awk '{print $1}')"
+nova_now="$(sha256sum -- "$live_root/media/ai-dj/service.py" | awk '{print $1}')"
+if [[ "$webbie_now" == "$webbie_pin" ]]; then
+  python3 "$script_dir/patch_owner_session_detection.py" \
+    --owner-archive "$archive" \
+    --installed-root "$live_root" \
+    --output "$dest/private-proposals/webbie/agent/webbie.py"
+  printf 'WEBBIE PROPOSAL: WRITTEN FOR OWNER REVIEW ONLY\\n'
+else
+  printf '%s\\n' 'HOLD: Installed Webbie is a different version. Patch not generated.' \
+    'Review installed changes and update the patch without overwriting them.' \
+    > "$dest/private-proposals/WEBBIE-PATCH-HOLD.txt"
+  printf 'WEBBIE PROPOSAL: ON HOLD (new owner source fingerprint)\\n'
+fi
 
-python3 "$script_dir/patch_owner_nova_voices.py" \
-  --owner-archive "$archive" \
-  --installed-root "$live_root" \
-  --candidate-source "$source_root" \
-  --output "$dest/private-proposals/media/ai-dj/service.py"
+if [[ "$nova_now" == "$nova_pin" ]]; then
+  python3 "$script_dir/patch_owner_nova_voices.py" \
+    --owner-archive "$archive" \
+    --installed-root "$live_root" \
+    --candidate-source "$source_root" \
+    --output "$dest/private-proposals/media/ai-dj/service.py"
+  printf 'NOVA PROPOSAL: WRITTEN FOR OWNER REVIEW ONLY\\n'
+else
+  printf '%s\\n' 'HOLD: Installed native Nova DJ service changed since original review.' \
+    'Newer owner service remains authoritative. A fresh semantic code review' \
+    'is required before integrating Australian voices into this service.' \
+    > "$dest/private-proposals/NOVA-PATCH-HOLD.txt"
+  printf 'NOVA PROPOSAL: ON HOLD (new installed service fingerprint)\\n'
+fi
 
 # Deliberately do not replace files in owner-stage/staged-source with the
 # two proposals; these are not proven safe at runtime.
