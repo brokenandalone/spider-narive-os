@@ -53,6 +53,7 @@ from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
 from voice_metrics import VOICE_INTAKE
 from launch_intents import direct_launch_intent
+from console_bridge import parse_console_request,perform_console_request
 from workspace_launchers import workspace_command
 from jarvis_commands import is_capability_question, voice_guide
 from voice_trust import voice_permission, trust_status
@@ -651,7 +652,15 @@ def handle_command(command, voice=False, expected_turn=None,
     # Jarvis browser actions never execute in the agent. A literal user
     # request may propose a URL to the existing GUI, which confirms it.
     browser = parse_browser_command(command) if voice else None
-    if navigation_reply is not None:
+    console_reply=None
+    if voice and parse_console_request(command) is not None:
+        grant=read_policy()
+        allowed=(grant.get('authorized') is True and
+                 grant.get('paused') is False)
+        console_reply=perform_console_request(command,authorized=allowed)
+    if console_reply is not None:
+        reply=console_reply
+    elif navigation_reply is not None:
         reply = navigation_reply
     elif browser is not None:
         reply = (request_approved_website(browser.url) if browser.url else
