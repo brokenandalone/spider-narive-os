@@ -83,6 +83,18 @@ class WebbieWorkflowDialog(QDialog):
         final_row.addWidget(close)
         self.preview()
 
+    def choose_template(self, key):
+        """GUI may stage one known plan; running checklist is never overwritten."""
+        blueprint_for(key)
+        if self.session.current() is not None:
+            return False
+        index = self.templates.findData(key)
+        if index < 0:
+            return False
+        self.templates.setCurrentIndex(index)
+        self.preview()
+        return True
+
     def preview(self):
         # Switching a template revokes any previous session. No implicit start.
         self.session.cancel()
