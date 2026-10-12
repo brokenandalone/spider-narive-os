@@ -181,6 +181,16 @@ class ApprovalTests(unittest.TestCase):
         newest = next(x for x in self.store.master_canon.claims(include_all=True)
                       if x['title'] == 'Clock clue')
         self.assertEqual(newest['status'], 'proposed')
+        self.assertEqual(
+            self.store.master_canon.proposed_duplicate(
+                book_id=self.book, chapter_id=self.chapter,
+                title=self.finding['title'],
+                statement=self.finding['statement'],
+                source_quote=self.finding['quote']
+            ), newest['id']
+        )
+        self.widget.save_proposal()
+        self.assertEqual(self.store.master_canon.audit()['total'], initial + 1)
         self.assertEqual(self.store.chapter(self.chapter)['content'],
                          'The clock struck exactly 3:13.')
 
