@@ -1,5 +1,5 @@
 """User-initiated recovery window for The Web's native workspace UI."""
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication, QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QMessageBox, QPushButton, QVBoxLayout)
@@ -7,6 +7,17 @@ from PyQt5.QtWidgets import (
 from workspaces import NATIVE
 from workspace_health import check_workspaces
 from desktop_diagnostics import build_safe_report, report_text
+from desktop_service_health import (probe_user_services, health_totals,
+                                    service_brief)
+
+class ServiceHealthWorker(QThread):
+    """Bounded read-only probe, never block Qt event handling."""
+    result = pyqtSignal(object)
+
+    def run(self):
+        self.result.emit(probe_user_services())
+
+
 
 class WorkspaceRecovery(QDialog):
     def __init__(self, shell):
@@ -51,6 +62,25 @@ class WorkspaceRecovery(QDialog):
         self.queue_status.setWordWrap(True)
         self.queue_status.setAccessibleName('Live workspace restore progress')
         layout.addWidget(self.queue_status)
+        services_heading = QLabel('SYSTEM SERVICES  ·  READ ONLY')
+        services_heading.setAccessibleName('Spider OS user-service status')
+        layout.addWidget(services_heading)
+        self.service_health = QListWidget()
+        self.service_health.setAccessibleName('Webbie and Spider service health')
+        self.service_health.setMaximumHeight(155)
+        layout.addWidget(self.service_health)
+        service_actions = QHBoxLayout()
+        self.service_check = QPushButton('Check user services')
+        self.service_check.clicked.connect(self.check_services)
+        service_actions.addWidget(self.service_check)
+        self.webbie_health = QPushButton('Ask Webbie about status')
+        self.webbie_health.clicked.connect(self.prepare_webbie_status)
+        self.webbie_health.setToolTip(
+            'Prepare a status-only question. You review and send it yourself.')
+        service_actions.addWidget(self.webbie_health)
+        layout.addLayout(service_actions)
+        self.service_worker = None
+        self.service_rows = []
         queue_row = QHBoxLayout()
         self.pause_restore = QPushButton('Pause restoring')
         self.pause_restore.clicked.connect(self.toggle_restore_pause)
@@ -84,6 +114,9 @@ class WorkspaceRecovery(QDialog):
         self.restore_timer = QTimer(self)
         self.restore_timer.timeout.connect(self.update_restore_controls)
         self.restore_timer.start(700)
+        self.service_timer = QTimer(self)
+        self.service_timer.timeout.connect(self.check_services_if_visible)
+        self.service_timer.start(60000)
 
     def refresh(self):
         rows = check_workspaces(
@@ -219,6 +252,55 @@ class WorkspaceRecovery(QDialog):
         self.status.setText(
             'Safe diagnostics copied locally. The report contains workspace '
             'identifiers, status, counts and load timings only. Review before sharing.')
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.check_services()
+
+    def check_services_if_visible(self):
+        if self.isVisible():
+            self.check_services()
+
+    def check_services(self):
+        worker = self.service_worker
+        if worker is not None and worker.isRunning():
+            return
+        self.service_check.setEnabled(False)
+        self.service_health.clear()
+        self.service_health.addItem('Checking user services (read only)…')
+        worker = ServiceHealthWorker(self)
+        self.service_worker = worker
+        worker.result.connect(self.show_service_results)
+        worker.finished.connect(self.finish_service_check)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def show_service_results(self, rows):
+        self.service_rows = list(rows)[:8]
+        self.service_health.clear()
+        for item in self.service_rows:
+            self.service_health.addItem(f'{item.label}: {item.status}  ·  {item.detail}')
+        counts = health_totals(self.service_rows)
+        problematic = sum(counts.get(name, 0) for name in
+                          ('failed', 'stopped', 'masked', 'not-installed'))
+        self.webbie_health.setEnabled(bool(self.service_rows))
+        self.status.setText(
+            f'Checked {len(self.service_rows)} allowed user services; '
+            f'{problematic} may require attention. No changes made.')
+
+    def finish_service_check(self):
+        self.service_check.setEnabled(True)
+        self.service_worker = None
+
+    def prepare_webbie_status(self):
+        if not self.service_rows:
+            self.status.setText('Check user services before asking Webbie.')
+            return
+        brief = service_brief(self.service_rows)
+        if self.shell.prepare_webbie_service_question(brief):
+            self.status.setText('Webbie draft prepared. Review it and press Send.')
+        else:
+            self.status.setText('Webbie already has a draft or is busy. Nothing changed.')
 
     def retry_selected(self):
         item = self.list.currentItem()
