@@ -14,10 +14,12 @@ if __package__:
     from .multitrack import ROLES, DEFAULT_OUTPUT, SessionError, export_session
     from .session_mix_dialog import SessionMixDialog
     from .click_track import validate as validate_click, write_guide
+    from .take_comp_dialog import TakeCompDialog
 else:
     from multitrack import ROLES, DEFAULT_OUTPUT, SessionError, export_session
     from session_mix_dialog import SessionMixDialog
     from click_track import validate as validate_click, write_guide
+    from take_comp_dialog import TakeCompDialog
 
 
 class SessionExportWorker(QThread):
@@ -105,6 +107,9 @@ class MultitrackDialog(QDialog):
         add_row.addWidget(self.role)
         add_row.addWidget(self.add_button)
         add_row.addWidget(self.remove_button)
+        self.comp_button = QPushButton("Take Comp Lab")
+        self.comp_button.clicked.connect(self.open_comp_lab)
+        add_row.addWidget(self.comp_button)
         layout.addLayout(add_row)
         click_row = QHBoxLayout()
         self.click_meter = QComboBox()
@@ -168,6 +173,24 @@ class MultitrackDialog(QDialog):
         self.entries.append({"path": str(actual), "role": role, "label": label})
         self.track_list.addItem(f"{len(self.entries):02d} | {role.replace('_', ' ')} | {label} | {actual}")
 
+    def open_comp_lab(self):
+        """Owner assembles a genuine isolated take, then explicitly imports it."""
+        if self.worker is not None or self.click_worker is not None:
+            self.status.setText("Finish the active session export before comping takes.")
+            return
+        dialog = TakeCompDialog(parent=self)
+        dialog.take_accepted.connect(self.add_comped_take)
+        dialog.exec_()
+
+    def add_comped_take(self, path, role, label):
+        try:
+            self.add_track_path(path, role, label)
+            self.status.setText(
+                "Recorded take comp added as a separate track. Listen for bleed and confirm "
+                "it contains ONLY the chosen instrument or vocal before release.")
+        except SessionError as error:
+            self.status.setText(str(error))
+
     def choose_track(self):
         path, _ = QFileDialog.getOpenFileName(self, "Add independent audio track", str(Path.home()),
                                              "WAV audio (*.wav)")
@@ -200,6 +223,7 @@ class MultitrackDialog(QDialog):
         self.click_worker.result.connect(self.click_done)
         self.click_worker.finished.connect(self.click_finished)
         self.click_button.setEnabled(False)
+        self.comp_button.setEnabled(False)
         self.click_cancel_button.setEnabled(True)
         self.export_button.setEnabled(False)
         self.status.setText("Creating a private tempo guide, no music model involved...")
@@ -216,6 +240,7 @@ class MultitrackDialog(QDialog):
     def click_finished(self):
         worker, self.click_worker = self.click_worker, None
         self.click_button.setEnabled(True)
+        self.comp_button.setEnabled(True)
         self.click_cancel_button.setEnabled(False)
         self.export_button.setEnabled(True)
         if worker is not None:
@@ -238,6 +263,7 @@ class MultitrackDialog(QDialog):
         self.worker.result.connect(self.export_done)
         self.worker.finished.connect(self.export_finished)
         self.add_button.setEnabled(False)
+        self.comp_button.setEnabled(False)
         self.remove_button.setEnabled(False)
         self.export_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
@@ -253,6 +279,7 @@ class MultitrackDialog(QDialog):
     def export_finished(self):
         worker, self.worker = self.worker, None
         self.add_button.setEnabled(True)
+        self.comp_button.setEnabled(True)
         self.remove_button.setEnabled(True)
         self.export_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
