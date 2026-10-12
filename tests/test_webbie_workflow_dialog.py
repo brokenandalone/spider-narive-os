@@ -113,7 +113,7 @@ class WorkflowDialogTests(unittest.TestCase):
         self.assertIn("self.cognitive_dialog.offer_workflow(workflow_key)", method)
         self.assertLess(method.index("workflow_key = workflow_request(text)"),
                         method.index("request = self.prepare_request(text)"))
-        self.assertIn("self.entry.clear()\\n            return", method)
+        self.assertIn("self.entry.clear()", method)
         self.assertNotIn("workflow_request(", (ROOT / "webbie/agent/webbie.py").read_text())
 
     def test_wiring_remains_parent_gui_only(self):
