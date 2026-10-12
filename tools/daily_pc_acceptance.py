@@ -61,7 +61,7 @@ PLANNED_NEW = frozenset((
     "Author canon intelligence",
     "Studio Release Desk", "Studio Production Board", "Studio board panel",
     "Studio PCM quality",
-    "Kali evidence chain", "Kali report engine", "Kali upgrade audit",
+    "Kali evidence chain", "Kali upgrade audit",
 ))
 SERVICES = ("webbie.service", "spider-ai-dj.service")
 MAX_BYTES = 5 * 1024 * 1024
