@@ -44,13 +44,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b'{"error":"not found"}')
 
     def do_POST(self):
-        body = {"context": {}}
-        script = ollama_script(body)
-        ident = "owner"
-        audio = make_audio(script, ident)
-        response = {"audioFile": str(audio)}
-        self.send_json_headers(200)
-        self.wfile.write(json.dumps(response).encode("utf-8"))
+        if True:
+            body = {"context": {}}
+            script = ollama_script(body)
+            ident = "owner"
+            audio = make_audio(script, ident)
+            response = {"audioFile": str(audio)}
+            self.send_json_headers(200)
+            self.wfile.write(json.dumps(response).encode("utf-8"))
 
 def main():
     return "owner remains"
