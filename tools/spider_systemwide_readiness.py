@@ -9,6 +9,7 @@ claims that hashes prove physical hardware continuity.
 from __future__ import annotations
 import argparse
 import ast
+from datetime import date
 import hashlib
 import importlib.util
 import json
@@ -138,6 +139,24 @@ def inspect(source=ROOT, installed=INSTALLED, *, scan_pc=False,
                 states[name] = "matching" if expected == actual else "different"
             except (OSError, ValueError):
                 states[name] = "unavailable"
+        # Read the central installer receipt directory only; never create locks
+        # or scan user private files. An interrupted same-day attempt counts too.
+        try:
+            receipt_root = installed / "upgrade-backups"
+            policy_path = source / "system/daily_install_policy.py"
+            spec = importlib.util.spec_from_file_location("wave5_receipts", policy_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            day = date.fromisoformat(release["release_date"])
+            receipts = module.existing_batch_receipts(receipt_root, day)
+            counts["same_day_batch_receipts"] = len(receipts)
+            if receipts:
+                problems.append("A successful, partial or ambiguous same-day system install already used the slot")
+            elif not receipt_root.is_dir():
+                warnings.append("Daily install receipt folder not found; confirm with installed owner")
+        except (OSError, ValueError, RuntimeError, TypeError, KeyError, ImportError):
+            counts["same_day_batch_receipts"] = None
+            problems.append("Daily installation receipts could not be independently verified")
         counts["pc_matches"] = sum(x == "matching" for x in states.values())
         counts["pc_differs"] = sum(x == "different" for x in states.values())
         counts["pc_unavailable"] = sum(x == "unavailable" for x in states.values())
