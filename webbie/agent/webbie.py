@@ -53,6 +53,7 @@ from voice_supervisor import VoiceSupervisor
 from workspace_launchers import workspace_command
 from jarvis_commands import is_capability_question, voice_guide
 from voice_trust import voice_permission, trust_status
+from speaker_provider_loader import speaker_gate_from_config
 from runtime_readiness import inspect_readiness, render_report
 from dialogue_state import next_window, is_end_conversation
 from workspace_names import context_name
@@ -496,6 +497,32 @@ def handle_builtin(command):
 
         return "Opening Study."
 
+    # Studio v10 exposes a small, read-only status from owner-selected
+    # production checkpoints. Never put lyrics, notes, voice recordings
+    # or absolute file paths into a spoken status response.
+    if lower in (
+        "studio progress", "studio status", "spider studio status",
+        "studio production status", "how is my studio song",
+        "what is next in studio",
+    ):
+        summary_script = workspace_path("studio", "production_board.py")
+        try:
+            result = subprocess.run(
+                ["python3", summary_script, "--summary"],
+                capture_output=True, text=True, timeout=4, check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()[:240]
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return "I cannot read Studio's local production status right now."
+
+    if re.fullmatch(r"(?:open|launch|start) (?:spider )?studio", lower):
+        set_workspace("studio")
+        if launch(["python3", workspace_path("studio", "main.py")]):
+            return "Opening Spider Studio."
+        return "Spider Studio could not open. Check the installed Studio launcher."
+
     if (
         "studio" in lower
         and any(
@@ -759,19 +786,22 @@ def voice_listener():
     # Single running model worker, plus one short-lived latest correction.
     # This queue NEVER asserts a speaker identity. The owner-local verified
     # speaker adapter remains a separate, fail-closed integration gate.
+    speaker_gate = speaker_gate_from_config(CONFIG)
     coordinator = VoiceTurnCoordinator(
-        lambda command, expected_turn, speaker_verified: handle_command(
+        lambda command, expected_turn, speaker_verified, evidence: handle_command(
             command, voice=True, expected_turn=expected_turn,
-            speaker_verified=speaker_verified),
+            speaker_evidence=evidence, speaker_verified=speaker_verified),
         voice_turns,
         can_run=lambda: not quiet_asleep(),
         on_error=lambda error: write_state(
             voice_turn_error=type(error).__name__),
         on_supersede=speech_playback.stop,
+        carry_evidence=True,
     )
 
-    def start_voice_turn(command):
-        result = coordinator.submit(command)
+    def start_voice_turn(command, evidence):
+        result = coordinator.submit(
+            command, speaker_verified=True, speaker_evidence=evidence)
         write_state(voice_turn_status=result)
 
     def on_interrupt(phrase):
@@ -789,12 +819,23 @@ def voice_listener():
         write_state(last_reply='Voice interruption requested',
                     voice_turn_status='interrupted')
 
-    def on_text(phrase):
+    def on_text(phrase, evidence=None):
         global awaiting_command_until
 
         original_phrase = str(phrase or "").strip()
         phrase = clean_phrase(original_phrase)
         if not phrase:
+            return
+        # Emergency STOP is universal even when audio cannot identify a user.
+        if is_direct_stop(phrase):
+            on_interrupt(phrase)
+            return
+        # No wake, sleep, greetings or follow-up from a TV, other speaker,
+        # model TTS or an unauthenticated transcript. The actual local
+        # speaker adapter must verify the SAME captured WAV first.
+        if not voice_permission(
+                voice=True, speaker_verified=evidence is not None,
+                evidence=evidence):
             return
 
         # Stay operational at night without answering TV, casual speech or
@@ -817,10 +858,6 @@ def voice_listener():
 
         now = time.time()
 
-        # Direct stop cancels current output and keeps follow-up listening open.
-        if is_direct_stop(phrase):
-            on_interrupt(phrase)
-            return
         if is_end_conversation(phrase):
             coordinator.cancel()
             speech_playback.stop()
@@ -832,7 +869,8 @@ def voice_listener():
             woke, command = remove_wake_word(original_phrase)
             awaiting_command_until = next_window(
                 awaiting_command_until, 'command', now)
-            start_voice_turn(command if woke and command else original_phrase)
+            start_voice_turn(command if woke and command else original_phrase,
+                             evidence)
             return
 
         woke, command = (
@@ -847,7 +885,7 @@ def voice_listener():
         if command:
             awaiting_command_until = next_window(
                 awaiting_command_until, 'command', now)
-            start_voice_turn(command)
+            start_voice_turn(command, evidence)
             return
 
         awaiting_command_until = next_window(
@@ -863,6 +901,7 @@ def voice_listener():
             on_text=on_text,
             should_continue=lambda: running,
             on_interrupt=on_interrupt,
+            verifier=speaker_gate.verify_file,
         )
 
     except Exception as error:
