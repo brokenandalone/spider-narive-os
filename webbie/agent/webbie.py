@@ -34,7 +34,7 @@ sys.path.insert(
 )
 
 
-from brain import respond
+from brain import respond, remember_exchange
 from tts import speech_controller
 from speaker_guard import SpeakerGuard
 
@@ -495,7 +495,7 @@ def handle_builtin(command):
     return None
 
 
-def handle_command(command, voice=False):
+def handle_command(command, voice=False, speaker=None):
     command = str(command or "").strip()
 
     if not command:
@@ -513,13 +513,15 @@ def handle_command(command, voice=False):
 
     built_in = handle_builtin(command)
 
+    session_key = "voice:" + speaker if voice and speaker else "typed"
     if built_in:
         reply = built_in
-
+        remember_exchange(session_key, command, reply)
     else:
         reply = respond(
             command,
             context_name=current_name(),
+            session_key=session_key,
         )
 
     if voice:
@@ -629,7 +631,7 @@ def voice_listener():
                 return
             awaiting_command_until = 0.0
             awaiting_command_speaker = None
-            handle_command(phrase, voice=True)
+            handle_command(phrase, voice=True, speaker=speaker)
             return
 
         awaiting_command_until = 0.0
@@ -637,7 +639,7 @@ def voice_listener():
         if not woke:
             return
         if command:
-            handle_command(command, voice=True)
+            handle_command(command, voice=True, speaker=speaker)
             return
         awaiting_command_speaker = speaker
         awaiting_command_until = time.time() + 10
