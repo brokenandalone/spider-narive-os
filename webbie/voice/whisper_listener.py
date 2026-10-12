@@ -186,7 +186,7 @@ def listen_forever(
             )
 
             if phrase:
-                on_text(phrase)
+                on_text(phrase, audio_path)
 
         finally:
             if audio_path:
