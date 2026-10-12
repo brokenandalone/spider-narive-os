@@ -453,7 +453,7 @@ class TheWeb(QMainWindow):
             return False
         text = ('Explain these Spider OS service states and suggest safe manual '
                 'diagnostics. Do not change services or run commands without '
-                'my separate approval.\n' + str(brief)[:450])
+                'my separate approval. | ' + str(brief)[:450])
         panel.entry.setText(text[:750])
         self.update_webbie_context()
         self.webbie_dock.show()
