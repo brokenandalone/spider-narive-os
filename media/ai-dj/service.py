@@ -2,7 +2,7 @@
 import json, os, re, shutil, subprocess, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from nova_host import NovaHost, HOST as ON_AIR_HOST, STATION as STATION_NAME
+from nova_host import NovaHost, HOST as ON_AIR_HOST, STATION as STATION_NAME, clean
 from nova_voice import synthesize, available_profiles, normalize_voice, configured_voice
 
 HOST = "127.0.0.1"
@@ -14,6 +14,30 @@ CACHE.mkdir(parents=True, exist_ok=True)
 
 PERSONA = NovaHost()
 LAST_VOICE = {'engine': 'no-break-prepared', 'usedFallback': False}
+PRODUCTION_TYPES = {'show_id', 'station_id', 'commercial', 'promo', 'sweeper', 'bumper', 'liner'}
+
+
+def production_context(body):
+    context = body.get('context') if isinstance(body.get('context'), dict) else {}
+    kind = str(body.get('type') or 'station_id').lower()
+    if kind not in PRODUCTION_TYPES:
+        raise ValueError('Unsupported BCN production category')
+    sponsor = clean(context.get('sponsor'), 90)
+    if kind == 'commercial' and not sponsor:
+        raise ValueError('Commercials must identify a real, operator-supplied sponsor')
+    return context, kind
+
+
+def approved_spoken_copy(context):
+    if context.get('copyApproved') is not True:
+        raise ValueError('Approve production copy before Nova voices or saves it')
+    original = context.get('approvedCopy')
+    if not isinstance(original, str) or len(original) > 1100:
+        raise ValueError('Approved copy is missing or too long')
+    script = clean(original, 1100)
+    if len(script) < 8 or len(script.split()) > 175:
+        raise ValueError('Approved copy must be 8 to 175 spoken words')
+    return script
 
 
 def track_text(track):
@@ -95,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b'{"error":"not found"}')
 
     def do_POST(self):
-        if self.path != "/dj/prepare":
+        if self.path not in ("/dj/prepare", "/dj/draft"):
             self.send_json_headers(404)
             self.wfile.write(b'{"error":"not found"}')
             return
@@ -108,7 +132,22 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
             if not isinstance(body, dict):
                 raise ValueError("Nova expects a JSON object")
-            script = ollama_script(body)
+            context = body.get("context") if isinstance(body.get("context"), dict) else {}
+            if self.path == "/dj/draft":
+                _, kind = production_context(body)
+                script = ollama_script(body)
+                self.send_json_headers(200)
+                self.wfile.write(json.dumps({"script": script, "type": kind, "draft": True,
+                                             "approved": False, "audioFile": None}).encode())
+                return
+            mode = str(body.get("type") or "transition").lower()
+            if mode in PRODUCTION_TYPES and context.get('productionMode') is True:
+                production_context(body)
+                script = approved_spoken_copy(context)
+            elif mode in {'commercial', 'promo', 'sweeper', 'bumper', 'show_id'}:
+                raise ValueError('Production elements require approved copy and production mode')
+            else:
+                script = ollama_script(body)
             ident = f"dj-{int(time.time())}-{uuid.uuid4().hex[:8]}"
             context = body.get("context") if isinstance(body.get("context"), dict) else {}
             profile = normalize_voice(context.get("voiceProfile", configured_voice()))

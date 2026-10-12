@@ -8,7 +8,8 @@ STATION = "Broken City Network"
 SHORT_NAME = "BCN"
 HOST = "Nova"
 MAX_WORDS = 48
-VALID_TYPES = {"transition", "station_id", "liner", "show_intro", "show_outro", "request"}
+VALID_TYPES = {"transition", "station_id", "liner", "show_id", "show_intro", "show_outro",
+               "request", "commercial", "promo", "sweeper", "bumper"}
 
 
 def clean(value, limit=160):
@@ -50,6 +51,9 @@ def normalize_request(payload):
         "show": clean(context.get("showName"), 80),
         "segment": clean(context.get("segment"), 80),
         "tone": clean(context.get("tone"), 48),
+        "sponsor": clean(context.get("sponsor"), 90),
+        "brief": clean(context.get("brief"), 320),
+        "approved_facts": clean(context.get("approvedFacts"), 400),
         "approved_request": clean(request.get("approvedRequest"), 180) if request.get("approved") is True else "",
     }
 
@@ -98,7 +102,12 @@ class NovaHost:
             "Never invent facts about artists or fabricate news, weather, sports, caller names, "
             "listener requests, traffic, events, station sponsors or broadcast availability. "
             "Only mention an explicitly approved listener request if one is supplied. "
-            "Use the official station identity naturally, not in every sentence."
+            "For a sponsor commercial, use ONLY supplied sponsor name and approved facts; "
+            "do not invent endorsements, pricing, discounts, websites, phone numbers, "
+            "claims about products, offers or endorsements. You are writing a draft for "
+            "operator review, NEVER claim it has already aired or been approved. "
+            "For show IDs use the provided actual show name. "
+            "Keep the official station identity natural and avoid a canned robotic cadence."
         )
         requested = info["approved_request"] or "none"
         data = (
@@ -108,6 +117,9 @@ class NovaHost:
             f"Show: {info['show'] or 'unspecified'}\n"
             f"Segment: {info['segment'] or 'unspecified'}\n"
             f"Tone: {info['tone'] or 'natural'}\n"
+            f"Sponsor (only if provided): {info['sponsor'] or 'none'}\n"
+            f"Creative brief (not established fact): {info['brief'] or 'none'}\n"
+            f"Approved claims and contact details (only supplied facts): {info['approved_facts'] or 'none'}\n"
             f"Current track: {track_phrase(info['current']) or 'unknown'}\n"
             f"Next track: {track_phrase(info['next']) or 'unknown'}\n"
             f"Approved request: {requested}\n"
@@ -139,6 +151,29 @@ class NovaHost:
                 f"That wraps up {show or 'this set'} on {SHORT_NAME}. I'm {HOST}. Stay with us.",
                 f"I'm {HOST}, signing off {show or 'this segment'}. The music continues on {SHORT_NAME}.",
             ]
+        elif mode == "show_id":
+            options = [
+                f"This is {show or STATION} on {SHORT_NAME}, with {HOST}.",
+                f"You're tuned to {show or STATION}. I'm {HOST}, here on {SHORT_NAME}.",
+            ]
+        elif mode == "commercial":
+            sponsor = info["sponsor"]
+            options = [
+                f"{sponsor} supports this segment on {SHORT_NAME}. Thanks for listening to {STATION}.",
+                f"This message is brought to you by {sponsor}, a supporter of {SHORT_NAME}.",
+            ] if sponsor else [f"You're listening to {STATION}."]
+        elif mode == "promo":
+            options = [
+                f"Coming up on {SHORT_NAME}: {show or 'more original programming'}. Stay with {STATION}.",
+                f"Stay tuned for {show or 'what comes next'}, right here on {SHORT_NAME}.",
+            ]
+        elif mode == "sweeper":
+            options = [
+                f"{SHORT_NAME}. {STATION}. Your soundtrack continues.",
+                f"{STATION}, keeping the music moving.",
+            ]
+        elif mode == "bumper":
+            options = [f"You're on {SHORT_NAME}. Back to the music.",f"{STATION}. Stay with us."]
         elif mode == "request" and approved:
             options = [
                 f"{HOST} here on {SHORT_NAME}. We have an approved request: {approved}.",
