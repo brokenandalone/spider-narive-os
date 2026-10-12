@@ -68,6 +68,20 @@ class TaskGrant:
             self._wide_app_id = ''
             return count
 
+    def restore_permanent(self, installed_ids, *, path=None):
+        """The owner-approved disk record, not an LLM argument, grants access."""
+        with self._lock:
+            kwargs={} if path is None else {"path":path}
+            count=self.wide.restore_permanent(installed_ids,**kwargs)
+            if not count:
+                return 0
+            self._active=False
+            self._stopped=False
+            self._task="Permanent owner-approved routine access"
+            self._app_id=""
+            self._wide_app_id=""
+            return count
+
     def can_open_wide(self, desktop_id):
         with self._lock:
             return (self.wide.status()['active'] and
@@ -104,6 +118,7 @@ class TaskGrant:
                     'task': 'Routine apps only. Risky operations blocked.',
                     'wide': True,
                     'eligible_apps': broad['eligible_apps'],
+                    'permanent': broad.get('permanent',False),
                 }
             valid = self._active and not self._stopped and self.clock() < self._expires
             return {
@@ -115,6 +130,7 @@ class TaskGrant:
                 'task': self._task if valid else '',
                 'wide': False,
                 'eligible_apps': 0,
+                'permanent': False,
             }
 
     def authorize(self, action, preview):
