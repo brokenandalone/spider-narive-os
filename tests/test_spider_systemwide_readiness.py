@@ -44,7 +44,7 @@ class SystemwideReadinessTests(unittest.TestCase):
 
     def write_plan(self, **override):
         gates = {x: True for x in ready.RELEASE_GATES}
-        gates.update({"workspaces": [{"name": "The Web"}], "pull_requests": []})
+        gates.update({"release_date": "2026-10-11", "workspaces": [{"name": "The Web"}], "pull_requests": []})
         gates.update(override)
         self.plan.write_text(json.dumps(gates))
 
