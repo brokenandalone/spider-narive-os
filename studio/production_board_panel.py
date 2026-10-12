@@ -17,12 +17,14 @@ if __package__:
         load_session, save_revision, latest_status, next_action,
     )
     from .song_mix import MixError, valid_wav
+    from .multitrack_dialog import MultitrackDialog
 else:
     from production_board import (
         ROLES, STEM_ROLES, ProductionError, create_session, list_sessions,
         load_session, save_revision, latest_status, next_action,
     )
     from song_mix import MixError, valid_wav
+    from multitrack_dialog import MultitrackDialog
 
 LABELS = {
     'reference_mix': 'Full song reference, not an independent instrument',
@@ -46,6 +48,7 @@ class ProductionBoardPanel(QWidget):
         self.band_mixer = band_mixer
         self.release_panel = release_panel
         self.tool_tabs = tool_tabs
+        self.quality_panel = None
         self.session_id = None
         self.sources = {}
         self.reviewed = {}
@@ -146,6 +149,14 @@ class ProductionBoardPanel(QWidget):
                        self.release_send_button):
             handoff_row.addWidget(button)
         layout.addLayout(handoff_row)
+        review_row = QHBoxLayout()
+        self.daw_button = QPushButton('Prepare reviewed stems for DAW')
+        self.daw_button.clicked.connect(self.prepare_daw)
+        self.qc_button = QPushButton('Inspect recordings in Audio Quality')
+        self.qc_button.clicked.connect(self.open_quality)
+        review_row.addWidget(self.daw_button)
+        review_row.addWidget(self.qc_button)
+        layout.addLayout(review_row)
         layout.addStretch()
         self.refresh_sessions()
 
@@ -338,3 +349,57 @@ class ProductionBoardPanel(QWidget):
         if self.tool_tabs is not None:
             self.tool_tabs.setCurrentIndex(2)
         self.status.setText('Final WAV selected in Release Desk. Export only after listening.')
+
+
+    def prepare_daw(self):
+        """Seed the existing WAV copy dialog, never start a copy silently."""
+        paths, approvals = self.data()
+        entries = []
+        identities = set()
+        daws = {
+            'backing': 'instrumental_bed', 'lead_vocal': 'lead_vocal',
+            'guest_vocal': 'backing_vocal', 'rhythm_guitar': 'rhythm_guitar',
+            'lead_guitar': 'lead_guitar', 'bass': 'bass', 'drums': 'drums',
+            'keys': 'piano_keys',
+        }
+        try:
+            for role in STEM_ROLES:
+                if role not in paths or not approvals[role]:
+                    continue
+                source = valid_wav(paths[role], role)
+                identity = (source.stat().st_dev, source.stat().st_ino)
+                if identity in identities:
+                    raise ProductionError('Duplicate audio cannot be exported as separate stems.')
+                identities.add(identity)
+                entries.append({
+                    'path': str(source), 'role': daws[role],
+                    'label': role.replace('_', ' ').title(),
+                })
+            if not entries:
+                raise ProductionError('Review at least one real independent WAV for DAW export.')
+            if 'reference_mix' in paths:
+                reference = valid_wav(paths['reference_mix'], 'song reference')
+                identity = (reference.stat().st_dev, reference.stat().st_ino)
+                if identity not in identities:
+                    entries.append({'path': str(reference), 'role': 'reference_mix',
+                                    'label': 'Whole-song reference, NOT a separate instrument'})
+        except (ProductionError, OSError, MixError) as exc:
+            self.status.setText(str(exc))
+            return
+        dialog = MultitrackDialog(entries, title=self.song_title.text(), parent=self)
+        self.status.setText(
+            'DAW editor opened with reviewed stems. Tracks start at zero; '
+            'listen and align manually. Export only if you approve.'
+        )
+        dialog.exec_()
+
+    def open_quality(self):
+        if self.quality_panel is None or self.tool_tabs is None:
+            self.status.setText('Audio Quality tab is unavailable.')
+            return
+        if self.quality_panel.worker is not None:
+            self.status.setText('Audio Quality is already analyzing. No changes applied.')
+            return
+        self.quality_panel.import_board()
+        self.tool_tabs.setCurrentWidget(self.quality_panel.parentWidget())
+        self.status.setText('Audio Quality opened with selected WAVs; click Inspect to run.')
