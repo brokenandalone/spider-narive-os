@@ -231,13 +231,24 @@ def latest_status(*, root=None):
     return _public_progress(entries[0])
 
 
+def latest_next_step(*, root=None):
+    """Expose only generic advice, not songs, paths, notes or personal audio."""
+    entries = list_sessions(root=root, limit=1)
+    if not entries:
+        return 'Start a song in Studio AI or record real instrumental WAVs.'
+    data = entries[0]
+    if data['missing']:
+        return 'Some Studio WAVs moved. Reselect missing recordings in Production Board.'
+    return next_action(data)
+
+
 def main():
-    parser = argparse.ArgumentParser(description='Studio read-only production summary')
-    parser.add_argument('--summary', action='store_true')
+    parser = argparse.ArgumentParser(description='Studio read-only production guidance')
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument('--summary', action='store_true')
+    action.add_argument('--next', action='store_true')
     args = parser.parse_args()
-    if not args.summary:
-        parser.error('Only the read-only --summary action is supported.')
-    print(latest_status())
+    print(latest_status() if args.summary else latest_next_step())
 
 
 if __name__ == '__main__':

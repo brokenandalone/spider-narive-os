@@ -22,6 +22,8 @@ PARTS = (
     'studio/mix_presets.py',
     'studio/production_board.py',
     'studio/production_board_panel.py',
+    'studio/audio_quality.py',
+    'studio/audio_quality_panel.py',
     'webbie/agent/webbie.py',
     'studio/music_backend.py',
     'studio/voice_profile.py',

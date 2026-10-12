@@ -38,6 +38,18 @@ class StudioVoiceBridgeTests(unittest.TestCase):
         self.assertTrue(args.kwargs['capture_output'])
         context['launch'].assert_not_called()
 
+    def test_webbie_next_step_reads_only_fixed_local_guide(self):
+        handler, context = load_builtin()
+        context['subprocess'].run.return_value = SimpleNamespace(
+            returncode=0, stdout='Review independent WAV stems.\n')
+        self.assertEqual(handler('What should I do next in Studio'),
+                         'Review independent WAV stems.')
+        args = context['subprocess'].run.call_args
+        self.assertEqual(args.args[0], [
+            'python3', '/usr/local/lib/spider-os/studio/production_board.py', '--next'])
+        self.assertEqual(args.kwargs['timeout'], 4)
+        context['launch'].assert_not_called()
+
     def test_open_studio_launches_an_explicit_fixed_app_path(self):
         handler, context = load_builtin()
         self.assertEqual(handler('Open Spider Studio'), 'Opening Spider Studio.')
