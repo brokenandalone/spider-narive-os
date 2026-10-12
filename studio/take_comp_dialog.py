@@ -260,21 +260,40 @@ class TakeCompDialog(QDialog):
             self.stop.setEnabled(False)
             self.status.setText("Stopping comp; original WAVs are preserved.")
 
+    def verified_output(self):
+        if self.output is None or self.completed_role is None:
+            raise SessionError("Render or reopen a saved Take Comp first.")
+        report = inspect_take_comp(self.output.parent)
+        if report["path"] != self.output.resolve() or report["role"] != self.completed_role:
+            raise SessionError("The chosen comp was replaced or changed after review.")
+        return report
+
     def audition(self):
-        if self.output and self.output.is_file() and not self.output.is_symlink():
-            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.output))):
+        try:
+            report = self.verified_output()
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(report["path"]))):
                 self.status.setText("No audio player was available. Open the comp WAV manually.")
+        except (SessionError, OSError, ValueError) as error:
+            self.status.setText("Cannot audition altered Take Comp: " + str(error))
+            self.listen.setEnabled(False)
+            self.accept.setEnabled(False)
 
     def accept_comp(self):
-        if (self.worker is not None or self.output is None or self.completed_role is None
-                or self.output.is_symlink() or not self.output.is_file()):
-            self.status.setText("Render and audition a genuine take first.")
+        if self.worker is not None:
+            self.status.setText("The comp is still rendering.")
+            return
+        try:
+            report = self.verified_output()
+        except (SessionError, OSError, ValueError) as error:
+            self.status.setText("Cannot import altered Take Comp: " + str(error))
+            self.listen.setEnabled(False)
+            self.accept.setEnabled(False)
             return
         self.take_accepted.emit(
-            str(self.output), self.completed_role,
-            f"Comped {self.completed_role.replace('_', ' ')} (recorded WAV, review isolation)"
+            str(report["path"]), report["role"],
+            f"Comped {report['role'].replace('_', ' ')} (recorded WAV, review isolation)"
         )
-        self.status.setText("Comp sent to multitrack project. Original takes still preserved.")
+        self.status.setText("Verified comp sent to multitrack project. Originals preserved.")
         self.accept.setEnabled(False)
 
     def closeEvent(self, event):
