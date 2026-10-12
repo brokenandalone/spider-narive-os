@@ -722,7 +722,8 @@
         "known_good_pr": 99,
         "owner_first_pr": 101,
         "matilda_doc_pr": 100,
-        "merged_voice_module_missing_from_wave_six": true
+        "merged_voice_module_missing_from_wave_six": true,
+        "main_nova_voice_module_sha": "b0099290f9618b47a22342b43ca25bb856852a9e"
       }
     },
     "legacy_spider_os1": {
@@ -940,7 +941,8 @@
       "special": {
         "playlist_workshop_merged_pr": 21,
         "four_artist_merged_pr": 22,
-        "open_shutdown_pr": 11
+        "open_shutdown_pr": 11,
+        "new_voice_pr_open": 23
       }
     },
     "bcn_network": {
@@ -1039,6 +1041,7 @@
     "Include latest Nova Australian-voices PR 102 merged to Spider OS main AFTER frozen Wave Six snapshot; main files media/ai-dj/nova_voice.py and media/ai-dj/service.py must be reconciled with customized live service.",
     "Keep Media Center V7 bulk playlists and four-artist show generator (merged PRs 21,22); verify player, playlist selection, visualizer, actual BCN live audio and Nova bridge.",
     "Audit unresolved Media Center PR 11 bounded radio shutdown; do not assume implemented.",
+    "Include Media Center PR 23's Australian Nova voice selector, invalid-library cleanup and BCN cue rotation only after review; PR23 remains OPEN, and cannot be assumed included in main or installed.",
     "Keep BCN network v3-v15 site and owner Command Center from main; separate deployment pipeline, test admin access, broadcast security; review draft PR14 Broken World multipage.",
     "Spider-OS1 is a legacy mirror/build source; avoid installing it alongside the native spider-narive-os system or mixing boot changes blindly.",
     "Run one coordinated change window with separate native OS batch + Media Center installer + BCN site deployment, each with own independent validation/rollback and owners' explicit approval.",
@@ -1062,6 +1065,7 @@
       88
     ],
     "media_center": [
+      23,
       22,
       21,
       20,
