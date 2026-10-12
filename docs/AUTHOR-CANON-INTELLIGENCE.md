@@ -25,6 +25,8 @@ Results show **POSSIBLE CONFLICT** or **UNAPPROVED IDEA** with exact citations. 
 
 **Save selected idea as Proposed** is offered only for unapproved suggestions, with an explicit Yes/No confirmation. It verifies source freshness again and saves a normal Master Canon claim with status **Proposed**, never Established. The writer can edit or promote that entry separately in the existing Master Canon tab.
 
+Exact duplicate proposals for the same book, chapter, title, statement, and quotation are blocked, including after reopening the review. Repeated AI suggestions never silently create multiple copies.
+
 The page does not automatically run when opened, including when Webbie opens it by voice. Spoken command **Webbie, show canon intelligence** only switches to the page after trusted-speaker verification. It does not start inference or approve anything.
 
 ## Privacy and installation
