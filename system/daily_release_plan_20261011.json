@@ -41,7 +41,9 @@
         68,
         69,
         76,
-        78
+        78,
+        88,
+        89
       ],
       "required_files": [
         "webbie/agent/webbie.py",
@@ -58,7 +60,8 @@
         64,
         71,
         73,
-        77
+        77,
+        84
       ],
       "required_files": [
         "study/study.py",
@@ -78,7 +81,8 @@
         59,
         62,
         74,
-        80
+        80,
+        82
       ],
       "required_files": [
         "studio/main.py",
@@ -94,7 +98,8 @@
         51,
         56,
         75,
-        79
+        79,
+        83
       ],
       "required_files": [
         "author/main.py",
@@ -163,7 +168,7 @@
       "pr": 52,
       "workspace": "The Web",
       "branch": "upgrades/the-web-menu-readability-20261011",
-      "observed_sha": "1723361cf7644a7275106407ddee517bda397c76",
+      "observed_sha": "e1d5891b5c5f83876ab7df53aded88032036c3f6",
       "integrated": false,
       "paths": [
         "the-web/shell/main.py",
@@ -171,7 +176,8 @@
         "the-web/shell/command_palette.py",
         "the-web/shell/navigation_core.py",
         "the-web/shell/readability.py"
-      ]
+      ],
+      "head_revalidated": false
     },
     {
       "pr": 53,
@@ -254,14 +260,15 @@
       "pr": 59,
       "workspace": "Studio",
       "branch": "feature/studio-session-mixing-20261011",
-      "observed_sha": "830c68a4c54a9b50b3cb7d966189747ac6440e39",
+      "observed_sha": "0c6651b0f0a93082430307addd250c029d218a22",
       "integrated": false,
       "paths": [
         "studio/ai_panel.py",
         "studio/session_mix.py",
         "studio/session_project.py",
         "studio/session_qc.py"
-      ]
+      ],
+      "head_revalidated": false
     },
     {
       "pr": 60,
@@ -370,7 +377,7 @@
       "pr": 69,
       "workspace": "Webbie",
       "branch": "feature/webbie-jarvis-cognitive-control-center-20261011",
-      "observed_sha": "1e895d036752baf2b6b6f7fba6df0e2d2f78383b",
+      "observed_sha": "8fcd1e6809e776614dad0723b7a250a86f3b55fc",
       "paths": [
         "webbie/agent/webbie.py",
         "system/release_batch.py",
@@ -380,7 +387,8 @@
         "webbie/agent/voice_queue.py",
         "webbie/brain/privacy_controls.py"
       ],
-      "integrated": false
+      "integrated": false,
+      "head_revalidated": false
     },
     {
       "pr": 70,
@@ -559,6 +567,88 @@
         "webbie/agent/webbie.py"
       ],
       "integrated": false
+    },
+    {
+      "pr": 82,
+      "workspace": "Studio",
+      "branch": "feature/studio-audio-qc-daw-v11-20261011",
+      "observed_sha": "6fb447b2459ed9949a21cf9ff37d3f4b87d74805",
+      "integrated": false,
+      "paths": [
+        "studio/main.py",
+        "studio/audio_quality.py",
+        "studio/audio_quality_panel.py",
+        "studio/production_board.py",
+        "studio/production_board_panel.py",
+        "webbie/agent/webbie.py"
+      ],
+      "review_note": "New Oct 11 draft, not reconciled into Wave Three source or installed on PC"
+    },
+    {
+      "pr": 83,
+      "workspace": "Author",
+      "branch": "feature/author-canon-intelligence-20261011",
+      "observed_sha": "45ba64efbff14354f807f11fb5fe7a2d376f1624",
+      "integrated": false,
+      "paths": [
+        "author/main.py",
+        "author/canon_intelligence.py",
+        "author/canon_intelligence_widget.py",
+        "author/master_canon.py",
+        "author/commands.py",
+        "author/control_socket.py",
+        "system/release_batch.py"
+      ],
+      "review_note": "New Oct 11 draft, not reconciled into Wave Three source or installed on PC"
+    },
+    {
+      "pr": 84,
+      "workspace": "Study",
+      "branch": "feature/study-passage-search-20261011",
+      "observed_sha": "42ab71c6f060ef6d2b53e5aeb9f3b4b6b848750d",
+      "integrated": false,
+      "paths": [
+        "study/reading_passages.py",
+        "study/reading_library.py",
+        "study/reading_library_ui.py",
+        "study/course_materials.py",
+        "study/store.py",
+        "system/release_batch.py"
+      ],
+      "review_note": "New Oct 11 draft, not reconciled into Wave Three source or installed on PC"
+    },
+    {
+      "pr": 88,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-resilience-control-20261011",
+      "observed_sha": "4f1fbf50571514ce7472a9ac8bac76be6e02595e",
+      "integrated": false,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/brain/brain.py",
+        "webbie/brain/model_resilience.py",
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/speaker_provider_loader.py",
+        "webbie/agent/voice_lab.py",
+        "system/release_batch.py"
+      ],
+      "review_note": "New Oct 11 draft, not reconciled into Wave Three source or installed on PC"
+    },
+    {
+      "pr": 89,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-hearing-speech-v3-20261011",
+      "observed_sha": "51f48ecbc469dce792cc057649aa07cdb22a91e3",
+      "integrated": false,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/brain/brain.py",
+        "webbie/voice/audio_gate.py",
+        "webbie/voice/speaker_guard.py",
+        "webbie/voice/tts.py",
+        "webbie/voice/whisper_listener.py"
+      ],
+      "review_note": "New Oct 11 draft, not reconciled into Wave Three source or installed on PC"
     }
   ],
   "resolved_shared_paths": [],
@@ -589,5 +679,23 @@
     ],
     "source_ci_verified": false,
     "pc_install_performed": false
+  },
+  "consolidation": {
+    "base_merged_wave3_sha": "ae48fd46dbdc5ae082247ab4dacf392d87251f6b",
+    "status": "REVIEW_ONLY_NOT_INSTALLABLE",
+    "added_unintegrated_prs": [
+      82,
+      83,
+      84,
+      88,
+      89
+    ],
+    "superseded_branch_prs": [
+      85,
+      86
+    ],
+    "independent_bcn_website": "brokenandalone/bcn-network@main; content in GitHub, live site/admin deploy not independently verified",
+    "independent_media_center": "brokenandalone/Spider-Media-Center; candidate v7 GPU scenes not approved for stable V6 installation",
+    "reason": "new PRs overlap existing Webbie, Studio, Author, Study and central installer; do not overwrite customized PC code"
   }
 }
