@@ -31,6 +31,7 @@ run_readonly() {
   return 0
 }
 run_readonly model_inventory.json python3 "$SOURCE/tools/webbie_model_compatibility.py" --json
+run_readonly known_good_pc_baseline.json python3 "$SOURCE/tools/known_good_baseline.py" --verify --json
 run_readonly pc_hardware_readiness.json python3 "$SOURCE/tools/spider_pc_readiness.py" --json
 run_readonly combined_source_audit.txt python3 "$SOURCE/tools/combined_release_audit.py" --checkout "$SOURCE"
 run_readonly candidate_vs_pc.json python3 "$SOURCE/tools/daily_pc_acceptance.py" --phase before --json
@@ -40,6 +41,7 @@ run_readonly installer_preview.txt python3 "$SOURCE/system/release_batch.py" --c
 echo "Read-only review finished: $DEST"
 echo "The release is NOT approved or installed. Review these files before any apply:"
 echo "  model_inventory.json"
+echo "  known_good_pc_baseline.json"
 echo "  pc_hardware_readiness.json"
 echo "  candidate_vs_pc.json"
 echo "  wave5_pc_continuity.json"
