@@ -8,6 +8,7 @@ This is a process-local permission cache, not an authentication service.
 from __future__ import annotations
 import threading
 import time
+from owner_safe_access import OwnerSafeAccess, safe_app_id
 
 ROUTINE = frozenset({
     'observe.apps', 'observe.windows', 'app.open', 'window.focus',
@@ -29,6 +30,8 @@ class TaskGrant:
         self._task = ''
         self._app_id = ''
         self._stopped = False
+        self.wide = OwnerSafeAccess(clock=self.clock)
+        self._wide_app_id = ''
 
     def activate(self, task, app_id, *, seconds=300):
         """ONLY a trusted UI should call this after the user clicks Allow."""
@@ -38,6 +41,8 @@ class TaskGrant:
                 type(seconds) is not int or not 1 <= seconds <= MAX_SECONDS):
             raise ValueError('Choose an app, task and short approval duration')
         with self._lock:
+            self.wide.revoke()
+            self._wide_app_id = ''
             self._active = True
             self._expires = self.clock() + seconds
             self._remaining = MAX_ACTIONS
@@ -45,14 +50,49 @@ class TaskGrant:
             self._app_id = app_id
             self._stopped = False
 
+    def activate_wide(self, installed_ids, *, owner_clicked=False, seconds=1800):
+        """Invoked only by the visible one-click native Webbie control."""
+        with self._lock:
+            count = self.wide.activate(
+                installed_ids, owner_clicked=owner_clicked, seconds=seconds)
+            self._active = False
+            self._stopped = False
+            self._task = 'Owner-approved routine app access'
+            self._app_id = ''
+            self._wide_app_id = ''
+            return count
+
+    def select_wide_app(self, desktop_id):
+        with self._lock:
+            if (not self.wide.status()['active'] or
+                    not safe_app_id(desktop_id) or
+                    desktop_id not in self.wide._apps):
+                self._wide_app_id = ''
+                return False
+            self._wide_app_id = desktop_id
+            return True
+
     def stop(self):
         with self._lock:
+            self.wide.revoke()
+            self._wide_app_id = ''
             self._active = False
             self._stopped = True
             self._remaining = 0
 
     def status(self):
         with self._lock:
+            broad = self.wide.status()
+            if broad['active']:
+                return {
+                    'active': True, 'stopped': False,
+                    'remaining_seconds': broad['remaining_seconds'],
+                    'remaining_actions': broad['remaining_actions'],
+                    'selected_app_id': self._wide_app_id,
+                    'task': 'Routine apps only. Risky operations blocked.',
+                    'wide': True,
+                    'eligible_apps': broad['eligible_apps'],
+                }
             valid = self._active and not self._stopped and self.clock() < self._expires
             return {
                 'active': valid,
@@ -61,10 +101,15 @@ class TaskGrant:
                 'remaining_actions': self._remaining if valid else 0,
                 'selected_app_id': self._app_id if valid else '',
                 'task': self._task if valid else '',
+                'wide': False,
+                'eligible_apps': 0,
             }
 
     def authorize(self, action, preview):
         with self._lock:
+            if self.wide.status()['active']:
+                return self.wide.authorize(
+                    action, preview, selected_app_id=self._wide_app_id)
             if (not self._active or self._stopped or
                     self.clock() >= self._expires or self._remaining <= 0 or
                     action not in ROUTINE | SENSITIVE):
