@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_ROOT = Path('/usr/local/lib/spider-os')
@@ -549,6 +550,67 @@ def user_info(for_apply=False):
     return Path(user.pw_dir), user.pw_uid, user.pw_gid
 
 
+def require_exact_candidate_commit(root, expected, runner=subprocess.run):
+    """Reject stale or locally modified checkouts regardless of PR test badges."""
+    if (not isinstance(expected, str) or len(expected) != 40 or
+            any(ch not in "0123456789abcdef" for ch in expected)):
+        raise RuntimeError("Missing or invalid exact reviewed release commit")
+    try:
+        observed = runner(
+            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
+            capture_output=True, text=True, timeout=8, check=False)
+        state = runner(
+            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True, text=True, timeout=8, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeError("Cannot verify the exact release checkout") from None
+    if observed.returncode != 0 or observed.stdout.strip() != expected:
+        raise RuntimeError("Staged source SHA differs from approved/tested release")
+    if state.returncode != 0 or state.stdout.strip():
+        raise RuntimeError("Staged source has modified tracked files")
+    return True
+
+
+def require_known_good_pc(source_root=PROJECT_ROOT):
+    """Compare real installed PC against its owner-confirmed stable baseline."""
+    import importlib.util
+    root = Path(source_root)
+    gate_path = root / "tools/known_good_baseline.py"
+    if not gate_path.is_file() or gate_path.is_symlink():
+        raise RuntimeError("Known-good PC compatibility gate missing")
+    spec = importlib.util.spec_from_file_location("spider_known_good_installer", gate_path)
+    gate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+    who = os.environ.get("SUDO_USER") or getpass.getuser()
+    account = pwd.getpwnam(who)
+    folder = Path(account.pw_dir) / ".local/state/spider-os/known-good"
+    report = gate.verify(repo=root, installed=INSTALL_ROOT,
+                         folder=folder, uid=account.pw_uid)
+    if report["status"] == "BLOCKED":
+        raise RuntimeError(
+            "Working Spider OS PC differs from its owner-confirmed baseline "
+            "or no known-good record exists. Preserve installed files and "
+            "reconcile the baseline report before any upgrade.")
+    if report.get("status") != "REVIEW_REQUIRED":
+        raise RuntimeError("Unexpected known-good review status")
+    # Matching the old PC does NOT authorize candidate changes; independent
+    # owner + model + CI + voice gates were already required above.
+    return report
+
+
+def daily_manifest_path(root=PROJECT_ROOT, today=None):
+    """Use today's plan, never silently approve a prior day's review."""
+    root = Path(root)
+    current = today or datetime.now(ZoneInfo("America/Indiana/Indianapolis")).date()
+    expected = root / "system" / ("daily_release_plan_" + current.strftime("%Y%m%d") + ".json")
+    if expected.is_file() or expected.is_symlink():
+        return expected
+    # An earlier plan is ONLY a diagnostic fallback. Its release_date must
+    # fail the independent day check in the continuity audit.
+    historical = sorted((root / "system").glob("daily_release_plan_????????.json"))
+    return historical[-1] if historical else expected
+
+
 def require_daily_continuity(backup_root, source_root=PROJECT_ROOT):
     """Fail closed unless the exact combined daily release is approved.
 
@@ -558,7 +620,7 @@ def require_daily_continuity(backup_root, source_root=PROJECT_ROOT):
     import importlib.util
     source_root = Path(source_root)
     audit_script = source_root / 'tools/daily_release_continuity.py'
-    manifest = source_root / 'system/daily_release_plan_20261011.json'
+    manifest = daily_manifest_path(source_root)
     if not audit_script.is_file() or not manifest.is_file():
         raise RuntimeError('Daily combined release audit or plan is missing')
     spec = importlib.util.spec_from_file_location(
@@ -574,6 +636,10 @@ def require_daily_continuity(backup_root, source_root=PROJECT_ROOT):
             + ' continuity checks). Run tools/daily_release_continuity.py'
             + ' and reconcile every issue before the single installation.'
         )
+    # Source CI must correspond to EXACTLY these bytes, not an older green PR.
+    require_exact_candidate_commit(source_root, plan.get('candidate_commit'))
+    # Even approved source cannot downgrade a machine changed since last check.
+    require_known_good_pc(source_root)
 
 
 def main(argv=None):

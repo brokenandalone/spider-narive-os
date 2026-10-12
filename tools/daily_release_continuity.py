@@ -166,9 +166,16 @@ def audit(plan, root, receipt_root=None, now=None):
     return sorted(set(blocked)), findings
 
 
+def active_daily_plan():
+    """Prefer today's plan; earlier plans only produce a blocked stale-day audit."""
+    today = datetime.now(ZoneInfo("America/Indiana/Indianapolis")).strftime("%Y%m%d")
+    desired = PLAN.parent / ("daily_release_plan_" + today + ".json")
+    return desired if desired.is_file() or desired.is_symlink() else PLAN
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--plan", type=Path, default=PLAN)
+    parser.add_argument("--plan", type=Path, default=active_daily_plan())
     parser.add_argument("--checkout", type=Path, default=PLAN.parents[1])
     parser.add_argument("--backup-root", type=Path, default=None)
     parser.add_argument("--json", action="store_true")

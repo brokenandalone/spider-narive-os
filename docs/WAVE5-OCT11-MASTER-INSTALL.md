@@ -53,3 +53,38 @@ Only sends an unprivileged fixed test prompt to the *installed configured* local
 - [ ] Perform after-install source acceptance, service/audio/playback tests and preserve rollback receipt.
 
 **Source tests are not proof of on-PC installation.**
+
+
+## Permanent known-good + same-day regression prevention (PR #99)
+
+This protects **the working PC as the baseline**, not merely a source branch that might lag behind the machine. An upgrade is never accepted solely because a GitHub branch passed CI.
+
+1. On the real PC, confirm manually that Webbie chat uses the intended installed Ollama model and that microphone, wake, TTS, STOP, The Web, Nova and essential native workspaces actually work.
+2. From a separate source checkout, **as the normal desktop user, not sudo**, record this working state **once**:
+
+   ```bash
+   python3 tools/known_good_baseline.py --capture --confirmed-working --json
+   ```
+
+   The tool writes a *new* private 0600 snapshot under `~/.local/state/spider-os/known-good/`. It contains SHA-256 hashes of known application files and the explicit locally configured model name. It never copies private files, code contents, voiceprints, credentials, manuscripts, recordings or messages. A new snapshot is only appropriate after physically confirming working behavior, not automatically at boot or when tests fail.
+
+3. Before **each** candidate upgrade, run:
+
+   ```bash
+   python3 tools/known_good_baseline.py --verify --json
+   python3 tools/webbie_model_compatibility.py --json
+   bash tools/prep_oct11_release.sh
+   ```
+
+   Any installed app-file drift since the golden snapshot, dropped previously working source module, changed selected model, unexpected untracked live code, invalid source file or absent snapshot is a hard stop. Candidate differences are explicitly enumerated and **require owner review**; they are not automatically approved.
+4. The central batch installer checks the owner's baseline again and refuses `--apply` unless the release has its exact SHA pinned and the working checkout has no modified tracked files. Existing source CI, rollback, model, microphone and owner-approval gates all remain.
+5. **Tomorrow and every following day**, first create the new dated plan in the DEVELOPMENT checkout:
+
+   ```bash
+   python3 tools/prepare_daily_plan.py --date YYYY-MM-DD
+   ```
+
+   Set the correct **Indianapolis-local release date**, review and commit the plan and all final changes, then rerun CI **on the exact final commit**. This generator rejects overwrites and resets source-CI evidence, owner approval, PC reconciliation, microphone, model and rollback flags to `false`. Today's plan cannot authorize tomorrow's installer.
+6. After the one approved batch installs and the owner verifies actual functionality, **capture another immutable working-state snapshot** for the next day's baseline. If a postinstall test fails, use the protected rollback path; NEVER label a broken state as known good.
+
+**Important limitations:** A file hash does not prove performance or feature parity. The installer cannot automatically determine which model is smarter or whether a browser UI behaves correctly. Human-tested acceptance and a full source comparison are still necessary. Installed models are not pulled or swapped by these tools. A service-level model override remains a separate PC check, and green source CI is not proof of live microphone/speaker verification.
