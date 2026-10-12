@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile native Nova service
-        run: python3 -m py_compile media/ai-dj/nova_host.py media/ai-dj/service.py
+        run: python3 -m py_compile media/ai-dj/nova_host.py media/ai-dj/nova_voice.py media/ai-dj/service.py
       - name: Test native Nova radio host
         run: python3 -m unittest discover -s tests -p 'test_nova_bcn.py' -v
       - name: Ensure there is one native DJ service

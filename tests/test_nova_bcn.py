@@ -162,5 +162,110 @@ class NativeHTTPTests(unittest.TestCase):
         self.assertEqual(status, 500)
         self.assertIn("tts unavailable", body["error"])
 
+
+class SharedAustralianVoiceTests(unittest.TestCase):
+    def test_profiles_are_a_fixed_safe_allowlist(self):
+        from nova_voice import SPEAKERS, VOICES, normalize_voice
+        self.assertEqual(SPEAKERS["matilda"], 7)
+        self.assertEqual(SPEAKERS["kirra"], 3)
+        self.assertEqual(SPEAKERS["bindi"], 1)
+        self.assertEqual(SPEAKERS["marlo"], 2)
+        self.assertEqual(SPEAKERS["tully"], 8)
+        self.assertEqual(SPEAKERS["willow"], 9)
+        self.assertIn("natasha", VOICES)
+        self.assertEqual(normalize_voice(" MaTiLdA "), "matilda")
+        self.assertEqual(normalize_voice("../../bin/sh"), "auto")
+
+    def test_matilda_offline_and_kirra_selection_share_webbie_model(self):
+        import tempfile
+        import wave
+        from nova_voice import synthesize
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            root = home / ".local/share/spider-os/webbie-neural-preview"
+            python = root / "venv/bin/python3"
+            model = root / "models/en_AU-librivox-medium.onnx"
+            python.parent.mkdir(parents=True)
+            python.write_text("#!/usr/bin/python3\n")
+            python.chmod(0o700)
+            model.parent.mkdir(parents=True)
+            model.write_bytes(b"example-model")
+            Path(str(model) + ".json").write_text("{}")
+            calls = []
+            def fake_run(args, **kwargs):
+                calls.append((args, kwargs))
+                self.assertEqual(kwargs.get("input"), "Nova here on BCN.\n")
+                out = Path(args[args.index("-f") + 1])
+                with wave.open(str(out), "wb") as writer:
+                    writer.setnchannels(1)
+                    writer.setsampwidth(2)
+                    writer.setframerate(22050)
+                    writer.writeframes(b"\x00\x00" * 800)
+            for name, index in (("matilda", "7"), ("kirra", "3")):
+                audio = synthesize("Nova here on BCN.", "nova-test-" + name, profile=name,
+                    home=home, cache=home / "cache", runner=fake_run, which=lambda _: None)
+                self.assertTrue(audio.is_file())
+                self.assertEqual(calls[-1][0][calls[-1][0].index("-s") + 1], index)
+                self.assertIn(str(model), calls[-1][0])
+
+    def test_auto_uses_matilda_when_online_natasha_unavailable(self):
+        import tempfile
+        import wave
+        from nova_voice import synthesize
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            root = home / ".local/share/spider-os/webbie-neural-preview"
+            python = root / "venv/bin/python3"
+            model = root / "models/en_AU-librivox-medium.onnx"
+            python.parent.mkdir(parents=True)
+            python.write_text("python")
+            python.chmod(0o700)
+            model.parent.mkdir(parents=True)
+            model.write_bytes(b"model")
+            Path(str(model) + ".json").write_text("{}")
+            calls = []
+            def piper_only(args, **kwargs):
+                calls.append(args)
+                with wave.open(args[args.index("-f") + 1], "wb") as writer:
+                    writer.setnchannels(1)
+                    writer.setsampwidth(2)
+                    writer.setframerate(22050)
+                    writer.writeframes(b"\x00\x00" * 800)
+            audio = synthesize("Nova announces music", "nova-auto", profile="auto",
+                home=home, cache=home / "cache", runner=piper_only, which=lambda _: None)
+            self.assertEqual(audio.suffix, ".wav")
+            self.assertEqual(calls[0][calls[0].index("-s") + 1], "7")
+
+    def test_native_service_reports_voice_profiles_and_routes_operator_choice(self):
+        import importlib
+        import json
+        from unittest.mock import patch
+        service = importlib.import_module("service")
+        self.assertIn("matilda", service.available_profiles()["voices"])
+        self.assertIn("kirra", service.available_profiles()["voices"])
+        with patch.object(service, "ollama_script", return_value="Nova speaks"), \
+             patch.object(service, "make_audio", return_value=Path("/tmp/nova-test.wav")) as audio, \
+             patch.object(service, "cleanup"):
+            from http.server import ThreadingHTTPServer
+            import threading, urllib.request
+            server = ThreadingHTTPServer(("127.0.0.1", 0), service.Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                url = "http://127.0.0.1:" + str(server.server_port)
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(url + "/dj/voices", timeout=3) as reply:
+                    self.assertIn("matilda", json.load(reply)["voices"])
+                body = json.dumps({"context": {"voiceProfile": "kirra"}, "type": "station_id"}).encode()
+                with opener.open(urllib.request.Request(url + "/dj/prepare", data=body, method="POST"), timeout=3) as reply:
+                    self.assertEqual(json.load(reply)["host"], "Nova")
+                audio.assert_called_once()
+                self.assertEqual(audio.call_args.kwargs["profile"], "kirra")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=3)
+
+
 if __name__ == "__main__":
     unittest.main()
