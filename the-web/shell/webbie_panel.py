@@ -26,9 +26,13 @@ from webbie_unified_workflow import WebbieUnifiedWorkflowDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
+from kali_assistant import handle_kali_request
+from kali_named_app import parse_named_app_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
 from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
+from owner_authorization_store import read_policy,update_policy
 from context_awareness import AwarenessState
 from unified_workflow import UnifiedWorkflow
 from jarvis_context import publish_context
@@ -389,23 +393,30 @@ class WebbiePanel(QWidget):
         computer_button.clicked.connect(self.open_computer_dialog)
         layout.addWidget(computer_button)
         access_row=QHBoxLayout();layout.addLayout(access_row)
-        self.safe_access_button=QPushButton('One click: Allow Webbie safe access')
+        self.safe_access_button=QPushButton(
+            'Permanently authorize Webbie (routine apps + Kali on command)')
         self.safe_access_button.setObjectName('webbieOwnerOneClickAccess')
         self.safe_access_button.setToolTip(
-            '30-minute local safe-access session. Opens ordinary apps, '
-            'inspects selected windows, navigates and reads local service '
-            'status. Deletes, installs, shell/root, Kali tools, purchases, '
-            'uploads, broadcasts, sends, and account changes are blocked.')
+            'One owner click saves routine app permissions permanently, '
+            'including exact requested Kali GUI tool launches. '
+            'Never authorizes arbitrary security scans, attacks, '
+            'deletions, privilege escalation, messages, broadcasts '
+            'or purchases. Separate authenticated app integrations still apply.')
         self.safe_access_button.clicked.connect(self.enable_safe_access)
         access_row.addWidget(self.safe_access_button)
-        revoke=QPushButton('Revoke access now')
+        revoke=QPushButton('Pause Webbie now')
         revoke.setObjectName('webbieOwnerRevokeAll')
         revoke.clicked.connect(self.stop_sensitive_actions)
         access_row.addWidget(revoke)
+        remove=QPushButton('Remove permanent permission')
+        remove.setObjectName('webbieOwnerRemovePermission')
+        remove.clicked.connect(self.remove_saved_permissions)
+        layout.addWidget(remove)
         access_note=QLabel(
-            'Safe access lasts 30 minutes, is not saved, and never overrides '
-            'speaker identity or the blocked-action rules. Online services '
-            'still require their existing individual sign-ins.')
+            'Saved permanently and restored after login unless paused. '
+            'Kali tools launch ONLY on your direct instruction. '
+            'STOP pauses access; remove permission cancels saved approval. '
+            'Online services require their own sign-ins.')
         access_note.setWordWrap(True)
         layout.addWidget(access_note)
         self.cloud_label = QLabel(cloud_state_label())
@@ -837,10 +848,21 @@ class WebbiePanel(QWidget):
                             json.dumps(state, indent=2, ensure_ascii=False))
 
     def enable_safe_access(self):
-        """The single deliberate owner's click enables routine access only."""
+        """Owner GUI click saves permanent bounded access plus Kali-on-demand."""
         self.open_computer_dialog()
         if self.computer_dialog is not None:
             self.computer_dialog.authorize_wide_access()
+            self.publish_jarvis_context()
+
+    def remove_saved_permissions(self):
+        """Explicit owner click removes persistent access, unlike STOP."""
+        self.open_computer_dialog()
+        if self.computer_dialog is not None:
+            if self.computer_dialog.remove_permanent_authorization():
+                self.unified_workflow.stop()
+                self.stop_camera()
+                self.awareness.revoke_observation('screen')
+                self.append_message('Webbie','Permanent permissions removed.')
             self.publish_jarvis_context()
 
     def open_computer_dialog(self, suggested_app_id=None):
@@ -864,6 +886,21 @@ class WebbiePanel(QWidget):
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        # Only literal typed owner requests can request launching named Kali
+        # desktop applications, and only under the saved unpaused policy.
+        # No LLM/screen/webpage output ever reaches this command handler.
+        if parse_named_app_request(text) is not None:
+            approval=read_policy()
+            if (approval.get('authorized') is True and
+                    approval.get('paused') is False and
+                    approval.get('kali_on_demand') is True):
+                answer=handle_kali_request(text,allow_named_apps=True)
+            else:
+                answer=('Kali tool access is not currently authorized. '
+                        'Enable or resume permanent owner permissions.')
+            self.append_message('Webbie',answer or 'Kali app request not recognized.')
+            self.entry.clear()
             return
         # Direct owner text can stage a deterministic window-bound navigation
         # mission. Neither the LLM nor a webpage can trigger this parser.
@@ -952,6 +989,8 @@ class WebbiePanel(QWidget):
         else:
             self.unified_workflow.stop()
             if self.computer_dialog is not None:
-                self.computer_dialog.stop()
+                # Closing the UI never erases or pauses standing authorization.
+                # Active sessions are shut down; the next login rechecks it.
+                self.computer_dialog.stop(pause_authorization=False)
             self.stop_camera()
             event.accept()
