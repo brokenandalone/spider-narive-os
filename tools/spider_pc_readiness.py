@@ -103,6 +103,8 @@ def collect(source_root=ROOT, installed_root=DEFAULT_INSTALL, *,
     if not services:
         approvals_missing.append("Service/Nova runtime status was not checked")
     blocked = list(file_report["blockers"])
+    if expected_sha and git_sha != expected_sha:
+        blocked.append("CHECKOUT SHA MISMATCH: expected reviewed candidate")
     if file_report.get("status") == "BLOCKED" and not blocked:
         blocked.append("Installed source inspection was blocked")
     result = {
