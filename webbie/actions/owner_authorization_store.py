@@ -12,7 +12,7 @@ from pathlib import Path
 import stat
 import tempfile
 
-DEFAULT_PATH=Path.home()/".config/spider-os/webbie-owner-authorization.json"
+DEFAULT_PATH=Path.home()/".config/spider-os/private/webbie-owner-authorization.json"
 VERSION=1
 MAX_BYTES=2048
 DISABLED={"version":VERSION,"authorized":False,"paused":True,
