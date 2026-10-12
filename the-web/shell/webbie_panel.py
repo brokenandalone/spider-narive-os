@@ -22,6 +22,7 @@ from webbie_vision_bridge import VisionBridge
 from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_catalog
 from webbie_reminders_dialog import WebbieRemindersDialog
 from webbie_cognitive_center import WebbieCognitiveDialog
+from webbie_unified_workflow import WebbieUnifiedWorkflowDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
@@ -29,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
 from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
 from context_awareness import AwarenessState
+from unified_workflow import UnifiedWorkflow
 from jarvis_context import publish_context
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from proactive_checks import read_status as proactive_snapshot, status_message as proactive_status_message, request_check_now
@@ -253,6 +255,8 @@ class WebbiePanel(QWidget):
         self.computer_dialog = None
         self.reminders_dialog = None
         self.cognitive_dialog = None
+        self.workflow_dialog = None
+        self.unified_workflow = UnifiedWorkflow()
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
         self.awareness.sleep(self.face_sleeping)
@@ -293,6 +297,13 @@ class WebbiePanel(QWidget):
             'Local focus tasks, AI model health, private session and safe stop.')
         cognitive_button.clicked.connect(self.open_cognitive_center)
         layout.addWidget(cognitive_button)
+        workflow_button = QPushButton('Work with Webbie · guided workflow')
+        workflow_button.setObjectName('webbieUnifiedWorkflowButton')
+        workflow_button.setToolTip(
+            'Guide an existing focus task through approved screen review, '
+            'desktop operation and owner-confirmed completion.')
+        workflow_button.clicked.connect(self.open_unified_workflow)
+        layout.addWidget(workflow_button)
         # Independent read-only system status, no microphone or camera access.
         self.proactive_label = QLabel('Proactive checks: awaiting first report')
         self.proactive_label.setWordWrap(True)
@@ -550,6 +561,7 @@ class WebbiePanel(QWidget):
         self.face_sleeping = bool(sleeping)
         self.awareness.sleep(self.face_sleeping)
         if self.face_sleeping:
+            self.unified_workflow.stop()
             self.stop_camera()
             if self.computer_dialog is not None:
                 self.computer_dialog.stop()
@@ -676,6 +688,8 @@ class WebbiePanel(QWidget):
                 selected_window=selected_window,
                 mission_status=mission_status,
                 last_action=last_action,
+                workflow_status=self.unified_workflow.advisory_status(
+                    workspace=self.awareness.snapshot()['workspace']),
                 sleeping=self.face_sleeping,
             )
         except (OSError, PermissionError, ValueError):
@@ -701,6 +715,13 @@ class WebbiePanel(QWidget):
         if not self.face_sleeping:
             self.awareness.observation(
                 'screen', description, consent=True, ttl=45)
+            # The only producer is a completed, explicitly consented
+            # Computer Control inspection of the owner-selected window.
+            self.unified_workflow.observed_window(
+                from_consented_gui=True,
+                workspace=self.awareness.snapshot()['workspace'])
+            if self.workflow_dialog is not None:
+                self.workflow_dialog.refresh()
 
     def open_reminders_dialog(self):
         if self.reminders_dialog is None:
@@ -740,6 +761,7 @@ class WebbiePanel(QWidget):
 
     def stop_sensitive_actions(self):
         """One owner GUI action to drop camera and all desktop grants."""
+        self.unified_workflow.stop()
         if self.computer_dialog is not None:
             self.computer_dialog.stop()
         self.stop_camera()
@@ -753,11 +775,34 @@ class WebbiePanel(QWidget):
         if self.cognitive_dialog is None:
             self.cognitive_dialog = WebbieCognitiveDialog(
                 self, workspace_callback=lambda: self.awareness.snapshot()['workspace'],
-                emergency_callback=self.stop_sensitive_actions)
+                emergency_callback=self.stop_sensitive_actions,
+                workflow_callback=self.open_unified_workflow)
         self.cognitive_dialog.refresh()
         self.cognitive_dialog.show()
         self.cognitive_dialog.raise_()
         self.cognitive_dialog.activateWindow()
+
+    def open_unified_workflow(self):
+        """Single supervised workflow, never an autonomous task grant."""
+        if self.workflow_dialog is None:
+            self.workflow_dialog = WebbieUnifiedWorkflowDialog(
+                self, session=self.unified_workflow,
+                workspace_callback=lambda: self.awareness.snapshot()['workspace'],
+                computer_callback=self.open_computer_dialog,
+                stop_callback=self.stop_sensitive_actions)
+        self.workflow_dialog.refresh()
+        self.workflow_dialog.show()
+        self.workflow_dialog.raise_()
+        self.workflow_dialog.activateWindow()
+
+    def _workflow_action(self, action, outcome):
+        """Only actual Computer Control GUI emits this redacted receipt."""
+        self.unified_workflow.record_action(
+            action, outcome, from_control_gui=True,
+            workspace=self.awareness.snapshot()['workspace'])
+        if self.workflow_dialog is not None:
+            self.workflow_dialog.refresh()
+        self.publish_jarvis_context()
 
     def show_jarvis_commands(self):
         self.append_message('Jarvis command guide', gui_guide())
@@ -777,8 +822,12 @@ class WebbiePanel(QWidget):
             self.computer_dialog.taskApproved.connect(self.awareness.note_user_request)
             self.computer_dialog.screenObserved.connect(
                 self._remember_consented_screen)
+            self.computer_dialog.actionOutcome.connect(
+                self._workflow_action)
             self.computer_dialog.authorizationRevoked.connect(
                 lambda: self.awareness.revoke_observation('screen'))
+            self.computer_dialog.authorizationRevoked.connect(
+                self.unified_workflow.stop)
         if suggested_app_id:
             self.computer_dialog.offer_program(suggested_app_id)
         self.computer_dialog.show()
@@ -863,5 +912,8 @@ class WebbiePanel(QWidget):
                 self.face_controls.active()):
             event.ignore()
         else:
+            self.unified_workflow.stop()
+            if self.computer_dialog is not None:
+                self.computer_dialog.stop()
             self.stop_camera()
             event.accept()

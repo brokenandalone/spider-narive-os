@@ -57,6 +57,24 @@ class JarvisContextTests(unittest.TestCase):
         self.clock[0]+=91
         self.assertEqual(self.read(),{})
 
+    def test_guided_workflow_phase_expires_and_never_grants_action(self):
+        self.publish(
+            workflow_status="Unified workflow: verify. This is advisory and never authorizes computer control.")
+        fresh=self.read()
+        self.assertIn("verify",fresh["workflow_status"])
+        self.assertIn("Unified workflow",m.context_summary(fresh))
+        self.assertNotIn("control_authorized",fresh)
+        self.clock[0]+=91
+        self.assertEqual(self.read(),{})
+
+    def test_sleep_clears_workflow_phase(self):
+        self.publish(workflow_status="Unified workflow: review_action.")
+        self.publish(workflow_status="Unified workflow: verify.",
+                     selected_title="private task",sleeping=True)
+        result=self.read()
+        self.assertTrue(result["sleeping"])
+        self.assertNotIn("workflow_status",result)
+
     def test_expiration(self):
         self.publish(selected_title="Old browser")
         self.clock[0] += 91

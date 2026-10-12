@@ -100,6 +100,7 @@ class StepWorker(QThread):
 class WebbieComputerDialog(QDialog):
     taskApproved = pyqtSignal(str)
     screenObserved = pyqtSignal(str)
+    actionOutcome = pyqtSignal(str, str)  # redacted trusted GUI receipt
     authorizationRevoked = pyqtSignal()
 
     def __init__(self, parent=None, *, discover=None, run=None, launcher=None,
@@ -290,6 +291,8 @@ class WebbieComputerDialog(QDialog):
     def receipt(self, action, outcome):
         self.action_receipts.record(action, outcome)
         self.receipt_label.setText('Last action: ' + self.action_receipts.summary())
+        # No command content/URL/window text crosses this signal.
+        self.actionOutcome.emit(action, outcome)
 
     def clear_activity(self):
         self.action_journal.clear()

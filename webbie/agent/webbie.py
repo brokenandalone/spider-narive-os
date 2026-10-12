@@ -647,7 +647,9 @@ def handle_command(command, voice=False, expected_turn=None,
         r"what is on my screen|what are we doing|what step are we on|"
         r"what is the next step|what is our navigation status|"
         r"what did you just do|what did you open|"
-        r"what happened with the last action)", command, re.I,
+        r"what happened with the last action|"
+        r"what is our workflow status|what is the workflow status|"
+        r"where are we in the workflow|what is the next workflow step)", command, re.I,
     ):
         reply = context_summary(read_context())
     # Speech-triggered camera questions work only with consent granted in
