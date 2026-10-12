@@ -22,6 +22,7 @@ from desktop_control import app_catalog, KEYS
 from window_safety import ConfinedDesktopOperator
 from task_grants import TaskGrant
 from owner_safe_access import safe_app_id
+from safe_service_status import read_local_service_status, status_summary
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from browser_routes import canonical_url, is_browser_app
@@ -182,6 +183,10 @@ class WebbieComputerDialog(QDialog):
             'external account actions. STOP revokes access immediately.')
         self.wide_access_info.setWordWrap(True)
         layout.addWidget(self.wide_access_info)
+        self.service_button=QPushButton('Read approved local service status')
+        self.service_button.setObjectName('webbieSafeServicesStatus')
+        self.service_button.clicked.connect(self.inspect_safe_services)
+        layout.addWidget(self.service_button)
         self.state = QLabel('OFF | Webbie cannot operate applications')
         self.state.setWordWrap(True)
         layout.addWidget(self.state)
@@ -333,6 +338,20 @@ class WebbieComputerDialog(QDialog):
         if hasattr(self, 'state'):
             self.refresh_status()
 
+    def inspect_safe_services(self):
+        if not self.grant.status().get('wide'):
+            self.status('Activate one-click safe access first.')
+            return
+        reports=[]
+        for service in ('webbie','nova','onedrive'):
+            try:
+                reports.append(read_local_service_status(
+                    service,access=self.grant.wide))
+            except (PermissionError,OSError,ValueError,TypeError):
+                reports.append({'service':service,'reported_online':False,
+                                'detail':'Local status unavailable'})
+        self.status(status_summary(reports))
+
     def authorize_wide_access(self):
         """The labeled button IS the owner's deliberate consent, no extra prompts."""
         if self.grant.status()['active']:
@@ -448,6 +467,7 @@ class WebbieComputerDialog(QDialog):
         safe_wide=bool(active and data.get('wide'))
         self.wide_access_button.setEnabled(not safe_wide)
         self.grant_button.setEnabled(not safe_wide)
+        self.service_button.setEnabled(safe_wide)
         self.autopilot_start.setEnabled(
             active and not safe_wide and not self.autopilot.active)
         self.autopilot_pause.setEnabled(self.autopilot.active)
