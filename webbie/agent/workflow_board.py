@@ -111,7 +111,7 @@ def workflow_request(text):
     """Return a fixed template key only for a complete owner-typed phrase."""
     if not isinstance(text, str) or len(text) > 130:
         return None
-    clean = re.sub(r"\\s+", " ", text.strip().lower().strip(" .!?"))
+    clean = re.sub(r"\s+", " ", text.strip().lower().strip(" .!?"))
     clean = re.sub(
         r"^(?:(?:hey )?(?:webbie|webby|web))[,.: ]+",
         "", clean, count=1,
