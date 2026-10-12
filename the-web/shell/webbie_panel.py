@@ -722,7 +722,8 @@ class WebbiePanel(QWidget):
         if self.cognitive_dialog is None:
             self.cognitive_dialog = WebbieCognitiveDialog(
                 self, workspace_callback=lambda: self.awareness.snapshot()['workspace'],
-                emergency_callback=self.stop_sensitive_actions)
+                emergency_callback=self.stop_sensitive_actions,
+                workspace_opener=getattr(self, 'workspace_navigator', None))
         self.cognitive_dialog.refresh()
         self.cognitive_dialog.show()
         self.cognitive_dialog.raise_()
