@@ -362,7 +362,7 @@ class WebbieComputerDialog(QDialog):
             count = self.grant.activate_wide(
                 app_ids, owner_clicked=True, seconds=1800)
             self.operator.begin_new_task()
-            self.bridge.deactivate()  # only local UI, never the voice socket
+            self.bridge.activate()  # existing owner-only local app request channel
             self.autopilot.stop()
             self.nav_mission.stop()
             self.pending_step = None
@@ -504,19 +504,42 @@ class WebbieComputerDialog(QDialog):
         self.refresh_status()
         return outcome
 
+    def open_program_safe(self, app_id):
+        """One previously consented routine app launch; no new modal dialog."""
+        if (not self.grant.status().get('wide') or
+                not self.grant.can_open_wide(app_id) or
+                not self.offer_program(app_id)):
+            self.receipt('application','denied')
+            return False
+        app=self.selected_app()
+        if app is None or app.desktop_id!=app_id:
+            self.receipt('application','denied')
+            return False
+        result=self.action(self.operator.open_app,app.name)
+        self.record_activity('app_requested' if result is not None
+                             else 'app_denied')
+        self.receipt('application',
+                     'requested' if result is not None else 'failed')
+        return result is not None
+
     def handle_voice_open(self, app_id):
         # A socket request cannot create/extend approval; the selected app ID
         # and current GUI grant are rechecked before even attempting a launch.
-        result = None
+        result = False
         app = self.selected_app()
-        if (app is not None and app.desktop_id == app_id
+        if self.grant.status().get('wide'):
+            result = self.open_program_safe(app_id)
+            app = self.selected_app()
+        elif (app is not None and app.desktop_id == app_id
                 and self.grant.status()['active']):
-            result = self.action(self.operator.open_app, app.name)
-        self.receipt('application', 'requested' if result is not None else 'denied')
+            result = self.action(self.operator.open_app, app.name) is not None
+            self.receipt('application', 'requested' if result else 'denied')
+        else:
+            self.receipt('application','denied')
         peer = self.bridge.pending
         if peer is not None:
             self.bridge.finish(
-                peer, f'Launch requested for {app.name}.' if result else
+                peer, f'Launch requested for {app.name}.' if result and app else
                 'App launch denied or unsuccessful. Check the desktop panel.')
 
     def offer_site(self, url):
