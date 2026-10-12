@@ -16,6 +16,7 @@ AUTHOR_MODULES = {
     'author/project_map.py', 'author/story_atlas.py',
     'author/atlas_widget.py', 'author/master_canon.py',
     'author/master_canon_widget.py',
+    'author/canon_intelligence.py', 'author/canon_intelligence_widget.py',
 }
 WEBBIE_BRIDGE = 'webbie/agent/author_voice_bridge.py'
 
