@@ -20,6 +20,10 @@ COMPONENTS = {
         "webbie/brain/local_models.py", "webbie/voice/whisper_listener.py",
         "webbie/agent/voice_trust.py", "webbie/agent/runtime_readiness.py",
         "webbie/actions/action_receipts.py",
+        "webbie/agent/segment_speaker_gate.py",
+        "webbie/agent/speaker_provider_loader.py",
+        "webbie/agent/voice_lab.py",
+        "webbie/voice/hearing_test.py",
     ),
     "Webbie vision and desktop": (
         "the-web/shell/webbie_camera.py", "the-web/shell/webbie_panel.py",
@@ -48,6 +52,8 @@ COMPONENTS = {
         "studio/package/voice-engine.sh",
         "studio/mix_presets.py", "studio/release_export.py",
         "studio/release_panel.py",
+        "studio/production_board.py",
+        "studio/production_board_panel.py",
     ),
     "Author library and continuity": (
         "author/main.py", "author/web_features.py",
@@ -57,6 +63,7 @@ COMPONENTS = {
         "author/control_socket.py", "author/review_cache.py",
         "author/narration_bookmarks.py",
         "author/story_atlas.py", "author/atlas_widget.py",
+        "author/master_canon.py", "author/master_canon_widget.py",
     ),
     "Kali Bay": (
         "kali-bay/ui/kali_bay.py", "kali-bay/bin/kali-bay",
