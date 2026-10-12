@@ -49,6 +49,7 @@ class ProductionBoardPanel(QWidget):
         self.release_panel = release_panel
         self.tool_tabs = tool_tabs
         self.quality_panel = None
+        self.quality_tab = None
         self.session_id = None
         self.sources = {}
         self.reviewed = {}
@@ -401,5 +402,6 @@ class ProductionBoardPanel(QWidget):
             self.status.setText('Audio Quality is already analyzing. No changes applied.')
             return
         self.quality_panel.import_board()
-        self.tool_tabs.setCurrentWidget(self.quality_panel.parentWidget())
+        if self.quality_tab is not None:
+            self.tool_tabs.setCurrentWidget(self.quality_tab)
         self.status.setText('Audio Quality opened with selected WAVs; click Inspect to run.')
