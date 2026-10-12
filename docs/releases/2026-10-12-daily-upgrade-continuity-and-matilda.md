@@ -11,6 +11,13 @@
 - Pin exact tested source commits, dry-run, backup, permit rollback, keep logs and detailed receipts. Verify each workspace after installing, then advance known-good baseline.
 - An earlier successful PR test is not a complete cross-component PC test. Don't independently run old workspace installers again.
 
+## User-confirmed live voice recovery (2026-10-12; supersedes older diagnostic statuses)
+
+- After successful direct microphone capture, direct Whisper transcription and wake-phrase normalization checks, the user tested **"Hey Webbie, what time is it?"** using the running resident Webbie and answered **yes** when asked whether Webbie responded **aloud using Matilda**.
+- **Verified by user in the live workflow:** microphone -> wake-word recognition/acceptance -> command response -> Matilda audible output. This is the current **known-good voice baseline**. The earlier "live commands unverified" diagnostic notes below are historical, not the current status.
+- Next daily PC install: preserve the installed `webbie.py`, `whisper_listener.py`, `tts.py`, model, service drop-ins and microphone default exactly unless a validated compatibility-safe change is explicitly needed. Detect current Matilda patch; **skip any already-installed repairs**. Capture hashes/patch marker and a successful live wake-and-reply test as the acceptance gate before applying broader upgrades.
+- **Still unverified:** other-speaker denial / Cory-Shayna voice authentication, proactive check-in operation, Azure/Edge Natasha reconnection, and all remaining system-wide workspaces. Do not falsely certify these.
+
 ## Current Webbie voice hotfix (user-reported success; installed state to verify)
 
 - Online primary: Microsoft `en-AU-NatashaNeural`, installed Edge TTS 7.2.8. Multiple online voices get HTTP 403, so do not claim Microsoft speech repaired.
