@@ -9,7 +9,12 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+# This module is also loaded directly by existing security regression tests.
+_LOCAL_AGENT=Path(__file__).resolve().parent
+if str(_LOCAL_AGENT) not in sys.path:
+    sys.path.insert(0,str(_LOCAL_AGENT))
 from kali_named_app import parse_named_app_request,launch_named_kali_app
 
 INSTALLED_MANAGER = Path("/usr/local/lib/spider-os/kali-bay/bin/kali-bay")
