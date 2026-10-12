@@ -62,7 +62,7 @@ class NovaOwnerPatchTests(unittest.TestCase):
         data=SOURCE.encode()
         helper=b'"""fixture local voice module"""\n'
         return data,helper,hashlib.sha256(data).hexdigest(),hashlib.sha1(
-            ("blob "+str(len(helper))+"\\0").encode()+helper
+            ("blob "+str(len(helper))).encode()+bytes((0,))+helper
         ).hexdigest()
 
     def test_only_expected_native_service_methods_change(self):
