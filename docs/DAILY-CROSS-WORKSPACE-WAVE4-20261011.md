@@ -24,6 +24,15 @@ performed by this workflow board. It does not read personal project content or
 save a history. Clicking STOP clears the current checklist, but desktop grants
 have a separate emergency STOP action, clearly disclosed in the interface.
 
+**Direct typed JARVIS requests:** The Web's own Webbie chat box recognizes
+complete literal phrases such as `Webbie, prepare my recording session`,
+`Webbie, prepare my coursework`, `Webbie, review Broken World continuity`,
+`Webbie, prepare BCN broadcasting`, and `Webbie, check Spider OS readiness`.
+These phrases only open the relevant Workflow Board *preview*. A direct GUI
+owner confirmation is still required to start it, and each fixed workspace
+is only opened by another explicit button click. No voice transcript, AI
+reply, copied webpage content or camera observation can authorize this route.
+
 **Webbie resilience:** Carefully scoped patches from PR #88 add a local
 model-request circuit breaker; private process-local voice intake counters with
 no transcripts or voiceprints; strict literal launch-intent parser; an opt-in,
