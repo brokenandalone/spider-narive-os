@@ -11,12 +11,13 @@
 - Pin exact tested source commits, dry-run, backup, permit rollback, keep logs and detailed receipts. Verify each workspace after installing, then advance known-good baseline.
 - An earlier successful PR test is not a complete cross-component PC test. Don't independently run old workspace installers again.
 
-## Current Webbie voice hotfix (not yet installed/verified)
+## Current Webbie voice hotfix (user-reported success; installed state to verify)
 
 - Online primary: Microsoft `en-AU-NatashaNeural`, installed Edge TTS 7.2.8. Multiple online voices get HTTP 403, so do not claim Microsoft speech repaired.
 - Offline preference: female Australian **Matilda / speaker 7** in previously downloaded `en_AU-librivox-medium.onnx`. Kirra / speaker 3 is another accepted preview, but NOT integrated as another fallback.
 - New conservative local hotfix: `webbie_matilda_hotfix.py` (separate downloadable 2026-10-12 ZIP, not on PC from this GitHub branch). It checks actual installed `/usr/local/lib/spider-os/webbie/voice/tts.py` before modification, inserts Matilda at start of old `_speak_espeak(text)` fallback only, retaining Natasha primary and original eSpeak fallback. It compiles the modified source, creates SHA-pinned backup and guarded rollback. No Ollama changes, no hearing edits, no auto-restart.
-- After user performs and confirms live audible speech, record timestamp + hashes from local `/var/lib/spider-os/webbie-voice-patches/matilda-piper-fallback.json` and mark integrated. The consolidated installer must detect its marker and preserve or safely merge it, never reapply.
+- **2026-10-12 user confirmation:** The local hotfix `--check` reported `PASS`; after voice testing, the user reported **“it's good”**. Treat audible Matilda as user-reported working, not proof of a successful service restart, repaired hearing, or restored online Natasha.
+- In the next consolidated install, **preserve and skip the hotfix if locally detected**. Verify `/var/lib/spider-os/webbie-voice-patches/matilda-piper-fallback.json`, inspect live `tts.py`, capture its checksum and receipt timestamp, and don't reapply or overwrite a working repair. If no valid marker exists, investigate before changing anything.
 - Hearing: local `webbie.service` and `parec` from onn 4K Webcam are running; webcam at 65% and unmuted. Actual transcription and command acceptance remain UNVERIFIED. Don't claim hearing fixed.
 - Outstanding: authorized speaker identification for Cory and Shayna (others ignored), session detection/proactive greeting fix, live model compatibility, Azure speech only with explicit credentials/account authorization.
 
@@ -40,9 +41,9 @@ Existing proposals to reconcile, not blindly combine: PRs #66, #81, #85, #86, #8
 
 1. Capture installed PC snapshot and local SHA manifest, installed model, active services and backups.
 2. Compare every staged upgrade against those hashes; skip matching installed features and abort on customizations.
-3. Test Matilda fallback with Natasha attempted first and eSpeak still functioning if local model fails. Separately test microphone->Whisper->authorized command->reply, with negative unauthorized speaker checks.
+3. Preserve user-confirmed audible Matilda first; verify installed hotfix receipt and hashes, skip if already working. Separately test microphone->Whisper->authorized command->reply, with negative unauthorized speaker checks.
 4. Test combined The Web/Studio/Author/Study/Kali Bay/Forage/Media Center plus independent BCN deployment.
 5. Approve **one** consolidated PC installer with rollback and record everything installed versus skipped.
 6. Advance known-good baseline only after end-to-end successful tests. No auto-merge or overwrite from this document.
 
-**Statuses reflect known evidence, not assumed installation.**
+**Statuses reflect known evidence, not assumed installation. As of 2026-10-12 the user confirmed Matilda sounded good. Do not infer that Webbie's hearing or all upgrades are complete.**
