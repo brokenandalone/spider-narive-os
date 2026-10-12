@@ -21,7 +21,7 @@ class VoiceTurnCoordinator:
 
     def __init__(self, run_command, tracker, *, can_run=None, on_error=None,
                  clock=None, queue_ttl=45, thread_factory=None,
-                 on_supersede=None):
+                 on_supersede=None, carry_evidence=False):
         if not callable(run_command):
             raise TypeError("run_command must be callable")
         if not 1 <= queue_ttl <= 45:
@@ -31,6 +31,7 @@ class VoiceTurnCoordinator:
         self.can_run = can_run or (lambda: True)
         self.on_error = on_error
         self.on_supersede = on_supersede
+        self.carry_evidence = carry_evidence is True
         self.clock = clock or time.monotonic
         self.queue_ttl = queue_ttl
         self.thread_factory = thread_factory or threading.Thread
@@ -38,7 +39,7 @@ class VoiceTurnCoordinator:
         self._busy = False
         self._pending = None
 
-    def submit(self, command, *, speaker_verified=False):
+    def submit(self, command, *, speaker_verified=False, speaker_evidence=None):
         """Return 'started', 'queued', or 'ignored'; never grant voice identity."""
         command = str(command or "").strip()
         if not command or not self.can_run():
@@ -50,7 +51,8 @@ class VoiceTurnCoordinator:
                 # answer immediately so it cannot speak after the correction.
                 generation = self.tracker.interrupted()
                 self._pending = (
-                    (command, generation, speaker_verified is True),
+                    (command, generation, speaker_verified is True,
+                     speaker_evidence if self.carry_evidence else None),
                     self.clock() + self.queue_ttl)
                 if self.on_supersede is not None:
                     try:
@@ -58,7 +60,8 @@ class VoiceTurnCoordinator:
                     except Exception:
                         pass
                 return "queued"
-            item = (command, self.tracker.start(), speaker_verified is True)
+            item = (command, self.tracker.start(), speaker_verified is True,
+                    speaker_evidence if self.carry_evidence else None)
             self._busy = True
         self._start_worker(item)
         return "started"
@@ -88,9 +91,13 @@ class VoiceTurnCoordinator:
 
     def _run_one(self, item):
         try:
-            command, generation, speaker_verified = item
+            command, generation, speaker_verified, evidence = item
             if self.tracker.current(generation) and self.can_run():
-                self.run_command(command, generation, speaker_verified)
+                if self.carry_evidence:
+                    self.run_command(command, generation, speaker_verified,
+                                     evidence)
+                else:
+                    self.run_command(command, generation, speaker_verified)
         except Exception as error:
             if self.on_error is not None:
                 try:
