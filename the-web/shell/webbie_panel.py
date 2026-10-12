@@ -461,6 +461,28 @@ class WebbiePanel(QWidget):
         self.jarvis_context_timer.start(15000)
         self.publish_jarvis_context()
         self.refresh_state()
+        # A valid saved owner permission is active after login without
+        # re-clicking, but no camera is started and no app is opened.
+        QTimer.singleShot(0,self.restore_standing_access)
+
+    def restore_standing_access(self):
+        record=read_policy()
+        if not record.get('authorized') or record.get('paused'):
+            return
+        if self.computer_dialog is None:
+            self.computer_dialog=WebbieComputerDialog(self)
+            self.computer_dialog.taskApproved.connect(
+                self.awareness.note_user_request)
+            self.computer_dialog.screenObserved.connect(
+                self._remember_consented_screen)
+            self.computer_dialog.actionOutcome.connect(
+                self._workflow_action)
+            self.computer_dialog.authorizationRevoked.connect(
+                lambda: self.awareness.revoke_observation('screen'))
+            self.computer_dialog.authorizationRevoked.connect(
+                self.unified_workflow.stop)
+        # Constructing the hidden panel restores its already authorized
+        # control bridge. Nothing launches until an actual owner request.
 
     def refresh_camera_devices(self):
         if self.camera_allowed:
@@ -811,6 +833,13 @@ class WebbiePanel(QWidget):
         self.unified_workflow.stop()
         if self.computer_dialog is not None:
             self.computer_dialog.stop()
+        else:
+            # Persist STOP even when the control dialog has not been opened.
+            if read_policy().get('authorized'):
+                try:
+                    update_policy('pause')
+                except (OSError,ValueError,PermissionError):
+                    pass
         self.stop_camera()
         self.awareness.revoke_observation('screen')
         self.publish_jarvis_context()
