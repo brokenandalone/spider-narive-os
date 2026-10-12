@@ -14,7 +14,8 @@
     {
       "name": "System/Recovery",
       "pull_requests": [
-        49
+        49,
+        97
       ],
       "required_files": [
         "system/release_batch.py",
@@ -709,6 +710,19 @@
         "webbie/actions/owner_authorization_store.py"
       ],
       "review_note": "Wave Five includes source-only safe subset; conflicting resident Webbie/TTS/permanent authority still require live PC reconciliation"
+    },
+    {
+      "pr": 97,
+      "workspace": "System/Recovery",
+      "branch": "release/pc-readiness-reconciliation-20261011",
+      "observed_sha": "22ee43902139562c08f63199c769229fd10293c4",
+      "integrated": true,
+      "paths": [
+        "tools/daily_pc_acceptance.py",
+        "tools/pc_hardware_compatibility.py",
+        "tools/spider_pc_readiness.py"
+      ],
+      "review_note": "Read-only PR97 hardware and application-code preflight copied intact to Wave Five; actual PC outputs not available"
     }
   ],
   "resolved_shared_paths": [],
@@ -756,7 +770,8 @@
       "Webbie workflow board #92 (GUI click preview)",
       "unified workflow primitives #90 (not automatically enabled)",
       "limited desktop access/diagnostics #95/#96 (no standing authorization enabled)",
-      "audio activity gate #89 (not connected to resident mic)"
+      "audio activity gate #89 (not connected to resident mic)",
+      "PC readiness and private hardware/source audit PR #97 (read-only)"
     ],
     "pending_risks": [
       "Voiceprint enrollment, hardware real mic",
