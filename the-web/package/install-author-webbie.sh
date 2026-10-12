@@ -39,6 +39,8 @@ managed=(
   author/control_socket.py
   author/manuscript_import.py
   author/project_map.py
+  author/story_atlas.py
+  author/atlas_widget.py
   author/master_canon.py
   author/master_canon_widget.py
   webbie/agent/author_voice_bridge.py
