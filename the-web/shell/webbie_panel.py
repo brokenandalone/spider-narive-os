@@ -995,19 +995,23 @@ class WebbiePanel(QWidget):
                 self.append_message('Status',
                     'That address is blocked. Only public HTTPS sites are allowed.')
             else:
-                # One permanent approval permits direct owner-requested
-                # public HTTPS opens without repeating a modal confirmation.
-                self.open_computer_dialog()
-                if self.computer_dialog.grant.status().get('wide'):
+                # With permanent approval, don't open a redundant Computer
+                # Control dialog on every website request.
+                if self.computer_dialog is None:
+                    self.restore_standing_access()
+                if (self.computer_dialog is not None and
+                        self.computer_dialog.grant.status().get('wide')):
                     opened=self.computer_dialog.open_website_safe(
                         browser_request.url)
                     self.append_message(
                         'Webbie','Website opening requested; page load not verified.'
                         if opened else 'Website was blocked or unavailable.')
-                elif self.computer_dialog.offer_site(browser_request.url):
-                    self.append_message(
-                        'Status','Review the address, authorize a browser task '
-                        'and confirm opening it.')
+                else:
+                    self.open_computer_dialog()
+                    if self.computer_dialog.offer_site(browser_request.url):
+                        self.append_message(
+                            'Status','Review the address, authorize a browser '
+                            'task and confirm opening it.')
             self.entry.clear()
             return
         # A typed request to open an installed program invokes a visible task
