@@ -40,7 +40,8 @@
         67,
         68,
         69,
-        76
+        76,
+        78
       ],
       "required_files": [
         "webbie/agent/webbie.py",
@@ -76,7 +77,8 @@
         57,
         59,
         62,
-        74
+        74,
+        80
       ],
       "required_files": [
         "studio/main.py",
@@ -91,7 +93,8 @@
       "pull_requests": [
         51,
         56,
-        75
+        75,
+        79
       ],
       "required_files": [
         "author/main.py",
@@ -487,6 +490,75 @@
         "study/reading_library.py",
         "system/release_batch.py"
       ]
+    },
+    {
+      "pr": 78,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-voice-lab-diagnostics-20261011",
+      "observed_sha": "883ff36dd1f82057007ee25d8fbf5b07ae26ff07",
+      "paths": [
+        "docs/WEBBIE-VOICE-LAB-2026-10-11.md",
+        "system/release_batch.py",
+        "tests/test_webbie_cognitive_center.py",
+        "tests/test_webbie_hearing_test.py",
+        "tests/test_webbie_listening_indicator.py",
+        "tests/test_webbie_segment_speaker_gate.py",
+        "tests/test_webbie_voice_lab.py",
+        "tests/test_webbie_whisper_segments.py",
+        "the-web/shell/webbie_cognitive_center.py",
+        "the-web/shell/webbie_panel.py",
+        "tools/combined_release_audit.py",
+        "webbie/agent/segment_speaker_gate.py",
+        "webbie/agent/speaker_provider_loader.py",
+        "webbie/agent/voice_lab.py",
+        "webbie/agent/voice_queue.py",
+        "webbie/agent/voice_trust.py",
+        "webbie/agent/webbie.py",
+        "webbie/config/default.json",
+        "webbie/voice/hearing_test.py",
+        "webbie/voice/whisper_listener.py"
+      ],
+      "integrated": false
+    },
+    {
+      "pr": 79,
+      "workspace": "Author",
+      "branch": "feature/author-master-canon-ledger-20261011",
+      "observed_sha": "aab11e517e6c8ab96a9291fa59e0c1ab5654ffb0",
+      "paths": [
+        "author/commands.py",
+        "author/control_socket.py",
+        "author/main.py",
+        "author/master_canon.py",
+        "author/master_canon_widget.py",
+        "author/store.py",
+        "docs/AUTHOR-MASTER-CANON.md",
+        "system/release_batch.py",
+        "tests/test_author_commands.py",
+        "tests/test_author_install_manifests.py",
+        "tests/test_author_master_canon.py",
+        "the-web/package/install-author-webbie.sh"
+      ],
+      "integrated": false
+    },
+    {
+      "pr": 80,
+      "workspace": "Studio",
+      "branch": "feature/studio-production-board-v10-20261011",
+      "observed_sha": "141eb9445839a95d5822a0ca337d7dad4acda572",
+      "paths": [
+        "docs/STUDIO-PRODUCTION-BOARD-V10-2026-10-11.md",
+        "studio/main.py",
+        "studio/package/inspect-studio-install.py",
+        "studio/production_board.py",
+        "studio/production_board_panel.py",
+        "tests/test_studio_production_board.py",
+        "tests/test_studio_production_board_panel.py",
+        "tests/test_studio_webbie_bridge.py",
+        "the-web/package/reconcile-native.py",
+        "webbie/agent/webbie.py"
+      ],
+      "integrated": false
     }
   ],
   "resolved_shared_paths": [],
@@ -504,5 +576,18 @@
     "result": "failed",
     "tested_commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
     "reason": "Mixed Study, Author, Studio, Kali, and Webbie tests expose incompatible shared entrypoints."
+  },
+  "wave3_staging": {
+    "source_base_pr": 81,
+    "pr": 87,
+    "added_files": 20,
+    "new_application_modules": 8,
+    "changes": [
+      "Webbie opt-in Voice Lab and segment speaker verification",
+      "Author Master Canon draft and approval ledger",
+      "Studio V10 Production Board"
+    ],
+    "source_ci_verified": false,
+    "pc_install_performed": false
   }
 }
