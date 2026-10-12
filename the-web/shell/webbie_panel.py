@@ -25,6 +25,7 @@ from webbie_cognitive_center import WebbieCognitiveDialog
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
+from workflow_board import workflow_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/actions'))
 from navigation_missions import parse_navigation_request
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/brain'))
@@ -722,7 +723,8 @@ class WebbiePanel(QWidget):
         if self.cognitive_dialog is None:
             self.cognitive_dialog = WebbieCognitiveDialog(
                 self, workspace_callback=lambda: self.awareness.snapshot()['workspace'],
-                emergency_callback=self.stop_sensitive_actions)
+                emergency_callback=self.stop_sensitive_actions,
+                workspace_opener=getattr(self, 'workspace_navigator', None))
         self.cognitive_dialog.refresh()
         self.cognitive_dialog.show()
         self.cognitive_dialog.raise_()
@@ -757,6 +759,19 @@ class WebbiePanel(QWidget):
     def send(self):
         text = self.entry.text().strip()
         if not text or self.pending:
+            return
+        # Only direct owner-typed text may open a fixed workflow preview.
+        # No source message, LLM, or voice transcript may start a workflow.
+        workflow_key = workflow_request(text)
+        if workflow_key is not None:
+            self.open_cognitive_center()
+            if self.cognitive_dialog.offer_workflow(workflow_key):
+                self.append_message('Webbie workflow',
+                    'A JARVIS Workflow Board preview is open. Nothing started.')
+            else:
+                self.append_message('Webbie workflow',
+                    'Another workflow is active. Stop or finish it first.')
+            self.entry.clear()
             return
         # Direct owner text can stage a deterministic window-bound navigation
         # mission. Neither the LLM nor a webpage can trigger this parser.
