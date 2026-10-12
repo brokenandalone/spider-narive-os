@@ -50,7 +50,7 @@ class DailyContinuityTests(unittest.TestCase):
         self.plan["candidate_commit"] = "a" * 40
         for flag in ("source_ci_verified", "installed_pc_reconciled",
                      "rollback_validated", "owner_approved_install",
-                     "installer_daily_guard_connected"):
+                     "installer_daily_guard_connected", "voice_pipeline_verified"):
             self.plan[flag] = True
         for entry in self.plan["pull_requests"]:
             entry["integrated"] = True
@@ -73,6 +73,13 @@ class DailyContinuityTests(unittest.TestCase):
         self.ready_plan()
         blocked, _ = gate.audit(self.plan, self.staged, self.backups, TODAY)
         self.assertEqual(blocked, [])
+
+    def test_voice_authentication_requires_independent_pc_verification(self):
+        self.ready_plan()
+        self.plan["voice_pipeline_verified"] = False
+        blocked, _ = gate.audit(self.plan, self.staged, self.backups, TODAY)
+        self.assertIn("OWNER VOICE AUTHENTICATION AND MICROPHONE CONTINUITY NOT VERIFIED", blocked)
+        self.assertNotIn("FULL COMBINED SOURCE TESTS NOT VERIFIED", blocked)
 
     def test_missing_workspace_or_unmerged_branch_blocks(self):
         self.ready_plan()
