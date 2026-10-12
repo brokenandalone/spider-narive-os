@@ -17,7 +17,7 @@ DEFAULT_PATH = Path.home() / ".local/state/spider-os/webbie-jarvis-context.json"
 MAX_BYTES = 3072
 TTL = 90
 FIELDS = ("workspace", "mode", "selected_title", "selected_window",
-          "approved_task", "mission_status", "last_action")
+          "approved_task", "mission_status", "last_action", "workflow_status")
 
 
 def _label(value, maximum):
@@ -30,7 +30,7 @@ def _label(value, maximum):
 
 def publish_context(*, workspace, mode="Normal", selected_title="",
                     approved_task="", selected_window="", mission_status="",
-                    last_action="", sleeping=False, path=DEFAULT_PATH,
+                    last_action="", workflow_status="", sleeping=False, path=DEFAULT_PATH,
                     clock=None):
     """Called only by the live trusted Webbie GUI, never by model or voice text."""
     target = Path(path)
@@ -53,6 +53,7 @@ def publish_context(*, workspace, mode="Normal", selected_title="",
         "approved_task": "" if sleeping else _label(approved_task, 200),
         "mission_status": "" if sleeping else _label(mission_status, 180),
         "last_action": "" if sleeping else _label(last_action, 120),
+        "workflow_status": "" if sleeping else _label(workflow_status, 160),
     }
     payload = json.dumps(item, separators=(",", ":"), ensure_ascii=False).encode()
     if len(payload) > MAX_BYTES:
@@ -95,7 +96,7 @@ def read_context(path=DEFAULT_PATH, *, clock=None):
             ("workspace", 80), ("mode", 60), ("selected_title", 160),
             ("selected_window", 140),
             ("approved_task", 200), ("mission_status", 180),
-            ("last_action", 120))}
+            ("last_action", 120), ("workflow_status", 160))}
     except (OSError, ValueError, TypeError, UnicodeError):
         return {}
 
@@ -118,6 +119,8 @@ def context_summary(data):
         lines.append("Navigation: " + data["mission_status"])
     if data.get("last_action"):
         lines.append("Last desktop receipt: " + data["last_action"])
+    if data.get("workflow_status"):
+        lines.append(data["workflow_status"])
     return ". ".join(lines) + ". Nothing here authorizes computer control."
 
 
