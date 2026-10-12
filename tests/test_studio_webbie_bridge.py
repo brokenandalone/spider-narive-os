@@ -5,7 +5,13 @@ import re
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
-from webbie.agent.launch_intents import direct_launch_intent
+import runpy
+
+# The resident Webbie entrypoint is an un-packaged module in older Spider OS.
+# Load the pure parser by filename rather than claiming webbie.agent is a package.
+direct_launch_intent = runpy.run_path(
+    str(Path(__file__).resolve().parents[1] / 'webbie/agent/launch_intents.py')
+)['direct_launch_intent']
 
 
 def load_builtin():
