@@ -8,6 +8,7 @@ Nothing is persisted and no private documents are read by this component.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 import time
 
 MAX_SECONDS = 900
@@ -82,6 +83,40 @@ BLUEPRINTS = (
                      "No backups are modified by this board."),
     )),
 )
+
+
+# These complete phrases are accepted ONLY from a trusted, directly typed
+# Webbie GUI message. A model reply, microphone transcript, webpage, camera
+# observation or tool output must never call the GUI route with this parser.
+DIRECT_REQUESTS = {
+    "prepare a recording session": "recording",
+    "prepare my recording session": "recording",
+    "get my recording session ready": "recording",
+    "prepare my studio session": "recording",
+    "prepare my coursework": "school",
+    "prepare my schoolwork": "school",
+    "get my assignments ready": "school",
+    "review broken world continuity": "canon",
+    "review the broken world canon": "canon",
+    "review my broken world canon": "canon",
+    "prepare bcn broadcasting": "broadcast",
+    "prepare the bcn broadcast": "broadcast",
+    "prepare bcn radio": "broadcast",
+    "check spider os readiness": "maintenance",
+    "prepare system maintenance": "maintenance",
+}
+
+
+def workflow_request(text):
+    """Return a fixed template key only for a complete owner-typed phrase."""
+    if not isinstance(text, str) or len(text) > 130:
+        return None
+    clean = re.sub(r"\\s+", " ", text.strip().lower().strip(" .!?"))
+    clean = re.sub(
+        r"^(?:(?:hey )?(?:webbie|webby|web))[,.: ]+",
+        "", clean, count=1,
+    )
+    return DIRECT_REQUESTS.get(clean)
 
 
 def blueprint_for(key: str) -> WorkflowBlueprint:
