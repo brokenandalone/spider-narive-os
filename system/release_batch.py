@@ -38,6 +38,18 @@ BASELINES = (
 # Files only. No passwords, auth files, models, service state, databases,
 # manuscripts, user preferences or original source documents are in this list.
 APP_FILES = (
+    # Wave Five: components not wired to unsafe persistent auth or microphone control.
+    'webbie/agent/workflow_board.py',
+    'the-web/shell/webbie_workflow_dialog.py',
+    'webbie/brain/unified_workflow.py',
+    'the-web/shell/webbie_unified_workflow.py',
+    'webbie/actions/owner_authorization_store.py',
+    'webbie/actions/owner_safe_access.py',
+    'webbie/actions/safe_service_status.py',
+    'webbie/agent/console_bridge.py',
+    'webbie/agent/kali_named_app.py',
+    'webbie/voice/audio_gate.py',
+    'webbie/voice/speaker_guard.py',
     # Wave-three modules: new files only, in the single guarded batch.
     'author/master_canon.py',
     'author/master_canon_widget.py',
