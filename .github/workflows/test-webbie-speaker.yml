@@ -1,0 +1,28 @@
+name: Webbie speaker gate tests
+on:
+  push:
+    paths:
+      - 'webbie/voice/speaker_guard.py'
+      - 'webbie/agent/webbie.py'
+      - 'webbie/voice/whisper_listener.py'
+      - 'tests/test_webbie_speaker_guard.py'
+      - '.github/workflows/test-webbie-speaker.yml'
+  pull_request:
+    paths:
+      - 'webbie/voice/speaker_guard.py'
+      - 'webbie/agent/webbie.py'
+      - 'webbie/voice/whisper_listener.py'
+      - 'tests/test_webbie_speaker_guard.py'
+      - '.github/workflows/test-webbie-speaker.yml'
+jobs:
+  speaker-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Python compilation
+        run: python -m py_compile webbie/voice/speaker_guard.py webbie/agent/webbie.py webbie/voice/whisper_listener.py
+      - name: Gate tests using fake voice embeddings
+        run: python -m unittest discover -s tests -p test_webbie_speaker_guard.py -v
