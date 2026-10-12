@@ -90,7 +90,7 @@ class DailyContinuityTests(unittest.TestCase):
         self.ready_plan()
         self.assertEqual(
             gate.overlapping_paths(self.plan)["webbie/agent/webbie.py"],
-            [54, 55, 58, 61, 67, 68, 69, 76, 78, 80],
+            [54, 55, 58, 61, 67, 68, 69, 76, 78, 80, 88, 92],
         )
         self.plan["resolved_shared_paths"] = []
         errors, _ = gate.audit(self.plan, self.staged, self.backups, TODAY)
