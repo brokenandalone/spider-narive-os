@@ -5,6 +5,7 @@ import re
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
+from webbie.agent.launch_intents import direct_launch_intent
 
 
 def load_builtin():
@@ -15,6 +16,7 @@ def load_builtin():
     global_vars = {
         're': re,
         'is_capability_question': lambda _: False,
+        'direct_launch_intent': direct_launch_intent,
         'set_workspace': Mock(),
         'workspace_path': lambda *items: '/usr/local/lib/spider-os/' + '/'.join(items),
         'launch': Mock(return_value=True),
