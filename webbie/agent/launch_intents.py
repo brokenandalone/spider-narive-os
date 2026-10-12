@@ -18,7 +18,7 @@ TARGETS={
     "system settings":"settings","settings":"settings",
 }
 DIRECT=re.compile(
-    r"^\s*(?:(?:hey\s+)?(?:webbie|webby|web)\s*[,.:]?\s+)?"
+    r"^\s*(?:(?:hey\s+)?(?:webbie|webby|web)(?:\s*[,.:]\s*|\s+))?"
     r"(?:please\s+)?(?:open|launch|start|enter)\s+"
     r"(?P<target>[a-z][a-z ]{0,50})[.!?]?\s*$",
     re.I,
