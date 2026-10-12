@@ -105,6 +105,17 @@ class WorkflowDialogTests(unittest.TestCase):
         self.assertFalse(d.session.status()["active"])
         opened.assert_not_called()
 
+    def test_typed_request_cannot_be_forwarded_to_model_before_preview(self):
+        panel = (ROOT / "the-web/shell/webbie_panel.py").read_text()
+        start = panel.index("    def send(self):")
+        method = panel[start:panel.index("    def request_finished(self):", start)]
+        self.assertIn("workflow_key = workflow_request(text)", method)
+        self.assertIn("self.cognitive_dialog.offer_workflow(workflow_key)", method)
+        self.assertLess(method.index("workflow_key = workflow_request(text)"),
+                        method.index("request = self.prepare_request(text)"))
+        self.assertIn("self.entry.clear()\\n            return", method)
+        self.assertNotIn("workflow_request(", (ROOT / "webbie/agent/webbie.py").read_text())
+
     def test_wiring_remains_parent_gui_only(self):
         shell = (ROOT / "the-web/shell/main.py").read_text()
         portrait = (ROOT / "the-web/shell/webbie_panel.py").read_text()
