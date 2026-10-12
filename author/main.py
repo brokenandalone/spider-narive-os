@@ -15,12 +15,14 @@ if __package__:
     from .control_socket import AuthorCommandServer
     from .project_map import ProjectMap
     from .atlas_widget import AtlasWidget
+    from .master_canon_widget import MasterCanonWidget
 else:
     from store import AuthorStore
     from web_features import AuthorToolkit
     from control_socket import AuthorCommandServer
     from project_map import ProjectMap
     from atlas_widget import AtlasWidget
+    from master_canon_widget import MasterCanonWidget
 
 
 class AuthorWindow(QMainWindow):
@@ -62,6 +64,9 @@ class AuthorWindow(QMainWindow):
         self.atlas_widget = AtlasWidget(self.store)
         self.atlas_widget.chapterRequested.connect(self.jump_to_chapter_id)
         tabs.addTab(self.atlas_widget, 'Story Atlas')
+        self.master_canon_widget = MasterCanonWidget(self.store)
+        self.master_canon_widget.chapterRequested.connect(self.jump_to_canon_source)
+        tabs.addTab(self.master_canon_widget, 'Master Canon')
         tabs.currentChanged.connect(self.on_tab_changed)
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
@@ -102,6 +107,9 @@ class AuthorWindow(QMainWindow):
         elif action == 'open_story_atlas':
             if self.flush():
                 self.editor_tabs.setCurrentWidget(self.atlas_widget)
+        elif action == 'open_master_canon':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.master_canon_widget)
 
     def action(self, function):
         try:
@@ -146,6 +154,7 @@ class AuthorWindow(QMainWindow):
         self.toolkit.set_book(self.book_id)
         self.project_map.set_book(self.book_id)
         self.atlas_widget.set_book(self.book_id)
+        self.master_canon_widget.set_book(self.book_id)
 
     def load_chapters(self):
         self.chapters.blockSignals(True); self.chapters.clear()
@@ -168,7 +177,8 @@ class AuthorWindow(QMainWindow):
 
     def on_tab_changed(self, index):
         target = self.editor_tabs.widget(index)
-        if (target in (self.project_map, self.atlas_widget)
+        if (target in (self.project_map, self.atlas_widget,
+                       self.master_canon_widget)
                 and self.book_id is not None and self.flush()):
             target.refresh()
 
@@ -183,6 +193,46 @@ class AuthorWindow(QMainWindow):
                 self.editor.setFocus()
                 return
         self.status.setText('Chapter is no longer in the selected book.')
+
+    def jump_to_canon_source(self, chapter_id, quote, digest):
+        """Navigate to a source across books, refusing stale quotation highlights."""
+        try:
+            chapter = self.store.chapter(int(chapter_id))
+        except (ValueError, TypeError):
+            self.status.setText('Canon source chapter is missing.')
+            return
+        if not self.flush():
+            return
+        book_id = chapter['book_id']
+        if self.book_id != book_id:
+            for index in range(self.books.count()):
+                if self.books.item(index).data(Qt.UserRole) == book_id:
+                    self.books.setCurrentRow(index)
+                    break
+        if self.book_id != book_id:
+            self.status.setText('Could not open the source book.')
+            return
+        self.jump_to_chapter_id(chapter['id'])
+        content = self.editor.toPlainText()
+        if not quote:
+            self.status.setText('Opened referenced chapter. No exact quote was recorded.')
+            return
+        if (hashlib.sha256(content.encode('utf-8')).hexdigest() != digest
+                or quote not in content):
+            self.status.setText(
+                'Opened source chapter. Canon quotation is outdated or source changed; '
+                'nothing was highlighted or edited.'
+            )
+            return
+        start = content.find(quote)
+        qt_start = len(content[:start].encode('utf-16-le')) // 2
+        qt_end = len(content[:start + len(quote)].encode('utf-16-le')) // 2
+        cursor = self.editor.textCursor()
+        cursor.setPosition(qt_start)
+        cursor.setPosition(qt_end, QTextCursor.KeepAnchor)
+        self.editor.setTextCursor(cursor)
+        self.editor.ensureCursorVisible()
+        self.status.setText('Selected verified canon quotation. No text changed.')
 
     def new_book(self):
         title, ok = QInputDialog.getText(self, 'New book', 'Title:')

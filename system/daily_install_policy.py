@@ -48,13 +48,18 @@ def existing_batch_receipts(backup_root, day):
         manifest = item / "manifest.json"
         if manifest.is_symlink():
             raise RuntimeError("Untrusted installation receipt")
-        if not manifest.is_file():
-            continue
-        # Prefer a recorded calendar date in the existing batch receipt;
-        # a PC with an unusual timezone still checks local mtime too.
+        # A crash can leave a *real* same-day batch backup directory before
+        # manifest.json is written. That may already contain copied originals
+        # or even partially applied source. Never take a second install slot
+        # merely because the receipt has not reached the filesystem yet.
         stamped = item.name.startswith(expected)
+        if manifest.exists() and not manifest.is_file():
+            raise RuntimeError("Malformed batch receipt requires review")
+        # A PC with an unusual timezone may have created the batch at a
+        # different wall-clock day. Check the backup directory timestamp too.
+        observed = manifest if manifest.is_file() else item
         modified_today = datetime.fromtimestamp(
-            manifest.stat().st_mtime, OWNER_TIMEZONE
+            observed.stat().st_mtime, OWNER_TIMEZONE
         ).date() == day
         if stamped or modified_today:
             items.append(item)
