@@ -20,6 +20,8 @@ class SpeakerEvidence:
     verified: bool
     source: str
     issued_at: float
+    audio_digest: str = ""  # optional backwards-compatible per-segment binding
+    confidence: float = 0.0  # provider score, must be calibrated offline
 
 
 def verify_speaker_evidence(evidence, *, now=None):

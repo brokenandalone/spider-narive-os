@@ -40,14 +40,18 @@
         67,
         68,
         69,
-        76
+        76,
+        78
       ],
       "required_files": [
         "webbie/agent/webbie.py",
         "webbie/agent/proactive_checks.py",
         "webbie/agent/voice_queue.py",
         "webbie/agent/voice_trust.py",
-        "webbie/agent/runtime_readiness.py"
+        "webbie/agent/runtime_readiness.py",
+        "webbie/agent/segment_speaker_gate.py",
+        "webbie/agent/voice_lab.py",
+        "webbie/voice/hearing_test.py"
       ]
     },
     {
@@ -76,14 +80,17 @@
         57,
         59,
         62,
-        74
+        74,
+        80
       ],
       "required_files": [
         "studio/main.py",
         "studio/session_mix.py",
         "studio/band_mix.py",
         "studio/release_export.py",
-        "studio/release_panel.py"
+        "studio/release_panel.py",
+        "studio/production_board.py",
+        "studio/production_board_panel.py"
       ]
     },
     {
@@ -91,13 +98,16 @@
       "pull_requests": [
         51,
         56,
-        75
+        75,
+        79
       ],
       "required_files": [
         "author/main.py",
         "author/project_map.py",
         "author/story_atlas.py",
-        "author/atlas_widget.py"
+        "author/atlas_widget.py",
+        "author/master_canon.py",
+        "author/master_canon_widget.py"
       ]
     },
     {
@@ -487,10 +497,58 @@
         "study/reading_library.py",
         "system/release_batch.py"
       ]
+    },
+    {
+      "pr": 78,
+      "workspace": "Webbie",
+      "branch": "feature/webbie-voice-lab-diagnostics-20261011",
+      "observed_sha": "883ff36dd1f82057007ee25d8fbf5b07ae26ff07",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "webbie/agent/webbie.py",
+        "webbie/voice/whisper_listener.py",
+        "webbie/agent/voice_queue.py",
+        "webbie/agent/voice_trust.py",
+        "the-web/shell/webbie_panel.py",
+        "the-web/shell/webbie_cognitive_center.py",
+        "system/release_batch.py",
+        "tools/combined_release_audit.py"
+      ]
+    },
+    {
+      "pr": 79,
+      "workspace": "Author",
+      "branch": "feature/author-master-canon-ledger-20261011",
+      "observed_sha": "aab11e517e6c8ab96a9291fa59e0c1ab5654ffb0",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "author/main.py",
+        "author/store.py",
+        "author/commands.py",
+        "author/control_socket.py",
+        "system/release_batch.py"
+      ]
+    },
+    {
+      "pr": 80,
+      "workspace": "Studio",
+      "branch": "feature/studio-production-board-v10-20261011",
+      "observed_sha": "141eb9445839a95d5822a0ca337d7dad4acda572",
+      "integrated": false,
+      "source_staged_for_review": true,
+      "paths": [
+        "studio/main.py",
+        "webbie/agent/webbie.py",
+        "the-web/package/reconcile-native.py",
+        "studio/package/inspect-studio-install.py",
+        "system/release_batch.py"
+      ]
     }
   ],
   "resolved_shared_paths": [],
-  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations. Kali Evidence Ledger PR #70 is additionally staged for integration review in the downstream release candidate; its source checks do not replace installed-PC audit or owner approval. Candidate remains intentionally BLOCKED. October 11 evening: PRs #71, #73, #74, #75, #76, #77 have source features staged in the downstream candidate after exact-base or unique-hunk reconciliation; do not confuse source-staged with approved integration. Owner PC acceptance, overlapping shared entrypoint reviews and daily final install approval still pending.",
+  "note": "Snapshot from GitHub on 2026-10-11; not an installation authorization. Branches change; re-audit against actual pinned tips. BCN website deployment is separate from Spider OS PC installations. Kali Evidence Ledger PR #70 is additionally staged for integration review in the downstream release candidate; its source checks do not replace installed-PC audit or owner approval. Candidate remains intentionally BLOCKED. October 11 evening: PRs #71, #73, #74, #75, #76, #77 have source features staged in the downstream candidate after exact-base or unique-hunk reconciliation; do not confuse source-staged with approved integration. Owner PC acceptance, overlapping shared entrypoint reviews and daily final install approval still pending. Wave3 PRs #78 (Webbie Voice Lab), #79 (Author Master Canon) and #80 (Studio Production Board) are source staged but not approved. The separate offline voice biometric provider is NOT bundled; owner PC microphone, enrollment, voice verification and normal voice command behavior are unvalidated and potential release blockers. No configuration or daily release approval is granted.",
   "additive_source_stage": {
     "commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
     "total_files": 107,
@@ -504,5 +562,7 @@
     "result": "failed",
     "tested_commit": "1a2053738e15aa2436686f047ab21e48f747eb48",
     "reason": "Mixed Study, Author, Studio, Kali, and Webbie tests expose incompatible shared entrypoints."
-  }
+  },
+  "voice_pipeline_verified": false,
+  "voice_pipeline_evidence": "Missing: installed PC hearing tests with Cory and Shayna, audited audio-bound verifier, non-owner/TV rejection, STOP, wake, sleep, speaking loop and rollback. No provider bundled in PR #78."
 }

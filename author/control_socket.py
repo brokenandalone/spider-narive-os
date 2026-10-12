@@ -99,7 +99,7 @@ class AuthorCommandServer(QThread):
                             if action not in {"review", "read", "pause_reading",
                                              "resume_reading", "stop_reading",
                                              "cancel_review", "open_project_map",
-                                             "open_story_atlas"}:
+                                             "open_story_atlas", "open_master_canon"}:
                                 raise ValueError("Unsupported action.")
                             if action in ("review", "read") and intent.get("scope") not in (
                                     "chapter", "book"):

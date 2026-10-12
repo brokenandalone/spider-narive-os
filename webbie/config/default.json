@@ -28,6 +28,10 @@
     "url": "http://127.0.0.1:11434/api/chat",
     "model": "qwen3:1.7b"
   },
+  "speaker_verification": {
+    "enabled": false,
+    "note": "Requires separately installed and owner-audited offline verifier; do not enable without enrollment and live testing"
+  },
   "speech_recognition": {
     "engine": "whisper.cpp",
     "model": "base.en",
