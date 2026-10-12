@@ -33,6 +33,9 @@ def parse_named_app_request(phrase):
     wanted=match.group(1).strip()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,94}",wanted):
         return None
+    if wanted.casefold().startswith((
+        "sudo ","apt ","bash ","sh ","execute ","command ","run ")):
+        return None
     return wanted
 
 
