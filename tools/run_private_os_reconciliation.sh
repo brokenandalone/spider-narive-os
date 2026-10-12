@@ -90,7 +90,14 @@ else
   printf 'WEBBIE PROPOSAL: ON HOLD (new owner source fingerprint)\\n'
 fi
 
-if [[ "$nova_now" == "$nova_pin" ]]; then
+if [[ -f "$source_root/media/ai-dj/nova_voice.py" ]] &&
+   cmp -s -- "$live_root/media/ai-dj/service.py" "$source_root/media/ai-dj/service.py"; then
+  printf '%s\\n' 'ALREADY MATCHED: Current native Nova DJ service exactly equals the pinned release source.' \
+    'Existing on-PC Australian voice service remains authoritative.' \
+    'No Nova source patch or reinstall is necessary for this component.' \
+    > "$dest/private-proposals/NOVA-ALREADY-INTEGRATED.txt"
+  printf 'NOVA NATIVE SERVICE: ALREADY MATCHES THE REVIEWED SOURCE\\n'
+elif [[ "$nova_now" == "$nova_pin" ]]; then
   python3 "$script_dir/patch_owner_nova_voices.py" \
     --owner-archive "$archive" \
     --installed-root "$live_root" \
