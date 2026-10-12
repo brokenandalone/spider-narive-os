@@ -1,0 +1,30 @@
+name: Spider OS source checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml python3-pyqt5 dbus-bin
+      - name: Source and recovery regression tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Validate feature scripts
+        run: |
+          bash distro/validate-feature-complete.sh
+          bash -n system/bin/spider-guardian
+          bash -n system/bin/spider-vault
+          python3 -m py_compile system/guardian.py system/vault.py
+      - name: Shell and wallpaper smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_ACCESSIBILITY: '0'
+        run: timeout --kill-after=5 120 dbus-run-session -- python3 -u tests/check-the-web.py .
