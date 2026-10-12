@@ -70,10 +70,15 @@ class WebbieUnifiedWorkflowDialog(QDialog):
         self.retry_button=QPushButton("Review again")
         self.retry_button.clicked.connect(self.retry)
         second.addWidget(self.retry_button)
+        third=QHBoxLayout();layout.addLayout(third)
+        self.next_button=QPushButton("Next reviewed step")
+        self.next_button.setObjectName("webbieWorkflowNextStep")
+        self.next_button.clicked.connect(self.next_step)
+        third.addWidget(self.next_button)
         self.stop_button=QPushButton("STOP workflow")
         self.stop_button.setObjectName("webbieWorkflowStop")
         self.stop_button.clicked.connect(self.cancel)
-        second.addWidget(self.stop_button)
+        third.addWidget(self.stop_button)
         self.timer=QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(1000)
@@ -128,6 +133,11 @@ class WebbieUnifiedWorkflowDialog(QDialog):
         self.session.retry(owner_clicked=True,workspace=self.workspace())
         self.refresh()
 
+    def next_step(self):
+        self.session.next_reviewed_step(
+            owner_clicked=True,workspace=self.workspace())
+        self.refresh()
+
     def cancel(self):
         self.session.stop()
         if callable(self.stop_callback):
@@ -140,12 +150,15 @@ class WebbieUnifiedWorkflowDialog(QDialog):
             "Workspace: "+self.workspace(),
             "Task: "+(state["task_title"] or "No active unified task"),
             "Stage: "+state["phase"].replace("_"," ").upper(),
+            "Reviewed step: "+str(state["step_number"])+
+                " / "+str(state["max_steps"]),
+            "Owner-verified steps: "+str(state["confirmed_steps"]),
             "Next: "+state["next_step"],
             "Screen observation (consented): "+
                 ("reported" if state["observation_reported"] else "not reported"),
             "Desktop operation: "+(state["last_action"] or "none"),
             "Last outcome: "+(state["last_outcome"] or "none"),
-            "Owner confirmed completion: "+("YES" if state["completed"] else "NO"),
+            "Owner confirmed this step: "+("YES" if state["completed"] else "NO"),
             "",
             "No workspace, model, webcam, browser or page can authorize an action.",
             "Computer Control requires its own task grant and window permission.",
@@ -155,6 +168,9 @@ class WebbieUnifiedWorkflowDialog(QDialog):
         self.open_button.setEnabled(state["phase"] in ("observe","review_action"))
         self.confirm_button.setEnabled(state["phase"]=="verify")
         self.retry_button.setEnabled(state["phase"]=="verify")
+        self.next_button.setEnabled(
+            state["phase"]=="done" and
+            state["confirmed_steps"]<state["max_steps"])
         self.start_button.setEnabled(True)
 
     def showEvent(self,event):
