@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from audio_gate import wav_has_activity, normalize_transcript, TranscriptDeduper
 
 
 WHISPER_BIN = (
@@ -48,7 +49,7 @@ def ready():
     )
 
 
-def record_chunk(path):
+def record_chunk(path, seconds=None):
     result = subprocess.run(
         [
             "arecord",
@@ -60,7 +61,7 @@ def record_chunk(path):
             "-c",
             "1",
             "-d",
-            str(CHUNK_SECONDS),
+            str(seconds or CHUNK_SECONDS),
             path,
         ],
         stdout=subprocess.DEVNULL,
@@ -127,7 +128,7 @@ def transcribe(path):
         if text.lower() in junk:
             return ""
 
-        return text
+        return normalize_transcript(text)
 
     except Exception:
         return ""
@@ -139,69 +140,42 @@ def transcribe(path):
             pass
 
 
-def listen_forever(
-    on_text,
-    should_continue,
-):
+def listen_forever(on_text, should_continue):
     if not ready():
-        raise RuntimeError(
-            "whisper.cpp or its model is not installed"
-        )
-
-    RUNTIME_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+        raise RuntimeError("whisper.cpp or its model is not installed")
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    deduper = TranscriptDeduper()
+    # Always pass a recording to speaker_guard, including during barge-in.
+    allow_barge_in = os.environ.get("WEBBIE_ALLOW_BARGE_IN", "1") == "1"
 
     while should_continue():
-
-        # Do not let Webbie hear herself talking.
-        if SPEAKING_MARKER.exists():
-            time.sleep(0.25)
+        speaking_at_start = SPEAKING_MARKER.exists()
+        if speaking_at_start and not allow_barge_in:
+            time.sleep(.15)
             continue
-
         audio_path = None
-
         try:
-            with tempfile.NamedTemporaryFile(
-                prefix="webbie-",
-                suffix=".wav",
-                delete=False,
-            ) as temp:
+            with tempfile.NamedTemporaryFile(prefix="webbie-",suffix=".wav",delete=False) as temp:
                 audio_path = temp.name
-
-            if not record_chunk(
-                audio_path
-            ):
-                time.sleep(1)
+            # Shorter microphone sample while Webbie speaks for "Webbie, stop".
+            duration = 2 if speaking_at_start else CHUNK_SECONDS
+            if not record_chunk(audio_path, duration):
+                time.sleep(.5)
                 continue
-
-            # If Webbie began speaking during capture,
-            # throw this chunk away.
-            if SPEAKING_MARKER.exists():
+            during_speech = speaking_at_start or SPEAKING_MARKER.exists()
+            if during_speech and not allow_barge_in:
                 continue
-
-            phrase = transcribe(
-                audio_path
-            )
-
-            if phrase:
-                on_text(phrase, audio_path)
-
+            if not wav_has_activity(audio_path):
+                continue
+            phrase = transcribe(audio_path)
+            if phrase and deduper.accept(phrase):
+                on_text(phrase, audio_path, during_speech)
         finally:
             if audio_path:
                 try:
-                    Path(
-                        audio_path
-                    ).unlink()
+                    Path(audio_path).unlink()
                 except OSError:
                     pass
 
-
 if __name__ == "__main__":
-    print(
-        "whisper.cpp ready:"
-        if ready()
-        else
-        "whisper.cpp unavailable"
-    )
+    print("whisper.cpp ready:" if ready() else "whisper.cpp unavailable")
