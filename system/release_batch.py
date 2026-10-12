@@ -83,7 +83,6 @@ APP_FILES = (
     'webbie/agent/speaker_provider_loader.py', 'webbie/agent/voice_lab.py',
     'webbie/agent/launch_intents.py',
     'webbie/agent/voice_metrics.py',
-    'webbie/agent/kali_assistant.py',
     'webbie/agent/kali_named_app.py',
     'webbie/agent/console_bridge.py',
     'webbie/actions/task_grants.py',
