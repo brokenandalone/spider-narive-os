@@ -131,6 +131,7 @@ def audit(plan, root, receipt_root=None, now=None):
         "rollback_validated": "COMBINED ROLLBACK NOT VALIDATED",
         "owner_approved_install": "INSTALLATION NOT APPROVED",
         "installer_daily_guard_connected": "ONCE-DAILY INSTALLER GUARD NOT VERIFIED",
+        "voice_pipeline_verified": "OWNER VOICE AUTHENTICATION AND MICROPHONE CONTINUITY NOT VERIFIED",
     }
     for key, reason in gates.items():
         if plan.get(key) is not True:
