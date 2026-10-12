@@ -388,6 +388,26 @@ class WebbiePanel(QWidget):
         computer_button.setToolTip('Opens a permission-required local desktop operator. No automatic control.')
         computer_button.clicked.connect(self.open_computer_dialog)
         layout.addWidget(computer_button)
+        access_row=QHBoxLayout();layout.addLayout(access_row)
+        self.safe_access_button=QPushButton('One click: Allow Webbie safe access')
+        self.safe_access_button.setObjectName('webbieOwnerOneClickAccess')
+        self.safe_access_button.setToolTip(
+            '30-minute local safe-access session. Opens ordinary apps, '
+            'inspects selected windows, navigates and reads local service '
+            'status. Deletes, installs, shell/root, Kali tools, purchases, '
+            'uploads, broadcasts, sends, and account changes are blocked.')
+        self.safe_access_button.clicked.connect(self.enable_safe_access)
+        access_row.addWidget(self.safe_access_button)
+        revoke=QPushButton('Revoke access now')
+        revoke.setObjectName('webbieOwnerRevokeAll')
+        revoke.clicked.connect(self.stop_sensitive_actions)
+        access_row.addWidget(revoke)
+        access_note=QLabel(
+            'Safe access lasts 30 minutes, is not saved, and never overrides '
+            'speaker identity or the blocked-action rules. Online services '
+            'still require their existing individual sign-ins.')
+        access_note.setWordWrap(True)
+        layout.addWidget(access_note)
         self.cloud_label = QLabel(cloud_state_label())
         self.cloud_label.setWordWrap(True)
         layout.addWidget(self.cloud_label)
@@ -815,6 +835,13 @@ class WebbiePanel(QWidget):
             include_visual=self.camera_allowed and not self.face_sleeping)
         self.append_message('Webbie context',
                             json.dumps(state, indent=2, ensure_ascii=False))
+
+    def enable_safe_access(self):
+        """The single deliberate owner's click enables routine access only."""
+        self.open_computer_dialog()
+        if self.computer_dialog is not None:
+            self.computer_dialog.authorize_wide_access()
+            self.publish_jarvis_context()
 
     def open_computer_dialog(self, suggested_app_id=None):
         if self.computer_dialog is None:
