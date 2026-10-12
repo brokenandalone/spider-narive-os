@@ -148,7 +148,7 @@ def review(*, installed_root=INSTALLED, candidate_root=BASE,
                 break
         if not isinstance(allowlist, (tuple, list)):
             raise ValueError("No safe central installer manifest")
-        if any(p.startswith("webbie/config/") or p == "webbie/brain/brain.py" and p not in allowlist
+        if any(p.startswith("webbie/config/") or p.startswith("webbie/models/")
                for p in allowlist):
             raise ValueError("Unexpected protected model configuration installation")
     except (OSError, ValueError, UnicodeError, SyntaxError, TypeError):
