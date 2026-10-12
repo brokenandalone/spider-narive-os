@@ -10,13 +10,17 @@ from pathlib import Path
 import shutil
 import os
 import stat
+from runtime_readiness import DEFAULT_AGENT, _private_json
+from voice_metrics import display_meter
+from speaker_provider_loader import _pinned_source
 
 DEFAULT_CONFIG=Path(__file__).resolve().parents[1]/"config/default.json"
 DEFAULT_MODEL=Path("/usr/local/share/spider-os/whisper/ggml-base.en.bin")
 DEFAULT_VOICE=Path(__file__).resolve().parents[1]/"voice"
 
 def inspect_voice_lab(*, config_path=DEFAULT_CONFIG, model_path=None,
-                      voice_path=DEFAULT_VOICE, executable=None, which=None):
+                      voice_path=DEFAULT_VOICE, executable=None, which=None,
+                      agent_path=DEFAULT_AGENT):
     which=which or shutil.which
     config={}
     try:
@@ -39,14 +43,17 @@ def inspect_voice_lab(*, config_path=DEFAULT_CONFIG, model_path=None,
     alsa=which("arecord")
     provider=Path(voice_path)/"speaker_voice_provider.py"
     configured=voice.get("enabled") is True
+    pinned=_pinned_source(Path(voice_path),voice.get("provider_sha256")) is not None
     return {
         "whisper_available":bool(engine and Path(engine).is_file()),
         "whisper_model_available":bool(model.is_file() and not model.is_symlink()),
         "arecord_available":bool(alsa and Path(alsa).is_file()),
         "voiceprint_opted_in":configured,
         "voiceprint_file_present":bool(provider.is_file() and not provider.is_symlink()),
+        "voiceprint_source_pinned":pinned,
         "voiceprint_verified":False,
         "engine":"whisper.cpp",
+        "intake":_private_json(agent_path).get("voice_intake"),
         "message":"Presence checks only. No microphone audio was sampled.",
     }
 
@@ -60,8 +67,10 @@ def voice_lab_report(result):
         "Owner opted into local speaker verifier: "+(
             "YES" if result.get("voiceprint_opted_in") else "NO"),
         "Offline verifier module installed: "+report("voiceprint_file_present"),
+        "Owner-approved verifier code hash matches: "+report("voiceprint_source_pinned"),
         "Cory/Shayna speaker identity: NOT VERIFIED BY THIS CHECK",
         "Emergency STOP remains available even without speaker identity.",
         "The voice model provider is not bundled or auto-installed.",
-        "No microphone audio, voiceprints or conversations were read."]
+        "No microphone audio, voiceprints or conversations were read.",
+        "",display_meter(result.get("intake"))]
     return "\n".join(lines)
