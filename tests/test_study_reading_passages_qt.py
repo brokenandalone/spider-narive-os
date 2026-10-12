@@ -53,7 +53,7 @@ class StudyPassageQt(unittest.TestCase):
         self.assertIsNone(picker.selected_excerpt)
         with patch.object(QMessageBox, "question", return_value=QMessageBox.Yes):
             picker.use_selected()
-        self.assertIn("LOCAL COURSE READING PASSAGE",
+        self.assertIn("OWNER-SELECTED COURSE READING PASSAGE",
                       picker.selected_excerpt)
         self.assertIn("stratification", picker.selected_excerpt.lower())
 
