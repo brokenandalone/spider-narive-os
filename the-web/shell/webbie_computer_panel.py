@@ -634,6 +634,29 @@ class WebbieComputerDialog(QDialog):
         self.status('Review the URL and authorize this browser task before opening.')
         return True
 
+    def open_website_safe(self,url):
+        """Single explicitly requested public URL under owner standing policy."""
+        if (not self.grant.status().get('wide')
+                or self.operator.cancelled.is_set()):
+            self.receipt('website','denied')
+            return False
+        try:
+            destination=canonical_url(url)
+        except ValueError:
+            self.receipt('website','denied')
+            return False
+        if not self.grant.wide.authorize('web.open','url='+destination):
+            self.receipt('website','denied')
+            return False
+        if not self.browser_opener(QUrl(destination)):
+            self.receipt('website','failed')
+            self.status('Browser did not accept the public HTTPS link.')
+            return False
+        self.receipt('website','requested')
+        self.record_activity('website_requested')
+        self.status('Public HTTPS website open requested; page load not verified.')
+        return True
+
     def open_website(self, url=None):
         """Owner-confirmed website navigation; never starts a privileged command."""
         app = self.selected_app()
@@ -673,7 +696,8 @@ class WebbieComputerDialog(QDialog):
         return True
 
     def handle_voice_web(self, url):
-        opened = self.open_website(url)
+        opened=(self.open_website_safe(url) if self.grant.status().get('wide')
+                else self.open_website(url))
         if self.bridge.pending is not None:
             self.bridge.finish(
                 self.bridge.pending,
