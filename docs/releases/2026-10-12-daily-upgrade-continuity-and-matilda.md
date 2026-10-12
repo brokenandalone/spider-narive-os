@@ -46,6 +46,13 @@
 
 Existing proposals to reconcile, not blindly combine: PRs #66, #81, #85, #86, #87, #89, #92, #94, #96, #99. PR #99 contains known-good protections, #94 Ollama model compatibility precautions and #96 scoped user authorization. Do not assume they were installed or that every proposal is compatible.
 
+
+## Daily preflight (prepared, not yet run on Spider OS)
+
+- A **read-only** Python script `spider_os_daily_preflight_2026_10_12.py` has been prepared and smoke-tested in an isolated environment. That isolated smoke test has **no access** to the actual Spider OS PC and is not evidence about its workspace state.
+- On the user's PC, the script writes `~/Downloads/spider-os-preflight-<timestamp>/SUMMARY.txt` and `installed-file-inventory.json`. It collects on-disk hashes of source files, Matilda repair receipt presence, service status, model list, and default audio routes. It does not install, restart, merge, or overwrite anything.
+- **Await actual PC output** before any installer construction. Preserve previously confirmed Matilda and live wake-to-voice response. Avoid reapplying repaired features already present in the manifest.
+
 ## Acceptance checklist
 
 1. Capture installed PC snapshot and local SHA manifest, installed model, active services and backups.
