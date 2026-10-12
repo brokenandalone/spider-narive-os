@@ -59,3 +59,18 @@ The `--check` command can emit blockers and must **not** be converted into `--ap
 
 ## Release gate owner
 No tool connection here has remote filesystem access to the actual Spider OS desktop. A GitHub commit cannot install software on the PC or validate its microphones, speakers, running services and custom patches. The correct result until those validations finish is **NOT INSTALLED**, never “complete”.
+
+
+## Rolling-update compatibility addendum (October 11, evening)
+Additional source branches appeared **after this initial PR #91 inventory**:
+- [PR #93](https://github.com/brokenandalone/spider-narive-os/pull/93): Wave Four Studio PCM audio checks, Author Canon Intelligence, Study passage provenance, and Webbie model resilience.
+- [PR #92](https://github.com/brokenandalone/spider-narive-os/pull/92): separate Wave Four JARVIS workflow board. Do not assume it is integrated with #93.
+- [PR #90](https://github.com/brokenandalone/spider-narive-os/pull/90): separate Webbie Brain/Eyes/Hands/Autopilot workflows. Overlaps #92/#93 and existing voice branches.
+- [PR #89](https://github.com/brokenandalone/spider-narive-os/pull/89): separate Webbie Hearing/Speech v3. Requires explicit speaker boundary and microphone acceptance.
+- [PR #94](https://github.com/brokenandalone/spider-narive-os/pull/94): new **installed-model compatibility hold** against the existing PC. It adds `model_compatibility_verified=false` to its own Wave Four release branch. Must be adopted by the ultimate candidate, not manually bypassed.
+
+Do **not** use the older PR #91 audit package as installation approval for any Wave Four source. Refresh the exact candidate HEAD, overlap list, installed-PC checks, and model compatibility results after the *last* feature commit. Re-run the single combined CI and physical smoke tests on that exact commit.
+
+The running October 10 Webbie may have a model newer than `qwen3:1.7b`. Preserve whichever exact model the owner's installed configuration and live service actually select. Never install source solely because the bundled default exists. The diagnostic `python3 tools/webbie_model_compatibility.py --json` (and owner-triggered `--smoke`) on PR #94 will block unknown or missing models. Installed config, Ollama blobs and personal voice enrollment must never be overwritten.
+
+All source branches remain review-only. Unknown user-PC source, future commits, speaker verification, backup and rollback readiness remain independent installation blockers.
