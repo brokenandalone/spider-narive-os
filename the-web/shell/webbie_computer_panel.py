@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / 'webbie/actions'))
 from desktop_control import app_catalog, KEYS
 from window_safety import ConfinedDesktopOperator
 from task_grants import TaskGrant
+from owner_safe_access import safe_app_id
 sys.path.insert(0, str(ROOT / 'webbie/agent'))
 from stop_signal import consume_stop
 from browser_routes import canonical_url, is_browser_app
@@ -151,7 +152,7 @@ class WebbieComputerDialog(QDialog):
         form = QFormLayout(); layout.addLayout(form)
         self.app_select = QComboBox()
         self.app_select.setObjectName('webbieInstalledProgram')
-        self.app_select.currentIndexChanged.connect(lambda _=None: self.pause_autopilot())
+        self.app_select.currentIndexChanged.connect(lambda _=None: self.app_selection_changed())
         for app in self.apps:
             self.app_select.addItem(f'{app.name}  [{app.workspace}]', app.desktop_id)
         form.addRow('Installed program', self.app_select)
@@ -168,6 +169,19 @@ class WebbieComputerDialog(QDialog):
         self.stop_button.clicked.connect(self.stop)
         self.stop_button.setStyleSheet('background:#6e1e55; color:white; font-weight:bold')
         auth_row.addWidget(self.stop_button)
+        wide_row = QHBoxLayout(); layout.addLayout(wide_row)
+        self.wide_access_button = QPushButton('One click: Allow safe access across apps')
+        self.wide_access_button.setObjectName('webbieOneClickSafeAccess')
+        self.wide_access_button.clicked.connect(self.authorize_wide_access)
+        wide_row.addWidget(self.wide_access_button)
+        self.wide_access_info = QLabel(
+            'For 30 minutes: open ordinary installed apps, view/focus a selected '
+            'window, and use harmless navigation keys without repeat approval. '
+            'No clicks, text entry, downloads, deletions, shell/root, Kali '
+            'operations, publishing, spending, messaging, system changes or '
+            'external account actions. STOP revokes access immediately.')
+        self.wide_access_info.setWordWrap(True)
+        layout.addWidget(self.wide_access_info)
         self.state = QLabel('OFF | Webbie cannot operate applications')
         self.state.setWordWrap(True)
         layout.addWidget(self.state)
@@ -309,6 +323,46 @@ class WebbieComputerDialog(QDialog):
                 return True
         return False
 
+    def app_selection_changed(self):
+        # Switching apps never retains a bound window from a previous app.
+        self.pause_autopilot()
+        if self.grant.status().get('wide'):
+            self.operator.target_window = None
+            app = self.selected_app()
+            self.grant.select_wide_app(app.desktop_id if app else '')
+        self.refresh_status()
+
+    def authorize_wide_access(self):
+        """The labeled button IS the owner's deliberate consent, no extra prompts."""
+        if self.grant.status()['active']:
+            # Existing task grants are replaced by this bounded safe grant.
+            self.stop()
+        app_ids = [app.desktop_id for app in self.apps]
+        try:
+            count = self.grant.activate_wide(
+                app_ids, owner_clicked=True, seconds=1800)
+            self.operator.begin_new_task()
+            self.bridge.deactivate()  # only local UI, never the voice socket
+            self.autopilot.stop()
+            self.nav_mission.stop()
+            self.pending_step = None
+            self.pending_step_target = None
+            selected = self.selected_app()
+            self.grant.select_wide_app(
+                selected.desktop_id if selected else '')
+        except (ValueError, PermissionError, InterruptedError, RuntimeError) as error:
+            self.operator.stop()
+            self.grant.stop()
+            self.status('Safe app access unavailable: ' + str(error))
+            self.refresh_status()
+            return
+        self.record_activity('grant_started')
+        self.status(
+            f'One-click safe access active: {count} eligible installed apps, '
+            '30-minute limit, 240 routine actions. '
+            'Risky changes are BLOCKED, not silently approved.')
+        self.refresh_status()
+
     def authorize(self):
         app = self.selected_app()
         task = self.task.text().strip()
@@ -386,17 +440,24 @@ class WebbieComputerDialog(QDialog):
         if not active and self.autopilot.active:
             self.autopilot.stop()
         self.state.setText(
-            (f"AUTHORIZED | {data['remaining_seconds']} sec left | "
+            (f"{'ONE-CLICK SAFE ACCESS' if data.get('wide') else 'AUTHORIZED'} | "
+             f"{data['remaining_seconds']} sec left | "
              f"{data['remaining_actions']} actions | {data['task']}")
             if active else 'OFF | Webbie cannot operate applications')
-        self.autopilot_start.setEnabled(active and not self.autopilot.active)
+        safe_wide=bool(active and data.get('wide'))
+        self.wide_access_button.setEnabled(not safe_wide)
+        self.grant_button.setEnabled(not safe_wide)
+        self.autopilot_start.setEnabled(
+            active and not safe_wide and not self.autopilot.active)
         self.autopilot_pause.setEnabled(self.autopilot.active)
         self.open_web_button.setEnabled(active and is_browser_app(self.selected_app())
                                         if self.selected_app() is not None else False)
-        for control in (self.open_button, self.refresh_button, self.bind_button, self.focus_button,
-                        self.inspect_button, self.close_button, self.click_button,
-                        self.key_button, self.type_button, self.suggest_button):
+        for control in (self.open_button, self.refresh_button, self.bind_button,
+                        self.focus_button, self.inspect_button, self.key_button):
             control.setEnabled(active)
+        for control in (self.close_button, self.click_button, self.type_button,
+                        self.suggest_button):
+            control.setEnabled(active and not safe_wide)
         self.nav_preview_button.setEnabled(active)
         self.nav_next_button.setEnabled(active and
                                         self.nav_mission.plan is not None and
