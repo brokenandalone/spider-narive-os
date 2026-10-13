@@ -23,6 +23,7 @@ from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_
 from webbie_reminders_dialog import WebbieRemindersDialog
 from webbie_cognitive_center import WebbieCognitiveDialog
 from webbie_unified_workflow import WebbieUnifiedWorkflowDialog
+from webbie_jarvis_mission_center import JarvisMissionCenter
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
@@ -276,6 +277,7 @@ class WebbiePanel(QWidget):
         self.reminders_dialog = None
         self.cognitive_dialog = None
         self.workflow_dialog = None
+        self.jarvis_mission_dialog = None
         self.unified_workflow = UnifiedWorkflow()
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
@@ -324,6 +326,13 @@ class WebbiePanel(QWidget):
             'desktop operation and owner-confirmed completion.')
         workflow_button.clicked.connect(self.open_unified_workflow)
         layout.addWidget(workflow_button)
+        mission_button=QPushButton('JARVIS Mission Center · projects, websites, system')
+        mission_button.setObjectName('webbieJarvisMissionCenterButton')
+        mission_button.setToolTip(
+            'Search an owner-selected local project, audit a website, '
+            'or check system health with standing permission.')
+        mission_button.clicked.connect(self.open_jarvis_mission_center)
+        layout.addWidget(mission_button)
         # Independent read-only system status, no microphone or camera access.
         self.proactive_label = QLabel('Proactive checks: awaiting first report')
         self.proactive_label.setWordWrap(True)
@@ -631,6 +640,8 @@ class WebbiePanel(QWidget):
         self.awareness.sleep(self.face_sleeping)
         if self.face_sleeping:
             self.unified_workflow.stop()
+            if self.jarvis_mission_dialog is not None:
+                self.jarvis_mission_dialog.core.stop()
             self.stop_camera()
             if self.computer_dialog is not None:
                 self.computer_dialog.stop()
@@ -831,6 +842,8 @@ class WebbiePanel(QWidget):
     def stop_sensitive_actions(self):
         """One owner GUI action to drop camera and all desktop grants."""
         self.unified_workflow.stop()
+        if self.jarvis_mission_dialog is not None:
+            self.jarvis_mission_dialog.core.stop()
         if self.computer_dialog is not None:
             self.computer_dialog.stop()
         else:
@@ -852,11 +865,21 @@ class WebbiePanel(QWidget):
             self.cognitive_dialog = WebbieCognitiveDialog(
                 self, workspace_callback=lambda: self.awareness.snapshot()['workspace'],
                 emergency_callback=self.stop_sensitive_actions,
-                workflow_callback=self.open_unified_workflow)
+                workflow_callback=self.open_unified_workflow,
+                mission_callback=self.open_jarvis_mission_center)
         self.cognitive_dialog.refresh()
         self.cognitive_dialog.show()
         self.cognitive_dialog.raise_()
         self.cognitive_dialog.activateWindow()
+
+    def open_jarvis_mission_center(self):
+        """Single entrypoint to owner-scoped local research/diagnostics."""
+        if self.jarvis_mission_dialog is None:
+            self.jarvis_mission_dialog=JarvisMissionCenter(
+                self,stop_callback=self.stop_sensitive_actions)
+        self.jarvis_mission_dialog.show()
+        self.jarvis_mission_dialog.raise_()
+        self.jarvis_mission_dialog.activateWindow()
 
     def open_unified_workflow(self):
         """Single supervised workflow, never an autonomous task grant."""
@@ -1074,6 +1097,8 @@ class WebbiePanel(QWidget):
             event.ignore()
         else:
             self.unified_workflow.stop()
+            if self.jarvis_mission_dialog is not None:
+                self.jarvis_mission_dialog.core.stop()
             if self.computer_dialog is not None:
                 # Closing the UI never erases or pauses standing authorization.
                 # Active sessions are shut down; the next login rechecks it.
