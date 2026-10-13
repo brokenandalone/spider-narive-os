@@ -57,7 +57,8 @@ class HearingTestWorker(QThread):
 
 class WebbieCognitiveDialog(QDialog):
     def __init__(self,parent=None,*,workspace_callback=None,
-                 emergency_callback=None,workflow_callback=None):
+                 emergency_callback=None,workflow_callback=None,
+                 mission_callback=None):
         super().__init__(parent)
         self.setWindowTitle("Webbie · Jarvis Control Center")
         self.setMinimumWidth(600)
@@ -73,6 +74,7 @@ class WebbieCognitiveDialog(QDialog):
         self.workspace_callback=workspace_callback or (lambda:"default")
         self.emergency_callback=emergency_callback
         self.workflow_callback=workflow_callback
+        self.mission_callback=mission_callback
         self.focus_dialog=None
         self.model_worker=None
         self.hearing_worker=None
@@ -99,6 +101,10 @@ class WebbieCognitiveDialog(QDialog):
         flow.setObjectName("webbieUnifiedWorkflowCognitiveButton")
         flow.clicked.connect(self.open_workflow)
         actions.addWidget(flow)
+        mission=QPushButton("JARVIS missions")
+        mission.setObjectName("webbieJarvisMissionCognitiveButton")
+        mission.clicked.connect(self.open_missions)
+        actions.addWidget(mission)
         inspect=QPushButton("Inspect local AI models")
         inspect.setObjectName("webbieInspectModelsButton")
         inspect.clicked.connect(self.inspect_models)
@@ -158,6 +164,13 @@ class WebbieCognitiveDialog(QDialog):
                "SPEAKER TRUST",trust_status(),
                "This is advisory status. No PC task has been executed."]
         self.report.setPlainText("\n".join(lines))
+
+    def open_missions(self):
+        if callable(self.mission_callback):
+            self.mission_callback()
+        else:
+            self.report.setPlainText(
+                "Open JARVIS Mission Center from The Web's Webbie panel.")
 
     def open_workflow(self):
         if callable(self.workflow_callback):
