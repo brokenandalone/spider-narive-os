@@ -102,6 +102,7 @@ APP_FILES = (
     'webbie/brain/unified_workflow.py',
     'tools/webbie_readiness_cli.py',
     'tools/jarvis_install_preflight.py',
+    'tools/jarvis_reconcile_preview.py',
     'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
