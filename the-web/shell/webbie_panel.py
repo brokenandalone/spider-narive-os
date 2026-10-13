@@ -640,7 +640,7 @@ class WebbiePanel(QWidget):
         self.awareness.sleep(self.face_sleeping)
         if self.face_sleeping:
             self.unified_workflow.stop()
-            if self.jarvis_mission_dialog is not None:
+            if getattr(self,'jarvis_mission_dialog',None) is not None:
                 self.jarvis_mission_dialog.core.stop()
             self.stop_camera()
             if self.computer_dialog is not None:
@@ -1097,7 +1097,7 @@ class WebbiePanel(QWidget):
             event.ignore()
         else:
             self.unified_workflow.stop()
-            if self.jarvis_mission_dialog is not None:
+            if getattr(self,'jarvis_mission_dialog',None) is not None:
                 self.jarvis_mission_dialog.core.stop()
             if self.computer_dialog is not None:
                 # Closing the UI never erases or pauses standing authorization.
