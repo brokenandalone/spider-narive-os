@@ -14,10 +14,11 @@ from owner_authorization_store import DEFAULT_PATH,read_policy
 from jarvis_local_evidence import search_local_evidence,render_evidence
 from jarvis_site_audit import inspect_site_project,render_site_report
 from jarvis_forage_research import research_public_web,render_public_research
+from jarvis_local_site_preview import LocalSitePreview
 
 OPERATIONS=frozenset((
     "local.evidence","site.audit","system.health","project.overview",
-    "forage.web",
+    "forage.web","site.preview",
 ))
 MAX_RESULT_LENGTH=8000
 
@@ -36,12 +37,14 @@ class JarvisCore:
 
     def __init__(self,*,policy_path=DEFAULT_PATH,
                  evidence=search_local_evidence,site=inspect_site_project,
-                 forage=research_public_web,console=None,clock=None):
+                 forage=research_public_web,console=None,clock=None,
+                 preview=None):
         self.policy_path=Path(policy_path)
         self.evidence=evidence
         self.site=site
         self.forage=forage
         self.console=console
+        self.preview=preview or LocalSitePreview()
         self.clock=clock or time.monotonic
         self.lock=threading.RLock()
         self.stop_flag=threading.Event()
@@ -56,6 +59,8 @@ class JarvisCore:
     def stop(self):
         """STOP revokes local work immediately; output cannot be published."""
         self.stop_flag.set()
+        # Shutdown of an existing site is always safe, even during pause.
+        self.preview.stop()
 
     def run(self,action,*,source,folder=None,query=None,home=None):
         if source!="owner_gui" or action not in OPERATIONS:
@@ -81,6 +86,21 @@ class JarvisCore:
                     raise ValueError("Choose a local website project folder")
                 data=self.site(folder,home=home)
                 report=render_site_report(data)
+            elif action=="site.preview":
+                if folder is None:
+                    raise ValueError("Choose a local HTML site folder to preview")
+                preview=self.preview.start(folder,home=home)
+                report=(
+                    "JARVIS · LOCAL STATIC WEBSITE PREVIEW
+"
+                    "Preview URL: "+preview["url"]+"
+"
+                    "Scope: "+preview["scope"]+"
+"
+                    "Only 127.0.0.1 accepts connections. No public deployment, "
+                    "site edits, uploads, remote accounts or build scripts.
+"
+                    "STOP closes the local preview server.")
             elif action=="forage.web":
                 if not query:
                     raise ValueError("Enter a specific public research topic")
@@ -138,6 +158,7 @@ class JarvisCore:
             "running":self.active,
             "last_actions":[dict(item) for item in self.history],
             "supported_operations":sorted(OPERATIONS),
+            "local_preview":self.preview.status(),
             "can_deploy_website":False,
             "can_run_arbitrary_shell":False,
             "can_run_security_scans":False,
