@@ -112,6 +112,55 @@ These need working, separately scoped operator adapters and live checks:
 A permanent policy record does not confer superuser rights, remote OAuth
 consent, or authority to perform actions the owner previously excluded.
 
+## Local PC source reconciliation command (read-only)
+
+On the **actual Spider OS PC**, after checking out this exact release branch,
+run:
+
+```bash
+cd ~/spider-narive-os
+git fetch origin
+git switch release/webbie-jarvis-unified-major-20261012
+git pull --ff-only origin release/webbie-jarvis-unified-major-20261012
+python3 tools/jarvis_install_preflight.py
+```
+
+This command has **no installation mode**. It reads the source manifest,
+compares known checksums against the current installed
+`/usr/local/lib/spider-os` tree, runs the strict source wiring audit,
+checks backup headroom and reports whether a pinned offline speaker provider
+is installed. Output intentionally contains source-relative names but no
+private file contents, access tokens, passwords, personal documents, microphone
+recordings or terminal history. The tool returns exit status 3 on blockers,
+or 2 if still held for manual acceptance. It does not return an
+"install approved" status.
+
+It is normal to see blockers before the source has been reconciled with
+the significantly customized PC. **Never work around a BLOCKED result
+with a blind sudo apply.** First inspect owner-source conflicts and
+preserve existing working desktop/voice/Nova/Studio/Media changes.
+
+For machine-readable redacted output, run
+`python3 tools/jarvis_install_preflight.py --json`.
+The existing `tools/combined_release_audit.py` and
+`tools/webbie_readiness_cli.py` remain available as complementary
+read-only diagnostics.
+
+### Voice STOP critical correction
+
+A direct spoken STOP reaches the live audio interruption callback
+*before* the normal Webbie command handler. The new release now persists
+`paused=true` from **both** paths. Otherwise the owner's permanent
+authorization could resume on the next GUI login despite the actual
+spoken STOP. The test suite isolates and exercises the real nested
+interruption callback without opening audio hardware.
+
+The source currently includes only the **hash-pinned speaker verifier
+loading framework**, not a validated Cory/Shayna identity model on the PC.
+Even a hash-valid provider requires physical enrollment and live liveness
+and rejected-speaker tests. Speaker identity must not be inferred from
+Whisper text, faces, names or wake words.
+
 ## Acceptance gates before a single PC installation
 
 1. Record the hashes of the customized local Spider OS and reconcile
@@ -143,6 +192,7 @@ installation is authorized here.
 - tests/test_webbie_jarvis_mission_gui.py
 - tests/test_webbie_jarvis_forage_research.py
 - tests/test_webbie_jarvis_local_site_preview.py
+- tests/test_webbie_jarvis_install_preflight.py
 - Existing Webbie, voice, trust, browser, desktop, workspace, release,
   Studio, Author, Study, Kali Bay and media checks.
 
