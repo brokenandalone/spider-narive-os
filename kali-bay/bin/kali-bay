@@ -172,8 +172,10 @@ doctor() {
     podman exec --user 0 --tty=false "${NAME}" sh -c '
         echo "Package database audit:"
         dpkg --audit || true
-        echo "Previously failing packages:"
-        dpkg-query -W -f="${Package}: ${Status}\\n" systemd udev kali-linux-everything 2>/dev/null || true
+        echo "Core Kali package status:"
+        # Escape dpkg field markers: the inner sh must not expand them as
+        # empty shell variables before dpkg-query receives its format.
+        dpkg-query -W -f="\${Package}: \${Status}\\n" systemd udev kali-linux-everything 2>/dev/null || true
         echo "Running package-manager processes:"
         ps -eo pid,comm,args | grep -E "[a]pt-get|[d]pkg" || true
     '
