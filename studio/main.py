@@ -85,7 +85,7 @@ class SpiderStudio(QMainWindow):
         side.setSpacing(10)
 
         logo = QLabel('SPIDER STUDIO')
-        logo.setFont(QFont('Sans Serif', 18, QFont.Bold))
+        logo.setFont(QFont('Sans Serif', 22, QFont.Bold))
         logo.setStyleSheet('color: #a78bfa;')
         side.addWidget(logo)
 
@@ -109,7 +109,7 @@ class SpiderStudio(QMainWindow):
 
         center = QWidget()
         content = QVBoxLayout(center)
-        content.setContentsMargins(24, 24, 24, 24)
+        content.setContentsMargins(50, 48, 50, 48)
 
         title = QLabel('Spider Studio')
         title.setFont(QFont('Sans Serif', 32, QFont.Bold))
@@ -156,6 +156,15 @@ class SpiderStudio(QMainWindow):
         content.addWidget(refresh)
         self.refresh_tools()
 
+        # Owner's installed layout distinguishes resident Webbie from Media.
+        content.addSpacing(8)
+        note = QLabel(
+            'Spider Media Center is the Media module.\n'
+            'Webbie remains the resident AI service shared across Spider OS.'
+        )
+        note.setStyleSheet('color: #82788d;')
+        content.addWidget(note)
+
         footer = QLabel('SPIDER OS  •  YOUR LIFE. ONE WEB.')
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet('color: #625a69;')
@@ -171,7 +180,7 @@ class SpiderStudio(QMainWindow):
     def launch(self, command):
         try:
             subprocess.Popen(command)
-            self.status.setText('Application opened.')
+            self.status.setText('Launched: ' + ' '.join(command))
             return True
         except Exception as exc:
             self.status.setText(str(exc))
