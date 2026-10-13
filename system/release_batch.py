@@ -103,6 +103,9 @@ APP_FILES = (
     'tools/webbie_readiness_cli.py',
     'tools/jarvis_install_preflight.py',
     'tools/jarvis_reconcile_preview.py',
+    # Oct 11 full Spider OS wave: additive modules from daily release inventory.
+    # Existing PC customizations are NOT made into recognized overwrite baselines.
+
     'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
