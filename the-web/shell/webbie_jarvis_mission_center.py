@@ -23,6 +23,7 @@ CHOICES=(
     ("Audit a website project","site.audit"),
     ("Check Spider OS health","system.health"),
     ("Find project TODOs","project.overview"),
+    ("Research the public web with Forage","forage.web"),
 )
 
 
@@ -110,7 +111,8 @@ class JarvisMissionCenter(QDialog):
         self.report.setPlainText(
             "Mission center ready. Nothing has run yet.\n\n"
             "Available today: local project text search, missing website "
-            "assets, project TODO search and shell-free system checks.\n"
+            "assets, Forage public web search, project TODO search "
+            "and shell-free system checks.\n"
             "Not available here yet: website deployment, arbitrary terminal "
             "commands, privileged upgrades, browser form submissions, "
             "or security scans. Those require connected tool adapters.")
@@ -126,9 +128,11 @@ class JarvisMissionCenter(QDialog):
 
     def refresh(self):
         action=self.action.currentData()
-        needs_folder=action!="system.health"
+        needs_folder=action in ("local.evidence","site.audit",
+                                "project.overview")
         self.choose.setEnabled(needs_folder)
-        self.query.setEnabled(action in ("local.evidence","project.overview"))
+        self.query.setEnabled(action in (
+            "local.evidence","project.overview","forage.web"))
         running=self.worker is not None and self.worker.isRunning()
         self.run_button.setEnabled(not running and
                                    (not needs_folder or bool(self.folder)))
@@ -138,7 +142,7 @@ class JarvisMissionCenter(QDialog):
         if self.worker is not None and self.worker.isRunning():
             return
         selected=self.action.currentData()
-        if selected!="system.health" and not self.folder:
+        if selected in ("local.evidence","site.audit","project.overview") and not self.folder:
             self.report.setPlainText("Select a project folder first.")
             return
         self.worker=JarvisMissionWorker(
