@@ -20,10 +20,17 @@ additive files into the owner's verified combined source before any install.
 - Studio WAV sample-quality preflight for PCM WAV recordings (bounded first/last
   2 seconds); peak, RMS, sample-rate, channel count and potential full-scale
   samples. No audio processing or playback.
+- Studio folder-level stems preflight (up to 24 WAV tracks) for mismatched
+  sample rates and bit depths, duration spread, and sampled peak warnings.
+  Does not mix, synchronize, rewrite or play stems.
 - Author TXT/Markdown structural review with approximate word count, chapter
   headings and editorial placeholders. No manuscript or canon mutation.
+- Author folder-level chapter overview (up to 60 local text chapters), with
+  word totals, placeholders and empty chapter signals. No recursive scanning.
 - Study TXT/Markdown draft checklist with optional word-range directions,
   simple citation-pattern counts, placeholder flags and references heading.
+- Study draft-folder review (up to 50 local text assignments), with aggregated
+  word counts, unresolved source markers and references headings.
   No source checking, grading, or APA certification.
 - Deep Forage saved-source JSON metadata inspection: host diversity, duplicate
   exact URLs, missing titles and publication dates. Never connects to URLs.
@@ -51,9 +58,11 @@ additive files into the owner's verified combined source before any install.
 - system/operations_quality.py
 - system/operations_services.py
 - system/operations_hub.py
+- system/operations_batch.py
 - system/bin/spider-operations
 - distro/config/applications/spider-operations.desktop
 - tests/test_operations_hub.py
+- tests/test_operations_batch.py
 
 ## Future release checklist
 
