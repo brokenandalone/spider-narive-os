@@ -23,6 +23,8 @@ class FakeCore:
     def __init__(self):
         self.calls=[]
         self.stop=Mock()
+        self.preview=type("Preview",(),{
+            "status":lambda self:{"running":False,"url":"","scope":""}})()
 
     def run(self,action,*,source,folder=None,query=None,home=None):
         self.calls.append((action,source,folder,query))
@@ -49,7 +51,8 @@ class JarvisMissionCenterUITests(unittest.TestCase):
                 dlg.findChild(QComboBox,"webbieJarvisOperation"))
             self.assertFalse(dlg.run_button.isEnabled())
             self.assertEqual(fake.calls,[])
-            dlg.action.setCurrentIndex(2) # system health, no file root
+            dlg.action.setCurrentIndex(
+                dlg.action.findData("system.health")) # no file root
             self.assertTrue(dlg.run_button.isEnabled())
             dlg.run_button.click()
             QTest.qWait(200)
