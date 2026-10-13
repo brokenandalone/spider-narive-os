@@ -37,7 +37,14 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert (Path(folder)/'spider-os/appearance.json').is_file()
     with patch.object(main, 'list_tasks', return_value=[Task('0x00000101', 'Movie'), Task('0x00000102', 'Editor'), Task('0x00000103', 'Browser')]), patch.object(main, 'close_window') as close, patch.object(main.QApplication, 'primaryScreen') as screen, patch.object(main, 'minimize_window', return_value=True) as minimize, patch.object(main, 'maximize_window') as maximize:
         screen.return_value.geometry.return_value.width.return_value = 1280
-        window.desktop_mode = True; window.taskbar.refresh()
+        # October 11 taskbar discovery is asynchronous. Render a mocked
+        # immutable scan result directly so this GUI smoke remains deterministic
+        # while still exercising close, menus, minimize, maximize and overflow.
+        task_snapshot = [Task('0x00000101', 'Movie'),
+                         Task('0x00000102', 'Editor'),
+                         Task('0x00000103', 'Browser')]
+        window.desktop_mode = True
+        window.taskbar.render_tasks(task_snapshot)
         group = window.taskbar.tasks.itemAt(0).widget()
         close_button = next(item for item in group.findChildren(QPushButton) if item.text() == '×')
         close_button.click(); close.assert_called_with('0x00000101')
@@ -47,8 +54,8 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         overflow.actions()[0].menu().actions()[2].trigger(); minimize.assert_called_with('0x00000103')
         overflow.actions()[0].menu().actions()[3].trigger(); maximize.assert_called_with('0x00000103')
         screen.return_value.geometry.return_value.width.return_value = 900
-        window.taskbar.refresh(); assert window.taskbar.tasks.itemAt(0).widget().menu() is not None
-        window.desktop_mode = False; window.taskbar.refresh()
+        window.taskbar.render_tasks(task_snapshot); assert window.taskbar.tasks.itemAt(0).widget().menu() is not None
+        window.desktop_mode = False; window.taskbar.render_tasks([])
     for name in main.WORKSPACES:
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
