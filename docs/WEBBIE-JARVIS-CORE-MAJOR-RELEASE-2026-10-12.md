@@ -46,6 +46,17 @@ presence and gives a reviewable report. This is not a deployed-host
 audit or proof that the radio stream works, and it does NOT run
 untrusted build scripts or publish anything.
 
+### Actual local website hosting (development preview only)
+The owner can select a website folder and click **Host local website
+preview (127.0.0.1)**. Webbie's bundled static-only HTTP service
+serves HTML, CSS, scripts, images and other safe public asset types
+on an automatically assigned loopback port. The preview URL
+can be opened by an explicit click. It does not bind to a public IP
+or deploy to GitHub Pages or a hosting provider. It rejects path
+traversal, symlinks, hidden files, credential-like names,
+directory listings and POST/PUT/DELETE. Closing the mission
+or pressing STOP shuts it down. No site build scripts execute.
+
 ### Integrated Forage public web research
 The owner can choose **Research the public web with Forage** and enter a
 short research topic. This calls the existing Spider Forage public DDGS search
@@ -131,6 +142,7 @@ installation is authorized here.
 - tests/test_webbie_jarvis_orchestrator.py
 - tests/test_webbie_jarvis_mission_gui.py
 - tests/test_webbie_jarvis_forage_research.py
+- tests/test_webbie_jarvis_local_site_preview.py
 - Existing Webbie, voice, trust, browser, desktop, workspace, release,
   Studio, Author, Study, Kali Bay and media checks.
 
