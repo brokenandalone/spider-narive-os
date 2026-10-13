@@ -91,15 +91,11 @@ class JarvisCore:
                     raise ValueError("Choose a local HTML site folder to preview")
                 preview=self.preview.start(folder,home=home)
                 report=(
-                    "JARVIS · LOCAL STATIC WEBSITE PREVIEW
-"
-                    "Preview URL: "+preview["url"]+"
-"
-                    "Scope: "+preview["scope"]+"
-"
+                    "JARVIS · LOCAL STATIC WEBSITE PREVIEW\n"
+                    "Preview URL: "+preview["url"]+"\n"
+                    "Scope: "+preview["scope"]+"\n"
                     "Only 127.0.0.1 accepts connections. No public deployment, "
-                    "site edits, uploads, remote accounts or build scripts.
-"
+                    "site edits, uploads, remote accounts or build scripts.\n"
                     "STOP closes the local preview server.")
             elif action=="forage.web":
                 if not query:
