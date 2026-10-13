@@ -35,7 +35,7 @@ def _safe_file(root,route):
                p.casefold() in SKIP or SENSITIVE.search(p) for p in parts):
             return None
         if not parts:
-            parts=("index.html",)
+            parts=("index.html",) if (root/"index.html").is_file() else ("index.htm",)
         candidate=root.joinpath(*parts)
         if candidate.is_dir() and not candidate.is_symlink():
             candidate=candidate/"index.html"
