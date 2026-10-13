@@ -22,7 +22,7 @@ SKIP=frozenset({
     "credentials","private","tokens","keys","backups","dist",
 })
 SENSITIVE=re.compile(
-    r"(?:^|[._-])(?:token|secret|credential|password|id_rsa|"
+    r"(?:^|[._-])(?:tokens?|secrets?|credentials?|passwords?|id_rsa|"
     r"private.key|auth|cookie|session|keyfile)(?:[._-]|$)",re.I,
 )
 MAX_FILES=1500
