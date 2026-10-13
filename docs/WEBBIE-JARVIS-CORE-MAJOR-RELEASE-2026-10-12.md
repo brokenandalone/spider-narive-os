@@ -46,6 +46,14 @@ presence and gives a reviewable report. This is not a deployed-host
 audit or proof that the radio stream works, and it does NOT run
 untrusted build scripts or publish anything.
 
+### Integrated Forage public web research
+The owner can choose **Research the public web with Forage** and enter a
+short research topic. This calls the existing Spider Forage public DDGS search
+engine, returns bounded results with public HTTPS source links and short
+snippets, and explicitly labels content untrusted. It does not run model
+commands, log into accounts, open pages automatically, download tools or
+retain the content. Requires Forage's optional DDGS dependency on the PC.
+
 ### Integrated system diagnostics
 JARVIS Core integrates Webbie's existing console diagnostic adapter
 to read uptime, kernel, memory, disk space and the local service
@@ -122,6 +130,7 @@ installation is authorized here.
 - tests/test_webbie_jarvis_site_audit.py
 - tests/test_webbie_jarvis_orchestrator.py
 - tests/test_webbie_jarvis_mission_gui.py
+- tests/test_webbie_jarvis_forage_research.py
 - Existing Webbie, voice, trust, browser, desktop, workspace, release,
   Studio, Author, Study, Kali Bay and media checks.
 
