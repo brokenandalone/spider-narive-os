@@ -25,22 +25,33 @@ class AuthorWindow(QMainWindow):
         self.store = AuthorStore(root)
         self.book_id = self.chapter_id = None
         self.setWindowTitle('Author | Spider OS')
-        self.resize(1200, 800)
+        # Preserve owner-reviewed readable UI on smaller displays.
+        screen = QApplication.primaryScreen()
+        available = screen.availableGeometry() if screen else None
+        self.resize(min(1200, available.width()) if available else 1200,
+                    min(800, available.height()) if available else 800)
         self.setStyleSheet('QWidget { background:#100b18; color:#eee6ff; } '
             'QTextEdit,QListWidget { background:#1b1228; } '
             'QPushButton { background:#4c1d95; padding:8px; border-radius:5px; }')
         root_widget = QWidget(); self.setCentralWidget(root_widget)
         layout = QVBoxLayout(root_widget)
-        bar = QHBoxLayout(); layout.addLayout(bar)
-        for label, action in [('New book', self.new_book), ('New chapter', self.new_chapter),
+        bar = QVBoxLayout(); layout.addLayout(bar)
+        action_rows = (QHBoxLayout(), QHBoxLayout())
+        for row in action_rows:
+            bar.addLayout(row)
+        for index, (label, action) in enumerate([('New book', self.new_book), ('New chapter', self.new_chapter),
                 ('Import text', self.import_text), ('Import library', self.import_bundle), ('Save', self.flush),
-                ('Restore snapshot', self.restore), ('Backup library', self.backup), ('Focus', self.toggle_focus)]:
-            button = QPushButton(label); button.clicked.connect(action); bar.addWidget(button)
+                ('Restore snapshot', self.restore), ('Backup library', self.backup), ('Focus', self.toggle_focus)]):
+            button = QPushButton(label); button.clicked.connect(action)
+            button.setMinimumHeight(36)
+            action_rows[index // 4].addWidget(button)
             if label == 'Focus': self.focus_button = button
         split = QSplitter(); self.split = split; layout.addWidget(split)
-        self.books = QListWidget(); split.addWidget(self.books)
-        self.chapters = QListWidget(); split.addWidget(self.chapters)
-        tabs = QTabWidget(); self.editor_tabs = tabs; split.addWidget(tabs)
+        self.books = QListWidget(); self.books.setMinimumWidth(125); split.addWidget(self.books)
+        self.chapters = QListWidget(); self.chapters.setMinimumWidth(125); split.addWidget(self.chapters)
+        tabs = QTabWidget(); self.editor_tabs = tabs; tabs.setMinimumWidth(380); split.addWidget(tabs)
+        split.setChildrenCollapsible(False)
+        split.setSizes([170, 170, 650])
         self.editor = QTextEdit(); self.editor.setAcceptRichText(False)
         self.canon = QTextEdit(); self.canon.setAcceptRichText(False)
         tabs.addTab(self.editor, 'Chapter'); tabs.addTab(self.canon, 'Canon notes')

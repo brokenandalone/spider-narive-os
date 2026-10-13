@@ -828,6 +828,14 @@ def voice_listener():
             awaiting_command_until, 'stop', time.time())
         coordinator.cancel()
         speech_playback.stop()
+        # The live listener intercepts STOP before handle_command().
+        # Persist the PAUSED state here too, even without an open GUI or
+        # a configured speaker verifier. Never undo owner revocation.
+        try:
+            if read_policy().get('authorized'):
+                update_policy('pause')
+        except (OSError, PermissionError, ValueError):
+            pass
         try:
             request_stop()
         except (OSError, PermissionError):
