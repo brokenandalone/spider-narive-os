@@ -8,7 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-from PyQt5.QtCore import QThread,pyqtSignal
+from PyQt5.QtCore import QThread,pyqtSignal,QUrl
+from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QComboBox,QDialog,QFileDialog,QHBoxLayout,QLabel,QLineEdit,QPushButton,
     QTextEdit,QVBoxLayout,
@@ -21,6 +22,7 @@ from jarvis_orchestrator import JarvisCore
 CHOICES=(
     ("Search selected folder","local.evidence"),
     ("Audit a website project","site.audit"),
+    ("Host local website preview (127.0.0.1)","site.preview"),
     ("Check Spider OS health","system.health"),
     ("Find project TODOs","project.overview"),
     ("Research the public web with Forage","forage.web"),
@@ -96,6 +98,10 @@ class JarvisMissionCenter(QDialog):
         self.run_button.setObjectName("webbieJarvisRun")
         self.run_button.clicked.connect(self.launch)
         actions.addWidget(self.run_button)
+        self.preview_button=QPushButton("Open local website preview")
+        self.preview_button.setObjectName("webbieJarvisPreviewOpen")
+        self.preview_button.clicked.connect(self.open_preview)
+        actions.addWidget(self.preview_button)
         self.stop_button=QPushButton("STOP this mission")
         self.stop_button.setObjectName("webbieJarvisMissionStop")
         self.stop_button.clicked.connect(self.stop_mission)
@@ -111,7 +117,8 @@ class JarvisMissionCenter(QDialog):
         self.report.setPlainText(
             "Mission center ready. Nothing has run yet.\n\n"
             "Available today: local project text search, missing website "
-            "assets, Forage public web search, project TODO search "
+            "assets, local-only website preview hosting, "
+            "Forage public web search, project TODO search "
             "and shell-free system checks.\n"
             "Not available here yet: website deployment, arbitrary terminal "
             "commands, privileged upgrades, browser form submissions, "
@@ -129,20 +136,24 @@ class JarvisMissionCenter(QDialog):
     def refresh(self):
         action=self.action.currentData()
         needs_folder=action in ("local.evidence","site.audit",
-                                "project.overview")
+                                "site.preview","project.overview")
         self.choose.setEnabled(needs_folder)
         self.query.setEnabled(action in (
             "local.evidence","project.overview","forage.web"))
         running=self.worker is not None and self.worker.isRunning()
         self.run_button.setEnabled(not running and
                                    (not needs_folder or bool(self.folder)))
-        self.stop_button.setEnabled(running)
+        self.stop_button.setEnabled(running or
+                                    self.core.preview.status()["running"])
+        self.preview_button.setEnabled(
+            self.core.preview.status()["running"])
 
     def launch(self):
         if self.worker is not None and self.worker.isRunning():
             return
         selected=self.action.currentData()
-        if selected in ("local.evidence","site.audit","project.overview") and not self.folder:
+        if selected in ("local.evidence","site.audit",
+                        "site.preview","project.overview") and not self.folder:
             self.report.setPlainText("Select a project folder first.")
             return
         self.worker=JarvisMissionWorker(
@@ -161,6 +172,11 @@ class JarvisMissionCenter(QDialog):
             "Status: "+result.status+"\n"
             "Read-only: YES\n\n"+result.report)
         self.refresh()
+
+    def open_preview(self):
+        status=self.core.preview.status()
+        if status["running"]:
+            QDesktopServices.openUrl(QUrl(status["url"]))
 
     def stop_mission(self):
         self.core.stop()
