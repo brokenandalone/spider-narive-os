@@ -20,6 +20,10 @@ from operations_quality import (
     manuscript_report, research_sources_report, study_report, wav_report,
 )
 from operations_services import kali_status, launch_workspace, system_status
+from operations_batch import (
+    studio_session_report, author_chapter_folder_report,
+    study_assignment_folder_report,
+)
 
 
 class OperationsHub(QWidget):
@@ -132,6 +136,11 @@ class OperationsHub(QWidget):
         if filename:
             self._run(name, lambda: operation(filename))
 
+    def _pick_folder(self, name, title, operation):
+        directory = QFileDialog.getExistingDirectory(self, title, str(Path.home()))
+        if directory:
+            self._run(name, lambda: operation(directory))
+
     def _overview(self):
         box, _ = self._page(
             "Home", "Launch only an installed workspace you select. "
@@ -172,6 +181,12 @@ class OperationsHub(QWidget):
                                "WAV audio (*.wav)", wav_report)
         )
 
+        self._button(
+            row, "Audit WAV stem folder...",
+            lambda: self._pick_folder("Studio", "Choose recording stem folder",
+                                      studio_session_report)
+        )
+
     def _author(self):
         box, _ = self._page(
             "Author", "Check approximate chapters, headings and editorial placeholders "
@@ -184,6 +199,12 @@ class OperationsHub(QWidget):
             lambda: self._pick("Author", "Choose manuscript",
                                "Text manuscripts (*.txt *.md *.markdown)",
                                manuscript_report)
+        )
+
+        self._button(
+            row, "Review chapter folder...",
+            lambda: self._pick_folder("Author", "Choose chapter folder",
+                                      author_chapter_folder_report)
         )
 
     def _study(self):
@@ -205,6 +226,12 @@ class OperationsHub(QWidget):
                 "Study", "Choose assignment draft", "Text drafts (*.txt *.md *.markdown)",
                 lambda path: study_report(path, self.directions.toPlainText()),
             )
+        )
+
+        self._button(
+            row, "Review assignment folder...",
+            lambda: self._pick_folder("Study", "Choose assignment draft folder",
+                                      study_assignment_folder_report)
         )
 
     def _forage(self):
