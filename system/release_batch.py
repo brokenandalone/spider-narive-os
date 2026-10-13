@@ -82,6 +82,7 @@ APP_FILES = (
     'webbie/actions/jarvis_site_audit.py',
     'webbie/actions/jarvis_orchestrator.py',
     'webbie/actions/jarvis_forage_research.py',
+    'webbie/actions/jarvis_local_site_preview.py',
     'webbie/agent/workspace_launchers.py', 'webbie/agent/jarvis_commands.py',
     'webbie/agent/voice_trust.py', 'webbie/agent/runtime_readiness.py',
     'webbie/agent/segment_speaker_gate.py',
