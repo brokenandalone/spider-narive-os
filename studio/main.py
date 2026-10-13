@@ -156,7 +156,6 @@ class SpiderStudio(QMainWindow):
         content.addWidget(refresh)
         self.refresh_tools()
 
-        # Owner's installed layout distinguishes resident Webbie from Media.
         content.addSpacing(8)
         note = QLabel(
             'Spider Media Center is the Media module.\n'
