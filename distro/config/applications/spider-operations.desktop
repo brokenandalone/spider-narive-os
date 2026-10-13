@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Spider Operations Hub
+GenericName=Spider OS Cross-Workspace Workbench
+Comment=Owner-directed audio, writing, research, Kali and system checks
+Exec=/usr/local/lib/spider-os/system/bin/spider-operations
+TryExec=/usr/local/lib/spider-os/system/bin/spider-operations
+Icon=spider-os-logo
+Terminal=false
+Categories=System;Utility;Education;AudioVideo;
+StartupNotify=true
