@@ -146,6 +146,43 @@ The existing `tools/combined_release_audit.py` and
 `tools/webbie_readiness_cli.py` remain available as complementary
 read-only diagnostics.
 
+### Owner-source reconciliation, all conflicting files in one private review
+
+When the read-only PC preflight reports multiple BLOCKED customized files
+(the October 12 local report found 21), do **not** force the installer.
+First run this second, read-only tool from the **same, separate release
+clone** after `git pull --ff-only` on the already checked-out branch:
+
+```bash
+REVIEW="$HOME/Downloads/Spider_JARVIS_Reconcile_$(date +%Y%m%d_%H%M%S)"
+python3 tools/jarvis_reconcile_preview.py --output "$REVIEW"
+```
+
+The tool checks every proposed release target once, reviews the files
+that the existing strict installer marked BLOCKED, and queries **local Git
+history only** for content-identical versions of those same relative paths.
+It prints only relative module names and counts. Output goes to one
+NEW, user-only directory (mode 0700) containing bounded private source
+diffs (mode 0600), `summary.json` and a cautionary README.
+
+Results have clear meanings:
+
+- `recognized_git_blob_manual_review`: the installed file matches a
+  historical blob on some local Git ref **at that path**. It is not a
+  license to overwrite the installation. Identify the original branch
+  and confirm behavior before extending recognized baselines.
+- `custom_code_manual_merge`: the installed code is not the exact content
+  of a historically recorded source at that path. Preserve features and
+  reconcile edits before building a combined release.
+- `unsafe_path_manual_review` and `unreadable_or_large_manual_review`:
+  do not merge automatically; the file cannot be safely inspected.
+
+**Never upload the complete private diff folder**, as it may include
+owner source comments, paths or sensitive local configuration text. The
+safe-to-share console summary and `summary.json` contain only module
+metadata. GitHub does not receive files from this tool, and the installed
+Spider OS is not changed. Voice enrollment is a separate gate.
+
 ### Voice STOP critical correction
 
 A direct spoken STOP reaches the live audio interruption callback
@@ -193,6 +230,7 @@ installation is authorized here.
 - tests/test_webbie_jarvis_forage_research.py
 - tests/test_webbie_jarvis_local_site_preview.py
 - tests/test_webbie_jarvis_install_preflight.py
+- tests/test_webbie_jarvis_reconcile_preview.py
 - Existing Webbie, voice, trust, browser, desktop, workspace, release,
   Studio, Author, Study, Kali Bay and media checks.
 
