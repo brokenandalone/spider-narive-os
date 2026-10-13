@@ -25,9 +25,18 @@ else:
     from continuity_engine import ContinuityEngine, ReviewCancelled
 from PyQt5.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QTabWidget, QTextEdit,
+    QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QTabWidget, QTextEdit,
     QVBoxLayout, QWidget
 )
+
+
+# Owner-tested scalable pages prevent clipping publishing/continuity controls.
+def _author_scroll_page(contents):
+    viewport = QScrollArea()
+    viewport.setWidgetResizable(True)
+    viewport.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    viewport.setWidget(contents)
+    return viewport
 
 
 class ReviewWorker(QThread):
@@ -168,6 +177,8 @@ class AuthorToolkit(QWidget):
         self.reference_body.textChanged.connect(self.mark_reference)
         tabs.addTab(references, 'Companion Library')
         tools = QWidget(); t = QVBoxLayout(tools)
+        t.setSpacing(10)
+        t.setContentsMargins(12, 12, 12, 12)
         t.addWidget(QLabel('Exports and revision comparisons stay on your computer.'))
         t.addWidget(QLabel('On-demand Webbie reviews. No manuscript edits or cloud uploads.'))
         self.review_depth = QComboBox()
@@ -188,6 +199,7 @@ class AuthorToolkit(QWidget):
         t.addWidget(self.review_status)
         self.review_result = QTextEdit()
         self.review_result.setReadOnly(True)
+        self.review_result.setMinimumHeight(170)
         self.review_result.setPlaceholderText('Full review report will appear here.')
         t.addWidget(self.review_result, 1)
         t.addWidget(QLabel('Saved reviews: open earlier feedback without rerunning Webbie.'))
@@ -199,11 +211,13 @@ class AuthorToolkit(QWidget):
         t.addWidget(self.review_freshness)
         self.review_chapters = QListWidget()
         self.review_chapters.setMaximumHeight(115)
+        self.review_chapters.setMinimumHeight(75)
         self.review_chapters.itemActivated.connect(self.jump_to_reviewed_chapter)
         t.addWidget(self.review_chapters)
         t.addWidget(QLabel('Review source sections (double-click to highlight):'))
         self.review_sections = QListWidget()
         self.review_sections.setMaximumHeight(140)
+        self.review_sections.setMinimumHeight(90)
         self.review_sections.itemActivated.connect(self.jump_to_review_section)
         t.addWidget(self.review_sections)
         self.export_review_button = QPushButton('Export displayed review as TXT')
@@ -253,17 +267,25 @@ class AuthorToolkit(QWidget):
         compare = QPushButton('Compare current chapter with last saved version'); compare.clicked.connect(self.compare)
         t.addWidget(compare)
         self.compare_result = QTextEdit(); self.compare_result.setReadOnly(True)
+        self.compare_result.setMinimumHeight(140)
         self.compare_result.setPlaceholderText('Revisions are shown here without changing the manuscript.')
         t.addWidget(self.compare_result, 1)
-        tabs.addTab(tools, 'Publishing & Revisions')
+        for control in tools.findChildren(QPushButton):
+            control.setMinimumHeight(36)
+        for control in tools.findChildren(QComboBox):
+            control.setMinimumHeight(32)
+        tabs.addTab(_author_scroll_page(tools), 'Publishing & Revisions')
         continuity = QWidget()
         cl = QVBoxLayout(continuity)
+        cl.setSpacing(10)
+        cl.setContentsMargins(12, 12, 12, 12)
         cl.addWidget(QLabel('Cross-book continuity: select the books you want checked.'))
         cl.addWidget(QLabel(
             'Webbie compares quoted evidence from manuscript chapters, '
             'book canon and Story Bible entries. Nothing starts automatically.'))
         self.continuity_books = QListWidget()
         self.continuity_books.setSelectionMode(QListWidget.MultiSelection)
+        self.continuity_books.setMinimumHeight(130)
         cl.addWidget(self.continuity_books)
         self.continuity_button = QPushButton('Webbie: Check selected books for contradictions')
         self.continuity_button.clicked.connect(self.start_continuity)
@@ -277,11 +299,14 @@ class AuthorToolkit(QWidget):
         cl.addWidget(self.continuity_status)
         self.continuity_result = QTextEdit()
         self.continuity_result.setReadOnly(True)
+        self.continuity_result.setMinimumHeight(180)
         cl.addWidget(self.continuity_result, 1)
         self.continuity_export_button = QPushButton('Export cross-book report as TXT')
         self.continuity_export_button.clicked.connect(self.export_continuity)
         cl.addWidget(self.continuity_export_button)
-        tabs.addTab(continuity, 'World Continuity')
+        for control in continuity.findChildren(QPushButton):
+            control.setMinimumHeight(36)
+        tabs.addTab(_author_scroll_page(continuity), 'World Continuity')
         self.set_book(None)
 
     def mark_story(self, *_):
