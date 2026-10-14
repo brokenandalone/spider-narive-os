@@ -30,12 +30,26 @@
     "system/operations_wave8_ui.py",
     "tests/test_operations_wave8.py",
     "docs/SPIDER-OPERATIONS-WAVE8-MAJOR-20261013.md",
-    "system/wave8_release_manifest.json"
+    "system/wave8_release_manifest.json",
+    "system/operations_wave8_projects.py",
+    "system/operations_wave8_projects_ui.py",
+    "tests/test_operations_wave8_projects.py"
   ],
   "existing_files_modified": [
     "system/operations_hub.py"
   ],
   "unit_tests": "committed_not_run",
   "qt_hardware_acceptance": "deferred",
-  "activation": "none"
+  "activation": "none",
+  "capabilities": [
+    "studio_stems",
+    "author_named_canon_coverage",
+    "study_rubric_signals",
+    "offline_citation_provenance",
+    "kali_purple_labs",
+    "system_source_drift",
+    "backup_inventory",
+    "webbie_ollama_readiness",
+    "owner_manual_project_checklists"
+  ]
 }

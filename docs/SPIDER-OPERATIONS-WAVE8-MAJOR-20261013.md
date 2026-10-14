@@ -68,10 +68,21 @@ exist as future verification steps; no live-Pc test/upgrade success is claimed.
 - Explicitly does not modify installed qwen3:8b, Natasha/Matilda, wake/STOP,
   microphone, camera, permitted speakers or computer-control access.
 
+
+### 8. Private project board and manual release checklists
+- Five bounded templates for Studio recording, Broken World chapter revision,
+  SNHU assignment preparation, authorized Kali Purple labs, and OS upgrades.
+- Owner manually marks fixed, visible steps complete. A plan cannot execute
+  commands or cause a change outside the GUI.
+- Saving requires a direct file dialog, writes a **new** JSON file with 0600
+  permissions and refuses overwrite. Opening verifies a fixed template and
+  known checklist steps; it never executes file contents.
+- No background AI process, reminders or cloud synchronization.
+
 ## GUI
 
 A new **Wave 8** tab inside the separate Operations Hub adds nine owner-click
-operations. Two independently selected file/folder inputs where required.
+operations. A separate **Projects** tab holds private manual checklists. Two independently selected file/folder inputs where required.
 Long local reviews use a worker thread with bounded scope; they cannot be
 dispatched by a webpage, model, TV audio or microphone.
 The existing Operations Hub manual report export is the only save route.
@@ -87,8 +98,11 @@ The existing Operations Hub manual report export is the only save route.
 - system/operations_wave8_system.py
 - system/operations_wave8_webbie.py
 - system/operations_wave8_ui.py
+- system/operations_wave8_projects.py
+- system/operations_wave8_projects_ui.py
 - system/operations_hub.py (only additive GUI wiring)
 - tests/test_operations_wave8.py
+- tests/test_operations_wave8_projects.py
 - docs/SPIDER-OPERATIONS-WAVE8-MAJOR-20261013.md
 - system/wave8_release_manifest.json
 
