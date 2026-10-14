@@ -26,6 +26,7 @@ from operations_batch import (
 )
 from operations_wave8_ui import Wave8Panel
 from operations_wave8_projects_ui import ProjectBoard
+from wave9_ui import Wave9Panel
 
 
 class OperationsHub(QWidget):
@@ -77,6 +78,9 @@ class OperationsHub(QWidget):
         self.projects = ProjectBoard(self._publish, self)
         self.tabs.addTab(self.projects, "Projects")
         self.views["Projects"] = self.projects.report
+        self.wave9 = Wave9Panel(self._publish, self)
+        self.tabs.addTab(self.wave9, "Wave 9")
+        self.views["Wave 9"] = self.wave9.report
         footer = QHBoxLayout()
         self.summary_status = QLabel("Waiting for an owner-selected operation.")
         self.summary_status.setWordWrap(True)
@@ -276,7 +280,8 @@ class OperationsHub(QWidget):
         self._button(row, "Refresh system status", lambda: self._run("System", system_status))
 
     def closeEvent(self, event):
-        if self.wave8.worker is not None and self.wave8.worker.isRunning():
+        if ((self.wave8.worker is not None and self.wave8.worker.isRunning())
+                or self.wave9.is_busy()):
             QMessageBox.information(
                 self, "Review is finishing",
                 "Please close the Hub after the selected local review completes."

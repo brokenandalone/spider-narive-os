@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "wave": 9,
+  "date": "2026-10-13",
+  "repository": "brokenandalone/spider-narive-os",
+  "parent_branch": "feature/spider-operations-wave8-major-20261013",
+  "mode": "development_only_no_install",
+  "tests": "written_not_run",
+  "risk": "branch_base_older_than_current_installed_pc",
+  "new_files": [
+    "system/wave9_music.py",
+    "system/wave9_visual.py",
+    "system/wave9_canon.py",
+    "system/wave9_desktop.py",
+    "system/wave9_ui.py",
+    "tests/test_wave9_creative_vision.py",
+    "docs/SPIDER-OPERATIONS-WAVE9-20261013.md",
+    "system/wave9_release_manifest.json"
+  ],
+  "modified_files": [
+    "system/operations_hub.py"
+  ],
+  "protected_installed_files": [
+    "webbie/agent/webbie.py",
+    "webbie/brain/brain.py",
+    "webbie/voice/tts.py",
+    "the-web/shell/main.py",
+    "kali-bay/ui/kali_bay.py",
+    "studio/music_backend.py",
+    "studio/ai_panel.py",
+    "author/main.py",
+    "study/study.py",
+    "forage/engine.py",
+    "media/ai-dj/nova_host.py",
+    "media/ai-dj/service.py"
+  ],
+  "features": [
+    "owner_approved_local_acestep_generation",
+    "single_camera_frame_vision",
+    "single_screen_capture_vision",
+    "scoped_canon_claim_review",
+    "source_quote_anchors",
+    "desktop_launcher_readiness"
+  ],
+  "forbidden_auto_actions": [
+    "camera_capture",
+    "screen_capture",
+    "music_generation",
+    "desktop_task_grants",
+    "unattended_research",
+    "package_or_boot_changes"
+  ]
+}
