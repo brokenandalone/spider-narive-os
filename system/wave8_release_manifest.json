@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "wave": 8,
+  "date": "2026-10-13",
+  "repo": "brokenandalone/spider-narive-os",
+  "state": "development_only_uninstalled_untested",
+  "parent_branch": "feature/spider-operations-hub-20261013",
+  "install_policy": "No direct deployment; reconcile additive sources with owner's newer installed PC hashes.",
+  "allowed_project": "native_spider_os_operations_hub",
+  "forbidden_operations": [
+    "replace_installed_webbie",
+    "reinstall_kali_container",
+    "modify_boot",
+    "install_host_packages",
+    "modify_nova",
+    "modify_bcn",
+    "start_scanners",
+    "auto_download_ollama",
+    "auto_approve_desktop"
+  ],
+  "new_files": [
+    "system/operations_wave8_core.py",
+    "system/operations_wave8_studio.py",
+    "system/operations_wave8_author.py",
+    "system/operations_wave8_study.py",
+    "system/operations_wave8_research.py",
+    "system/operations_wave8_kali.py",
+    "system/operations_wave8_system.py",
+    "system/operations_wave8_webbie.py",
+    "system/operations_wave8_ui.py",
+    "tests/test_operations_wave8.py",
+    "docs/SPIDER-OPERATIONS-WAVE8-MAJOR-20261013.md",
+    "system/wave8_release_manifest.json"
+  ],
+  "existing_files_modified": [
+    "system/operations_hub.py"
+  ],
+  "unit_tests": "committed_not_run",
+  "qt_hardware_acceptance": "deferred",
+  "activation": "none"
+}

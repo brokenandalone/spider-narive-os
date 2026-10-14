@@ -24,6 +24,7 @@ from operations_batch import (
     studio_session_report, author_chapter_folder_report,
     study_assignment_folder_report,
 )
+from operations_wave8_ui import Wave8Panel
 
 
 class OperationsHub(QWidget):
@@ -69,6 +70,9 @@ class OperationsHub(QWidget):
         self._forage()
         self._kali()
         self._system()
+        self.wave8 = Wave8Panel(self._publish, self)
+        self.tabs.addTab(self.wave8, "Wave 8")
+        self.views["Wave 8"] = self.wave8.report
         footer = QHBoxLayout()
         self.summary_status = QLabel("Waiting for an owner-selected operation.")
         self.summary_status.setWordWrap(True)
