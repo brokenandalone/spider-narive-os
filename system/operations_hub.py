@@ -24,6 +24,8 @@ from operations_batch import (
     studio_session_report, author_chapter_folder_report,
     study_assignment_folder_report,
 )
+from operations_wave8_ui import Wave8Panel
+from operations_wave8_projects_ui import ProjectBoard
 
 
 class OperationsHub(QWidget):
@@ -69,6 +71,12 @@ class OperationsHub(QWidget):
         self._forage()
         self._kali()
         self._system()
+        self.wave8 = Wave8Panel(self._publish, self)
+        self.tabs.addTab(self.wave8, "Wave 8")
+        self.views["Wave 8"] = self.wave8.report
+        self.projects = ProjectBoard(self._publish, self)
+        self.tabs.addTab(self.projects, "Projects")
+        self.views["Projects"] = self.projects.report
         footer = QHBoxLayout()
         self.summary_status = QLabel("Waiting for an owner-selected operation.")
         self.summary_status.setWordWrap(True)
@@ -266,6 +274,16 @@ class OperationsHub(QWidget):
         row = QHBoxLayout()
         box.insertLayout(box.count() - 1, row)
         self._button(row, "Refresh system status", lambda: self._run("System", system_status))
+
+    def closeEvent(self, event):
+        if self.wave8.worker is not None and self.wave8.worker.isRunning():
+            QMessageBox.information(
+                self, "Review is finishing",
+                "Please close the Hub after the selected local review completes."
+            )
+            event.ignore()
+            return
+        super().closeEvent(event)
 
     def save_summary(self):
         if self.last_report is None:
