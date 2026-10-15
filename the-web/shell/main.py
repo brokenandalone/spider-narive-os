@@ -39,6 +39,7 @@ from bay_mission_panel import BayMissionPanel
 from webbie_research_panel import WebbieResearchPanel
 from webbie_native_operations import WebbieNativeOperations
 from legacy_control_centers import destination as legacy_destination
+from home_dashboard import SpiderHomeDashboard
 from native_utility_bays import (ArtLabPanel, CommunicationsPanel, DevBayPanel,
                                  DevicesPanel, ProductivityPanel)
 from art_workbench import ArtWorkbench
@@ -361,16 +362,17 @@ class TheWeb(QMainWindow):
         self.recent_grid = QGridLayout()
         home_layout.addLayout(self.recent_grid)
         self.render_recent_shortcuts()
-        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
+        self.home_dashboard = SpiderHomeDashboard(
+            workspace_opener=self.open_workspace,
+            installed_supplier=lambda: self.installed_apps,
+            parent=home)
+        home_layout.addWidget(self.home_dashboard, 1)
         home_actions = button('The Web: advanced tools & tasks', self.toggle_home_tools)
         home_layout.addWidget(home_actions)
         self.home_max_tools = NativeWorkspaceTools('default', home)
         self.home_max_tools.setVisible(False)
         home_layout.addWidget(self.home_max_tools, 1)
-        content = QWidget(); content.setObjectName('root'); scroll.setWidget(content); grid = QGridLayout(content); grid.setAlignment(Qt.AlignTop | Qt.AlignLeft); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(14)
-        for index, (workspace, label) in enumerate((k, v) for k, v in VISIBLE_WORKSPACES.items() if k != 'default'):
-            shortcut = button(label, lambda checked=False, name=workspace: self.open_workspace(name)); shortcut.setFixedWidth(175)
-            grid.addWidget(shortcut, index // 4, index % 4)
+        # Native home dashboard replaces the old grid of unlabelled launcher buttons.
         home.setProperty('workspace', 'default'); self.tabs.addTab(home, 'The Web'); self.workspace_widgets['default'] = home
         self.tabs.tabBar().setTabButton(0, self.tabs.tabBar().RightSide, None)
         self._restoring_home_tab = False
@@ -688,6 +690,8 @@ class TheWeb(QMainWindow):
 
     def apps_discovered(self, applications):
         self.installed_apps = applications
+        if hasattr(self, 'home_dashboard'):
+            self.home_dashboard.refresh()
         for name in list(self.app_lists):
             self.populate_app_list(name)
         self.start_menu.populate()
@@ -965,11 +969,16 @@ class TheWeb(QMainWindow):
             # redirected into existing native bays. Nothing is uninstalled.
             self.open_workspace(legacy.workspace)
             page = self.workspace_widgets[legacy.workspace]
-            tabs = page.workspace_tabs
-            for index in range(tabs.count()):
-                if tabs.tabText(index) == legacy.tab_title:
-                    tabs.setCurrentIndex(index)
-                    break
+            if legacy.workspace == 'default':
+                # The Web Home is the permanent tab created during build_ui,
+                # not a nested workspace-tabs container.
+                self.home_max_tools.setVisible(True)
+            else:
+                tabs = page.workspace_tabs
+                for index in range(tabs.count()):
+                    if tabs.tabText(index) == legacy.tab_title:
+                        tabs.setCurrentIndex(index)
+                        break
             self.status.setText(legacy.message)
             self.remember_navigation('app', ident)
             return
