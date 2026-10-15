@@ -29,7 +29,9 @@ else
 fi
 
 printf '\nMounted boot partitions:\n'
-findmnt -no SOURCE,FSTYPE,TARGET / /boot /boot/efi 2>/dev/null || true
+for mountpoint in / /boot /boot/efi; do
+  findmnt -n -o SOURCE,FSTYPE,TARGET --target "$mountpoint" 2>/dev/null || true
+done
 printf '\nRoot free space:\n'
 df -h /
 free_kb="$(df --output=avail -k / | tail -n 1 | tr -d ' ')"
