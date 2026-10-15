@@ -104,6 +104,12 @@ class InstrumentWorkbench(QWidget):
         self.tabs.addTab(self._build_fretboard("guitar", GUITAR_OPEN), "Guitar Machine")
         self.tabs.addTab(self._build_fretboard("bass", BASS_OPEN), "Bass Machine")
         self.tabs.addTab(self._build_keys(), "Keyboard + Synth")
+        if __package__:
+            from .midi_input_panel import MidiInputPanel
+        else:
+            from midi_input_panel import MidiInputPanel
+        self.midi_input = MidiInputPanel(self._external_midi_note, self)
+        self.tabs.addTab(self.midi_input, "External MIDI Keyboard")
 
         self.status = QLabel("Ready. Click pads, frets or keys to play, or sequence a pattern.")
         self.status.setWordWrap(True)
@@ -235,6 +241,12 @@ class InstrumentWorkbench(QWidget):
             shortcut.activated.connect(lambda n=KEYS_START + offset: self._shortcut_key(n))
         layout.addStretch()
         return page
+
+    def _external_midi_note(self, instrument, midi, velocity):
+        # Owner explicitly opens the external MIDI input from its dedicated tab.
+        # We never silently enable MIDI monitoring or record incoming messages.
+        if instrument in ("keys", "guitar", "bass") and 24 <= midi <= 96:
+            self._play_note(instrument, midi)
 
     def _shortcut_key(self, midi):
         if self.tabs.currentIndex() == 3:
@@ -395,6 +407,10 @@ class InstrumentWorkbench(QWidget):
             QMessageBox.warning(self, "Export failed", str(error)[:300])
 
     def closeEvent(self, event):
+        self.midi_input.disconnect()
+        if self.midi_input.worker is not None and self.midi_input.worker.isRunning():
+            event.ignore()
+            return
         self.timer.stop()
         for audio, data in list(self._voices):
             audio.stop()
