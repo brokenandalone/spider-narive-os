@@ -72,6 +72,33 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         if bay == 'default':
             continue
         assert isinstance(window.workspace_widgets[bay].mission_desk, main.BayMissionPanel), bay
+    studio_rack = window.workspace_widgets['studio'].instrument_rack
+    assert isinstance(studio_rack, main.InstrumentRack)
+    assert studio_rack.mode.count() == 4
+    assert len(studio_rack.steps['Kick']) == 16
+    studio_rack.mode.setCurrentText('Drums')
+    assert studio_rack.drums_group.isVisible()
+    assert studio_rack.wav().startswith(b'RIFF')
+    studio_rack.mode.setCurrentText('Guitar')
+    assert studio_rack.wav('E').startswith(b'RIFF')
+    webbie_operations = window.workspace_widgets['webbie'].webbie_operations
+    assert isinstance(webbie_operations, main.WebbieNativeOperations)
+    assert webbie_operations.tabs.count() == 3
+    assert webbie_operations.cognitive is not None
+    assert webbie_operations.missions is not None
+    assert webbie_operations.workflow is not None
+    assert webbie_operations.can_close()
+    # Legacy control-center launchers route into existing native bays;
+    # no subprocess is ever spawned and Ubuntu Studio entries stay intact.
+    with patch.object(window, 'launch') as legacy_launch:
+        window.open_installed('spider-webbie-intelligence.desktop')
+        assert window.current_workspace == 'webbie'
+        assert window.workspace_widgets['webbie'].workspace_tabs.tabText(
+            window.workspace_widgets['webbie'].workspace_tabs.currentIndex()
+        ) == 'Webbie controls'
+        window.open_installed('spider-os-workspace-max.desktop')
+        assert window.current_workspace == 'default'
+        legacy_launch.assert_not_called()
     research = window.workspace_widgets['webbie'].findChildren(main.WebbieResearchPanel)
     assert len(research) == 1, 'Webbie research mind not present in native bay'
     mission_store = window.workspace_widgets['studio'].mission_desk.store
