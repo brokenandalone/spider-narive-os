@@ -10,6 +10,44 @@ Ubuntu Studio 26.10 Stonking Stingray released today and officially supports upg
 
 The migration branch configuration points to the final 26.10 ISO, release channel, and stonking codename.
 
+## Primary installation policy: in-place, no USB
+
+**Owner requirement (October 15, 2026): No USB creation, no reformat, no clean install.**
+The daily-use Spider OS computer already runs Ubuntu Studio 26.04. Use the
+official Ubuntu Studio 26.04 LTS -> 26.10 in-place release upgrader, the
+same general method used for the previous operating-system upgrade.
+
+A Spider 26.10 ISO and disposable virtual-machine tests in GitHub Actions are
+**optional developer qualifications, not a prerequisite for the owner to burn
+a USB or boot an installer**. The user must never be instructed to write a
+USB as part of the standard upgrade.
+
+Sequence:
+1. Run the read-only readiness/preflight scripts on the installed 26.04 PC.
+2. Save a fresh package inventory, the current Spider OS service and file state,
+   current GRUB/initramfs/crypttab details and any locally newer bay files.
+3. Back up the data you cannot afford to lose to a separately accessible
+   network share, cloud account, or other existing storage. A same-disk
+   backup alone does not protect against disk failure. A bootable USB is not
+   required, but lack of independent recovery media increases the risk of an
+   unrecoverable boot failure. Back up the LUKS header securely and privately.
+4. Fully update 26.04, then review held/broken packages, foreign apt repos,
+   kernel drivers, services, and the release upgrader's proposed removals.
+5. Enable prompting for interim Ubuntu releases (Prompt=normal), then run
+   the official `do-release-upgrade` for Ubuntu Studio 26.10. Never use
+   `do-release-upgrade -d` or rewrite apt release codenames by hand.
+6. After reboot, verify that encrypted unlock, KDE, PipeWire, Webbie, all
+   native workspaces and Ubuntu Studio applications survived. Repair any
+   incompatibilities without indiscriminately replacing locally newer files.
+7. Install/test the native Spider SDDM + Plasma splash package in place,
+   preserving the existing user configuration. Activate Plymouth on the
+   encrypted boot path only after unlock-prompt qualification. This does
+   not require any ISO, USB or clean install.
+
+In-place upgrade *normally preserves* installed applications and files, but
+third-party packages may be disabled or removed by the release upgrader. Never
+promise zero data loss or zero removals; inspect the proposed changes first.
+
 ## Startup artwork sets
 All assets are existing repo-approved artwork, not replacement stock designs.
 
@@ -37,20 +75,31 @@ The live ISO no longer forces plymouth.enable=0, but its inherited upstream init
     bash distro/check-26-10-readiness.sh
     bash distro/preflight-inplace-upgrade.sh
 
-Both inspect and report. Neither invokes the release upgrade. Back up your files, service configuration, encrypted disk header, boot files, Kali Bay volumes, Webbie models, and all live Bay content to tested external recovery storage. Preserve the exact LUKS unlock flow. Reconcile newer local program files against pinned Git sources before any overlay copy.
+Both inspect and report. Neither invokes the release upgrade. Back up your files, service configuration, encrypted disk header, boot files, Kali Bay volumes, Webbie models, and all live Bay content to a separately accessible location such as network storage or cloud storage. No USB creation is required. Preserve the exact LUKS unlock flow. Reconcile newer local program files against pinned Git sources before any overlay copy.
 
 Only after review, switch the release upgrader from Prompt=lts to Prompt=normal via Ubuntu Studio's Software Sources settings. Use the supported normal do-release-upgrade path, not the -d development path or manual apt-codename rewriting.
 
-## Required qualification gates
+## Optional developer ISO qualification (GitHub runner; no owner USB)
 1. Official upstream SHA256/signature verified, Casper layer and installer metadata inspected.
 2. Spider ISO builds and has a bootable BIOS/UEFI layout.
 3. The live image reaches KDE with Spider identity, functional startup graphics, network and audio.
 4. An isolated test virtual disk installs, boots without ISO, starts Spider Core, Webbie and The Web, and reboots again.
 5. Separate LUKS2/encrypted disk test demonstrates visible password prompt and successful unlock.
 6. Native bays, installed Studio, School, Author, Forage, Kali Bay, Media Center, system Recovery and user configuration pass tests.
-7. Known-good rollback media and external backups have been tested.
-8. The installed PC gets a fresh preflight after all other gates pass.
+7. A separately accessible backup and a realistic recovery route have been reviewed; no removable installation media is mandated.
+8. The installed PC gets a fresh preflight before any in-place release upgrade. The actual release-upgrader proposal and removal list must be reviewed.
 
 This PR is source preparation, not a verified production rollout. The 26.10 workflow is not a substitute for real encrypted boot hardware testing. Do not merge or install until the actual gates pass.
 
 Known upstream hazards: a dangling /lib32 symlink can interrupt upgrades; some future GRUB changes impact unusual encrypted-/boot configurations; and Ubuntu Studio warns that installing tlp can remove power-profiles-daemon and critical desktop packages.
+
+
+## Required in-place 26.04 -> 26.10 checks (no USB)
+
+- Confirm the running OS really is Ubuntu Studio 26.04 and the package manager is clean.
+- Confirm LUKS unlock and the installed GRUB boot path still work on two baseline boots.
+- Capture enabled services, apt source list, package inventory, locally modified workspaces, and encrypted-disk mapping.
+- Make a suitable independently accessible backup, and record what recovery is actually possible without USB.
+- Inspect the release upgrader's specific proposed removals before consenting.
+- Verify the boot, audio and bays after the normal release upgrade.
+- Test new SDDM/Plasma images independently from Plymouth/initramfs before enabling a boot splash that affects encrypted unlock.
