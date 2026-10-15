@@ -139,6 +139,80 @@ After a qualified release, compare the package inventory using
 `--compare ~/spider-studio-packages-before.json --strict`.
 Neither inventory requires sudo nor changes any package.
 
+## October 15: native cockpit, playable instruments, Art Lab and no redundant control centers
+
+The owner explicitly rejected the **three separate developer launchers**
+created in a previous round because their purpose overlapped real native bays.
+This upgrade preserves their engines but replaces their reason to exist as
+standalone interfaces.
+
+**One real native Home.** `the-web/shell/home_dashboard.py` now presents
+the purpose, unfinished local mission count and installed program count for
+each true bay. Selecting a card enters the existing native workspace, rather
+than starting a separate application. The old anonymous launcher grid is gone.
+Pinned favorites and installed Ubuntu Studio application menus are retained.
+
+**Webbie, not "Webbie Intelligence Center".** The native Webbie bay gains
+a `Webbie controls` tab with three existing owner-controlled services:
+(1) cognition, local models, speaker-trust, voice test and privacy,
+(2) local JARVIS evidence/search/site preview missions,
+(3) supervised guided workflow. Existing computer-control permissions,
+privacy controls and STOP rules are reused, never reset. No automatic
+camera, listening device, web task or terminal execution is granted.
+
+**Exact compatibility routing for yesterday's redundant shortcuts.**
+The Web now redirects these internal menu requests to real bay surfaces
+instead of launching additional competing windows:
+
+| Existing menu entry | Native destination |
+| --- | --- |
+| `spider-os-universal.desktop` | The Web Home + Home's advanced analysis |
+| `spider-os-workspace-max.desktop` | Home's advanced analysis; each bay has its own verified MAX module |
+| `spider-webbie-intelligence.desktop` | Webbie > Webbie controls |
+
+The user-owned `.desktop` registrations and possible icons in
+`~/Desktop` remain untouched until inspected and explicitly approved
+for retirement. In the regular KDE application menu, the originals are
+still accessible as a fallback. The new audit tool can identify exactly
+which icons exist without deleting any files:
+
+```bash
+python3 -B ~/spider-os-native-wave/tools/audit_legacy_shortcuts.py
+```
+
+**Real Studio sound creation:** `studio/instrument_engine.py` provides
+offline deterministic WAV generation for keyboard tones, Karplus-Strong
+plucked guitar/bass and four-voice 16-step drum patterns, with tempo
+45–220 BPM and up to four bars. `studio/instrument_panel.py` adds a
+playable native note keyboard, sequencer grid, optional local Qt audio
+preview and explicit atomic WAV export. It is embedded in both standalone
+*existing* Spider Studio and The Web's Studio bay. These are prototype
+synthesized instruments, not accurate sampled guitars or a replacement
+for Ardour, Guitarix, Hydrogen, JACK/MIDI or a commercial DAW. Audio
+latency and playback still need real-hardware validation.
+
+**Native Art Lab:** `the-web/shell/art_workbench.py` provides a
+graphite/colored-pencil/marker/paintbrush/eraser canvas, color picker,
+brush size, 12-step undo, local photo-to-ink outline extraction and
+explicit atomic PNG export. An imported photo is protected from export
+overwrite. This is a basic raster workbench, not yet blendable paint
+simulation, native 3D editing or a Krita replacement.
+
+**Data and system invariants:**
+
+- All confirmed **174** owner-visible Ubuntu Studio menu entries remain
+  registered; actual installed package/plugin inventory is separate.
+- Existing Art, Author, Media/Nova, Studio, Kali, Study and Webbie user
+  project files are not changed by GitHub code development.
+- No `apt purge`, service restart, microphone/camera activation, reboot,
+  root command or LUKS/GRUB/system upgrade accompanies this development.
+- The real machine still has **31 unknown protected local modifications**.
+  `release_batch.py check` must continue to block blindly replacing
+  them; merging and rollback validation precede any owner installation.
+- GitHub source/Qt smoke checks do not prove all features are usable on the
+  owner PC. Check audio, GPU, Nova broadcast, Studio MIDI, Webbie identity
+  gates and sound devices before treating as a releasable product.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
