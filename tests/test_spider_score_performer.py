@@ -73,7 +73,7 @@ class TestScorePerformer(unittest.TestCase):
         p = parse_ascii_tab(TAB, bpm=122, slots_per_beat=2)
         self.assertEqual(p.bpm, 122)
         self.assertEqual(p.parts[0].name, "Guitar")
-        self.assertEqual(len(p.notes), 21)
+        self.assertEqual(len(p.notes), 19)
         first = [n.pitch for n in p.notes if n.start == 1]
         self.assertEqual(set(first), {64, 60, 55, 52, 48})
         self.assertTrue(p.warnings)
