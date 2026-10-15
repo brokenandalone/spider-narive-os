@@ -5,6 +5,10 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
+from contextlib import redirect_stdout
+import io
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location(
@@ -53,6 +57,52 @@ class InventoryTests(unittest.TestCase):
             alias.symlink_to(source)
             with self.assertRaises(OSError):
                 module.save_manifest(alias, record)
+
+    def test_strict_release_gate_blocks_missing_menu_entry(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            baseline = root / "before.json"
+            baseline.write_text(json.dumps({
+                "format": "spider-os-xdg-v1",
+                "entries": [
+                    {"id": "ardour.desktop", "name": "Ardour",
+                     "bay": "studio", "source_sha256": None},
+                    {"id": "krita.desktop", "name": "Krita",
+                     "bay": "art-lab", "source_sha256": None},
+                ]
+            }))
+            application = SimpleNamespace(
+                desktop_id="ardour.desktop", name="Ardour",
+                workspace="studio", path=root / "nonexistent.desktop")
+            catalog = SimpleNamespace(discover_apps=lambda **kwargs: [application])
+            with patch.object(module, "catalog_module", return_value=catalog):
+                with redirect_stdout(io.StringIO()) as output:
+                    status = module.main(["--compare", str(baseline), "--strict"])
+            self.assertEqual(status, 2)
+            self.assertIn("PRESERVATION GATE: FAIL", output.getvalue())
+            self.assertIn("krita.desktop", output.getvalue())
+
+    def test_category_change_passes_strict_gate(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            baseline = root / "before.json"
+            baseline.write_text(json.dumps({
+                "format": "spider-os-xdg-v1",
+                "entries": [
+                    {"id": "ardour.desktop", "name": "Ardour",
+                     "bay": "media", "source_sha256": None},
+                ]
+            }))
+            application = SimpleNamespace(
+                desktop_id="ardour.desktop", name="Ardour",
+                workspace="studio", path=root / "nonexistent.desktop")
+            catalog = SimpleNamespace(discover_apps=lambda **kwargs: [application])
+            with patch.object(module, "catalog_module", return_value=catalog):
+                with redirect_stdout(io.StringIO()) as output:
+                    status = module.main(["--compare", str(baseline), "--strict"])
+            self.assertEqual(status, 0)
+            self.assertIn("PRESERVATION GATE: PASS", output.getvalue())
+            self.assertIn("media -> studio", output.getvalue())
 
     def test_rejects_unknown_prior_inventory(self):
         with self.assertRaises(ValueError):
