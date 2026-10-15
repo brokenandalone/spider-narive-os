@@ -77,6 +77,68 @@ Those commands inspect names, menu IDs and file checksums; they never
 execute or remove a program. The live system's 31 customized code files
 remain release-blocked until reconciled with backup and rollback.
 
+## Real machine inventory follow-through, October 15
+
+The owner completed the first inventory on their Ubuntu Studio 26.04 host:
+
+- **174 visible, available XDG application-menu entries**.
+- Initial native bay counts: Art Lab **23**, Author **1**,
+  Communications **4**, Dev Bay **4**, Devices **4**, Forage **1**,
+  Media Center **40**, Productivity **6**, Studio **46**, Study **7**,
+  System **38**.
+- The owner-local baseline file is
+  `~/spider-studio-apps-before.json`. Do not commit or overwrite it.
+- This is NOT a complete package list: command-line programs, plugin
+  libraries, and audio effects may have no XDG menu entry.
+
+The inspected inventory identified **58 real, specific menu IDs** whose
+primary bay was ambiguous or incorrect, now covered by a deterministic
+routing table and regression tests. In particular:
+
+- **Studio**: both Spider Studio entrypoints, Aeolus, AT1, DGEdit, DIN,
+  Fluidsynth, FreeWheeling, JACK Mixer, SooperLooper, JACK session tools,
+  instrument tuners, MIDI/music synths, lighting/video production tools,
+  Recorder and JACK networking.
+- **Media Center / BCN**: Internet DJ Console, FreeShow, OpenLP,
+  Kid3 catalog tag editors and the installed Spider Media Center menu
+  entry, in addition to existing music and video players.
+- **Devices**: ALSA/FFADO hardware mixer and audio interface controls,
+  KDE device utilities, Wacom tablet locator and QR camera tool.
+- **Webbie**: the resident assistant, her face wake/sleep actions,
+  OneDrive connection and Intelligence Center.
+- **Forage / Deep Forage / Kali / Author / School**: their original
+  app entries move out of their mistaken Study, System or Productivity
+  assignments and into the matching native bays.
+- **System**: legacy control center menu entries remain accessible,
+  not deleted or used instead of native System.
+
+These are **only category changes**. The actual binary, config, packages,
+GNOME/KDE menu registrations, owner data and recordings remain intact.
+Both Spider Studio `.desktop` entries are retained because they may
+point to different entrypoints. The menus can be reviewed before
+simplifying any redundant shortcuts.
+
+**Read-only validation on the owner's existing checkout:**
+
+```bash
+git -C ~/spider-os-native-wave pull --ff-only
+
+python3 -B ~/spider-os-native-wave/tools/ubuntu_studio_app_inventory.py \
+  --compare ~/spider-studio-apps-before.json --strict
+
+python3 -B ~/spider-os-native-wave/tools/ubuntu_studio_package_inventory.py \
+  --snapshot ~/spider-studio-packages-before.json
+```
+
+The first command compares today's categorization to the original
+174-entry snapshot. It reports category moves but returns failure if
+an original menu entry disappears. The second checks the installed
+`dpkg` package database and privately snapshots **all installed
+packages**, including plugins and CLI tools with no launcher.
+After a qualified release, compare the package inventory using
+`--compare ~/spider-studio-packages-before.json --strict`.
+Neither inventory requires sudo nor changes any package.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
