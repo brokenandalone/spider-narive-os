@@ -101,13 +101,13 @@ class AutoPerformerPanel(QWidget):
         title.setStyleSheet("font-size:21px;font-weight:bold;color:#d0b0ff")
         layout.addWidget(title)
         note = QLabel(
-            "Import MusicXML sheet music, or paste standard six-string guitar/four-string "
+            "Import MusicXML sheet music or MIDI, or paste six-string guitar/four-string "
             "bass ASCII tab. Spider translates the notes into a timed performance. "
             "Choose a local licensed SoundFont for higher-quality sound.")
         note.setWordWrap(True)
         layout.addWidget(note)
         row = QHBoxLayout()
-        self.load_button = self._button("Import MusicXML / MXL / TXT TAB / .chords", self.import_file)
+        self.load_button = self._button("Import sheet music / MIDI / TAB / chords", self.import_file)
         row.addWidget(self.load_button)
         self.soundfont_button = self._button("Select instrument SoundFont (.sf2/.sf3)", self.choose_soundfont)
         row.addWidget(self.soundfont_button)
@@ -353,7 +353,7 @@ class AutoPerformerPanel(QWidget):
         filename, _ = QFileDialog.getOpenFileName(
             self, "Open MusicXML sheet music or guitar/bass TAB",
             str(Path.home() / "Music"),
-            "Notation and tab (*.mxl *.musicxml *.xml *.txt *.chords)")
+            "Notation and music (*.mxl *.musicxml *.xml *.mid *.midi *.txt *.chords)")
         if not filename:
             return
         try:
