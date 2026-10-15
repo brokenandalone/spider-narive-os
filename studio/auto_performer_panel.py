@@ -486,9 +486,14 @@ class AutoPerformerPanel(QWidget):
         if part.channel == 9:
             return  # GM percussion channel is a drum kit, not a pitched patch.
         if 0 <= index <= 127:
-            self.performance.parts[selected] = replace(part, program=index)
-            if self.editor_panel is not None:
-                self.editor_panel.sync_external(self.performance)
+            if self.editor_panel is not None and self.editor_panel.editor is not None:
+                # Instrument decisions are edits too: the Undo command can
+                # reverse an accidental wrong guitar/piano sound assignment.
+                self.editor_panel.editor.set_program(selected,index)
+                self.performance = self.editor_panel.editor.score
+                self.editor_panel.refresh()
+            else:
+                self.performance.parts[selected] = replace(part, program=index)
             self.status.setText(
                 f"SoundFont program updated: {part.name} · GM patch {index}. "
                 "The next playback/render will use this sound.")
