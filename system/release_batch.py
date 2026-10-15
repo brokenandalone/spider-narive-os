@@ -267,6 +267,7 @@ APP_FILES = (
     'studio/score_edit_session.py',
     'studio/score_timeline_panel.py',
     'studio/score_stem_export.py',
+    'studio/spider_piano_roll.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
