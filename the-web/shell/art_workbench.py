@@ -5,6 +5,8 @@ Produces a new PNG only after explicit export. Heavy 3D/layer tools still
 belong to installed Krita, GIMP and Blender.
 """
 from pathlib import Path
+import os
+import tempfile
 from PyQt5.QtCore import Qt, QPoint, QSize
 from PyQt5.QtGui import (QImage, QPainter, QPen, QColor, QPixmap)
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
@@ -140,6 +142,7 @@ class ArtWorkbench(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("spiderNativeArtWorkbench")
+        self.source_original = None
         root = QVBoxLayout(self)
         title = QLabel("ART LAB / PAINTING & OUTLINE WORKBENCH")
         title.setStyleSheet("font-size:20px;font-weight:bold;color:#e2bcff")
@@ -203,6 +206,7 @@ class ArtWorkbench(QWidget):
             return
         try:
             self.canvas.load_outline(image)
+            self.source_original = Path(path).resolve()
             self.status.setText(
                 "Extracted a new outline from " + Path(path).name +
                 ". The original photo is untouched.")
@@ -235,6 +239,9 @@ class ArtWorkbench(QWidget):
         if destination.is_symlink():
             self.status.setText("Symlink export target rejected.")
             return
+        if self.source_original is not None and destination.resolve() == self.source_original:
+            self.status.setText("Original photo is protected. Choose a different export name.")
+            return
         if destination.exists() and QMessageBox.question(
                 self, "Replace existing PNG?",
                 "This destination already exists. Replace that file?",
@@ -244,8 +251,17 @@ class ArtWorkbench(QWidget):
         if not destination.parent.is_dir():
             self.status.setText("Choose an existing export folder.")
             return
-        # Qt's PNG export is the only write. No automatic project/cloud save.
-        if self.canvas.image.save(str(destination), "PNG"):
+        # Export an atomic temporary PNG; the original photo remains protected.
+        fd, temporary = tempfile.mkstemp(prefix=".spider-art-", suffix=".png",
+                                         dir=destination.parent)
+        os.close(fd)
+        try:
+            if not self.canvas.image.save(temporary, "PNG"):
+                raise OSError("Cannot render PNG")
+            os.replace(temporary, destination)
             self.status.setText("New PNG exported to " + str(destination))
-        else:
-            self.status.setText("Export failed. Canvas remains intact.")
+        except OSError as error:
+            self.status.setText("Export failed; canvas intact: " + str(error))
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
