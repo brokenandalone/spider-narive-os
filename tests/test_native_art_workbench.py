@@ -43,8 +43,7 @@ class ArtWorkbenchTests(unittest.TestCase):
         self.assertIn("self.source_original", source)
         self.assertIn("destination.resolve() == self.source_original", source)
         self.assertIn("os.replace(temporary, destination)", source)
-        self.assertIn("self.canvas.checkpoint()", source.replace(
-            "self.canvas.reset()", "self.canvas.checkpoint()")) if False else None
+        self.assertIn("self.checkpoint()", source)
         for forbidden in ("subprocess", "requests", "urllib", "sudo ",
                           "git push", "os.system(", "shutil.rmtree"):
             self.assertNotIn(forbidden, source)
