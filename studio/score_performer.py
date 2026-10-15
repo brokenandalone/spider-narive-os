@@ -67,10 +67,18 @@ class Performance:
     warnings: list[str] = field(default_factory=list)
     meter: tuple[int, int] = (4, 4)
     origin: Path | None = None
+    tempo_changes: list[tuple[Fraction, int]] = field(default_factory=list)
 
     @property
     def duration_seconds(self):
-        return float(self.beats) * 60 / self.bpm
+        """Exact duration with written tempo changes, in quarter-note beats."""
+        elapsed = 0.0
+        previous = Fraction(0)
+        tempo = self.bpm
+        for beat, next_tempo in self.tempo_changes:
+            elapsed += float(beat - previous) * 60 / tempo
+            previous, tempo = beat, next_tempo
+        return elapsed + float(self.beats - previous) * 60 / tempo
 
     def validated(self):
         if not isinstance(self.title, str) or not self.title.strip() or len(self.title) > 150:
@@ -91,6 +99,15 @@ class Performance:
         if (not isinstance(self.meter, tuple) or len(self.meter) != 2
             or not 1 <= self.meter[0] <= 16 or self.meter[1] not in (1, 2, 4, 8, 16)):
             raise ValueError("Unsupported time signature")
+        if not isinstance(self.tempo_changes, list) or len(self.tempo_changes) > 512:
+            raise ValueError("Too many tempo changes")
+        previous = Fraction(0)
+        for change in self.tempo_changes:
+            if (not isinstance(change, tuple) or len(change) != 2 or
+                not isinstance(change[0], Fraction) or not previous < change[0] < self.beats or
+                type(change[1]) is not int or not 30 <= change[1] <= 280):
+                raise ValueError("Tempo map must have ordered valid mid-score changes")
+            previous = change[0]
         return self
 
 
@@ -208,6 +225,7 @@ def parse_musicxml(source, title="Imported MusicXML"):
     meter = (4, 4)
     warnings = []
     notes = []
+    tempo_changes = []
     part_ends = []
     for part_index, node in enumerate(part_nodes):
         division = 1
@@ -273,10 +291,14 @@ def parse_musicxml(source, title="Imported MusicXML"):
                             raise ValueError("Invalid MusicXML tempo") from None
                         if not 30 <= tempo <= 280:
                             raise ValueError("Tempo outside supported 30-280 BPM")
-                        if part_index == 0 and part_base == 0:
-                            bpm = tempo
-                        elif tempo != bpm and "Mid-score tempo changes are not yet reproduced" not in warnings:
-                            warnings.append("Mid-score tempo changes are not yet reproduced")
+                        if part_index == 0:
+                            beat = part_base + position
+                            if beat == 0:
+                                bpm = tempo
+                            elif tempo_changes and tempo_changes[-1][0] == beat:
+                                tempo_changes[-1] = (beat, tempo)
+                            elif not tempo_changes or tempo_changes[-1][1] != tempo:
+                                tempo_changes.append((beat, tempo))
                 elif kind in ("backup", "forward"):
                     duration = as_integer(val(item, "duration"), kind + " duration")
                     if duration <= 0:
@@ -370,8 +392,11 @@ def parse_musicxml(source, title="Imported MusicXML"):
            for p in part_nodes for m in children(p, "measure")):
         unique_warnings.append("Repeat barlines are not expanded; written measures play once")
     actual_title = val(root, "movement-title") or title
+    # Late/identical score-end tempo directions do not affect the performed
+    # audio and should not break a perfectly valid score.
+    tempo_changes = [(beat, value) for beat, value in tempo_changes if beat < end]
     return Performance(str(actual_title)[:150], bpm, parts, notes, end,
-                       unique_warnings, meter).validated()
+                       unique_warnings, meter, tempo_changes=tempo_changes).validated()
 
 
 def parse_ascii_tab(text, bpm=110, slots_per_beat=2):
