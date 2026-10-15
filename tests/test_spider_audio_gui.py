@@ -146,6 +146,16 @@ class StudioProductionGUITests(unittest.TestCase):
             performer.interpret_tab()
             original=performer.performance.notes[0]
             self.assertIsNotNone(editor.editor)
+            self.assertGreater(len(editor.piano.notes), 0)
+            from PyQt5.QtGui import QImage, QPainter
+            editor.piano.resize(760,220)
+            canvas=QImage(760,220,QImage.Format_ARGB32)
+            canvas.fill(0)
+            painter=QPainter(canvas)
+            editor.piano.render(painter)
+            painter.end()
+            self.assertFalse(canvas.isNull())
+            self.assertEqual(len(editor.piano._hit),len(editor.piano.notes))
             self.assertEqual(editor.editor.score.notes[0].pitch,original.pitch)
             editor.table.selectRow(0)
             editor.pitch.setValue(original.pitch+1)
