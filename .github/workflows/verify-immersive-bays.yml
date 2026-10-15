@@ -8,6 +8,8 @@ on:
       - 'tests/test_immersive_native_bays_v8.py'
       - 'tests/test_workspace_max_native_integrated.py'
       - 'tests/test_max_real_native_apps.py'
+      - 'tests/test_vendored_max_native_engine.py'
+      - 'spider_max_source/**'
       - 'studio/main.py'
       - 'author/main.py'
       - 'study/study.py'
@@ -39,6 +41,7 @@ jobs:
           /usr/bin/python3 -m unittest discover -s tests -p 'test_immersive_native_bays_v8.py' -v
           /usr/bin/python3 -m unittest discover -s tests -p 'test_workspace_max_native_integrated.py' -v
           /usr/bin/python3 -m unittest discover -s tests -p 'test_max_real_native_apps.py' -v
+          /usr/bin/python3 -m unittest discover -s tests -p 'test_vendored_max_native_engine.py' -v
       - name: Install Qt for offscreen smoke test
         run: |
           sudo apt-get update -qq
@@ -71,7 +74,7 @@ jobs:
               tools.resize(750, 500)
               tools.show()
               app.processEvents()
-              assert tools.action.count() >= 0
+              assert tools.action.count() > 0, workspace
               tools.close()
               print("PASS", workspace)
           PY
