@@ -5,6 +5,10 @@ Window.SetBackgroundBottomColor(0.00, 0.00, 0.00);
 logo = Image("spider-os-splash.png");
 screen_width = Window.GetWidth();
 screen_height = Window.GetHeight();
+
+background = Image("spider-os-background.png").Scale(screen_width, screen_height);
+background_sprite = Sprite(background);
+background_sprite.SetZ(-100);
 if (logo.GetWidth() > screen_width || logo.GetHeight() > screen_height) {
     ratio = Math.Min(screen_width / logo.GetWidth(),
                      screen_height / logo.GetHeight());
