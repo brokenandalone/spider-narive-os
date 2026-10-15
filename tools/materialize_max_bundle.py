@@ -48,7 +48,7 @@ def main():
     if sha(encoded.encode("ascii")) != B85_SHA256:
         raise ValueError("Wrong reviewed MAX source-bundle checksum")
     compressed = base64.b85decode(encoded)
-    unpacked = lzma.decompress(compressed, memlimit=40 * 1024 * 1024)
+    unpacked = lzma.decompress(compressed, memlimit=160 * 1024 * 1024)
     if len(unpacked) > 200000 or sha(unpacked) != TAR_SHA256:
         raise ValueError("Reviewed tar source checksum/size mismatch")
     manifest = expected_modules()
