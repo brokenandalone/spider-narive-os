@@ -225,6 +225,13 @@ class CommunicationsPanel(QWidget):
         body.addLayout(buttons)
 
     def open_draft(self):
+        if self.editor.document().isModified():
+            answer = QMessageBox.question(
+                self, "Unsaved draft",
+                "Discard unsaved changes before opening another draft?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                return
         name, _ = QFileDialog.getOpenFileName(
             self, "Open existing draft", str(Path.home() / "Documents"),
             "Text files (*.txt *.md)")
@@ -235,6 +242,7 @@ class CommunicationsPanel(QWidget):
             if path.is_symlink() or path.stat().st_size > 1024 * 1024:
                 raise ValueError("Draft is too large or a symlink")
             self.editor.setPlainText(path.read_text(encoding="utf-8"))
+            self.editor.document().setModified(False)
             self.status.setText("Opened: " + str(path))
         except (OSError, UnicodeError, ValueError) as error:
             QMessageBox.warning(self, "Communications", str(error))
@@ -256,9 +264,31 @@ class CommunicationsPanel(QWidget):
                 if answer != QMessageBox.Yes:
                     return
             path.write_text(self.editor.toPlainText(), encoding="utf-8")
+            self.editor.document().setModified(False)
             self.status.setText("Saved locally: " + str(path))
         except OSError as error:
             QMessageBox.warning(self, "Communications", str(error))
+
+
+    def closeEvent(self, event):
+        if not self.editor.document().isModified():
+            event.accept()
+            return
+        answer = QMessageBox.warning(
+            self, "Unsaved communications draft",
+            "Save your changes before leaving this bay?",
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+            QMessageBox.Save)
+        if answer == QMessageBox.Cancel:
+            event.ignore()
+        elif answer == QMessageBox.Discard:
+            event.accept()
+        else:
+            self.save_draft()
+            if self.editor.document().isModified():
+                event.ignore()
+            else:
+                event.accept()
 
 
 class DevBayPanel(QWidget):
