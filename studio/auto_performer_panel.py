@@ -29,6 +29,7 @@ try:
     from .soundfont_render import quality_backend_available, render_soundfont, validate_soundfont
     from .performance_expression import Expression, GROOVES, express
     from .studio_score_mix import MixChannel, render_score_mix
+    from .soundfont_library import auto_soundfont, discover_soundfonts
 except ImportError:
     from score_performer import parse_musicxml, parse_ascii_tab, load_notation
     from chord_chart_performer import parse_chord_chart
@@ -36,6 +37,7 @@ except ImportError:
     from soundfont_render import quality_backend_available, render_soundfont, validate_soundfont
     from performance_expression import Expression, GROOVES, express
     from studio_score_mix import MixChannel, render_score_mix
+    from soundfont_library import auto_soundfont, discover_soundfonts
 
 TAB_EXAMPLE = """e|--0---2---3---2-|
 B|--1---3---0---3-|
@@ -109,6 +111,7 @@ class AutoPerformerPanel(QWidget):
         row.addWidget(self.load_button)
         self.soundfont_button = self._button("Select instrument SoundFont (.sf2/.sf3)", self.choose_soundfont)
         row.addWidget(self.soundfont_button)
+        row.addWidget(self._button("Find installed instruments", self.detect_soundfonts))
         layout.addLayout(row)
         config = QHBoxLayout()
         config.addWidget(QLabel("TAB tempo"))
@@ -240,6 +243,9 @@ class AutoPerformerPanel(QWidget):
             "music or control Nova. Sound quality depends on your selected SoundFont.")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        # Automatic local discovery is read-only and never enables a MIDI/
+        # audio device. The user can replace this bank at any time.
+        self.detect_soundfonts()
 
     def _button(self, text, action):
         button = QPushButton(text)
@@ -368,6 +374,22 @@ class AutoPerformerPanel(QWidget):
                                          bpm=self.tempo.value()))
         except ValueError as error:
             QMessageBox.warning(self, "Chord chart error", str(error)[:400])
+
+    def detect_soundfonts(self):
+        try:
+            banks = discover_soundfonts()
+        except (OSError, ValueError):
+            banks = []
+        if not banks:
+            self.status.setText(
+                "No installed SoundFont detected in standard local folders. "
+                "Select a licensed .sf2/.sf3 file to enable sample-based performance.")
+            return
+        self.soundfont = str(banks[0])
+        backend = "FluidSynth ready" if quality_backend_available() else "FluidSynth not installed"
+        self.status.setText(
+            f"Found {len(banks)} local instrument bank(s); using {banks[0].name} "
+            f"as the default. {backend}. Actual fidelity and licensing must be checked.")
 
     def choose_soundfont(self):
         filename, _ = QFileDialog.getOpenFileName(
