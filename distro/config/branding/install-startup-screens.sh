@@ -26,6 +26,11 @@ install -m 644 "$source_root/branding/wallpapers/collection/neon-purple-grunge-s
 
 install -Dm644 "$background_dir/$selected.png" \
   "$target_root/usr/share/spider-os/branding/startup-background.png"
+
+# Ship the GRUB artwork under /boot too, for an unencrypted /boot layout.
+# Deliberately do NOT activate it or rewrite GRUB's boot entry at build time.
+install -Dm644 "$background_dir/$selected.png" \
+  "$target_root/boot/grub/themes/spider-os/background.png"
 install -Dm644 "$source_root/branding/splash/spider-os-splash.png" \
   "$target_root/usr/share/spider-os/branding/spider-os-splash.png"
 
