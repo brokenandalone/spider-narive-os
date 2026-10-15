@@ -239,6 +239,13 @@ APP_FILES = (
     # Do not overwrite installed art, models, service configurations or data.
     'the-web/shell/immersive_bays.py',
     'the-web/shell/workspace_max_native.py',
+    # Today's native bay functions. All new Python goes through the same
+    # known-version preflight and atomic rollback, never blind deployment.
+    'the-web/shell/bay_missions.py',
+    'the-web/shell/bay_mission_panel.py',
+    'the-web/shell/native_utility_bays.py',
+    'the-web/shell/webbie_research_panel.py',
+    'webbie/brain/research_agenda.py',
     'spider_max_source/spider_monster/__init__.py',
     'spider_max_source/spider_monster/max_art.py',
     'spider_max_source/spider_monster/max_author.py',
