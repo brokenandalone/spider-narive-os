@@ -125,6 +125,35 @@ rollback directories and backups inside `/home` do not protect against
 loss of the same physical disk. An external installer USB is not
 required, and the user specifically declined creating one.
 
+## Firmware boot and Webbie volume evidence (October 15, 2026)
+
+Actual EFI output provided by the owner:
+- `BootCurrent: 0002` and `Boot0002* SpiderOS` uses
+  `\\EFI\\SpiderOS\\grubx64.efi` from the `SPIDER_EFI` partition,
+  **not** the stale Windows/Fedora/Ubuntu firmware entries. These other
+  entries must not be removed automatically.
+- `/boot/grub/grub.cfg`, `vmlinuz-7.0.0-38-generic` and
+  `initrd.img-7.0.0-38-generic` currently live in the
+  `/boot` directory on the mounted root volume; no separate `/boot`
+  mount was reported.
+- The grep of `/etc/default/grub` showed no explicit
+  `GRUB_ENABLE_CRYPTODISK` or `GRUB_PRELOAD_MODULES`, which does not
+  establish how this existing EFI GRUB executable finds kernels.
+- The owner did not include the `mokutil --sb-state` or
+  `findmnt -T /boot` portions in the reported result. **Secure Boot is
+  not yet confirmed.**
+- `/etc/fstab` also references an ext4 filesystem mounted at
+  `/var/lib/spider-os/webbie-brain` with UUID
+  `bf0d0a18-68ed-4d28-b8b7-d26f6ec967f0`. It was not visible
+  as a mounted filesystem in the prior `df -hT` / `lsblk` outputs.
+  Determine whether the backing volume exists, and whether any data
+  is being written to an unmounted fallback directory. Do not mount,
+  format or overwrite it without a separate data-preserving plan.
+
+The upgraded host-readiness script now checks these items. Do not
+infer that the 26.10 UEFI encrypted boot path is safe from existing
+kernel files alone.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
