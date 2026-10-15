@@ -5,7 +5,7 @@ set -Eeuo pipefail
 
 target_root="$(realpath -m "$1")"
 source_root="$(realpath "$2")"
-set_name="\${3:-spider-purple}"
+set_name="${3:-spider-purple}"
 
 case "$target_root" in
   /|/boot|/etc|/usr) echo "Refusing unsafe target root" >&2; exit 2 ;;
