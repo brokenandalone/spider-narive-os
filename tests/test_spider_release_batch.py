@@ -134,6 +134,19 @@ class BatchReleaseTests(unittest.TestCase):
         self.assertNotIn('rclone.conf', targets)
         self.assertNotIn('kali-vg', targets)
 
+    def test_2604_native_bay_and_max_engine_covered_by_rollback_catalog(self):
+        items = batch.prepare_items(root=ROOT, install=self.base / 'install',
+                                    units=self.base / 'unit',
+                                    home=self.base / 'user', uid=os.geteuid(),
+                                    gid=os.getegid())
+        names = {item.reference for item in items}
+        self.assertIn('the-web/shell/immersive_bays.py', names)
+        self.assertIn('the-web/shell/workspace_max_native.py', names)
+        self.assertIn('spider_max_source/spider_monster/max_catalog.py', names)
+        self.assertIn('spider_max_source/spider_monster/security.py', names)
+        for item in items:
+            self.assertTrue(item.source.is_file(), str(item.source))
+
     def test_one_unknown_component_blocks_every_other_component(self):
         source2 = self.source_root / 'webbie.py'
         target2 = self.target_root / 'webbie.py'
