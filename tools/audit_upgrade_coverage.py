@@ -35,6 +35,9 @@ SOURCE_AREAS = {
         "studio/instrument_panel.py",
         "the-web/shell/art_workbench.py",
     ),
+    "Native Home dashboard in place of extra control centers": (
+        "the-web/shell/home_dashboard.py",
+    ),
     "Native Webbie control center integration": (
         "the-web/shell/webbie_native_operations.py",
         "the-web/shell/legacy_control_centers.py",
