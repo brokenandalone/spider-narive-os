@@ -23,6 +23,16 @@ Also designed icons and backgrounds: Spider Forage, Deep Forage, Nova, Recovery 
 ## Audio Studio phase one, implemented in this development branch
 Native instrument workbench embedded in existing studio/main.py: four original procedural percussion sounds (kick/snare/hat/clap), seven-channel 16-step pattern grid, three drum presets, tempo 40-240 BPM, six-string guitar fretboard, four-string bass fretboard, playable two-octave piano and keyboard shortcuts, per-event pitch, safe JSON pattern save/load, offline 44.1 kHz mono WAV export. The audio engine does not use copied commercial sample packs. Real-time preview is available only when Qt Multimedia works on the host. The rest of the original Studio remains intact.
 
+## Score-driven Auto Performer (new source-stage feature)
+
+The original native Studio now includes an Auto Performer tab: MusicXML, zipped
+MXL sheet music, standard guitar/bass ASCII TAB, and chord charts. Timed
+polyphonic notes, score tempo/meter, chords/ties, MIDI program selection,
+MusicXML drum-kit mappings, standalone MIDI export, and optional FluidSynth
+SoundFont WAV playback/render are implemented in source. **This is not OCR**
+of photographed or scanned sheet music and not a professional multisampled
+instrument library. See docs/SPIDER_AUDIO_AUTO_PERFORMER.md.
+
 ## Audio Studio missing commercial features
 Low-latency PipeWire/JACK architecture, full multitrack timeline, tempo-accurate audio recording, robust MIDI device handling, LV2/VST3 support as licensed, polyphonic DSP and real guitar/bass articulations, sample libraries with provable rights, session recoverability, user-defined scales/presets, multi-output mixing, hardware tests and accessible controls. The current engine is a **prototype** and cannot honestly be marketed yet.
 
