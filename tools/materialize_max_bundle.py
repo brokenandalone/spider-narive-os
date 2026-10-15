@@ -13,7 +13,7 @@ from pathlib import Path
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE = ROOT / "tools/native_max_payload/reviewed_max_v4.b85"
+# Transfer consists of six verified Git blobs in tools/native_max_payload.
 B85_SHA256 = "08376ca3d0ddc9fa96f989a1aa81c1c895625fc496ef7d15a286dfef70e7b54d"
 TAR_SHA256 = "968942c05f2efc52364e379549602121ddad090447f4b6efdbfdb2bbc30d428e"
 MAX_EXTRA_SHA = {
@@ -41,7 +41,12 @@ def expected_modules():
 def main():
     if BUNDLE.is_symlink():
         raise ValueError("Refusing a source-bundle symlink")
-    encoded = BUNDLE.read_text(encoding="ascii").strip()
+    # Chunks are ordinary Git blobs. Concatenation restores one SHA-pinned bundle.
+    parts = [ROOT / "tools/native_max_payload" / ("part%02d.b85" % i)
+             for i in range(1, 7)]
+    if any(part.is_symlink() or not part.is_file() for part in parts):
+        raise ValueError("Required checked-in native MAX source parts are missing")
+    encoded = "".join(part.read_text(encoding="ascii").strip() for part in parts)
     if sha(encoded.encode("ascii")) != B85_SHA256:
         raise ValueError("Wrong reviewed MAX source-bundle checksum")
     compressed = base64.b85decode(encoded)
