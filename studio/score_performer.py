@@ -455,12 +455,19 @@ def load_notation(path, bpm=110, slots_per_beat=2):
         if filename.stat().st_size > MAX_BYTES:
             raise ValueError("MusicXML exceeds the 2 MB limit")
         performance = parse_musicxml(filename.read_bytes(), filename.stem)
-    elif filename.suffix.lower() == ".txt":
+    elif filename.suffix.lower() in (".txt", ".chords"):
         if filename.stat().st_size > 40_000:
-            raise ValueError("TAB exceeds the 40 KB limit")
-        performance = parse_ascii_tab(filename.read_text(encoding="utf-8"),
-                                      bpm=bpm, slots_per_beat=slots_per_beat)
+            raise ValueError("Text notation exceeds 40 KB")
+        text = filename.read_text(encoding="utf-8")
+        if filename.suffix.lower() == ".chords":
+            try:
+                from .chord_chart_performer import parse_chord_chart
+            except ImportError:
+                from chord_chart_performer import parse_chord_chart
+            performance = parse_chord_chart(text, bpm)
+        else:
+            performance = parse_ascii_tab(text, bpm=bpm, slots_per_beat=slots_per_beat)
     else:
-        raise ValueError("Use .mxl/.musicxml/.xml for notation, or .txt for guitar/bass TAB")
+        raise ValueError("Use .mxl/.musicxml/.xml for notation, .txt for TAB, or .chords for chords")
     performance.origin = filename.resolve()
     return performance
