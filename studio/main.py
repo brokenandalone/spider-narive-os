@@ -198,7 +198,20 @@ class SpiderStudio(QMainWindow):
         else:
             from auto_performer_panel import AutoPerformerPanel
         self.auto_performer_panel = AutoPerformerPanel(self)
-        self.tool_tabs.addTab(self.auto_performer_panel, 'Auto Performer · Scores & TAB')
+        auto_scroll = QScrollArea()
+        auto_scroll.setWidgetResizable(True)
+        auto_scroll.setWidget(self.auto_performer_panel)
+        self.tool_tabs.addTab(auto_scroll, 'Auto Performer · Scores & TAB')
+        self.auto_performer_page = auto_scroll
+        if __package__:
+            from .score_timeline_panel import ScoreTimelinePanel
+        else:
+            from score_timeline_panel import ScoreTimelinePanel
+        self.score_timeline_panel = ScoreTimelinePanel(self.auto_performer_panel.apply_edited_score, self)
+        self.tool_tabs.addTab(self.score_timeline_panel, 'Performance Note Editor')
+        self.auto_performer_panel.attach_editor(
+            self.score_timeline_panel,
+            lambda: self.tool_tabs.setCurrentWidget(self.score_timeline_panel))
 
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
