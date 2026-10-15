@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location(
@@ -10,6 +11,25 @@ spec.loader.exec_module(layout)
 
 
 class LayerNormalizationTests(unittest.TestCase):
+    def test_grub_updates_normal_and_loopback_menus(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('grub.cfg', 'loopback.cfg'):
+                (root/name).write_text('linux /casper/vmlinuz layerfs-path=minimal.standard.live.squashfs quiet\n')
+            layout.normalize_grub(root)
+            for name in ('grub.cfg', 'loopback.cfg'):
+                self.assertIn('layerfs-path=standard.live.squashfs quiet', (root/name).read_text())
+
+    def test_unknown_boot_layer_fails_without_partial_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expected = 'layerfs-path=minimal.standard.live.squashfs\n'
+            (root/'grub.cfg').write_text(expected)
+            (root/'loopback.cfg').write_text('layerfs-path=minimal.gpu.live.squashfs\n')
+            with self.assertRaises(ValueError):
+                layout.normalize_grub(root)
+            self.assertEqual((root/'grub.cfg').read_text(), expected)
+
     def catalog(self):
         return {'version': 2, 'kernel': {'default': 'linux-generic'}, 'sources': [
             {'id': 'minimal', 'path': 'minimal.squashfs', 'default': False},
