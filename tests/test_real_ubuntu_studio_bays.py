@@ -114,6 +114,26 @@ class ObservedNativeAppRouting(unittest.TestCase):
         self.assertNotIn("os.system", (
             ROOT / "the-web/shell/app_catalog.py").read_text())
 
+    def test_known_app_purpose_explains_why_in_native_bay(self):
+        examples = (
+            ("aeolus.desktop", "Aeolus", "studio", "organ"),
+            ("idjc.desktop", "Internet DJ Console", "media", "radio"),
+            ("org.hydrogenmusic.Hydrogen.desktop", "Hydrogen",
+             "studio", "drum"),
+            ("org.kde.kid3.desktop", "Kid3", "media", "music metadata"),
+            ("org.ffado.FfadoMixer.desktop", "FFADO Mixer",
+             "devices", "FireWire"),
+            ("webbie-face-sleep-tonight.desktop", "Webbie: Sleep Quietly",
+             "webbie", "quiet mode"),
+        )
+        for ident, name, bay, description in examples:
+            with self.subTest(app=ident):
+                application = catalog.InstalledApp(
+                    ident, Path("/not/accessed/" + ident), name, "",
+                    "", bay)
+                self.assertIn(description.casefold(),
+                              catalog.app_purpose(application).casefold())
+
     def test_apps_with_normal_id_still_route_by_category(self):
         self.assertEqual(
             catalog.workspace_for("my-lighting-tool.desktop", "Unknown",
