@@ -76,6 +76,28 @@ else
   mark REVIEW "Secure Boot" "mokutil not installed; state unverified"
 fi
 ls -l /boot/vmlinuz* /boot/initrd.img* /boot/grub/grub.cfg > "$OUT/boot-kernel-files.txt" 2>&1 || true
+# The actual firmware entry is important on heavily customized installations.
+if command -v efibootmgr >/dev/null 2>&1; then
+  efibootmgr > "$OUT/efi-current-entry.txt" 2>&1 || true
+  if grep -q "BootCurrent:" "$OUT/efi-current-entry.txt"; then
+    mark INFO "EFI boot entry" "Current entry recorded in efi-current-entry.txt"
+  else
+    mark REVIEW "EFI boot entry" "Could not resolve active boot entry without privileges"
+  fi
+else
+  mark REVIEW "EFI boot entry" "efibootmgr unavailable"
+fi
+
+# A separate mounted data volume may hold Webbie state; verify it exists
+# before a release upgrade. Never mount, format or edit it automatically.
+brain_target="/var/lib/spider-os/webbie-brain"
+if awk -v tgt="$brain_target" '$1 !~ /^#/ && $2 == tgt {found=1} END {exit !found}' /etc/fstab; then
+  if findmnt -rn --mountpoint "$brain_target" >/dev/null 2>&1; then
+    mark PASS "Webbie brain storage" "fstab target is mounted"
+  else
+    mark REVIEW "Webbie brain storage" "fstab target NOT mounted; confirm its UUID and data before upgrading"
+  fi
+fi
 if [[ -s /etc/crypttab ]]; then
   mark INFO "LUKS" "Nonempty crypttab; disk unlock must be verified before and after"
 else
