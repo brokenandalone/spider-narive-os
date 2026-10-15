@@ -42,6 +42,7 @@ for file in \
     usr/share/spider-os/startup-sets/spider-purple.png \
     usr/share/spider-os/startup-sets/spider-crimson.png \
     usr/share/spider-os/startup-sets/spider-nightfall.png \
+    boot/grub/themes/spider-os/background.png \
     usr/share/plasma/look-and-feel/org.spider.os/metadata.json \
     usr/share/plasma/look-and-feel/org.spider.os/contents/splash/Splash.qml \
     usr/share/plasma/look-and-feel/org.spider.os/contents/splash/images/background.png \
