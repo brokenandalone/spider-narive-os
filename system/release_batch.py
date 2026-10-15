@@ -249,6 +249,7 @@ APP_FILES = (
     'studio/midi_song_export.py',
     'studio/dj_deck_engine.py',
     'studio/dj_deck_panel.py',
+    'studio/midi_input_panel.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
