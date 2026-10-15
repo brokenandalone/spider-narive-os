@@ -238,7 +238,15 @@ class MasterCanonGuiTests(unittest.TestCase):
 
 class AuthorWindowCanonTests(unittest.TestCase):
     def test_verified_quote_navigates_across_books_and_never_rewrites_text(self):
-        from main import AuthorWindow
+        # Resolve the Author entrypoint explicitly. A different workspace also
+        # has a main.py, so unittest discovery can otherwise import The Web.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'spider_author_main_under_test', ROOT / 'author' / 'main.py'
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        AuthorWindow = module.AuthorWindow
         with tempfile.TemporaryDirectory() as tmp:
             initial = AuthorStore(tmp)
             first = initial.create_book('First')
