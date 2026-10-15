@@ -84,7 +84,7 @@ class AutoPerformerPanel(QWidget):
         note.setWordWrap(True)
         layout.addWidget(note)
         row = QHBoxLayout()
-        self.load_button = self._button("Import MusicXML / TXT TAB", self.import_file)
+        self.load_button = self._button("Import MusicXML / MXL / TXT TAB", self.import_file)
         row.addWidget(self.load_button)
         self.soundfont_button = self._button("Select instrument SoundFont (.sf2/.sf3)", self.choose_soundfont)
         row.addWidget(self.soundfont_button)
@@ -150,7 +150,7 @@ class AutoPerformerPanel(QWidget):
         filename, _ = QFileDialog.getOpenFileName(
             self, "Open MusicXML sheet music or guitar/bass TAB",
             str(Path.home() / "Music"),
-            "Notation and tab (*.musicxml *.xml *.txt)")
+            "Notation and tab (*.mxl *.musicxml *.xml *.txt)")
         if not filename:
             return
         try:
