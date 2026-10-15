@@ -30,7 +30,7 @@ def parse_installed(output):
         name, version, status = fields
         if not PACKAGE.fullmatch(name):
             continue
-        if status.strip().endswith("installed"):
+        if status.strip().split()[-1:] == ["installed"]:
             if not version or len(version) > 256:
                 continue
             result[name] = version
