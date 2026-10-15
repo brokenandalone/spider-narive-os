@@ -40,11 +40,21 @@ class NativeImmersiveBays(unittest.TestCase):
     def test_native_page_is_not_replaced(self):
         self.assertIn("from immersive_bays import ImmersiveBay, SCENES", self.shell)
         self.assertIn("layout.addWidget(ImmersiveBay(name, page))", self.shell)
-        self.assertIn("bay_row.addWidget(self.application_panel(name))", self.shell)
-        self.assertIn("bay_row.addWidget(area, 1)", self.shell)
-        self.assertIn("bay_row.addWidget(surface, 1)", self.shell)
+        self.assertIn("workspace_tabs.addTab(self.application_panel(name), 'Optional installed tools')", self.shell)
+        self.assertIn("workspace_tabs.addTab(mission_desk, 'Projects & missions')", self.shell)
+        self.assertIn("workspace_tabs.addTab(area, 'Native workspace')", self.shell)
+        self.assertIn("workspace_tabs.addTab(surface, 'Native workspace')", self.shell)
         self.assertIn("else: native = create_native(name, SPIDER_ROOT)", self.shell)
         self.assertIn("if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)", self.shell)
+
+    def test_actual_devices_productivity_and_communications_bays(self):
+        self.assertIn("elif name == 'devices': native = DevicesPanel()", self.shell)
+        self.assertIn("elif name == 'productivity': native = ProductivityPanel()", self.shell)
+        self.assertIn("elif name == 'communications': native = CommunicationsPanel()", self.shell)
+        self.assertIn("elif name == 'dev-bay': native = DevBayPanel()", self.shell)
+        self.assertIn("elif name == 'art-lab': native = ArtLabPanel()", self.shell)
+        self.assertIn("workspace_tabs.addTab(research_panel, 'Research mind')", self.shell)
+        self.assertIn("workspace_tabs.addTab(recovery_panel, 'Recovery & backups')", self.shell)
 
     def test_source_preserves_active_services_and_models(self):
         forbidden = (
