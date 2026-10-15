@@ -213,6 +213,71 @@ simulation, native 3D editing or a Krita replacement.
   owner PC. Check audio, GPU, Nova broadcast, Studio MIDI, Webbie identity
   gates and sound devices before treating as a releasable product.
 
+## Owner-host live reconciliation result, October 15
+
+The protected owner-PC audit has now been run **against the complete
+monster development wave**, not the earlier 31-blocker release:
+
+```text
+Inspected: 260 release files | blocked: 33
+custom_code_manual_merge: 33
+No installed source modified; installation remains BLOCKED.
+```
+
+The **two additional blocker paths** relative to the previous 31 are
+`the-web/shell/app_catalog.py` and
+`the-web/shell/workspace_files.py`. This is expected: both were upgraded
+to preserve and categorize all existing Ubuntu Studio programs.
+
+All 33 files are **manual reconciliation required**; they are not
+verified Git historical revisions. Do not rename, skip or bypass these
+checks to force an install. The GitHub candidate source and installed
+programs contain different changes. The current owner machine's
+baseline contains 174 visible menu entries and 4,360 installed Debian
+packages; the menu-preservation audit passed.
+
+**Work in this dependency order:**
+
+1. **Native desktop / live bay registration:** merge `the-web/shell/main.py`
+   with local fixes; review `app_catalog.py`, `workspace_files.py`,
+   `webbie_panel.py` and `webbie_cognitive_center.py`.
+2. **Webbie resident runtime and trust:** preserve working wake/stop,
+   allowed-speaker gating, model routing, owner approvals, voice audio,
+   screenshot/operator actions. Merge the agent, brain, voice and panels.
+3. **Actual creative bays:** Studio, Author, Forage, Deep Forage, Study,
+   including local music catalog, spellings and book canon.
+4. **Broadcast and security services:** preserve native BCN Nova running
+   show clock, current Matilda voice, radio playlist/source and Podman
+   Kali configuration. Never blindly restart or replace service units.
+5. **Ancillary shell/OS and support files:** examine local touchups
+   `quick_settings.py`, camera/face overlay, control sockets,
+   grants, installers and all remaining files. Verify no unreviewed
+   differences remain.
+
+The source-only structural comparator
+`tools/compare-native-2604.py` was upgraded to recognize both the
+approved 26.04 reconciliation branch and this reviewed development
+branch. It accepts `--focus desktop`, `--focus webbie`,
+`--focus creative`, `--focus services` and `--all`.
+It reads files under the installed native program tree but does not
+execute, modify, or upload them. **No sudo required:**
+
+```bash
+git -C ~/spider-os-native-wave pull --ff-only
+python3 -B ~/spider-os-native-wave/tools/compare-native-2604.py \
+  --source ~/spider-os-native-wave \
+  --installed-root /usr/local/lib/spider-os \
+  --focus desktop
+```
+
+The output contains AST class/function **names and counts**, not
+source bodies. For real manual merges, separately use the existing
+`tools/jarvis_reconcile_preview.py --output` feature to produce
+**private local-only diffs** (mode 0700/0600). Do not upload private
+diffs without inspecting them for passwords, credentials or embedded
+local host paths. Even a conflict-free three-way merge does not
+authorize installation without owner-host tests and rollback proof.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
