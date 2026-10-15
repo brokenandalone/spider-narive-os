@@ -42,7 +42,7 @@ class WaveformCanvas(QWidget):
         p.setPen(QPen(QColor("#665083"), 1))
         p.drawLine(0, mid, width, mid)
         if self.peaks:
-            p.setPen(QPen(QColor("#bd91fb"), max(1, width / max(1, len(self.peaks)) * .62)))
+            p.setPen(QPen(QColor("#bd91fb"), max(1, round(width / max(1, len(self.peaks)) * .62))))
             for i, (minimum, maximum) in enumerate(self.peaks):
                 x = int((i + .5) * width / len(self.peaks))
                 p.drawLine(x, int(mid - maximum * height * .43),
