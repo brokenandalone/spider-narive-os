@@ -34,6 +34,8 @@ from webbie_face import (asleep as face_asleep, set_sleep as set_face_sleep,
                          full_screen_display, set_display_mode)
 from media_panel import MediaPanel
 from immersive_bays import ImmersiveBay, SCENES
+from bay_mission_panel import BayMissionPanel
+from app_catalog import VISIBLE_WORKSPACES
 from workspace_max_native import NativeWorkspaceTools, WORKSPACE_TO_MAX
 from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
@@ -156,7 +158,7 @@ class StartMenu(QDialog):
 
     def populate(self):
         query = self.search.text().casefold(); self.results.clear()
-        for workspace, label in WORKSPACES.items():
+        for workspace, label in VISIBLE_WORKSPACES.items():
             if workspace != 'default' and query in label.casefold():
                 item = QListWidgetItem('Workspace  /  ' + label); item.setData(Qt.UserRole, ('workspace', workspace)); self.results.addItem(item)
         for app in self.shell.installed_apps:
@@ -357,7 +359,7 @@ class TheWeb(QMainWindow):
         self.home_max_tools.setVisible(False)
         home_layout.addWidget(self.home_max_tools, 1)
         content = QWidget(); content.setObjectName('root'); scroll.setWidget(content); grid = QGridLayout(content); grid.setAlignment(Qt.AlignTop | Qt.AlignLeft); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(14)
-        for index, (workspace, label) in enumerate((k, v) for k, v in WORKSPACES.items() if k != 'default'):
+        for index, (workspace, label) in enumerate((k, v) for k, v in VISIBLE_WORKSPACES.items() if k != 'default'):
             shortcut = button(label, lambda checked=False, name=workspace: self.open_workspace(name)); shortcut.setFixedWidth(175)
             grid.addWidget(shortcut, index // 4, index % 4)
         home.setProperty('workspace', 'default'); self.tabs.addTab(home, 'The Web'); self.workspace_widgets['default'] = home
@@ -366,7 +368,7 @@ class TheWeb(QMainWindow):
         self.tabs.tabBar().tabMoved.connect(self.tab_moved)
         wallpaper_row = QHBoxLayout(); outer.addLayout(wallpaper_row)
         self.background_picker = QComboBox()
-        for name, label in WORKSPACES.items(): self.background_picker.addItem(label, name)
+        for name, label in VISIBLE_WORKSPACES.items(): self.background_picker.addItem(label, name)
         self.background_picker.setMinimumHeight(40)
         self.background_picker.currentIndexChanged.connect(lambda index: self.open_workspace(self.background_picker.itemData(index)))
         wallpaper_row.addWidget(self.background_picker)
@@ -502,7 +504,8 @@ class TheWeb(QMainWindow):
 
     def application_panel(self, workspace):
         panel = QWidget(); panel.setObjectName('panel'); layout = QVBoxLayout(panel)
-        layout.addWidget(QLabel('Installed apps  /  ' + WORKSPACES[workspace]))
+        help_label = QLabel('Optional installed programs for ' + WORKSPACES[workspace] + '.\nYour native bay works without adding a desktop launcher. Select a program only when its specialized tools are needed.')
+        help_label.setWordWrap(True); layout.addWidget(help_label)
         apps = QListWidget(); apps.setMinimumWidth(230); apps.setMaximumWidth(340); apps.setIconSize(QSize(28, 28)); layout.addWidget(apps)
         apps.itemActivated.connect(lambda item: self.open_installed(item.data(Qt.UserRole)))
         self.app_lists[workspace] = apps; self.populate_app_list(workspace)
@@ -584,7 +587,7 @@ class TheWeb(QMainWindow):
         return True
 
     def workspaces_for_navigation(self):
-        return WORKSPACES
+        return VISIBLE_WORKSPACES
 
     def render_pinned_workspaces(self):
         """Keep quick access predictable without changing existing tabs."""
@@ -718,11 +721,10 @@ class TheWeb(QMainWindow):
             if name in SCENES:
                 layout.addWidget(ImmersiveBay(name, page))
             bay_row = QHBoxLayout(); layout.addLayout(bay_row, 1)
-            bay_row.addWidget(self.application_panel(name))
-            workspace_tabs = QTabWidget(page) if name in WORKSPACE_TO_MAX else None
-            if workspace_tabs is not None:
-                workspace_tabs.setObjectName('nativeBayToolsTabs')
-                bay_row.addWidget(workspace_tabs, 1)
+            workspace_tabs = QTabWidget(page)
+            workspace_tabs.setObjectName('nativeBayToolsTabs')
+            workspace_tabs.setDocumentMode(True)
+            bay_row.addWidget(workspace_tabs, 1)
             try:
                 if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
                 elif name == 'media': native = MediaPanel(self.launch_media)
@@ -736,7 +738,7 @@ class TheWeb(QMainWindow):
                 native.setParent(page); native.setWindowFlags(Qt.Widget)
                 area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native)
                 if workspace_tabs is not None:
-                    workspace_tabs.addTab(area, 'Original workspace')
+                    workspace_tabs.addTab(area, 'Native workspace')
                 else:
                     bay_row.addWidget(area, 1)
                 native.show()
@@ -746,12 +748,15 @@ class TheWeb(QMainWindow):
                 else:
                     surface = QWidget(); surface.setObjectName('root'); body = QVBoxLayout(surface)
                     heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
-                    body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1)
+                    body.addWidget(QLabel('This bay has its own projects and operations below.\nExternal applications are optional tools, not the bay itself.')); body.addStretch(1)
                 if workspace_tabs is not None:
-                    workspace_tabs.addTab(surface, 'Original workspace')
+                    workspace_tabs.addTab(surface, 'Native workspace')
                 else:
                     bay_row.addWidget(surface, 1)
-            if workspace_tabs is not None:
+            mission_desk = BayMissionPanel(name, workspace_tabs)
+            page.mission_desk = mission_desk
+            workspace_tabs.addTab(mission_desk, 'Projects & missions')
+            if name in WORKSPACE_TO_MAX:
                 advanced = NativeWorkspaceTools(name, workspace_tabs)
                 page.advanced_tools = advanced
                 workspace_tabs.addTab(advanced, 'Advanced tools & tasks')
@@ -764,6 +769,10 @@ class TheWeb(QMainWindow):
                     extra = NativeWorkspaceTools('backups', workspace_tabs)
                     page.extra_max_tools.append(extra)
                     workspace_tabs.addTab(extra, 'Backup & integrity tools')
+            if name == 'system':
+                recovery_panel = SystemPanel(SPIDER_ROOT, recovery=True)
+                workspace_tabs.addTab(recovery_panel, 'Recovery & backups')
+            workspace_tabs.addTab(self.application_panel(name), 'Optional installed tools')
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
         if name != 'default':
