@@ -228,6 +228,36 @@ Upgrade decision: **HOLD**, pending inspection of sda1, independent
 backup, compatibility checks of actual 26.10 release-upgrader removals,
 and an official upgrade offer. No installer USB requested or required.
 
+## Active sda1 GRUB configuration independently confirmed
+
+Owner's read-only `debugfs` results from October 15 conclusively show:
+
+- `/dev/sda1:/grub/grub.cfg` is present: **7,946 bytes**, last modified
+  October 2, 2026. This corresponds to the filesystem UUID searched by
+  the active `EFI/SpiderOS/grub.cfg` stub.
+- The small partition also contains `/grub/x86_64-efi/`,
+  `/grub/i386-pc/`, `grubenv`, fonts and a wallpaper cache.
+- The unmounted `sda1` GRUB config defines
+  `Spider OS GNU/Linux` plus Linux `7.0.0-38-generic` and its
+  recovery mode. Its menu entries search for `sda1` by UUID.
+- **NOT YET VERIFIED:** Which `linux` and `initrd` file paths are
+  referenced and whether those boot files also exist on `sda1`.
+  The grep used `linux ` and `initrd `, which can miss commands
+  using tabs. Get the actual menu entry lines with
+  `debugfs -R 'cat /grub/grub.cfg' /dev/sda1` piped into
+  `grep -nE '^[[:space:]]*(linux|initrd|linuxefi|initrdefi)[[:space:]]'`,
+  then list the corresponding `sda1` files using read-only debugfs.
+- An ordinary `update-grub` that writes the encrypted root's
+  `/boot/grub/grub.cfg` may not update the **active sda1**
+  `/grub/grub.cfg`. The risk is a mismatched kernel, initramfs
+  and GRUB menu after a release upgrade.
+
+Release gate remains HOLD until the kernel/initrd file paths, the
+sda1 synchronization/rollback method, independent backup and normal
+26.10 release-upgrade offer have all been reviewed. Do not run
+`update-grub`, `grub-install`, reformat or change /dev/sda1
+just to prepare these checks. Existing installer media is not needed.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
