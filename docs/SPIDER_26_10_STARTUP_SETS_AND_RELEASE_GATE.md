@@ -258,6 +258,33 @@ sda1 synchronization/rollback method, independent backup and normal
 `update-grub`, `grub-install`, reformat or change /dev/sda1
 just to prepare these checks. Existing installer media is not needed.
 
+## Boot path follow-up: /dev/sda1 has no /boot directory
+
+The user's next read-only `debugfs` check confirmed that
+`/dev/sda1` **does not contain a `/boot` directory**, while
+the *main encrypted root's* `/boot/grub/grub.cfg` contains
+`linux /boot/vmlinuz-7.0.0-38-generic` and
+`initrd /boot/initrd.img-7.0.0-38-generic`.
+This **does not prove** that the sda1 configuration directly loads
+the same files or that they are unreachable. GRUB can load modules,
+decrypt a LUKS container, select a different root and then invoke the
+kernel from that filesystem. GNU GRUB documents `cryptomount` for
+this purpose: https://www.gnu.org/software/grub/manual/grub/html_node/cryptomount.html
+
+The owner's last terminal excerpt did **not include** the
+`ACTIVE SDA1 KERNEL COMMANDS` output. Before any install,
+read the *effective* sda1 boot commands and their surrounding
+`set root` / `search` / `cryptomount` / `configfile` lines.
+For example:
+
+    sudo debugfs -R 'cat /grub/grub.cfg' /dev/sda1 2>/dev/null | grep -nE 'menuentry|linux|initrd|cryptomount|cryptodisk|insmod lvm|configfile|search|set root|set prefix|vmlinuz' | head -95
+    sudo debugfs -R 'ls -l /' /dev/sda1 2>&1 | head -45
+
+Read-only; never `debugfs -w`. Without the active command
+sequence, do not presume a boot partition synchronization
+strategy or attempt an upgrade. Independent backup and normal
+release availability remain required.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
