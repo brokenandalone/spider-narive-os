@@ -32,6 +32,7 @@ if __package__:
     from .release_panel import ReleasePanel
     from .production_board_panel import ProductionBoardPanel
     from .audio_quality_panel import AudioQualityPanel
+    from .instrument_workbench import InstrumentWorkbench
 else:
     from tools import TOOLS, resolve_tool
     from ai_panel import StudioAIPanel
@@ -39,6 +40,7 @@ else:
     from release_panel import ReleasePanel
     from production_board_panel import ProductionBoardPanel
     from audio_quality_panel import AudioQualityPanel
+    from instrument_workbench import InstrumentWorkbench
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 
@@ -148,6 +150,13 @@ class SpiderStudio(QMainWindow):
         ai_scroll.setWidgetResizable(True)
         ai_scroll.setWidget(self.ai_panel)
         self.tool_tabs.addTab(ai_scroll, 'Studio AI')
+        # Native Spider instrument machine: no external launcher, no replacement DAW.
+        self.instrument_workbench = InstrumentWorkbench(self)
+        instrument_scroll = QScrollArea()
+        instrument_scroll.setWidgetResizable(True)
+        instrument_scroll.setWidget(self.instrument_workbench)
+        self.tool_tabs.addTab(instrument_scroll, 'Play Instruments')
+
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
         # Preserve the owner-reviewed Studio layout while activating the
