@@ -7,6 +7,7 @@ directions are not supported; unsupported material is reported honestly.
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 import tempfile
 import wave
 
@@ -115,6 +116,35 @@ class AutoPerformerPanel(QWidget):
                            "transposition and a fixed tempo; complex notation may need review.")
         self.info.setWordWrap(True)
         layout.addWidget(self.info)
+        # Override GM patches in the SoundFont without changing the score.
+        # This is especially useful for electric guitar vs. steel acoustic
+        # guitar. General MIDI programs are 0-127.
+        patch_row = QHBoxLayout()
+        patch_row.addWidget(QLabel("PLAY PART"))
+        self.part_select = QComboBox()
+        self.part_select.setAccessibleName("Imported score part to adjust")
+        self.part_select.currentIndexChanged.connect(self._part_selected)
+        patch_row.addWidget(self.part_select, 1)
+        patch_row.addWidget(QLabel("AS INSTRUMENT"))
+        self.patch_select = QComboBox()
+        self.patch_select.setAccessibleName("Instrument sound program")
+        labels = {
+            0: "Grand Piano", 1: "Bright Piano", 4: "Electric Piano",
+            16: "Drawbar Organ", 24: "Nylon Acoustic Guitar",
+            25: "Steel Acoustic Guitar", 26: "Jazz Electric Guitar",
+            27: "Clean Electric Guitar", 28: "Muted Electric Guitar",
+            29: "Overdrive Guitar", 30: "Distortion Guitar",
+            31: "Guitar Harmonics", 32: "Acoustic Bass",
+            33: "Finger Electric Bass", 34: "Pick Electric Bass",
+            35: "Fretless Bass", 38: "Synth Bass I", 39: "Synth Bass II",
+            40: "Violin", 42: "Cello", 48: "Strings",
+            52: "Choir", 80: "Square Lead",
+        }
+        for patch in range(128):
+            self.patch_select.addItem(f"{patch:03} · {labels.get(patch, 'GM Program')}", patch)
+        self.patch_select.currentIndexChanged.connect(self._patch_selected)
+        patch_row.addWidget(self.patch_select, 2)
+        layout.addLayout(patch_row)
         actions = QHBoxLayout()
         self.play_button = self._button("▶ Play score automatically", self.play)
         self.stop_button = self._button("■ Stop", self.stop)
@@ -137,6 +167,14 @@ class AutoPerformerPanel(QWidget):
     def _load(self, performance):
         self.stop()
         self.performance = performance
+        self.part_select.blockSignals(True)
+        try:
+            self.part_select.clear()
+            for part in performance.parts:
+                self.part_select.addItem(part.name)
+        finally:
+            self.part_select.blockSignals(False)
+        self._part_selected(0)
         parts = ", ".join(p.name for p in performance.parts)
         warning = " | ".join(performance.warnings)
         self.info.setText(
@@ -145,6 +183,33 @@ class AutoPerformerPanel(QWidget):
             f"{performance.bpm} BPM · {performance.duration_seconds:.1f} sec"
             + (f"\nLIMITATIONS: {warning}" if warning else ""))
         self.status.setText("Performance ready. Select a SoundFont to play it, or export MIDI.")
+
+    def _part_selected(self, index):
+        if self.performance is None or not 0 <= index < len(self.performance.parts):
+            self.patch_select.setEnabled(False)
+            return
+        part = self.performance.parts[index]
+        self.patch_select.blockSignals(True)
+        try:
+            self.patch_select.setCurrentIndex(part.program)
+            self.patch_select.setEnabled(part.channel != 9)
+        finally:
+            self.patch_select.blockSignals(False)
+
+    def _patch_selected(self, index):
+        if self.performance is None:
+            return
+        selected = self.part_select.currentIndex()
+        if not 0 <= selected < len(self.performance.parts):
+            return
+        part = self.performance.parts[selected]
+        if part.channel == 9:
+            return  # GM percussion channel is a drum kit, not a pitched patch.
+        if 0 <= index <= 127:
+            self.performance.parts[selected] = replace(part, program=index)
+            self.status.setText(
+                f"SoundFont program updated: {part.name} · GM patch {index}. "
+                "The next playback/render will use this sound.")
 
     def import_file(self):
         filename, _ = QFileDialog.getOpenFileName(
