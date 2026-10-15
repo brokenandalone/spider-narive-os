@@ -90,6 +90,41 @@ The Plymouth background is copied but not made the default during this
 in-place operation because the real LUKS passphrase prompt must be tested
 before changing the initramfs boot experience.
 
+## 26.10 boot security caution from actual host (Oct 15)
+
+**Observed in user terminal:** UEFI mode, 512 MB `SPIDER_EFI` on
+`/dev/sda2` mounted at `/boot/efi`; `/dev/sda5` LUKS containing
+`spider-disk` LVM and the main root; `/boot` is not a separate mount.
+There is an unmounted `/dev/sda1` ext4 partition (449 MB) whose
+purpose has not been verified. Do not format or repurpose it.
+`Prompt=normal` and plasma-distro-release-notifier are already present;
+the system still reports no new upgrade offer. Available root space was
+roughly 211 GB. The expected external backup mount is missing and a
+USB device named PRAM was reported as 0 bytes; no verified external
+backup is known.
+
+Under **Secure Boot**, Ubuntu 26.10 restricts signed GRUB support
+for `/boot` on LUKS or LVM. `/boot` located under an encrypted
+root is an indicator to investigate, but is *not proof* that the
+running EFI loader reads kernels through encrypted GRUB.
+Check `mokutil --sb-state`, the active EFI/GRUB loader configuration,
+the contents of `/boot` and the filesystem where the actual kernels
+are loaded from **before allowing the upgrade**.
+Never disable Secure Boot, move `/boot`, change partitions or
+rebuild GRUB automatically in the migration stage.
+The read-only host report now blocks the conservative case of
+reported Secure Boot enabled plus an encrypted-root `/boot` directory
+pending manual verification.
+
+Official Ubuntu guidance:
+https://ubuntu.com/blog/ubuntu-26-10-security
+https://documentation.ubuntu.com/release-notes/26.10/
+
+**Independent backup still required.** The earlier application-source
+rollback directories and backups inside `/home` do not protect against
+loss of the same physical disk. An external installer USB is not
+required, and the user specifically declined creating one.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
