@@ -51,7 +51,7 @@ class InstrumentEngineTests(unittest.TestCase):
             with wave.open(str(target), "rb") as reader:
                 self.assertEqual(reader.getnchannels(), 1)
                 self.assertEqual(reader.getframerate(), 8000)
-                self.assertEqual(reader.getnframes(), 8000 * 60 * 4 // p.bpm)
+                self.assertEqual(reader.getnframes(), round(8000 * 60 * 4 / p.bpm))
                 self.assertTrue(any(reader.readframes(1000)))
 
 if __name__ == "__main__":
