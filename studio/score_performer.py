@@ -385,7 +385,7 @@ def load_compressed_musicxml(path):
             if "META-INF/container.xml" not in bundle.namelist():
                 raise ValueError("MXL score manifest is missing")
             container_data = bundle.read("META-INF/container.xml")
-            if re.search(br"<!\\s*(?:DOCTYPE|ENTITY)\\b", container_data, re.IGNORECASE):
+            if re.search(br"<!\s*(?:DOCTYPE|ENTITY)\b", container_data, re.IGNORECASE):
                 raise ValueError("MXL XML entities are not accepted")
             manifest = ET.fromstring(container_data)
             if local(manifest.tag) != "container":
