@@ -34,13 +34,14 @@ WORKSPACE_TO_MAX = {
 }
 V4_SHA256 = "ac9af96ea33201817a43190d4cc622621f386002bae79b493ac068625e1cf391"
 V4_NAMES = (
-    "max_catalog.py", "max_core.py", "max_board.py", "security.py",
+    "__init__.py", "max_catalog.py", "max_core.py", "max_board.py", "security.py",
     "max_author.py", "max_study.py", "max_studio.py", "max_media.py",
     "max_art.py", "max_forage.py", "max_dev.py", "max_kali.py",
     "max_webbie.py", "max_theweb.py", "max_nova.py", "max_comms.py",
     "max_recovery.py", "max_system.py", "max_backups.py",
 )
 V4_BLOB_SHA256 = {
+    "__init__.py": "dc7d5bdcbaeb7c3eaa9fd7bf0c52a02b69ec67fab0b29172a71bb6528ddfd743",
     "max_catalog.py": "5fcdc5f8fdf98c0993f91a316f083dcace0a37805960e770a9b4311c6d048c6b",
     "max_core.py": "305a96d45f1b1c5722658d45f0c9b59f1b16ea07387faae918fdd1ab1858736b",
     "max_board.py": "062595156dcdd0e7ecebe3da3761b23a7d7c355828b9be4768ea9628a951a2fa",
