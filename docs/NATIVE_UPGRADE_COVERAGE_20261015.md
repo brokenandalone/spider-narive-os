@@ -28,6 +28,12 @@ The `tools/audit_upgrade_coverage.py` gate checks actual source files and both t
 
 **Separate bays are native application interfaces.** The immersive scenes are part of these workspaces. They are not a replacement launcher. `main.py` retains `create_native(...)`, the actual media/Webbie panels, and MAX operations in their own QTabWidget sections. Four native apps (Studio, Author, Study, Kali) also contain their own integrated tool panels.
 
+## Destination workspace audit
+
+The existing shell registry contains fifteen top-level entries, but they are not the final planned fifteen. **Productivity** and **Devices** are not yet in the native registry; **Recovery** and **Games** still appear top-level. Preserve the existing tabs and their state until the new bays work. Recovery must eventually sit inside System.
+
+This shortfall is deliberately reported by `tools/audit_upgrade_coverage.py` as a **destination-workspace gap**, without mislabeling source-level CI failures as lost legacy functionality. See issue #114 for the completion gate.
+
 ## Explicit blockers before declaring the repositories identical to the PC
 
 1. **Installed machine comparison missing.** The owner reports Ubuntu 26.04, but GitHub cannot inspect the current live filesystem, installed/local-only changes, or the LUKS/boot configuration. Run the separate read-only audit from `docs/INSTALLED_26_04_RECONCILIATION.md` on the PC. Never replace local changes automatically.
