@@ -12,7 +12,7 @@ from studio.studio_score_mix import MixChannel, render_score_mix
 
 def make_bank(path):
     # RIFF SoundFont header is enough for a safety fixture. No bundled sample.
-    path.write_bytes(b"RIFF" + b"\x38\x00\x00\x00" + b"sfbk" + b"\0" * 48)
+    path.write_bytes(b"RIFF" + b"\x38\x00\x00\x00" + b"sfbk" + b"\0" * 52)
     return path
 
 def make_score():
