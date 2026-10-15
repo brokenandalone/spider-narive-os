@@ -24,6 +24,15 @@ SOURCE_AREAS = {
         "the-web/shell/app_catalog.py",
         "spider_max_source/spider_monster/max_catalog.py",
     ),
+    "Native bay mission desks and shared project workflow": (
+        "the-web/shell/bay_missions.py",
+        "the-web/shell/bay_mission_panel.py",
+        "the-web/shell/native_utility_bays.py",
+    ),
+    "Webbie private evidence and research agenda": (
+        "webbie/brain/research_agenda.py",
+        "the-web/shell/webbie_research_panel.py",
+    ),
     "Webbie resident AI and voice": (
         "webbie/agent/webbie.py", "webbie/voice/whisper_listener.py",
         "webbie/actions/gateway.py", "webbie/brain/brain.py",
