@@ -81,6 +81,15 @@ REQUIRED_DESKTOPS = ("webbie", "study", "forage", "deep-forage",
                      "kali-bay", "spider-guardian", "spider-vault",
                      "studio", "author")
 
+# The approved 26.04 destination layout has 15 top-level workspaces.
+# Recovery is a function inside System. These are planned states, not
+# a license to delete existing Recovery/Games data or tabs prematurely.
+TARGET_WORKSPACES = {
+    "default", "study", "author", "studio", "media", "webbie",
+    "forage", "deep-forage", "dev-bay", "art-lab",
+    "communications", "productivity", "devices", "kali-bay", "system",
+}
+
 
 def audit(root: Path = ROOT) -> dict:
     root = root.resolve()
@@ -126,6 +135,18 @@ def audit(root: Path = ROOT) -> dict:
         'UBUNTU_RELEASE="26.04"', 'UBUNTU_CODENAME="resolute"',
         'UBUNTU_IMAGE_VERSION="26.04.1"'
     ))
+    # Check the actual The Web registry, not only mockups or docs.
+    catalog_file = root / "the-web/shell/app_catalog.py"
+    declared = set()
+    if catalog_file.is_file():
+        for node in ast.parse(catalog_file.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "WORKSPACES" for t in node.targets
+            ):
+                declared = set(ast.literal_eval(node.value))
+                break
+    outstanding_workspaces = sorted(TARGET_WORKSPACES - declared)
+    legacy_top_level = sorted(({"recovery", "games"} & declared))
     media_install = root / "distro/install-spm.sh"
     media_source = media_install.read_text() if media_install.is_file() else ""
     # 'external required' is expected, not a passing install claim.
@@ -143,11 +164,17 @@ def audit(root: Path = ROOT) -> dict:
             "separate validated package required"
             if external_media else "media installer contract missing"
         ),
+        "target_workspace_count": len(TARGET_WORKSPACES),
+        "unimplemented_destination_workspaces": outstanding_workspaces,
+        "legacy_top_level_workspaces_to_review": legacy_top_level,
         "actual_pc_synchronization": "unverified; local read-only audit required",
         "full_26_04_iso_build_and_vm_install": "not established by this check",
         "passes_source_coverage": bool(lts_pinned and not missing
                                      and not iso_gaps and not scene_gaps
                                      and external_media),
+        # This flag deliberately stays false until the host/install/media gates
+        # are separately verified. Green source CI cannot greenlight deployment.
+        "ready_for_host_installation": False,
     }
 
 
@@ -167,6 +194,8 @@ def main(argv=None) -> int:
             if report[key]:
                 print(f"FAIL {key}: {report[key]}")
         print("Media Center runtime:", report["media_electron_binary"])
+        print("Missing destination bays:", report["unimplemented_destination_workspaces"])
+        print("Legacy top-level bays:", report["legacy_top_level_workspaces_to_review"])
         print("Installed machine:", report["actual_pc_synchronization"])
         print("Result:", "SOURCE COVERAGE PASS" if report["passes_source_coverage"]
               else "SOURCE COVERAGE FAIL")
