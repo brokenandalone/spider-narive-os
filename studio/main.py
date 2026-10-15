@@ -165,6 +165,15 @@ class SpiderStudio(QMainWindow):
         instrument_scroll.setWidgetResizable(True)
         instrument_scroll.setWidget(self.instrument_workbench)
         self.tool_tabs.addTab(instrument_scroll, 'Play Instruments')
+        if __package__:
+            from .song_production_panel import SongProductionPanel
+        else:
+            from song_production_panel import SongProductionPanel
+        self.song_production_panel = SongProductionPanel(self.instrument_workbench, self)
+        song_scroll = QScrollArea()
+        song_scroll.setWidgetResizable(True)
+        song_scroll.setWidget(self.song_production_panel)
+        self.tool_tabs.addTab(song_scroll, 'Song Arranger & Mixer')
 
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
