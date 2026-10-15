@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDialo
     QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'the-web' / 'shell'))
+from workspace_max_native import NativeWorkspaceTools
 if __package__:
     from .store import AuthorStore
     from .web_features import AuthorToolkit
@@ -61,6 +63,8 @@ class AuthorWindow(QMainWindow):
         self.toolkit.reviewRequested.connect(self.author_review_requested)
         self.toolkit.editRequested.connect(self.apply_revised_passage)
         tabs.addTab(self.toolkit, 'Writing Studio')
+        self.native_max_tools = NativeWorkspaceTools('author', self)
+        tabs.addTab(self.native_max_tools, 'Atlas, canon & analysis')
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
         self.books.currentItemChanged.connect(self.select_book)
