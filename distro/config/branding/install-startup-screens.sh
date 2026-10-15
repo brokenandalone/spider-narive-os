@@ -29,6 +29,11 @@ install -Dm644 "$background_dir/$selected.png" \
 install -Dm644 "$source_root/branding/splash/spider-os-splash.png" \
   "$target_root/usr/share/spider-os/branding/spider-os-splash.png"
 
+# Stage selected backdrop for the pre-login Plymouth screen as well.
+# Do not select Plymouth or regenerate encrypted-host initramfs here.
+install -Dm644 "$background_dir/$selected.png" \
+  "$target_root/usr/share/plymouth/themes/spider-os/spider-os-background.png"
+
 # Keep the Breeze greeter and Plasma global theme, change the image only.
 install -d "$target_root/usr/share/sddm/themes/breeze"
 cat > "$target_root/usr/share/sddm/themes/breeze/theme.conf.user" <<'SDDM'
