@@ -30,6 +30,7 @@ try:
     from .performance_expression import Expression, GROOVES, express
     from .studio_score_mix import MixChannel, render_score_mix
     from .soundfont_library import auto_soundfont, discover_soundfonts
+    from .score_edit_session import save_project, load_project
 except ImportError:
     from score_performer import parse_musicxml, parse_ascii_tab, load_notation
     from chord_chart_performer import parse_chord_chart
@@ -38,6 +39,7 @@ except ImportError:
     from performance_expression import Expression, GROOVES, express
     from studio_score_mix import MixChannel, render_score_mix
     from soundfont_library import auto_soundfont, discover_soundfonts
+    from score_edit_session import save_project, load_project
 
 TAB_EXAMPLE = """e|--0---2---3---2-|
 B|--1---3---0---3-|
@@ -81,6 +83,8 @@ class AutoPerformerPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.performance = None
+        self.editor_panel = None
+        self.editor_switch = None
         self.soundfont = None
         self.part_banks = {}
         self.mix_channels = []
@@ -251,6 +255,11 @@ class AutoPerformerPanel(QWidget):
                        self.expressive_midi_button, self.wav_button):
             actions.addWidget(button)
         layout.addLayout(actions)
+        project_row = QHBoxLayout()
+        project_row.addWidget(self._button("✎ Edit Notes / Quantize", self.open_editor))
+        project_row.addWidget(self._button("Save Spider Score Session", self.save_score_session))
+        project_row.addWidget(self._button("Open Spider Score Session", self.open_score_session))
+        layout.addLayout(project_row)
         self.status = QLabel(
             "Auto Performer is offline and does not monitor your mic, import private "
             "music or control Nova. Sound quality depends on your selected SoundFont.")
@@ -259,6 +268,97 @@ class AutoPerformerPanel(QWidget):
         # Automatic local discovery is read-only and never enables a MIDI/
         # audio device. The user can replace this bank at any time.
         self.detect_soundfonts()
+
+    def attach_editor(self, editor_panel, switch_callback):
+        self.editor_panel = editor_panel
+        self.editor_switch = switch_callback
+        if self.performance is not None:
+            editor_panel.set_score(self.performance)
+
+    def open_editor(self):
+        if self.performance is None:
+            self.status.setText("Import notation or MIDI before editing notes.")
+            return
+        if self.editor_switch is not None:
+            self.editor_switch()
+
+    def apply_edited_score(self, performance):
+        """Make all renders and MIDI exports use the actual edited note score."""
+        self.performance = performance.validated()
+        if self.part_select.count():
+            self._part_selected(self.part_select.currentIndex())
+        self.info.setText(
+            f"Edited performance: {self.performance.title} · "
+            f"{len(self.performance.notes)} notes · "
+            f"{len(self.performance.parts)} instrument parts · "
+            f"{self.performance.duration_seconds:.2f} seconds")
+        self.status.setText("Edited score is active in Auto Performer and ready to render.")
+
+    def _session_settings(self):
+        return {
+            "channels":[{"gain":m.gain,"pan":m.pan,"mute":m.mute,"solo":m.solo}
+                        for m in self.mix_channels],
+            "groove":self.groove.currentText(),
+            "energy":self.energy.value(),
+            "strum_ms":self.strum_ms.value(),
+            "rate":self.rate_select.currentData(),
+            "depth":self.depth_select.currentData(),
+        }
+
+    def save_score_session(self):
+        if self.performance is None:
+            self.status.setText("Import or compose a score before saving its session.")
+            return
+        filename,_=QFileDialog.getSaveFileName(
+            self,"Save a private Spider Score Session",
+            str(Path.home()/"Music"/"Spider-Session.spiderscore"),
+            "Spider Score Session (*.spiderscore)")
+        if not filename:
+            return
+        try:
+            save_project(filename,self.performance,self._session_settings())
+            self.status.setText(
+                "Saved score, edits and mixer settings in " + Path(filename).name +
+                ". Sample-bank locations are not embedded; reselect them when opening.")
+        except (ValueError,OSError,TypeError) as error:
+            QMessageBox.warning(self,"Session save failed",str(error)[:280])
+
+    def open_score_session(self):
+        filename,_=QFileDialog.getOpenFileName(
+            self,"Open your Spider Score Session",str(Path.home()/"Music"),
+            "Spider Score Session (*.spiderscore)")
+        if not filename:
+            return
+        try:
+            score,settings=load_project(filename)
+            raw_channels=settings.get("channels",[])
+            if raw_channels:
+                if not isinstance(raw_channels,list) or len(raw_channels)!=len(score.parts):
+                    raise ValueError("Saved mixer channels do not match the score")
+                controls=[MixChannel(**record).validate() for record in raw_channels]
+            else:
+                controls=[MixChannel() for _ in score.parts]
+            groove=settings.get("groove","Natural player")
+            energy=settings.get("energy",75)
+            strum=settings.get("strum_ms",9)
+            rate=settings.get("rate",48000)
+            depth=settings.get("depth",24)
+            Expression(groove,energy,strum).validate()
+            if rate not in (44100,48000) or depth not in (16,24):
+                raise ValueError("Saved export format is invalid")
+            self._load(score)
+            self.mix_channels=controls
+            self._part_selected(0)
+            self.groove.setCurrentText(groove)
+            self.energy.setValue(energy)
+            self.strum_ms.setValue(strum)
+            self.rate_select.setCurrentIndex(0 if rate==48000 else 1)
+            self.depth_select.setCurrentIndex(1 if depth==24 else 0)
+            self.status.setText(
+                f"Loaded {Path(filename).name}: notes, parts, dynamics and mix restored. "
+                "Reconnect your licensed sample banks to render.")
+        except (ValueError,OSError,TypeError,KeyError,IndexError) as error:
+            QMessageBox.warning(self,"Cannot open score session",str(error)[:320])
 
     def _button(self, text, action):
         button = QPushButton(text)
@@ -278,6 +378,8 @@ class AutoPerformerPanel(QWidget):
         finally:
             self.part_select.blockSignals(False)
         self._part_selected(0)
+        if self.editor_panel is not None:
+            self.editor_panel.set_score(performance)
         parts = ", ".join(p.name for p in performance.parts)
         warning = " | ".join(performance.warnings)
         self.info.setText(
@@ -358,6 +460,8 @@ class AutoPerformerPanel(QWidget):
             return  # GM percussion channel is a drum kit, not a pitched patch.
         if 0 <= index <= 127:
             self.performance.parts[selected] = replace(part, program=index)
+            if self.editor_panel is not None:
+                self.editor_panel.sync_external(self.performance)
             self.status.setText(
                 f"SoundFont program updated: {part.name} · GM patch {index}. "
                 "The next playback/render will use this sound.")
