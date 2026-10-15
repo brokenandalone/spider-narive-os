@@ -52,6 +52,14 @@ def _kind(name):
         return "bass"
     return "other"
 
+def _tempo_at(score, beat):
+    tempo = score.bpm
+    for start, value in score.tempo_changes:
+        if start > beat:
+            break
+        tempo = value
+    return tempo
+
 def express(performance: Performance, expression: Expression = Expression()):
     """Return the same written pitches with expressive timing and velocity.
 
@@ -79,16 +87,18 @@ def express(performance: Performance, expression: Expression = Expression()):
             if (onset.numerator // max(1, onset.denominator)) % 2:
                 sorted_notes.reverse()
             for rank, i in enumerate(sorted_notes):
-                offsets[i] = Fraction(config.strum_ms * rank, 1000) * score.bpm / 60
+                offsets[i] = (Fraction(config.strum_ms * rank, 1000) *
+                              _tempo_at(score, onset) / 60)
     out = []
     for index, note in enumerate(score.notes):
         instrument = _kind(score.parts[note.part].name)
         start = note.start
         duration = note.duration
+        current_tempo = _tempo_at(score, start)
         delta = offsets.get(index, Fraction(0))
         variability = _rand(config.seed, note.part, note.start, note.pitch, index)
         if config.groove == "Natural player":
-            delta += Fraction(round(variability * 12), 1000) * score.bpm / 60
+            delta += Fraction(round(variability * 12), 1000) * current_tempo / 60
         elif config.groove == "Behind the beat":
             delta += Fraction(24 + round(variability * 7), 1000) * score.bpm / 60
         elif config.groove == "Swing 60%":
