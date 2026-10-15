@@ -5,8 +5,8 @@ Source-stage capability (2026-10-15). Implemented on the feature branch, not yet
 ## User workflow
 
 1. In the **real Spider Audio Studio** select **Auto Performer · Scores & TAB**.
-2. Import **MusicXML** (`.musicxml`, `.xml`), **compressed MusicXML** (`.mxl`), or **plain-text standard guitar/bass TAB** (`.txt`). You can also paste standard 6-line guitar or 4-line bass tabs.
-3. Review the detected parts, tempo, note count, warnings and duration.
+2. Import **MusicXML** (`.musicxml`, `.xml`), **compressed MusicXML** (`.mxl`), **plain-text guitar/bass TAB** (`.txt`), or chord-only charts (`.chords`). You can paste either 6-line guitar / 4-line bass tab or a chord chart such as `Am | F | C | G`.
+3. For chord-only input, select **Arrange as Chord Chart** to generate a new backing arrangement using rhythm guitar, bass, keys and kick/snare/hi-hat. For tablature select **Interpret as Guitar/Bass TAB**. Review the detected parts, tempo, note count, warnings and duration.
 4. Select which part to edit and its **General MIDI instrument patch**. Acoustic/electric guitar variants, bass types, piano, strings and more can be selected without editing the score.
 5. Choose a **local SoundFont (.sf2 or .sf3)** with permission to use it. Optional independent **FluidSynth** must be installed separately. Select **Play score automatically**. Spider renders the full performance offline, then sends the resulting stereo PCM WAV to Qt Multimedia for playback on the user's audio device. Playback does not start until clicked.
 6. Export the same notes as **multi-part standard MIDI** or a 44.1 kHz stereo WAV via SoundFont. Nothing replaces the source MusicXML/TAB/SoundFont.
@@ -15,6 +15,7 @@ Source-stage capability (2026-10-15). Implemented on the feature branch, not yet
 
 - MusicXML score-partwise notation: multiple named parts, note pitches, alterations, rests, voices with `backup`/`forward`, chords, explicit note durations, ties, fixed time signature, first tempo, written transposition, and embedded MusicXML General MIDI program choices.
 - Drum kit notation: uses actual MusicXML `midi-unpitched` mappings for each unpitched instrument; uses MIDI channel 10 and respects MusicXML's **1-based** MIDI note/program encoding.
+- Chord charts: single-symbol-per-bar assumption, standard major/minor/seventh/diminished/augmented/suspended/add9 and slash chords; creates an original generic four-piece backing pattern with editable instrument patches, not a reproduction of the original recorded arrangement.
 - Text TAB: 6-line standard E/B/G/D/A/E guitar or 4-line G/D/A/E bass. Fret 0–24. Simultaneous fret positions become real polyphonic chords. Text TAB has no reliable rhythm by default, so the owner explicitly selects 1, 2, or 4 columns per beat and can select BPM.
 - MIDI export: SMF type 1 with distinct instrument tracks, tempo, time signature, program changes, polyphonic note-on/note-off, velocity.
 - SoundFont export: separate licensed local file and FluidSynth CLI (no shell), sample rate 44.1/48 kHz, 16-bit stereo WAV, bounded duration, validated output, atomic saving. Nothing automatically downloads third-party sound banks.
@@ -26,7 +27,7 @@ This does **not** yet read photographed sheet music, scanned PDFs, lyric/chord s
 
 **Professional instrument quality is not guaranteed solely by choosing a GM patch.** Sound quality is determined by the instrument recording library's licensing, sample depth, round robins, velocity layers and articulations, plus FluidSynth settings and master effects. The initial procedural synth remains available in the other Studio tools. A truly marketable product needs licensed high-resolution multisampled instruments (or a commercially licensed compatible engine), advanced expression controls, low-latency device support, humanized score playback and empirical audio QA.
 
-The first fully featured release must provide non-destructive sheet-to-notation conversion for scanned PDFs/photos, extended TAB formats, tempo maps, MIDI 2.0 or CC expression where applicable, and an open source/commercial licensing audit. Do not market as fully automatic transcriber yet.
+The first fully featured release must provide non-destructive sheet-to-notation conversion for scanned PDFs/photos, extended TAB formats, tempo maps, MIDI 2.0 or CC expression where applicable, and an open source/commercial licensing audit. Chord-only input is intentionally not expected to recreate a missing original melody, lyrics, or recorded rhythm. Do not market as fully automatic transcriber yet.
 
 ## Licensing
 
