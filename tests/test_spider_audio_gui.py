@@ -72,7 +72,8 @@ class StudioProductionGUITests(unittest.TestCase):
         self.assertIn("self.song_production_panel,", source)
         self.assertIn("self.waveform_edit_panel, self.dj_deck_panel", source)
         self.assertIn("midi.disconnect()", source)
-        self.assertIn("self.tool_tabs.addTab(self.auto_performer_panel", source)
+        self.assertIn("self.tool_tabs.addTab(auto_scroll, 'Auto Performer · Scores & TAB')", source)
+        self.assertIn("self.tool_tabs.addTab(self.score_timeline_panel", source)
         self.assertNotIn("self.tool_tabs.addTab(auto_scroll, 'Sheet Music & TAB Autoplay')", source)
         self.assertIn("from .song_production_panel import SongProductionPanel", source)
         self.assertIn("from .waveform_edit_panel import WaveformEditPanel", source)
@@ -133,6 +134,36 @@ class StudioProductionGUITests(unittest.TestCase):
             self.assertEqual(panel.rate_select.currentData(), 44100)
         finally:
             panel.close()
+
+    def test_note_editor_actually_changes_auto_performer_with_undo(self):
+        from studio.score_timeline_panel import ScoreTimelinePanel
+        from studio.auto_performer_panel import AutoPerformerPanel
+        from fractions import Fraction
+        performer=AutoPerformerPanel()
+        editor=ScoreTimelinePanel(performer.apply_edited_score)
+        performer.attach_editor(editor, lambda:None)
+        try:
+            performer.interpret_tab()
+            original=performer.performance.notes[0]
+            self.assertIsNotNone(editor.editor)
+            self.assertEqual(editor.editor.score.notes[0].pitch,original.pitch)
+            editor.table.selectRow(0)
+            editor.pitch.setValue(original.pitch+1)
+            editor.apply_note()
+            self.assertTrue(any(n.pitch==original.pitch+1 and n.start==original.start
+                                for n in performer.performance.notes))
+            self.assertTrue(editor.editor.can_undo)
+            editor.undo()
+            self.assertEqual(performer.performance.notes[0].pitch,original.pitch)
+            editor.part.setCurrentIndex(1)
+            editor.transpose_amount.setValue(2)
+            editor.transpose_part()
+            self.assertTrue(editor.editor.can_undo)
+            self.assertTrue(any(n.pitch==original.pitch+2
+                                for n in performer.performance.notes))
+        finally:
+            editor.close()
+            performer.close()
 
 if __name__ == "__main__":
     unittest.main()
