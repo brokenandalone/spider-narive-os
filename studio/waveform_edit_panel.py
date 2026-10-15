@@ -185,7 +185,8 @@ class WaveformEditPanel(QWidget):
         start = min(source.total_frames - 1, round(self.start.value() * source.rate))
         end = min(source.total_frames, round(self.end.value() * source.rate))
         if end <= start:
-            self.status.setText("Trim end must be later than trim start.")
+            self.clip = None
+            self.status.setText("Trim end must be later than trim start. Export disabled for this selection.")
             return
         try:
             clip = source.edited(
@@ -225,8 +226,13 @@ class WaveformEditPanel(QWidget):
             return
         self.stop_preview()
         try:
-            short = self.clip.edited(end=min(
-                self.clip.end, self.clip.start + 5 * self.clip.rate))
+            # Reverse previews start at the *end* of the source selection.
+            if self.clip.reverse:
+                short = self.clip.edited(
+                    start=max(self.clip.start, self.clip.end - 5 * self.clip.rate))
+            else:
+                short = self.clip.edited(
+                    end=min(self.clip.end, self.clip.start + 5 * self.clip.rate))
             pcm = render_clip(short)
             audio = QAudioOutput(self._format(short), self)
             buffer = QBuffer(audio)
