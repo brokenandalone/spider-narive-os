@@ -22,9 +22,20 @@ builds. Original Ubuntu Studio tools, Spider bays, Webbie and Nova remain intact
   bank; single-bank fast rendering or independent part passes, selected 44.1/48
   kHz sample rate, and independent part gain, pan, mute and solo.
 - **Sound**: offline FluidSynth rendering where available, atomic WAV output,
+  a 24-bit stereo mix-output option with reproducible TPDF dithering after
+  float summing, and 16-bit WAV for Qt playback compatibility. The underlying
+  16-bit sample libraries are not magically upgraded to 24-bit fidelity.
   bounded memory streaming during multi-bank stereo mixing and no shell
   invocation. Optional playback in the Qt audio stack.
-- **Interchange**: standard MIDI format-1 per-part export for external DAWs;
+- **Tempo maps**: MusicXML tempo changes are now represented in score time and
+  written to MIDI conductor tracks, so later passages actually speed up or
+  slow down instead of inheriting a misleading fixed initial tempo.
+- **MIDI import and live takes**: standard SMF type-0/type-1 .mid/.midi files
+  enter the same Auto Performer alongside scores; the owner may connect a
+  MIDI controller and explicitly record up to 3 minutes of note-on/off and
+  velocity as a standard MIDI take. No microphone or audio recorded.
+- **Interchange**: separate as-written or humanized standard MIDI format-1
+  per-part exports for external DAWs;
   source notation is not overwritten. Separate native song arrangement,
   waveform editor, virtual instrument workbench and offline DJ deck panels
   remain integrated within Spider Studio.
