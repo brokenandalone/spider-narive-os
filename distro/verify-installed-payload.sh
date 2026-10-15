@@ -37,6 +37,7 @@ for file in \
     usr/share/backgrounds/spider-os-wallpaper.png \
     usr/share/spider-os/branding/selected-startup-set \
     usr/share/spider-os/branding/spider-os-splash.png \
+    usr/share/plymouth/themes/spider-os/spider-os-background.png \
     usr/share/spider-os/branding/startup-background.png \
     usr/share/spider-os/startup-sets/spider-purple.png \
     usr/share/spider-os/startup-sets/spider-crimson.png \
