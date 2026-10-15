@@ -31,6 +31,7 @@ try:
     from .studio_score_mix import MixChannel, render_score_mix
     from .soundfont_library import auto_soundfont, discover_soundfonts
     from .score_edit_session import save_project, load_project
+    from .score_stem_export import render_score_stems
 except ImportError:
     from score_performer import parse_musicxml, parse_ascii_tab, load_notation
     from chord_chart_performer import parse_chord_chart
@@ -40,6 +41,7 @@ except ImportError:
     from studio_score_mix import MixChannel, render_score_mix
     from soundfont_library import auto_soundfont, discover_soundfonts
     from score_edit_session import save_project, load_project
+    from score_stem_export import render_score_stems
 
 TAB_EXAMPLE = """e|--0---2---3---2-|
 B|--1---3---0---3-|
@@ -78,6 +80,30 @@ class ScoreRenderWorker(QThread):
             self.finished_score.emit(True, str(result), "")
         except (OSError, ValueError, RuntimeError) as error:
             self.finished_score.emit(False, "", str(error)[:300])
+
+class StemRenderWorker(QThread):
+    finished_score = pyqtSignal(bool, str, str)
+    kind = "stems"
+    preview = False
+
+    def __init__(self, score, default_bank, destination, banks, rate, depth, parent=None):
+        super().__init__(parent)
+        self.score = score
+        self.default_bank = default_bank
+        self.destination = destination
+        self.banks = dict(banks)
+        self.rate = rate
+        self.depth = depth
+
+    def run(self):
+        try:
+            result = render_score_stems(
+                self.score,self.default_bank,self.destination,
+                part_banks=self.banks,rate=self.rate,bit_depth=self.depth)
+            self.finished_score.emit(True,str(result),"")
+        except (OSError,ValueError,RuntimeError) as error:
+            self.finished_score.emit(False,"",str(error)[:320])
+
 
 class AutoPerformerPanel(QWidget):
     def __init__(self, parent=None):
@@ -259,6 +285,7 @@ class AutoPerformerPanel(QWidget):
         project_row.addWidget(self._button("✎ Edit Notes / Quantize", self.open_editor))
         project_row.addWidget(self._button("Save Spider Score Session", self.save_score_session))
         project_row.addWidget(self._button("Open Spider Score Session", self.open_score_session))
+        project_row.addWidget(self._button("Export Separate Instrument Stems", self.export_stems))
         layout.addLayout(project_row)
         self.status = QLabel(
             "Auto Performer is offline and does not monitor your mic, import private "
@@ -566,6 +593,49 @@ class AutoPerformerPanel(QWidget):
             except (OSError, ValueError) as error:
                 QMessageBox.warning(self, "Expressive MIDI export failed", str(error)[:300])
 
+    def export_stems(self):
+        """Produce isolated dry tracks. Existing stem folders are never overwritten."""
+        if self.performance is None:
+            self.status.setText("Load a score before exporting individual instrument tracks.")
+            return
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Another audio export is already running.")
+            return
+        if not self.soundfont:
+            self.status.setText("Select one local licensed SoundFont first.")
+            return
+        if not quality_backend_available():
+            self.status.setText("Install FluidSynth CLI to render independent instruments.")
+            return
+        parent=QFileDialog.getExistingDirectory(
+            self,"Choose the parent folder for a new instrument-stems directory",
+            str(Path.home()/"Music"))
+        if not parent:
+            return
+        try:
+            expressive=express(self.performance,Expression(
+                self.groove.currentText(),self.energy.value(),self.strum_ms.value()))
+            # A new folder, not the chosen existing parent, is created atomically.
+            from re import sub
+            safe=sub(r"[^A-Za-z0-9_-]+","-",expressive.title).strip("-")[:44]
+            destination=Path(parent)/((safe or "Spider-Session")+"-Stems")
+            if destination.exists():
+                self.status.setText(
+                    "Stem folder already exists. Choose a different parent folder or "
+                    "rename the previous stems; no recordings were overwritten.")
+                return
+            self._play_after=False
+            self.worker=StemRenderWorker(
+                expressive,self.soundfont,str(destination),dict(self.part_banks),
+                self.rate_select.currentData(),self.depth_select.currentData(),self)
+            self.worker.finished_score.connect(self._done)
+            self.worker.start()
+            self.status.setText(
+                "Rendering each instrument as aligned, dry stereo tracks. "
+                "All stems remain available even when mixer channels are muted.")
+        except (ValueError,OSError,TypeError) as error:
+            self.status.setText("Cannot export stems: "+str(error)[:260])
+
     def _start_render(self, destination, preview):
         if self.performance is None:
             self.status.setText("Import MusicXML or interpret text tab first.")
@@ -632,6 +702,10 @@ class AutoPerformerPanel(QWidget):
     def _done(self, ok, filename, error):
         if not ok:
             self.status.setText("SoundFont rendering failed: " + error)
+            return
+        if getattr(self.worker,"kind",None)=="stems":
+            self.status.setText(
+                "Exported aligned instrument stems and stems.json: " + Path(filename).name)
             return
         if self.worker is None or not self.worker.preview or not self._play_after:
             self.status.setText("Rendered full SoundFont WAV: " + Path(filename).name)
