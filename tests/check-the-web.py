@@ -138,8 +138,8 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert window.app_lists['studio'].count() == 1
     assert window.app_lists['studio'].item(0).data(Qt.UserRole) == 'krita.desktop'
     window.app_lists['studio'].setCurrentRow(0)
-    with patch.object(main, 'save_app_assignment') as save, \\
-            patch.object(window, 'refresh_apps') as refresh:
+    with (patch.object(main, 'save_app_assignment') as save,
+          patch.object(window, 'refresh_apps') as refresh):
         window.assign_selected_app('studio')
         save.assert_called_once_with('krita.desktop', 'studio')
         refresh.assert_called_once()
