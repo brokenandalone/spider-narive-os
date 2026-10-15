@@ -508,6 +508,12 @@ def load_compressed_musicxml(path):
 def load_notation(path, bpm=110, slots_per_beat=2):
     """Read supported files; plain TXT TAB and uncompressed MusicXML only."""
     filename = Path(path)
+    if filename.suffix.lower() in (".mid", ".midi"):
+        try:
+            from .midi_score_import import import_midi_file
+        except ImportError:
+            from midi_score_import import import_midi_file
+        return import_midi_file(filename)
     if filename.suffix.lower() == ".mxl":
         performance = load_compressed_musicxml(filename)
     elif filename.suffix.lower() in (".musicxml", ".xml"):
