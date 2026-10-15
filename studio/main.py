@@ -174,6 +174,15 @@ class SpiderStudio(QMainWindow):
         song_scroll.setWidgetResizable(True)
         song_scroll.setWidget(self.song_production_panel)
         self.tool_tabs.addTab(song_scroll, 'Song Arranger & Mixer')
+        if __package__:
+            from .waveform_edit_panel import WaveformEditPanel
+        else:
+            from waveform_edit_panel import WaveformEditPanel
+        self.waveform_edit_panel = WaveformEditPanel(self)
+        waveform_scroll = QScrollArea()
+        waveform_scroll.setWidgetResizable(True)
+        waveform_scroll.setWidget(self.waveform_edit_panel)
+        self.tool_tabs.addTab(waveform_scroll, 'Waveform Editor')
 
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
