@@ -66,6 +66,7 @@ class StudioProductionGUITests(unittest.TestCase):
         self.assertIn("self.tool_tabs.addTab(song_scroll, 'Song Arranger & Mixer')", source)
         self.assertIn("self.tool_tabs.addTab(waveform_scroll, 'Waveform Editor')", source)
         self.assertIn("self.tool_tabs.addTab(dj_scroll, 'DJ Decks')", source)
+        self.assertIn("self.tool_tabs.setCurrentWidget(self.instrument_page)", source)
         self.assertIn("from .song_production_panel import SongProductionPanel", source)
         self.assertIn("from .waveform_edit_panel import WaveformEditPanel", source)
         w = self.wave_class()
