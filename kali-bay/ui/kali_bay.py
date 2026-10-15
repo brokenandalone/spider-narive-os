@@ -244,6 +244,10 @@ class KaliWebbieReplyWorker(QThread):
             self.failed.emit("Webbie connection: " + str(error))
 
 
+# Native review-only lab operations share the existing Kali Bay window.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'the-web' / 'shell'))
+from workspace_max_native import NativeWorkspaceTools
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -499,6 +503,8 @@ class KaliBayWindow(QMainWindow):
             ),
             "PURPLE DEFENSE",
         )
+        self.native_max_tools = NativeWorkspaceTools('kali-bay', self)
+        self.security_tabs.addTab(self.native_max_tools, 'EVIDENCE & LAB ANALYSIS')
         outer.addWidget(self.security_tabs, 1)
 
         warning = QLabel(
