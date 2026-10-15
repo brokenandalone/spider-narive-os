@@ -278,6 +278,50 @@ diffs without inspecting them for passwords, credentials or embedded
 local host paths. Even a conflict-free three-way merge does not
 authorize installation without owner-host tests and rollback proof.
 
+## Private desktop integration staging after the owner review
+
+The owner executed the structural comparator and confirmed that the
+current **installed** The Web does **not** import
+`immersive_bays`, `workspace_max_native`, `webbie_native_operations`,
+`home_dashboard`, `art_workbench` or `instrument_panel`, while
+all six exist in the incoming GitHub source. This is the key reason
+why copying candidate-only modules cannot activate the upgrades.
+
+A new local-only helper now prepares **paired copies of just the five
+desktop integration files**, for safe Meld review:
+
+```bash
+git -C ~/spider-os-native-wave pull --ff-only
+
+python3 -B ~/spider-os-native-wave/tools/stage_native_merge.py \
+  --source ~/spider-os-native-wave \
+  --installed-root /usr/local/lib/spider-os \
+  --focus desktop \
+  --output "$HOME/SpiderOS-Private-Desktop-Merge-20261015"
+```
+
+It verifies each file is in the guarded release catalog, rejects
+symlinks, limits file sizes, and stages only private local copies under
+the owner's home, with directories `0700` and files `0600`.
+It creates `installed/`, `candidate/`, `diffs/`, a
+sanitized `manifest.json` with symbol names and missing integration
+imports, and a README cautioning against uploading private code.
+The output directory **must not already exist**.
+
+**This command does not merge or install anything.** Source files on
+the actual PC are never modified; no authorization, service, model,
+audio data, passwords, or personal project library is requested.
+The staged code is private and must not be sent to public GitHub or
+any chat without the owner's independent review/redaction.
+
+Prioritize reconciling
+`the-web/shell/main.py`, `app_catalog.py`,
+`workspace_files.py`, `webbie_panel.py` and
+`webbie_cognitive_center.py`, then re-run the structural comparison
+before reviewing Webbie voice and safety, Studio, Author, Nova, Kali,
+and the rest of the **33 protected customized files**.
+The strict installer remains BLOCKED regardless of staged output.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
