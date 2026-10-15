@@ -25,6 +25,7 @@ class PackagePreservationTests(unittest.TestCase):
             "lsp-plugins:amd64\t1.2-1\tinstall ok installed\n"
             "libreoffice-writer\t4.2-1\tinstall ok installed\n"
             "old-package\t1\tdeinstall ok config-files\n"
+            "never-installed\t2\tunknown ok not-installed\n"
         )
         self.assertEqual(module.parse_installed(text), {
             "ardour": "8.4-2",
