@@ -34,7 +34,18 @@ for file in \
     usr/local/lib/spider-os/the-web/shell/wallpapers.py \
     usr/local/lib/spider-os/branding/wallpapers/collection.json \
     etc/skel/.config/autostart/the-web.desktop \
-    usr/share/backgrounds/spider-os-wallpaper.png
+    usr/share/backgrounds/spider-os-wallpaper.png \
+    usr/share/spider-os/branding/selected-startup-set \
+    usr/share/spider-os/branding/spider-os-splash.png \
+    usr/share/spider-os/branding/startup-background.png \
+    usr/share/spider-os/startup-sets/spider-purple.png \
+    usr/share/spider-os/startup-sets/spider-crimson.png \
+    usr/share/spider-os/startup-sets/spider-nightfall.png \
+    usr/share/plasma/look-and-feel/org.spider.os/metadata.json \
+    usr/share/plasma/look-and-feel/org.spider.os/contents/splash/Splash.qml \
+    usr/share/plasma/look-and-feel/org.spider.os/contents/splash/images/background.png \
+    etc/xdg/ksplashrc \
+    usr/share/sddm/themes/breeze/theme.conf.user
 do
     test -s "${spider_target_root}/${file}" || {
         echo "Missing installed Spider OS file: ${file}" >&2
