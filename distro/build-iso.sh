@@ -97,8 +97,7 @@ rm -rf "${ISO_TREE}"
 mkdir -p "${ISO_TREE}"
 
 rsync -aH \
-    --exclude="/casper/standard.squashfs" \
-    --exclude="/casper/standard.live.squashfs" \
+    --exclude="/casper/*.squashfs" \
     "${ISO_MOUNT}/" \
     "${ISO_TREE}/"
 
@@ -108,6 +107,31 @@ rm -rf "${ROOTFS}"
 
 STANDARD_LAYER="${ISO_MOUNT}/casper/standard.squashfs"
 LIVE_LAYER="${ISO_MOUNT}/casper/standard.live.squashfs"
+
+if [[ -s "${ISO_MOUNT}/casper/minimal.standard.squashfs" ]]; then
+    # Resolve the real installed chain, including overlay whiteouts, before
+    # repacking a standalone Spider install root. A delta cannot be renamed.
+    python3 "${ROOT}/distro/normalize-install-layout.py" \
+        "${ISO_TREE}/casper/install-sources.yaml"
+    bash "${ROOT}/distro/materialize-install-root.sh" \
+        "${ISO_MOUNT}/casper" "${ROOTFS}"
+    LIVE_LAYER="${ISO_MOUNT}/casper/minimal.standard.live.squashfs"
+    # The normalized image offers the full Studio source only. Remove obsolete
+    # upstream layer metadata rather than advertising uncustomized choices.
+    find "${ISO_TREE}/casper" -maxdepth 1 -type f -name 'minimal.*' -delete
+    python3 - "${ISO_TREE}/boot/grub" <<'PY'
+import sys
+from pathlib import Path
+count = 0
+for path in Path(sys.argv[1]).rglob('*.cfg'):
+    text = path.read_text()
+    old = 'layerfs-path=minimal.standard.live.squashfs'
+    count += text.count(old)
+    path.write_text(text.replace(old, 'layerfs-path=standard.live.squashfs'))
+if not count:
+    raise SystemExit('No verified upstream live-layer boot argument; refusing to build')
+PY
+else
 
 if [[ ! -f "${STANDARD_LAYER}" ]]; then
     echo "ERROR: Missing Ubuntu Studio install layer: ${STANDARD_LAYER}"
@@ -126,6 +150,9 @@ echo "Extracting Ubuntu Studio installed-system layer..."
 unsquashfs \
     -d "${ROOTFS}" \
     "${STANDARD_LAYER}"
+fi
+
+test -s "${LIVE_LAYER}"
 
 echo "Extracting Ubuntu Studio live-session layer..."
 

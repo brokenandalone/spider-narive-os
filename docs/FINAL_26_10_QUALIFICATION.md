@@ -13,10 +13,33 @@ Run 38756210018 passed source tests and the offscreen desktop checks, and
 authenticated the final upstream ISO using Ubuntu's signed checksum list.
 Its recorded Casper listing contains `minimal.squashfs`,
 `minimal.standard.squashfs`, and `minimal.standard.live.squashfs`.
-The builder's two-layer `standard.*` assumption is therefore incompatible.
-The qualification gate stays closed and now saves the installer catalog,
-GRUB configuration and all squashfs superblocks before rejecting that layout.
-No successful image build, installation, or boot is claimed.
+The builder's previous two-layer `standard.*` assumption was incompatible.
+The migration fix mounts the base and standard delta as a read-only overlay,
+materializes the combined installed filesystem with metadata intact, then
+customizes and repacks a standalone `standard.squashfs`. The separate live
+delta becomes `standard.live.squashfs`. Installer metadata and GRUB leaf-layer
+arguments change together; the default full Studio source keeps its ID and
+kernel metadata. Only that customized full source is offered, preserving Studio
+applications rather than offering an unmodified upstream minimal installation.
+Unrecognized default paths, language layers or source types fail closed.
+
+The probe saves the original catalog, normalized catalog, GRUB configuration
+and all squashfs superblocks. A synthetic mounted-image test checks base files,
+overrides, deletions, hardlinks and symlinks before the real build begins.
+No successful 26.10 image build, installation, or boot is claimed yet.
+
+The integrated feature snapshot passed 1,056 unit tests. The new coverage
+auditor initially rejected the migration because it required the 26.04 pin;
+its explicit `--target 26.10` mode now checks the release, codename, final image
+and release channel without weakening the default LTS gate. Source-check run
+38825420371 passed, including native UI checks and payload coverage.
+
+Upstream implementation references:
+- https://github.com/canonical/curtin/blob/main/curtin/commands/extract.py
+  (`_get_image_stack` and `get_handler_for_source` resolve dotted layer names;
+  a single-component `standard.squashfs` is a one-image installed stack).
+- https://github.com/canonical/subiquity/blob/main/subiquity/models/source.py
+  (source ID, variation path and source type determine the install URI).
 
 Source integration:
 - migration foundation: 8fb4030b0591c3496529ebfade0021eb60e92b0e

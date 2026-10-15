@@ -96,7 +96,7 @@ run_guest 5400 "${spider_test}/install.serial.log" \
     -drive "file=${spider_iso},media=cdrom,readonly=on" \
     -drive "file=${spider_work}/seed.iso,media=cdrom,readonly=on" \
     -kernel "${spider_work}/vmlinuz" -initrd "${spider_work}/initrd" \
-    -append 'boot=casper autoinstall ds=nocloud console=ttyS0,115200n8 systemd.mask=spider-ci.service systemd.mask=serial-getty@ttyS0.service'
+    -append 'boot=casper layerfs-path=standard.live.squashfs autoinstall ds=nocloud console=ttyS0,115200n8 systemd.mask=spider-ci.service systemd.mask=serial-getty@ttyS0.service'
 grep -q SPIDER_INSTALL_PASSED "${spider_test}/install.serial.log"
 echo 'Booting the installed disk with no ISO attached...'
 run_guest 900 "${spider_test}/boot.serial.log"

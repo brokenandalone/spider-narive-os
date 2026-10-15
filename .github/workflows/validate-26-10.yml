@@ -132,20 +132,12 @@ jobs:
           for image in build/iso-mount/casper/*.squashfs; do
             unsquashfs -s "$image" > "build/upstream-probe/$(basename "$image").superblock.txt"
           done
-          if [[ ! -s build/iso-mount/casper/standard.squashfs ]]; then
-            echo '::error::Upstream uses a different installed filesystem chain. Catalog and GRUB diagnostics were saved; do not build or install until layer reconstruction is adapted.'
-            cat build/upstream-probe/install-sources.yaml
-            exit 1
-          fi
-          for layer in standard.squashfs standard.live.squashfs; do
-            test -s "build/iso-mount/casper/$layer"
-            unsquashfs -s "build/iso-mount/casper/$layer" > "build/upstream-probe/$layer.superblock.txt"
-          done
           test -s build/iso-mount/casper/vmlinuz
           test -s build/iso-mount/casper/initrd
           cp build/iso-mount/casper/install-sources.yaml build/upstream-probe/
           /usr/bin/python3 - <<'PY'
           from pathlib import Path, PurePosixPath
+          import importlib.util
           import yaml
           casper = Path("build/iso-mount/casper")
           catalog = yaml.safe_load((casper/"install-sources.yaml").read_text())
@@ -164,11 +156,23 @@ jobs:
                       raise SystemExit("Unsupported or missing installer source: " + name)
                   if source is defaults[0]:
                       default_paths.add(name)
-          if "standard.squashfs" not in default_paths:
-              raise SystemExit("Default installer no longer selects standard.squashfs; adapt builder first")
+          if default_paths == {"minimal.standard.squashfs"}:
+              for name in ("minimal.squashfs", "minimal.standard.squashfs", "minimal.standard.live.squashfs"):
+                  if not (casper/name).is_file():
+                      raise SystemExit("Missing required layer: " + name)
+              spec = importlib.util.spec_from_file_location("layout", "distro/normalize-install-layout.py")
+              layout = importlib.util.module_from_spec(spec)
+              spec.loader.exec_module(layout)
+              normalized = layout.normalize(catalog)
+              Path("build/upstream-probe/normalized-install-sources.yaml").write_text(yaml.safe_dump(normalized, sort_keys=False))
+          elif default_paths != {"standard.squashfs"}:
+              raise SystemExit("Unverified default installed filesystem selection: " + str(default_paths))
           PY
         env:
           ISO_NAME: ubuntustudio-26.10-desktop-amd64.iso
+
+      - name: Verify installed layer reconstruction with synthetic images
+        run: sudo bash tests/check-install-layer-merge.sh
 
       - name: Build Spider OS
         run: |
