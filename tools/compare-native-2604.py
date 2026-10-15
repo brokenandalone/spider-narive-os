@@ -14,8 +14,41 @@ import hashlib
 from pathlib import Path
 import subprocess
 
-APPROVED_BRANCH = "reconciliation/ubuntu-studio-26.04-lts-20261015"
+APPROVED_BRANCHES = frozenset({
+    "reconciliation/ubuntu-studio-26.04-lts-20261015",
+    "feature/native-monster-bays-20261015",
+})
 SHELL = "the-web/shell/main.py"
+PRIORITY_GROUPS = {
+    "desktop": (
+        "the-web/shell/main.py",
+        "the-web/shell/app_catalog.py",
+        "the-web/shell/workspace_files.py",
+        "the-web/shell/webbie_panel.py",
+        "the-web/shell/webbie_cognitive_center.py",
+    ),
+    "webbie": (
+        "webbie/agent/webbie.py",
+        "webbie/brain/brain.py",
+        "webbie/voice/whisper_listener.py",
+        "webbie/voice/interruptible_speech.py",
+        "the-web/shell/webbie_computer_panel.py",
+        "the-web/shell/webbie_operator_bridge.py",
+        "the-web/shell/webbie_camera.py",
+    ),
+    "creative": (
+        "studio/main.py", "studio/ai_panel.py",
+        "author/main.py", "author/web_features.py",
+        "forage/engine.py", "forage/forage.py",
+        "forage/deep-forage/deep_forage.py",
+        "study/study.py", "study/homework_ui.py",
+    ),
+    "services": (
+        "media/ai-dj/service.py", "media/ai-dj/spider-ai-dj.service",
+        "kali-bay/bin/kali-bay", "kali-bay/ui/kali_bay.py",
+        "webbie/actions/task_grants.py",
+    ),
+}
 PRIMARY = (
     SHELL,
     "the-web/shell/webbie_panel.py",
@@ -125,14 +158,17 @@ def main(argv=None) -> int:
     p.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[1])
     p.add_argument("--installed-root", type=Path, default=Path("/usr/local/lib/spider-os"))
     p.add_argument("--all", action="store_true", help="Show structural summary of all changed application files")
+    p.add_argument("--focus", choices=("desktop", "webbie", "creative", "services"),
+                   default="desktop", help="Subset of locally customized files to inspect, default desktop")
     args = p.parse_args(argv)
     source, installed = args.source.resolve(), args.installed_root.resolve()
     branch = subprocess.run(
         ["git", "-C", str(source), "branch", "--show-current"],
         check=True, text=True, capture_output=True
     ).stdout.strip()
-    if branch != APPROVED_BRANCH:
-        p.error("Expected approved 26.04 branch, got " + (branch or "(detached)"))
+    if branch not in APPROVED_BRANCHES:
+        p.error("Expected a reviewed Spider OS 26.04 development branch, got " +
+                (branch or "(detached)"))
     if not (installed / SHELL).is_file():
         p.error("Installed native shell not found under the selected root")
     report = inspect(source, installed)
@@ -147,8 +183,10 @@ def main(argv=None) -> int:
     for name, reason in report["skipped"]:
         print("SKIP", name, "(" + reason + ")")
 
-    show = (report["changed"] if args.all
-            else [path for path in PRIMARY if path in report["changed"]])
+    names = report["changed"] if args.all else PRIORITY_GROUPS[args.focus]
+    show = [path for path in names if path in report["changed"]]
+    print("Review selection:", "all" if args.all else args.focus,
+          "|", len(show), "locally changed files")
     for relative in show:
         source_file = source / relative
         installed_file = installed / relative
@@ -174,10 +212,13 @@ def main(argv=None) -> int:
     print("\nMissing candidate modules:")
     for relative in report["missing"]:
         print("  ADD ONLY AFTER REVIEW:", relative)
-    if SHELL in report["changed"]:
+    if SHELL in report["changed"] and (args.all or args.focus == "desktop"):
         old = (installed / SHELL).read_text(encoding="utf-8", errors="replace")
         new = (source / SHELL).read_text(encoding="utf-8", errors="replace")
         for token in ("from immersive_bays import", "from workspace_max_native import",
+                      "from webbie_native_operations import",
+                      "from home_dashboard import",
+                      "from art_workbench import", "from instrument_panel import",
                       "ImmersiveBay(", "NativeWorkspaceTools("):
             print("Native shell integration {!r}: installed={}, GitHub={}".format(
                 token, token in old, token in new))
