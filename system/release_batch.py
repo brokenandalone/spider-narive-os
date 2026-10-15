@@ -242,6 +242,11 @@ APP_FILES = (
     # Deployed only by an owner-approved guarded batch after reconciliation.
     'studio/instruments_engine.py',
     'studio/instrument_workbench.py',
+    'studio/song_arranger_engine.py',
+    'studio/song_production_panel.py',
+    'studio/waveform_edit_engine.py',
+    'studio/waveform_edit_panel.py',
+    'studio/midi_song_export.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
