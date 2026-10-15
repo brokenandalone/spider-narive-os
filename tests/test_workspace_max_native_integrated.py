@@ -50,7 +50,7 @@ class NativeMaxIntegrationTests(unittest.TestCase):
             self.assertNotIn(dangerous, BRIDGE)
 
     def test_workspace_worker_blocks_close(self):
-        self.assertIn("Wait for the workspace analysis to finish", SHELL)
+        self.assertIn("Finish workspace analysis before closing this bay.", SHELL)
         self.assertIn("worker and worker.isRunning()", SHELL)
 
     def test_eight_immersive_bays_preserved(self):
