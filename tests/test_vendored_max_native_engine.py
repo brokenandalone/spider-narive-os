@@ -44,7 +44,7 @@ class VendoredNativeOperations(unittest.TestCase):
             root = pathlib.Path(directory)
             (root / "scene.txt").write_text("Shayna enters Apartment 17.", encoding="utf-8")
             (root / "track.wav").write_bytes(b"RIFF")
-            (root / "image.png").write_bytes(b"\\x89PNG\\r\\n\\x1a\\n")
+            (root / "image.png").write_bytes(bytes.fromhex("89504e470d0a1a0a"))
             before = {x.name: hashlib.sha256(x.read_bytes()).hexdigest()
                       for x in root.iterdir() if x.is_file()}
             for workspace, operation in SAMPLES.items():
