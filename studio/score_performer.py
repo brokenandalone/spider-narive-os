@@ -152,11 +152,35 @@ def parse_musicxml(source, title="Imported MusicXML"):
     if part_list is None:
         raise ValueError("MusicXML score-part list missing")
     definitions = {}
+    # MusicXML enumerates sounds and MIDI programs from 1; MIDI file values
+    # start at 0. Honour instrument mappings instead of assuming the staff's
+    # printed vertical position is a percussion note pitch.
+    sound_definitions = {}
     for descriptor in children(part_list, "score-part"):
         ident = descriptor.attrib.get("id")
         if not ident or ident in definitions:
             raise ValueError("Duplicate or missing MusicXML score-part ID")
         definitions[ident] = val(descriptor, "part-name", "Instrument")
+        for sound in children(descriptor, "midi-instrument"):
+            sound_id = sound.attrib.get("id")
+            if not sound_id:
+                continue
+            patch = val(sound, "midi-program")
+            unpitched = val(sound, "midi-unpitched")
+            midi_channel = val(sound, "midi-channel")
+            program = None if patch is None else as_integer(patch, "MIDI program")
+            drum_note = None if unpitched is None else as_integer(unpitched, "drum note")
+            channel = None if midi_channel is None else as_integer(midi_channel, "MIDI channel")
+            if program is not None and not 1 <= program <= 128:
+                raise ValueError("Invalid MusicXML MIDI program")
+            if drum_note is not None and not 1 <= drum_note <= 128:
+                raise ValueError("Invalid MusicXML drum note")
+            if channel is not None and not 1 <= channel <= 16:
+                raise ValueError("Invalid MusicXML channel")
+            sound_definitions[(ident, sound_id)] = (
+                program - 1 if program is not None else None,
+                drum_note - 1 if drum_note is not None else None,
+                channel - 1 if channel is not None else None)
     part_nodes = children(root, "part")
     if not 1 <= len(part_nodes) <= MAX_PARTS:
         raise ValueError("MusicXML supports 1 to 15 parts in this prototype")
@@ -167,6 +191,10 @@ def parse_musicxml(source, title="Imported MusicXML"):
             raise ValueError("MusicXML part not listed in part-list")
         name = definitions[ident][:80]
         program, percussion = _part_program(name)
+        sounds = [sound for (owner, _id), sound in sound_definitions.items() if owner == ident]
+        if sounds and sounds[0][0] is not None:
+            program = sounds[0][0]
+        percussion = percussion or any(snd[1] is not None or snd[2] == 9 for snd in sounds)
         used_channels = [p.channel for p in parts]
         if percussion and 9 not in used_channels:
             channel = 9
@@ -251,9 +279,17 @@ def parse_musicxml(source, title="Imported MusicXML"):
                     last_start = start
                     if child(item, "rest") is None:
                         pitch_node = child(item, "pitch")
-                        if pitch_node is None:
-                            raise ValueError("Unpitched percussion needs mapped MIDI notes before playback")
-                        pitch = _midi_pitch(pitch_node, transpose)
+                        if pitch_node is not None:
+                            pitch = _midi_pitch(pitch_node, transpose)
+                        elif child(item, "unpitched") is not None:
+                            instrument = child(item, "instrument")
+                            sound_id = instrument.attrib.get("id") if instrument is not None else None
+                            sound = sound_definitions.get((node.attrib.get("id"), sound_id))
+                            if sound is None or sound[1] is None:
+                                raise ValueError("Unpitched drum note has no MIDI sound mapping")
+                            pitch = sound[1]
+                        else:
+                            raise ValueError("Unsupported MusicXML note without pitch")
                         active_key = (pitch, int(part_index))
                         ties = {tie.attrib.get("type") for tie in children(item, "tie")}
                         # Stop/continue tie merges duration into one sustained
