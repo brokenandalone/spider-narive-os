@@ -25,6 +25,8 @@ class StudioProductionGUITests(unittest.TestCase):
         cls.workbench_class = InstrumentWorkbench
         cls.arranger_class = SongProductionPanel
         cls.wave_class = WaveformEditPanel
+        from studio.dj_deck_panel import DJDeckPanel
+        cls.dj_class = DJDeckPanel
 
     def test_capture_edit_and_mixer_controls(self):
         workbench = self.workbench_class()
@@ -62,6 +64,7 @@ class StudioProductionGUITests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "studio/main.py").read_text()
         self.assertIn("self.tool_tabs.addTab(song_scroll, 'Song Arranger & Mixer')", source)
         self.assertIn("self.tool_tabs.addTab(waveform_scroll, 'Waveform Editor')", source)
+        self.assertIn("self.tool_tabs.addTab(dj_scroll, 'DJ Decks')", source)
         self.assertIn("from .song_production_panel import SongProductionPanel", source)
         self.assertIn("from .waveform_edit_panel import WaveformEditPanel", source)
         w = self.wave_class()
@@ -71,6 +74,15 @@ class StudioProductionGUITests(unittest.TestCase):
             self.assertGreaterEqual(w.canvas.minimumHeight(), 220)
         finally:
             w.close()
+        deck = self.dj_class()
+        try:
+            self.assertEqual(deck.decks, [None, None])
+            self.assertEqual(deck.cross.value(), 0)
+            deck.cross.setValue(100)
+            self.assertEqual(deck.cross.value(), 100)
+            self.assertEqual(deck.gains[0].value(), 100)
+        finally:
+            deck.close()
 
 if __name__ == "__main__":
     unittest.main()
