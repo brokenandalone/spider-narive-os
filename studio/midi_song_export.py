@@ -9,8 +9,12 @@ import os
 from pathlib import Path
 import struct
 import tempfile
-from .instruments_engine import DRUMS, TRACKS
-from .song_arranger_engine import Song
+try:
+    from .instruments_engine import DRUMS, TRACKS
+    from .song_arranger_engine import Song
+except ImportError:
+    from instruments_engine import DRUMS, TRACKS
+    from song_arranger_engine import Song
 
 PPQ = 480
 TICKS_STEP = PPQ // 4
