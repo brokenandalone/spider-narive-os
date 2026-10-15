@@ -142,6 +142,10 @@ class TestScorePerformer(unittest.TestCase):
             notation = Path(directory) / "score.musicxml"
             notation.write_text(SCORE)
             self.assertEqual(load_notation(notation).bpm, 96)
+            imported = load_notation(notation)
+            self.assertEqual(imported.origin, notation.resolve())
+            with self.assertRaisesRegex(ValueError, "original sheet music"):
+                export_performance_midi(imported, notation)
 
     def test_safe_compressed_mxl_and_reject_path_traversal(self):
         with tempfile.TemporaryDirectory() as directory:
