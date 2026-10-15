@@ -33,6 +33,7 @@ from webbie_face import (asleep as face_asleep, set_sleep as set_face_sleep,
                          full_screen_display, set_display_mode)
 from media_panel import MediaPanel
 from immersive_bays import ImmersiveBay, SCENES
+from workspace_max_native import NativeWorkspaceTools, WORKSPACE_TO_MAX
 from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
 from window_overview import WindowOverview
@@ -431,6 +432,11 @@ class TheWeb(QMainWindow):
                 layout.addWidget(ImmersiveBay(name, page))
             bay_row = QHBoxLayout(); layout.addLayout(bay_row, 1)
             bay_row.addWidget(self.application_panel(name))
+            # Native tabs keep the original application AND its advanced MAX tools.
+            workspace_tabs = QTabWidget(page) if name in WORKSPACE_TO_MAX else None
+            if workspace_tabs is not None:
+                workspace_tabs.setObjectName('nativeBayToolsTabs')
+                bay_row.addWidget(workspace_tabs, 1)
             try:
                 if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
                 elif name == 'media': native = MediaPanel(self.launch_media)
@@ -442,7 +448,12 @@ class TheWeb(QMainWindow):
                 native.show_webbie_review = self.show_author_review
             if native:
                 native.setParent(page); native.setWindowFlags(Qt.Widget)
-                area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native); bay_row.addWidget(area, 1); native.show()
+                area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native)
+                if workspace_tabs is not None:
+                    workspace_tabs.addTab(area, 'Original workspace')
+                else:
+                    bay_row.addWidget(area, 1)
+                native.show()
             else:
                 if name in {'system', 'recovery'}:
                     surface = SystemPanel(SPIDER_ROOT, recovery=name == 'recovery'); page.native = surface
@@ -450,7 +461,14 @@ class TheWeb(QMainWindow):
                     surface = QWidget(); surface.setObjectName('root'); body = QVBoxLayout(surface)
                     heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
                     body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1)
-                bay_row.addWidget(surface, 1)
+                if workspace_tabs is not None:
+                    workspace_tabs.addTab(surface, 'Original workspace')
+                else:
+                    bay_row.addWidget(surface, 1)
+            if workspace_tabs is not None:
+                advanced = NativeWorkspaceTools(name, workspace_tabs)
+                page.advanced_tools = advanced
+                workspace_tabs.addTab(advanced, 'Advanced tools & tasks')
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
         self.update_webbie_context()
@@ -473,6 +491,12 @@ class TheWeb(QMainWindow):
         except RuntimeError as error: self.status.setText(str(error))
 
     def can_close(self, page):
+        # Do not destroy worker threads running a MAX operation in this bay.
+        advanced = getattr(page, 'advanced_tools', None)
+        worker = getattr(advanced, 'worker', None)
+        if worker and worker.isRunning():
+            self.status.setText('Wait for the workspace analysis to finish before closing this bay.')
+            return False
         native = getattr(page, 'native', None)
         worker = getattr(native, 'worker', None)
         if worker and worker.isRunning():
