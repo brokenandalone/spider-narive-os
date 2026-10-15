@@ -134,7 +134,6 @@ jobs:
           done
           test -s build/iso-mount/casper/vmlinuz
           test -s build/iso-mount/casper/initrd
-          cp build/iso-mount/casper/install-sources.yaml build/upstream-probe/
           /usr/bin/python3 - <<'PY'
           from pathlib import Path, PurePosixPath
           import importlib.util
