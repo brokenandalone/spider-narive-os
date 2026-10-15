@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     for name in main.WORKSPACES:
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
-    assert window.tabs.count()==15
+    assert window.tabs.count()==len(main.WORKSPACES)
     for name in ['system', 'recovery']:
         panel = window.workspace_widgets[name].native
         assert panel is not None and panel.tables['storage'].rowCount() > 0
@@ -86,7 +86,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     window.open_audio(); assert system.tabs.currentWidget() is system.audio_page
     author=window.workspace_widgets['author'].native
     window.open_author();window.open_author();assert window.workspace_widgets['author'].native is author
-    assert window.tabs.count()==15
+    assert window.tabs.count()==len(main.WORKSPACES)
     for name in ['author','study','studio','forage','deep-forage','webbie','kali-bay']:
         assert window.workspace_widgets[name].native is not None, (name, getattr(window.workspace_widgets[name], 'native_error', 'no error detail'))
     book=author.store.create_book('Desktop test');chapter=author.store.create_chapter(book,'One','Original')
@@ -126,11 +126,11 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     wallpaper_id=window.wallpaper_catalog.defaults['deep-forage']
     window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))
     window.open_author();assert window.close()
-    reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
+    reopened=main.TheWeb();assert reopened.tabs.count()==len(main.WORKSPACES);assert reopened.current_workspace=='author'
     assert reopened.appearance=='light'
     assert reopened.background_surface.appearance=='light'
     assert reopened.taskbar.styleSheet()==reopened.styleSheet()
     assert reopened.workspace_widgets['author'].native.store.chapter(chapter)['content']=='Edited inside the workspace tab'
     assert reopened.wallpaper_catalog.selected_id('deep-forage')==wallpaper_id
     assert reopened.close();app.processEvents()
-print('DESKTOP INTEGRATION PASSED: 15 tabs, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')
+print('DESKTOP INTEGRATION PASSED: full native bay registry, project workbenches, saved editing/state/wallpapers and safe close')
