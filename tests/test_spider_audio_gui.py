@@ -105,6 +105,10 @@ class StudioProductionGUITests(unittest.TestCase):
             self.assertIsNotNone(panel.performance)
             self.assertEqual(panel.performance.parts[0].name, "Guitar")
             self.assertGreater(len(panel.performance.notes), 12)
+            self.assertEqual(panel.part_select.count(), 1)
+            self.assertEqual(panel.patch_select.currentIndex(), 24)
+            panel.patch_select.setCurrentIndex(30)
+            self.assertEqual(panel.performance.parts[0].program, 30)
         finally:
             panel.close()
 
