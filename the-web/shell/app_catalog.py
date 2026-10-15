@@ -67,7 +67,6 @@ UBUNTU_STUDIO_DESKTOP_IDS = {
     "studio": (
         "spider-studio.desktop",
         "studio.desktop",
-        "idjc.desktop",
         "aeolus.desktop",
         "zita-at1.desktop",
         "devede_ng.py.desktop",
@@ -94,6 +93,7 @@ UBUNTU_STUDIO_DESKTOP_IDS = {
         "ubuntustudio-audio-config.desktop",
     ),
     "media": (
+        "idjc.desktop",
         "org.kde.kid3.desktop",
         "org.kde.kid3-qt.desktop",
         "freeshow_freeshow.desktop",
@@ -163,7 +163,7 @@ KNOWN_APPLICATIONS = (
     ("deep-forage", ("deep forage", "deep-forage")),
     ("forage", ("forage",)),
     ("kali-bay", ("kali bay", "kali-bay")),
-    ("studio", ("spider studio", "spider-studio", "internet dj console",
+    ("studio", ("spider studio", "spider-studio",
        "aeolus", "zita-at1", "zita-rev1", "zita-mu1", "dgEdit",
        "ffado mixer studio", "fluidsynth", "jack mixer", "jack_mixer",
        "jacktrip", "patchance", "phaseX", "freewheeling",
@@ -179,7 +179,7 @@ KNOWN_APPLICATIONS = (
        "calf", "lsp plugin", "kdenlive", "shotcut", "openshot",
        "olive editor", "olive video", "obs studio", "obs-studio",
        "obsidian video", "handbrake", "k3b", "brasero")),
-    ("media", ("kid3", "freeShow", "openlp", "vlc", "audacious", "mpv", "smplayer", "dragon player",
+    ("media", ("internet dj console", "kid3", "freeShow", "openlp", "vlc", "audacious", "mpv", "smplayer", "dragon player",
        "elisa", "rhythmbox", "strawberry", "clementine", "haruna",
        "parole", "steam", "lutris", "retroarch", "spider media center")),
     ("art-lab", ("spectacle", "color profile viewer", "krita", "gimp", "inkscape", "blender", "darktable",
@@ -218,7 +218,8 @@ KNOWN_APPLICATIONS = (
 
 def _has_name(identity, term):
     import re
-    return bool(re.search(r"(?<![a-z0-9])" + re.escape(term) + r"(?![a-z0-9])", identity))
+    return bool(re.search(r"(?<![a-z0-9])" + re.escape(term.casefold()) +
+                          r"(?![a-z0-9])", identity.casefold()))
 
 
 def workspace_for(desktop_id, name, categories):
