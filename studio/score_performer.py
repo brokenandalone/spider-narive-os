@@ -11,6 +11,7 @@ from fractions import Fraction
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
+from zipfile import ZipFile, BadZipFile
 
 MAX_BYTES = 2_000_000
 MAX_PARTS = 15
@@ -365,9 +366,54 @@ def parse_ascii_tab(text, bpm=110, slots_per_beat=2):
                         "Bends, slides, palm mute, hammer-ons and guitar articulation are not interpreted."]).validated()
 
 
+def load_compressed_musicxml(path):
+    """Load .mxl MusicXML with bounded in-memory ZIP inspection, never extraction."""
+    target = Path(path)
+    if target.stat().st_size > MAX_BYTES:
+        raise ValueError("MXL archive exceeds 2 MB")
+    try:
+        with ZipFile(target, "r") as bundle:
+            members = bundle.infolist()
+            if len(members) > 48:
+                raise ValueError("MXL contains too many files")
+            if any(member.flag_bits & 1 for member in members):
+                raise ValueError("Encrypted MXL entries are not supported")
+            if sum(member.file_size for member in members) > 4 * MAX_BYTES:
+                raise ValueError("MXL decompressed content exceeds safe limits")
+            if any(member.file_size > MAX_BYTES for member in members):
+                raise ValueError("MXL entry exceeds 2 MB")
+            if "META-INF/container.xml" not in bundle.namelist():
+                raise ValueError("MXL score manifest is missing")
+            container_data = bundle.read("META-INF/container.xml")
+            if re.search(br"<!\\s*(?:DOCTYPE|ENTITY)\\b", container_data, re.IGNORECASE):
+                raise ValueError("MXL XML entities are not accepted")
+            manifest = ET.fromstring(container_data)
+            if local(manifest.tag) != "container":
+                raise ValueError("Invalid MXL manifest")
+            rootfiles = next((node for node in manifest.iter()
+                              if local(node.tag) == "rootfiles"), None)
+            candidates = children(rootfiles, "rootfile") if rootfiles is not None else []
+            if not candidates:
+                raise ValueError("MXL root score is missing")
+            member_path = candidates[0].attrib.get("full-path", "")
+            # Never trust ZIP entry names as filesystem paths. Read chosen
+            # bytes from memory only; ignore non-score image/media attachments.
+            if (not member_path or member_path.startswith("/")
+                or "\\" in member_path or ".." in Path(member_path).parts
+                or Path(member_path).suffix.lower() not in (".musicxml", ".xml")
+                or member_path not in bundle.namelist()):
+                raise ValueError("MXL points to an invalid score entry")
+            score_data = bundle.read(member_path)
+            return parse_musicxml(score_data, target.stem)
+    except (BadZipFile, ET.ParseError) as exc:
+        raise ValueError("Invalid compressed MusicXML archive") from exc
+
+
 def load_notation(path, bpm=110, slots_per_beat=2):
     """Read supported files; plain TXT TAB and uncompressed MusicXML only."""
     filename = Path(path)
+    if filename.suffix.lower() == ".mxl":
+        return load_compressed_musicxml(filename)
     if filename.suffix.lower() in (".musicxml", ".xml"):
         if filename.stat().st_size > MAX_BYTES:
             raise ValueError("MusicXML exceeds the 2 MB limit")
@@ -377,4 +423,4 @@ def load_notation(path, bpm=110, slots_per_beat=2):
             raise ValueError("TAB exceeds the 40 KB limit")
         return parse_ascii_tab(filename.read_text(encoding="utf-8"),
                                bpm=bpm, slots_per_beat=slots_per_beat)
-    raise ValueError("Use .musicxml or .xml for notation, or .txt for ASCII guitar/bass TAB")
+    raise ValueError("Use .mxl/.musicxml/.xml for notation, or .txt for guitar/bass TAB")
