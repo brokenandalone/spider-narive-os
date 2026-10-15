@@ -97,10 +97,34 @@ The live ISO no longer forces plymouth.enable=0, but its inherited upstream init
 
 ## Preflight on your existing Ubuntu Studio 26.04 host
 
-    bash distro/check-26-10-readiness.sh
+First run the one-command **unprivileged and non-invasive** host report,
+from a checked-out copy of this migration branch:
+
+    bash distro/report-inplace-26-10.sh
+
+This saves a local SUMMARY.txt, exact installed package inventory,
+current 26.04-only apt simulation, source file names, service snapshot and
+the known /lib32 dangling-link hazard. It makes no package, boot, service,
+root-filesystem or release-upgrade changes. It needs no sudo or USB and never
+contains a 26.10 proposed-removal simulation because that list is not available
+until the release upgrader actually calculates it.
+
+If a source checkout is not yet on the PC, a single safe fetch and execution
+from the branch can be used in Konsole:
+
+    curl -fL --retry 3 https://raw.githubusercontent.com/brokenandalone/spider-narive-os/upgrade/2610-startup-sets-20261015/distro/report-inplace-26-10.sh -o "$HOME/Downloads/spider-2610-readiness.sh"
+    bash "$HOME/Downloads/spider-2610-readiness.sh"
+
+Review the displayed SUMMARY.txt and blocker list first. The existing
+full preflight remains available for an **optional later privileged audit**:
+
     bash distro/preflight-inplace-upgrade.sh
 
-Both inspect and report. Neither invokes the release upgrade. Back up your files, service configuration, encrypted disk header, boot files, Kali Bay volumes, Webbie models, and all live Bay content to a separately accessible location such as network storage or cloud storage. No USB creation is required. Preserve the exact LUKS unlock flow. Reconcile newer local program files against pinned Git sources before any overlay copy.
+That existing full preflight asks for sudo and copies sensitive system config
+into the user's home. Keep its report private, especially the crypttab and
+system-service archives. Do not upload it publicly.
+
+Neither preflight invokes the actual release upgrade. Back up your files, service configuration, encrypted disk header, boot files, Kali Bay volumes, Webbie models, and all live Bay content to a separately accessible location such as network storage or cloud storage. No USB creation is required. Preserve the exact LUKS unlock flow. Reconcile newer local program files against pinned Git sources before any overlay copy.
 
 Only after review, switch the release upgrader from Prompt=lts to Prompt=normal via Ubuntu Studio's Software Sources settings. Use the supported normal do-release-upgrade path, not the -d development path or manual apt-codename rewriting.
 
