@@ -136,8 +136,8 @@ def import_midi(source):
         pos = end
     if pos != len(source):
         raise ValueError("MIDI file contains unexpected trailing data")
-    tempo_events = sorted((tick, (b[0]<<16 | b[1]<<8 | b[2]))
-                          for tick, kind, b, _ in all_events if kind == "tempo")
+    tempo_events = sorted((event[0], (event[2][0]<<16 | event[2][1]<<8 | event[2][2]))
+                          for event in all_events if len(event) == 4 and event[1] == "tempo")
     tempo = 120
     tempo_changes = []
     for tick, micros in tempo_events:
@@ -156,7 +156,7 @@ def import_midi(source):
                 tempo_changes.append((beat, bpm))
     meter = (4,4)
     warnings = []
-    for tick, kind, payload, _ in all_events:
+    for tick, kind, payload, _ in (event for event in all_events if len(event) == 4):
         if kind == "meter":
             candidate = (payload[0], 2**payload[1])
             if not 1 <= candidate[0] <= 16 or candidate[1] not in (1,2,4,8,16):
@@ -170,7 +170,7 @@ def import_midi(source):
     channel_events = sorted(
         (tick, 0 if kind == 0x80 or kind == 0x90 and payload[1] == 0 else 1,
          tid, channel, kind, payload)
-        for tick, channel, kind, payload, tid in all_events if type(channel) is int)
+        for tick, channel, kind, payload, tid in (event for event in all_events if len(event) == 5))
     programs = {}
     track_notes = []
     active = defaultdict(deque)
