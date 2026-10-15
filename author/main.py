@@ -504,6 +504,10 @@ class AuthorWindow(QMainWindow):
                 self.status.setText('Library backup saved.')
 
     def closeEvent(self, event):
+        worker = getattr(self.native_max_tools, 'worker', None)
+        if worker is not None and worker.isRunning():
+            event.ignore()
+            return
         if not self.canon_intelligence.shutdown():
             self.status.setText(
                 'Canon Intelligence is cancelling the running local review. '
