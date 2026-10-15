@@ -17,6 +17,7 @@ from pathlib import Path
 COMPONENTS = (
     "spider-core", "webbie", "forage", "the-web", "kali-bay",
     "study", "media", "system", "studio", "author", "branding",
+    "spider_max_source",
 )
 
 
