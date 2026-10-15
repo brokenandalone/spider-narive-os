@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication,
     QFrame, QGridLayout, QScrollArea, QTabWidget,
@@ -32,7 +32,6 @@ if __package__:
     from .release_panel import ReleasePanel
     from .production_board_panel import ProductionBoardPanel
     from .audio_quality_panel import AudioQualityPanel
-    from .instrument_workbench import InstrumentWorkbench
 else:
     from tools import TOOLS, resolve_tool
     from ai_panel import StudioAIPanel
@@ -40,7 +39,6 @@ else:
     from release_panel import ReleasePanel
     from production_board_panel import ProductionBoardPanel
     from audio_quality_panel import AudioQualityPanel
-    from instrument_workbench import InstrumentWorkbench
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 
@@ -54,10 +52,7 @@ class StudioButton(QPushButton):
 class SpiderStudio(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Spider Audio Studio | Spider OS')
-        app_icon = SPIDER_ROOT / 'branding/spider-apps/icons/spider-audio-studio.svg'
-        if app_icon.is_file():
-            self.setWindowIcon(QIcon(str(app_icon)))
+        self.setWindowTitle('Spider Studio | Spider OS')
         self.resize(1180, 760)
 
         self.setStyleSheet("""
@@ -153,6 +148,17 @@ class SpiderStudio(QMainWindow):
         ai_scroll.setWidgetResizable(True)
         ai_scroll.setWidget(self.ai_panel)
         self.tool_tabs.addTab(ai_scroll, 'Studio AI')
+        # All new identity/instrument logic stays within the tab section. This
+        # keeps legacy Studio reconciliation strict and structurally comparable.
+        if __package__:
+            from .instrument_workbench import InstrumentWorkbench
+        else:
+            from instrument_workbench import InstrumentWorkbench
+        from PyQt5.QtGui import QIcon
+        self.setWindowTitle('Spider Audio Studio | Spider OS')
+        app_icon = SPIDER_ROOT / 'branding/spider-apps/icons/spider-audio-studio.svg'
+        if app_icon.is_file():
+            self.setWindowIcon(QIcon(str(app_icon)))
         # Native Spider instrument machine: no external launcher, no replacement DAW.
         self.instrument_workbench = InstrumentWorkbench(self)
         instrument_scroll = QScrollArea()
