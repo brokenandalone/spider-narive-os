@@ -142,8 +142,9 @@ def summary(local: bytes, incoming: bytes, relative: str):
 def _private_folder(target: Path, *, home: Path, source: Path, installed: Path):
     # Require a new, visible, owner-home destination. Never stage in a Git
     # checkout, system directory or inside the installed native program tree.
-    if not target.is_absolute():
-        raise ValueError("Review directory must be an absolute path")
+    if (not target.is_absolute() or ".." in target.parts or
+            target != target.resolve(strict=False)):
+        raise ValueError("Review directory must be a normalized absolute path")
     home = home.resolve()
     if target.exists() or target.is_symlink() or home not in target.parents:
         raise ValueError("Choose a NEW review directory inside your home")
