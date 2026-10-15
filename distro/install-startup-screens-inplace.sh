@@ -7,7 +7,7 @@ mode="--check"
 if (( $# >= 1 )); then mode="$1"; fi
 preset="spider-purple"
 if (( $# >= 2 )); then preset="$2"; fi
-source_root="$(cd "$(dirname "$0")/../.." && pwd)"
+source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ "$mode" != "--check" && "$mode" != "--apply" ]]; then
     echo "Usage: $0 [--check|--apply] [spider-purple|spider-crimson|spider-nightfall]" >&2
