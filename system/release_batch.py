@@ -263,6 +263,7 @@ APP_FILES = (
     'studio/studio_score_mix.py',
     'studio/soundfont_library.py',
     'studio/midi_score_import.py',
+    'studio/midi_take_recorder.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
