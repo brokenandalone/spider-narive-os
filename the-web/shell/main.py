@@ -391,6 +391,7 @@ class TheWeb(QMainWindow):
         'communications': 'Communications Assistant',
         'kali-bay': 'Security Assistant', 'system': 'System Technician',
         'recovery': 'Recovery Assistant', 'games': 'Normal',
+        'productivity': 'Planning Assistant', 'devices': 'Device Technician',
     }
 
     def setup_webbie_assistant(self):
@@ -753,7 +754,7 @@ class TheWeb(QMainWindow):
                     workspace_tabs.addTab(surface, 'Native workspace')
                 else:
                     bay_row.addWidget(surface, 1)
-            mission_desk = BayMissionPanel(name, workspace_tabs)
+            mission_desk = BayMissionPanel({'recovery': 'system', 'games': 'media'}.get(name, name), workspace_tabs)
             page.mission_desk = mission_desk
             workspace_tabs.addTab(mission_desk, 'Projects & missions')
             if name in WORKSPACE_TO_MAX:
