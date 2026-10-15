@@ -37,6 +37,13 @@ class InstalledSourceAuditTests(unittest.TestCase):
         target.write_text(data)
         return target
 
+    def test_tracks_vendored_max_source_without_reading_private_files(self):
+        self.source("spider_max_source/spider_monster/max_catalog.py", "safe")
+        self.deployed("spider_max_source/spider_monster/max_catalog.py", "safe")
+        result = module.audit(self.repo, self.installed)
+        self.assertEqual(result["total_tracked"], 1)
+        self.assertEqual(result["components"]["spider_max_source"]["matching"], 1)
+
     def test_identical_public_files_match(self):
         self.source("webbie/agent/webbie.py", "print('hi')")
         self.deployed("webbie/agent/webbie.py", "print('hi')")
