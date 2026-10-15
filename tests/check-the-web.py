@@ -126,6 +126,24 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     fake=InstalledApp('ardour.desktop',Path('/tmp/Ardour.desktop'),'Ardour','Record','ardour','studio')
     window.installed_apps=[fake];window.start_menu.populate()
     window.start_menu.search.setText('ardour');assert window.start_menu.results.count()==1
+    # All installed programs stay reachable, even if the primary bay differs.
+    krita = InstalledApp('krita.desktop', Path('/tmp/Krita.desktop'),
+                         'Krita', 'Paint artwork', 'krita', 'art-lab')
+    window.installed_apps = [fake, krita]
+    window.populate_app_list('studio')
+    assert window.app_lists['studio'].count() == 1
+    window.app_scopes['studio'].setCurrentIndex(1)
+    assert window.app_lists['studio'].count() == 2
+    window.app_queries['studio'].setText('krita')
+    assert window.app_lists['studio'].count() == 1
+    assert window.app_lists['studio'].item(0).data(Qt.UserRole) == 'krita.desktop'
+    window.app_lists['studio'].setCurrentRow(0)
+    with patch.object(main, 'save_app_assignment') as save, \\
+            patch.object(window, 'refresh_apps') as refresh:
+        window.assign_selected_app('studio')
+        save.assert_called_once_with('krita.desktop', 'studio')
+        refresh.assert_called_once()
+    window.app_queries['studio'].clear()
     with patch.object(main,'launch_command',return_value=['gio','launch',str(fake.path)]),patch.object(main.subprocess,'Popen') as process, patch.object(main,'wm_command') as wm:
         # Exercise real desktop code paths: launching Firefox-like XDG apps must
         # never turn on KDE Show Desktop and hide the newly opened window.
