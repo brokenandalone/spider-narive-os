@@ -79,7 +79,7 @@ for name in spider-os.service ollama.service; do
 done
 printf 'webbie.service (user): '
 systemctl --user is-active webbie.service 2>/dev/null || true
-printf 'KDE session: %s\n' "\${XDG_CURRENT_DESKTOP:-unknown}"
+printf 'KDE session: %s\n' "${XDG_CURRENT_DESKTOP:-unknown}"
 
 printf '\nThird-party package-source inventory:\n'
 grep -RhlE '^[[:space:]]*(deb |URIs:)' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true
