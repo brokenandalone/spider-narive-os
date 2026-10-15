@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDialo
     QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'the-web' / 'shell'))
+from workspace_max_native import NativeWorkspaceTools
 if __package__:
     from .store import AuthorStore
     from .web_features import AuthorToolkit
@@ -72,6 +74,8 @@ class AuthorWindow(QMainWindow):
         self.toolkit.reviewRequested.connect(self.author_review_requested)
         self.toolkit.editRequested.connect(self.apply_revised_passage)
         tabs.addTab(self.toolkit, 'Writing Studio')
+        self.native_max_tools = NativeWorkspaceTools('author', self)
+        tabs.addTab(self.native_max_tools, 'Atlas, canon & analysis')
         self.project_map = ProjectMap(self.store)
         self.project_map.chapterRequested.connect(self.jump_to_chapter_id)
         self.project_map.statusChanged.connect(self.project_map_status)
@@ -500,6 +504,10 @@ class AuthorWindow(QMainWindow):
                 self.status.setText('Library backup saved.')
 
     def closeEvent(self, event):
+        worker = getattr(self.native_max_tools, 'worker', None)
+        if worker is not None and worker.isRunning():
+            event.ignore()
+            return
         if not self.canon_intelligence.shutdown():
             self.status.setText(
                 'Canon Intelligence is cancelling the running local review. '

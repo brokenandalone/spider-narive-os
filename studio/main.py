@@ -22,6 +22,8 @@ from PyQt5.QtWidgets import (
 SPIDER_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
+sys.path.insert(0, str(SPIDER_ROOT / 'the-web' / 'shell'))
+from workspace_max_native import NativeWorkspaceTools
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .tools import TOOLS, resolve_tool
@@ -146,6 +148,8 @@ class SpiderStudio(QMainWindow):
         ai_scroll.setWidgetResizable(True)
         ai_scroll.setWidget(self.ai_panel)
         self.tool_tabs.addTab(ai_scroll, 'Studio AI')
+        self.native_max_tools = NativeWorkspaceTools('studio', self)
+        self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
         # Preserve the owner-reviewed Studio layout while activating the
         # October 11 production, band mixing and quality-control workspaces.
         self.band_mixer_panel = BandMixerPanel(ai_panel=self.ai_panel)
@@ -296,6 +300,14 @@ class SpiderStudio(QMainWindow):
         self.ollama_status.setText(
             '● Ollama: INSTALLED' if shutil.which('ollama') else '○ Ollama: NOT FOUND'
         )
+
+
+    def closeEvent(self, event):
+        worker = getattr(self.native_max_tools, 'worker', None)
+        if worker is not None and worker.isRunning():
+            event.ignore()
+            return
+        super().closeEvent(event)
 
 
 def main():

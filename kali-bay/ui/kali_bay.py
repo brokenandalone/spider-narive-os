@@ -297,6 +297,10 @@ class KaliEvidenceWorker(QThread):
             self.failed.emit(str(error))
 
 
+# The read-only MAX tools are embedded in the original Kali Bay window.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'the-web' / 'shell'))
+from workspace_max_native import NativeWorkspaceTools
+
 class KaliBayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -609,6 +613,8 @@ class KaliBayWindow(QMainWindow):
         )
         self._focus_search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self._focus_search_shortcut.activated.connect(self.focus_tool_search)
+        self.native_max_tools = NativeWorkspaceTools('kali-bay', self)
+        self.security_tabs.addTab(self.native_max_tools, 'EVIDENCE & LAB ANALYSIS')
         outer.addWidget(self.security_tabs, 1)
 
         warning = QLabel(
@@ -1235,6 +1241,10 @@ class KaliBayWindow(QMainWindow):
         self.webbie_chat_entry.setFocus()
 
     def closeEvent(self, event):
+        worker = getattr(self.native_max_tools, 'worker', None)
+        if worker is not None and worker.isRunning():
+            event.ignore()
+            return
         if self.evidence_worker and self.evidence_worker.isRunning():
             event.ignore()
             self.lab_status.setText(

@@ -33,6 +33,8 @@ sys.path.insert(0, str(SPIDER_ROOT / 'the-web/overlay'))
 from webbie_face import (asleep as face_asleep, set_sleep as set_face_sleep,
                          full_screen_display, set_display_mode)
 from media_panel import MediaPanel
+from immersive_bays import ImmersiveBay, SCENES
+from workspace_max_native import NativeWorkspaceTools, WORKSPACE_TO_MAX
 from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
 from window_overview import WindowOverview
@@ -349,6 +351,11 @@ class TheWeb(QMainWindow):
         home_layout.addLayout(self.recent_grid)
         self.render_recent_shortcuts()
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
+        home_actions = button('The Web: advanced tools & tasks', self.toggle_home_tools)
+        home_layout.addWidget(home_actions)
+        self.home_max_tools = NativeWorkspaceTools('default', home)
+        self.home_max_tools.setVisible(False)
+        home_layout.addWidget(self.home_max_tools, 1)
         content = QWidget(); content.setObjectName('root'); scroll.setWidget(content); grid = QGridLayout(content); grid.setAlignment(Qt.AlignTop | Qt.AlignLeft); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(14)
         for index, (workspace, label) in enumerate((k, v) for k, v in WORKSPACES.items() if k != 'default'):
             shortcut = button(label, lambda checked=False, name=workspace: self.open_workspace(name)); shortcut.setFixedWidth(175)
@@ -697,11 +704,25 @@ class TheWeb(QMainWindow):
         if action is not None and ident in {key for key, _, _ in INTERNAL_ACTIONS}:
             action()
 
+    def toggle_home_tools(self):
+        shown = not self.home_max_tools.isVisible()
+        self.home_max_tools.setVisible(shown)
+        if shown:
+            self.home_max_tools.reload()
+
     def open_workspace(self, name):
         if name not in WORKSPACES: return
         if name not in self.workspace_widgets:
             page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
-            layout = QHBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8); layout.addWidget(self.application_panel(name))
+            layout = QVBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8)
+            if name in SCENES:
+                layout.addWidget(ImmersiveBay(name, page))
+            bay_row = QHBoxLayout(); layout.addLayout(bay_row, 1)
+            bay_row.addWidget(self.application_panel(name))
+            workspace_tabs = QTabWidget(page) if name in WORKSPACE_TO_MAX else None
+            if workspace_tabs is not None:
+                workspace_tabs.setObjectName('nativeBayToolsTabs')
+                bay_row.addWidget(workspace_tabs, 1)
             try:
                 if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
                 elif name == 'media': native = MediaPanel(self.launch_media)
@@ -713,7 +734,12 @@ class TheWeb(QMainWindow):
                 native.show_webbie_review = self.show_author_review
             if native:
                 native.setParent(page); native.setWindowFlags(Qt.Widget)
-                area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native); layout.addWidget(area, 1); native.show()
+                area = QScrollArea(); area.setWidgetResizable(True); area.setWidget(native)
+                if workspace_tabs is not None:
+                    workspace_tabs.addTab(area, 'Original workspace')
+                else:
+                    bay_row.addWidget(area, 1)
+                native.show()
             else:
                 if name in {'system', 'recovery'}:
                     surface = SystemPanel(SPIDER_ROOT, recovery=name == 'recovery'); page.native = surface
@@ -721,7 +747,23 @@ class TheWeb(QMainWindow):
                     surface = QWidget(); surface.setObjectName('root'); body = QVBoxLayout(surface)
                     heading = QLabel(WORKSPACES[name]); heading.setFont(QFont('Sans Serif', 26, QFont.Bold)); body.addWidget(heading)
                     body.addWidget(QLabel('Open an installed app from this workspace.')); body.addStretch(1)
-                layout.addWidget(surface, 1)
+                if workspace_tabs is not None:
+                    workspace_tabs.addTab(surface, 'Original workspace')
+                else:
+                    bay_row.addWidget(surface, 1)
+            if workspace_tabs is not None:
+                advanced = NativeWorkspaceTools(name, workspace_tabs)
+                page.advanced_tools = advanced
+                workspace_tabs.addTab(advanced, 'Advanced tools & tasks')
+                page.extra_max_tools = []
+                if name == 'media':
+                    extra = NativeWorkspaceTools('bcn-nova', workspace_tabs)
+                    page.extra_max_tools.append(extra)
+                    workspace_tabs.addTab(extra, 'BCN / Nova radio tools')
+                elif name == 'system':
+                    extra = NativeWorkspaceTools('backups', workspace_tabs)
+                    page.extra_max_tools.append(extra)
+                    workspace_tabs.addTab(extra, 'Backup & integrity tools')
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
         if name != 'default':
@@ -749,6 +791,14 @@ class TheWeb(QMainWindow):
 
     def can_close(self, page):
         native = getattr(page, 'native', None)
+        live_tools = [getattr(page, 'advanced_tools', None)] + list(
+            getattr(page, 'extra_max_tools', ()))
+        live_tools.append(getattr(native, 'native_max_tools', None))
+        for tool in live_tools:
+            worker = getattr(tool, 'worker', None)
+            if worker and worker.isRunning():
+                self.status.setText('Finish workspace analysis before closing this bay.')
+                return False
         worker = getattr(native, 'worker', None)
         if worker and worker.isRunning():
             self.status.setText('A workspace task is still running. Keep this tab open until it finishes.'); return False
