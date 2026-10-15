@@ -22,6 +22,8 @@ from PyQt5.QtWidgets import (
 SPIDER_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
+sys.path.insert(0, str(SPIDER_ROOT / 'the-web' / 'shell'))
+from workspace_max_native import NativeWorkspaceTools
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .tools import TOOLS, resolve_tool
@@ -138,6 +140,8 @@ class SpiderStudio(QMainWindow):
         ai_scroll.setWidgetResizable(True)
         ai_scroll.setWidget(self.ai_panel)
         self.tool_tabs.addTab(ai_scroll, 'Studio AI')
+        self.native_max_tools = NativeWorkspaceTools('studio', self)
+        self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
         self.tool_buttons = []
         for category, tools in TOOLS.items():
             page = QWidget(); grid = QGridLayout(page)
