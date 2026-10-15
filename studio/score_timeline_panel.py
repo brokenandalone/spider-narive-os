@@ -9,8 +9,10 @@ from PyQt5.QtWidgets import (
 )
 try:
     from .score_edit_session import ScoreEditor
+    from .spider_piano_roll import SpiderPianoRoll
 except ImportError:
     from score_edit_session import ScoreEditor
+    from spider_piano_roll import SpiderPianoRoll
 
 PAGE_SIZE=300
 
@@ -46,6 +48,9 @@ class ScoreTimelinePanel(QWidget):
         self.totals=QLabel("No performance loaded.")
         row.addWidget(self.totals,1)
         layout.addLayout(row)
+        self.piano=SpiderPianoRoll(self)
+        self.piano.note_selected.connect(self._roll_note_selected)
+        layout.addWidget(self.piano)
         self.table=QTableWidget(0,6)
         self.table.setHorizontalHeaderLabels(
             ["Part","Pitch","Start (beats)","Length (beats)","Velocity","Instrument"])
@@ -158,6 +163,7 @@ class ScoreTimelinePanel(QWidget):
             index=(self.page.value()-1)*PAGE_SIZE
             subset=score.notes[index:index+PAGE_SIZE]
             self.table.setRowCount(len(subset))
+            self.piano.set_notes(subset)
             for row,note in enumerate(subset):
                 part=score.parts[note.part]
                 values=(part.name,str(note.pitch),str(note.start),str(note.duration),
@@ -171,11 +177,16 @@ class ScoreTimelinePanel(QWidget):
         finally:
             self.table.blockSignals(False)
 
+    def _roll_note_selected(self,index):
+        if 0 <= index < self.table.rowCount():
+            self.table.selectRow(index)
+
     def _note_selected(self):
         try:
             note=self.editor.score.notes[self._chosen()]
         except (ValueError,IndexError,AttributeError):
             return
+        self.piano.set_selected(self.table.currentRow())
         self.pitch.setValue(note.pitch)
         self.start.setText(str(note.start))
         self.duration.setText(str(note.duration))
