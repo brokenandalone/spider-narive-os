@@ -165,6 +165,7 @@ class SpiderStudio(QMainWindow):
         instrument_scroll.setWidgetResizable(True)
         instrument_scroll.setWidget(self.instrument_workbench)
         self.tool_tabs.addTab(instrument_scroll, 'Play Instruments')
+        self.instrument_page = instrument_scroll
         if __package__:
             from .song_production_panel import SongProductionPanel
         else:
@@ -293,12 +294,11 @@ class SpiderStudio(QMainWindow):
             self.status.setText(f'Opened {tool[0]}.')
 
     def launch_music(self):
-        for tool in TOOLS['Recording & mixing']:
-            command = resolve_tool(tool)
-            if command:
-                self.launch(command)
-                return
-        self.status.setText('No supported DAW or audio editor was detected. Refresh installed tools after checking the Ubuntu Studio menu.')
+        # The music sidebar button must open Spider's REAL native tools, not
+        # launch another DAW as a substitute. Ubuntu Studio apps remain
+        # available in the preserved installed-tool tabs when needed.
+        self.tool_tabs.setCurrentWidget(self.instrument_page)
+        self.status.setText('Spider Audio Studio instruments are ready in this window.')
 
     def media_command(self):
         try:
