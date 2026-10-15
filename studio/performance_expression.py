@@ -100,16 +100,16 @@ def express(performance: Performance, expression: Expression = Expression()):
         if config.groove == "Natural player":
             delta += Fraction(round(variability * 12), 1000) * current_tempo / 60
         elif config.groove == "Behind the beat":
-            delta += Fraction(24 + round(variability * 7), 1000) * score.bpm / 60
+            delta += Fraction(24 + round(variability * 7), 1000) * current_tempo / 60
         elif config.groove == "Swing 60%":
             # Eighth-note offbeat moves from beat fraction .5 to .6.
             if (start % 1) == Fraction(1, 2):
                 delta += Fraction(1, 10)
-            delta += Fraction(round(variability * 4), 1000) * score.bpm / 60
+            delta += Fraction(round(variability * 4), 1000) * current_tempo / 60
         elif config.groove == "Driving rock":
             if instrument in ("drums", "bass"):
-                delta -= Fraction(5, 1000) * score.bpm / 60
-            delta += Fraction(round(variability * 5), 1000) * score.bpm / 60
+                delta -= Fraction(5, 1000) * current_tempo / 60
+            delta += Fraction(round(variability * 5), 1000) * current_tempo / 60
         start = max(Fraction(0), min(score.beats - Fraction(1, 480), start + delta))
         duration = min(duration, score.beats - start)
         if duration <= 0:
