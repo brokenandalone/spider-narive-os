@@ -88,6 +88,6 @@ grep -RhlE '^[[:space:]]*(deb |URIs:)' /etc/apt/sources.list /etc/apt/sources.li
 echo
 echo "REQUIRED HUMAN GATES: external backup and restore test; LUKS header backup"
 echo "stored offline; third-party apt source review; audio and Webbie baseline;"
-echo "boot recovery media; two successful 26.04 reboots; Spider 26.10 VM install,"
+echo "a reviewed non-USB recovery strategy; two successful 26.04 reboots; optional VM tests,"
 echo "encrypted-unlock test, live login and second reboot; splash password prompt test."
 echo "No changes made. Do not run do-release-upgrade until these are reviewed."
