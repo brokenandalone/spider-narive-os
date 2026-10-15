@@ -80,6 +80,36 @@ This script is **read-only**: it hashes paths already tracked in the public repo
 
 If your installed Spider OS programs live elsewhere, give `--installed-root` the right root. Never infer installation success from a passing CI build.
 
+## Preflight BLOCKED on the actual 26.04 PC
+
+The user ran the guarded `system/release_batch.py check` on 2026-10-15.
+Its result was **31 BLOCKED locally customized files**, **186 CURRENT**
+managed files, **26 ADD** candidates, and **no UPGRADE** candidates.
+The working desktop shell, Webbie/voice, BCN/Nova, Studio, Study, Author,
+Kali and Forage modules were among the protected changes. The installer
+correctly exited with **PRE-FLIGHT BLOCKED; no changes made**.
+
+In particular, adding `immersive_bays.py`, `workspace_max_native.py`
+and the vendored MAX engine without merging the locally customized
+`the-web/shell/main.py` does not activate the integrated native bays.
+Do not force the batch installer with elevated privileges or replace
+the machine's working programs directly from GitHub.
+
+**Next read-only comparison, run locally without sudo:**
+
+```bash
+git -C ~/spider-os-2604-trial pull --ff-only
+python3 -B ~/spider-os-2604-trial/tools/compare-native-2604.py
+```
+
+This prints symbol names and structure counts for critical locally
+modified application files, plus the current-shell integration references.
+For all changed managed application files, add `--all`. It never
+executes installed programs, outputs file contents, performs external
+network requests or makes changes. Its output helps plan file-by-file
+merges that retain local behavior. The tool is **not** an install command.
+Any subsequent release still requires explicit rollback and live validation.
+
 ## Qualification gates
 
 1. Validate source syntax and 26.04.1 upstream SHA256SUMS signature on disposable GitHub runners.
