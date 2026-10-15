@@ -33,7 +33,9 @@ def workspace_folders(workspace, home=None):
         'dev-bay': [('Spider OS source', home / 'spider-narive-os'), ('Development projects', spider / 'Dev Bay')],
         'communications': [('Communications documents', spider / 'Communications')],
         'recovery': [('Spider OS upgrade backups', spider / 'Upgrade Backups'), ('Local recovery files', home / 'Spider-OS-Backups')],
-        'system': [('Spider OS documents', spider)],
+        'system': [('Spider OS documents', spider), ('Recovery backups', spider / 'Upgrade Backups')],
+        'productivity': [('Planning documents', spider / 'Productivity')],
+        'devices': [('Device reports', spider / 'Devices')],
         'games': [('Games and saves', spider / 'Games')],
     }
     return [(label, path) for label, path in entries.get(workspace, [])]
