@@ -250,6 +250,11 @@ APP_FILES = (
     'studio/dj_deck_engine.py',
     'studio/dj_deck_panel.py',
     'studio/midi_input_panel.py',
+    # Score-driven autonomous instrument performance, opt-in samples only.
+    'studio/score_performer.py',
+    'studio/score_midi.py',
+    'studio/soundfont_render.py',
+    'studio/auto_performer_panel.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
