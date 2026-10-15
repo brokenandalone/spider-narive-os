@@ -14,7 +14,7 @@ import wave
 from PyQt5.QtCore import Qt, QBuffer, QByteArray, QIODevice, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QFileDialog, QComboBox, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
-    QPushButton, QSpinBox, QVBoxLayout, QWidget,
+    QPushButton, QSpinBox, QVBoxLayout, QWidget, QSlider, QCheckBox,
 )
 
 try:
@@ -26,12 +26,16 @@ try:
     from .score_performer import parse_musicxml, parse_ascii_tab, load_notation
     from .chord_chart_performer import parse_chord_chart
     from .score_midi import export_performance_midi
-    from .soundfont_render import quality_backend_available, render_soundfont
+    from .soundfont_render import quality_backend_available, render_soundfont, validate_soundfont
+    from .performance_expression import Expression, GROOVES, express
+    from .studio_score_mix import MixChannel, render_score_mix
 except ImportError:
     from score_performer import parse_musicxml, parse_ascii_tab, load_notation
     from chord_chart_performer import parse_chord_chart
     from score_midi import export_performance_midi
-    from soundfont_render import quality_backend_available, render_soundfont
+    from soundfont_render import quality_backend_available, render_soundfont, validate_soundfont
+    from performance_expression import Expression, GROOVES, express
+    from studio_score_mix import MixChannel, render_score_mix
 
 TAB_EXAMPLE = """e|--0---2---3---2-|
 B|--1---3---0---3-|
@@ -43,16 +47,27 @@ E|----------3-----|"""
 class ScoreRenderWorker(QThread):
     finished_score = pyqtSignal(bool, str, str)
 
-    def __init__(self, performance, soundfont, output, preview=False, parent=None):
+    def __init__(self, performance, soundfont, output, preview=False, parent=None,
+                 banks=None, channels=None, studio_mix=False, rate=48000):
         super().__init__(parent)
         self.performance = performance
         self.soundfont = soundfont
         self.output = output
         self.preview = preview
+        self.banks = dict(banks or {})
+        self.channels = list(channels or [])
+        self.studio_mix = bool(studio_mix)
+        self.rate = rate
 
     def run(self):
         try:
-            result = render_soundfont(self.performance, self.soundfont, self.output)
+            if self.studio_mix or self.banks:
+                result = render_score_mix(
+                    self.performance, self.soundfont, self.output,
+                    part_banks=self.banks, channels=self.channels, rate=self.rate)
+            else:
+                result = render_soundfont(self.performance, self.soundfont, self.output,
+                                          rate=self.rate)
             self.finished_score.emit(True, str(result), "")
         except (OSError, ValueError, RuntimeError) as error:
             self.finished_score.emit(False, "", str(error)[:300])
@@ -62,7 +77,10 @@ class AutoPerformerPanel(QWidget):
         super().__init__(parent)
         self.performance = None
         self.soundfont = None
+        self.part_banks = {}
+        self.mix_channels = []
         self.worker = None
+        self._play_after = False
         self._audio = None
         self._buffer = None
         self._temporary = None
@@ -150,6 +168,65 @@ class AutoPerformerPanel(QWidget):
         self.patch_select.currentIndexChanged.connect(self._patch_selected)
         patch_row.addWidget(self.patch_select, 2)
         layout.addLayout(patch_row)
+
+        # Professional production controls operate on the selected score
+        # part; the user picks local/licensed sample banks one part at a time.
+        bank_row = QHBoxLayout()
+        self.part_bank_label = QLabel("This part uses the default SoundFont")
+        self.part_bank_label.setWordWrap(True)
+        bank_row.addWidget(self.part_bank_label, 1)
+        bank_row.addWidget(self._button("Assign SoundFont to selected part", self.choose_part_bank))
+        bank_row.addWidget(self._button("Use default bank", self.reset_part_bank))
+        layout.addLayout(bank_row)
+        mixer_row = QHBoxLayout()
+        mixer_row.addWidget(QLabel("PART VOLUME"))
+        self.part_gain = QSlider(Qt.Horizontal)
+        self.part_gain.setRange(0, 120)
+        self.part_gain.setValue(90)
+        self.part_gain.setAccessibleName("Selected score part volume")
+        self.part_gain.valueChanged.connect(self._part_mix_changed)
+        mixer_row.addWidget(self.part_gain, 2)
+        mixer_row.addWidget(QLabel("PAN"))
+        self.part_pan = QSlider(Qt.Horizontal)
+        self.part_pan.setRange(-100, 100)
+        self.part_pan.setAccessibleName("Selected score part stereo pan")
+        self.part_pan.valueChanged.connect(self._part_mix_changed)
+        mixer_row.addWidget(self.part_pan, 2)
+        self.part_mute = QCheckBox("Mute")
+        self.part_solo = QCheckBox("Solo")
+        self.part_mute.toggled.connect(self._part_mix_changed)
+        self.part_solo.toggled.connect(self._part_mix_changed)
+        mixer_row.addWidget(self.part_mute)
+        mixer_row.addWidget(self.part_solo)
+        layout.addLayout(mixer_row)
+
+        groove_row = QHBoxLayout()
+        groove_row.addWidget(QLabel("PERFORMANCE FEEL"))
+        self.groove = QComboBox()
+        self.groove.addItems(GROOVES)
+        self.groove.setCurrentText("Natural player")
+        groove_row.addWidget(self.groove)
+        groove_row.addWidget(QLabel("Energy"))
+        self.energy = QSpinBox()
+        self.energy.setRange(0, 100)
+        self.energy.setValue(75)
+        groove_row.addWidget(self.energy)
+        groove_row.addWidget(QLabel("Strum ms"))
+        self.strum_ms = QSpinBox()
+        self.strum_ms.setRange(0, 45)
+        self.strum_ms.setValue(9)
+        groove_row.addWidget(self.strum_ms)
+        groove_row.addWidget(QLabel("Output"))
+        self.rate_select = QComboBox()
+        self.rate_select.addItem("48 kHz", 48000)
+        self.rate_select.addItem("44.1 kHz", 44100)
+        groove_row.addWidget(self.rate_select)
+        layout.addLayout(groove_row)
+        self.studio_mix = QCheckBox(
+            "Studio multi-bank mix · render each part separately (more CPU, enables per-part pan/volume)")
+        self.studio_mix.setChecked(True)
+        self.studio_mix.setAccessibleName("Enable studio multi SoundFont rendering")
+        layout.addWidget(self.studio_mix)
         actions = QHBoxLayout()
         self.play_button = self._button("▶ Play score automatically", self.play)
         self.stop_button = self._button("■ Stop", self.stop)
@@ -172,6 +249,8 @@ class AutoPerformerPanel(QWidget):
     def _load(self, performance):
         self.stop()
         self.performance = performance
+        self.part_banks = {}
+        self.mix_channels = [MixChannel() for _ in performance.parts]
         self.part_select.blockSignals(True)
         try:
             self.part_select.clear()
@@ -200,6 +279,54 @@ class AutoPerformerPanel(QWidget):
             self.patch_select.setEnabled(part.channel != 9)
         finally:
             self.patch_select.blockSignals(False)
+        setting = self.mix_channels[index] if index < len(self.mix_channels) else MixChannel()
+        for widget in (self.part_gain, self.part_pan, self.part_mute, self.part_solo):
+            widget.blockSignals(True)
+        try:
+            self.part_gain.setValue(setting.gain)
+            self.part_pan.setValue(setting.pan)
+            self.part_mute.setChecked(setting.mute)
+            self.part_solo.setChecked(setting.solo)
+        finally:
+            for widget in (self.part_gain, self.part_pan, self.part_mute, self.part_solo):
+                widget.blockSignals(False)
+        bank = self.part_banks.get(index)
+        self.part_bank_label.setText(
+            "Selected part bank: " + Path(bank).name if bank else
+            "This part uses the default SoundFont")
+
+    def _part_mix_changed(self, *unused):
+        index = self.part_select.currentIndex()
+        if not 0 <= index < len(self.mix_channels):
+            return
+        self.mix_channels[index] = MixChannel(
+            self.part_gain.value(), self.part_pan.value(),
+            self.part_mute.isChecked(), self.part_solo.isChecked()).validate()
+
+    def choose_part_bank(self):
+        index = self.part_select.currentIndex()
+        if not 0 <= index < len(self.mix_channels):
+            self.status.setText("Import a score and select an instrument part first.")
+            return
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Choose licensed samples for this instrument",
+            str(Path.home()), "SoundFont bank (*.sf2 *.sf3)")
+        if filename:
+            try:
+                bank = validate_soundfont(filename)
+                self.part_banks[index] = str(bank)
+                self._part_selected(index)
+                self.status.setText(
+                    f"Selected {bank.name} for {self.performance.parts[index].name}. "
+                    "Other instrument parts keep their selected banks.")
+            except (OSError, ValueError) as error:
+                QMessageBox.warning(self, "Invalid instrument bank", str(error)[:300])
+
+    def reset_part_bank(self):
+        index = self.part_select.currentIndex()
+        if 0 <= index < len(self.mix_channels):
+            self.part_banks.pop(index, None)
+            self._part_selected(index)
 
     def _patch_selected(self, index):
         if self.performance is None:
@@ -291,8 +418,19 @@ class AutoPerformerPanel(QWidget):
         if self.worker is not None and self.worker.isRunning():
             self.status.setText("A score is already rendering.")
             return
+        try:
+            expression = Expression(
+                groove=self.groove.currentText(), energy=self.energy.value(),
+                strum_ms=self.strum_ms.value())
+            snapshot = express(self.performance, expression)
+        except (ValueError, TypeError) as error:
+            self.status.setText("Performance settings invalid: " + str(error)[:200])
+            return
+        self._play_after = preview
         self.worker = ScoreRenderWorker(
-            self.performance, self.soundfont, destination, preview, self)
+            snapshot, self.soundfont, destination, preview, self,
+            banks=dict(self.part_banks), channels=list(self.mix_channels),
+            studio_mix=self.studio_mix.isChecked(), rate=self.rate_select.currentData())
         self.worker.finished_score.connect(self._done)
         self.worker.start()
         self.status.setText(
@@ -326,7 +464,7 @@ class AutoPerformerPanel(QWidget):
         if not ok:
             self.status.setText("SoundFont rendering failed: " + error)
             return
-        if self.worker is None or not self.worker.preview:
+        if self.worker is None or not self.worker.preview or not self._play_after:
             self.status.setText("Rendered full SoundFont WAV: " + Path(filename).name)
             return
         self._play_wav(filename)
@@ -359,6 +497,7 @@ class AutoPerformerPanel(QWidget):
             self.status.setText("Playback failed: " + str(error)[:250])
 
     def stop(self):
+        self._play_after = False
         if self._audio is not None:
             self._audio.stop()
             self._audio.deleteLater()
