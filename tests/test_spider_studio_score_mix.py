@@ -65,6 +65,34 @@ class StudioScoreMixTests(unittest.TestCase):
             self.assertGreater(pcm[0], 0)
             self.assertLess(pcm[1], 0)
 
+    def test_dithered_24_bit_pcm_export_has_correct_frames(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            bank = make_bank(root / "studio.sf2")
+            def fake_renderer(score, samplebank, output, rate):
+                sample = array("h", [10000, -8000] * 256)
+                if sys.byteorder != "little":
+                    sample.byteswap()
+                with wave.open(str(output), "wb") as writer:
+                    writer.setnchannels(2)
+                    writer.setsampwidth(2)
+                    writer.setframerate(rate)
+                    writer.writeframes(sample.tobytes())
+            target = root / "production-24bit.wav"
+            render_score_mix(make_score(), bank, target,
+                             rate=48000, part_renderer=fake_renderer, bit_depth=24)
+            with wave.open(str(target), "rb") as result:
+                self.assertEqual(result.getnchannels(), 2)
+                self.assertEqual(result.getsampwidth(), 3)
+                self.assertEqual(result.getframerate(), 48000)
+                self.assertEqual(result.getnframes(), 256)
+                raw = result.readframes(256)
+                self.assertEqual(len(raw), 256 * 6)
+                self.assertNotEqual(raw, b"\\0" * len(raw))
+            with self.assertRaises(ValueError):
+                render_score_mix(make_score(), bank, target,
+                                 part_renderer=fake_renderer, bit_depth=20)
+
     def test_channel_mute_solo_and_source_protection(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
