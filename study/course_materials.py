@@ -27,8 +27,10 @@ def safe_remote_file(folder, name):
     return "/".join(parts)
 
 
-def read_course_document(path):
-    """Extract bounded text from an explicit local or downloaded document."""
+def read_course_document(path, *, max_chars=MAX_TEXT_CHARS):
+    """Extract bounded text; default remains 12,000 chars for Webbie/OneDrive."""
+    if type(max_chars) is not int or not 100 <= max_chars <= 240000:
+        raise ValueError("Document extraction limit must be 100 to 240,000 characters.")
     path = Path(path)
     if path.is_symlink() or not path.is_file():
         raise ValueError("Choose an existing regular document, not a link.")
@@ -58,7 +60,7 @@ def read_course_document(path):
     text = text.strip()
     if not text:
         raise ValueError("No readable text found. Scanned or image-only files need OCR.")
-    return text[:MAX_TEXT_CHARS]
+    return text[:max_chars]
 
 
 def format_selected_source(remote_file, text):

@@ -74,7 +74,6 @@ else:
 sys.path.insert(0, str(SPIDER_ROOT / 'the-web' / 'shell'))
 from workspace_max_native import NativeWorkspaceTools
 
-
 WALLPAPER = (
     SPIDER_ROOT
     / "branding"
@@ -229,6 +228,20 @@ class StudyWindow(QMainWindow):
                 background:#581c87;
                 color:white;
             }
+
+            QHeaderView::section {
+                background:#291737;
+                border:1px solid #784ba1;
+                color:#f9f0ff;
+                padding:7px;
+                font-weight:bold;
+            }
+            QMenu {
+                background:#17101e;
+                color:#f9f0ff;
+                selection-background-color:#6b21a8;
+                selection-color:#ffffff;
+            }
             """
         )
 
@@ -337,6 +350,7 @@ class StudyWindow(QMainWindow):
         self.add_action(school_actions, "MY SNHU", self.open_snhu)
         self.add_action(school_actions, "SCHOOL ONEDRIVE", self.open_school_onedrive)
         self.add_action(school_actions, "APA GUIDE", self.open_apa_guide)
+        self.add_action(school_actions, "WEEKLY PLAN", self.open_weekly_planner)
         outer.addLayout(school_actions)
         self.dashboard = QLabel()
         self.dashboard.setWordWrap(True)
@@ -538,6 +552,27 @@ class StudyWindow(QMainWindow):
         assignments_layout.addLayout(
             assignment_buttons
         )
+
+        planner_buttons = QHBoxLayout()
+        self.add_action(planner_buttons, "IMPORT CSV ASSIGNMENTS", self.import_csv_assignments)
+        self.add_action(planner_buttons, "EXPORT COURSE CALENDAR", self.export_course_calendar)
+        self.add_action(planner_buttons, "PRIVATE STUDY BACKUP", self.open_study_backup)
+        assignments_layout.addLayout(planner_buttons)
+
+        workspace_buttons = QHBoxLayout()
+        self.add_action(workspace_buttons, "ASSIGNMENT WORKSPACE",
+                        self.open_assignment_workspace)
+        self.add_action(workspace_buttons, "COURSE FLASHCARDS",
+                        self.open_flashcards)
+        self.add_action(workspace_buttons, "MY PROGRESS",
+                        self.open_study_progress)
+        self.add_action(workspace_buttons, "WEBBIE STUDY COACH",
+                        self.open_study_coach)
+        self.add_action(workspace_buttons, "COURSE READINGS",
+                        self.open_course_readings)
+        assignments_layout.addLayout(workspace_buttons)
+        self.assignment_table.itemDoubleClicked.connect(
+            lambda _: self.open_assignment_workspace())
 
         self.tabs.addTab(
             assignments_tab,
@@ -990,6 +1025,191 @@ class StudyWindow(QMainWindow):
 
         self.load_assignments()
 
+    def import_csv_assignments(self):
+        """Preview selected CSV assignments before creating local coursework."""
+        if not self.current_course_id:
+            return
+        folder = self.store.course_folder(self.current_course_id)
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Choose assignments CSV", str(folder),
+            "Comma-separated assignments (*.csv)")
+        if not filename:
+            return
+        try:
+            if __package__:
+                from .assignment_planner import parse_assignment_csv
+            else:
+                from assignment_planner import parse_assignment_csv
+            result = parse_assignment_csv(filename, self.store.assignments(self.current_course_id))
+            rows = result["rows"]
+            if not rows:
+                self.status.setText(
+                    f"No new open assignments. {result['skipped']} duplicates; "
+                    f"{result['completed']} completed rows skipped.")
+                return
+            names = "\n".join(
+                f"• {title} ({due or 'date not specified'})"
+                for title, due in rows[:8])
+            more = f"\n...and {len(rows) - 8} more." if len(rows) > 8 else ""
+            answer = QMessageBox.question(
+                self, "Import assignment preview",
+                f"Add {len(rows)} open assignments to this course?\n"
+                f"{result['skipped']} duplicates; {result['completed']} completed rows skipped.\n\n"
+                + names + more + "\n\nNo school files will be uploaded.")
+            if answer != QMessageBox.Yes:
+                self.status.setText("Assignment import cancelled; no changes made.")
+                return
+            self.store.add_assignments_bulk(self.current_course_id, rows)
+            self.load_assignments()
+            self.status.setText(f"Imported {len(rows)} assignments to the selected course.")
+        except (OSError, UnicodeError, ValueError) as error:
+            QMessageBox.warning(self, "Assignment import", str(error))
+
+    def export_course_calendar(self):
+        """Owner-triggered .ics export covers all locally tracked courses."""
+        if not self.current_course_id:
+            return
+        if __package__:
+            from .assignment_planner import write_calendar
+        else:
+            from assignment_planner import write_calendar
+        folder = self.store.course_folder(self.current_course_id)
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Export all Study assignment deadlines",
+            str(folder / "study-assignments.ics"),
+            "Calendar (*.ics)")
+        if not target:
+            return
+        if not target.lower().endswith(".ics"):
+            target += ".ics"
+        overwrite = False
+        if Path(target).exists():
+            overwrite = QMessageBox.question(
+                self, "Replace calendar file",
+                "Replace this calendar file? Existing files are otherwise preserved."
+            ) == QMessageBox.Yes
+            if not overwrite:
+                return
+        try:
+            count = write_calendar(target, self.store.all_assignments(), overwrite=overwrite)
+            self.status.setText(f"Saved {count} open dated deadlines from all Study courses: {target}")
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Calendar export", str(error))
+
+    def open_assignment_workspace(self):
+        """Open the selected assignment's persistent local workbook."""
+        assignment_id = self.selected_assignment_id()
+        if not assignment_id:
+            self.status.setText("Select an assignment before opening its workspace.")
+            return
+        try:
+            if __package__:
+                from .assignment_workspace_ui import AssignmentWorkspaceDialog
+            else:
+                from assignment_workspace_ui import AssignmentWorkspaceDialog
+            dialog = AssignmentWorkspaceDialog(
+                self.store, assignment_id,
+                self.store.course_folder(self.current_course_id), self)
+            dialog.exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Assignment workspace", str(error))
+
+    def open_flashcards(self):
+        """Manual review deck for this course, with optional CSV import."""
+        if not self.current_course_id:
+            self.status.setText("Select a course to open flashcards.")
+            return
+        try:
+            if __package__:
+                from .flashcards_ui import FlashcardsDialog
+            else:
+                from flashcards_ui import FlashcardsDialog
+            dialog = FlashcardsDialog(
+                self.store, self.current_course_id,
+                self.store.course_folder(self.current_course_id), self)
+            dialog.exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Flashcards", str(error))
+
+    def open_study_backup(self):
+        """Manually archive a consistent database copy and private course files."""
+        try:
+            if __package__:
+                from .study_backup_ui import StudyBackupDialog
+            else:
+                from study_backup_ui import StudyBackupDialog
+            StudyBackupDialog(self).exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Study backup", str(error))
+
+    def open_weekly_planner(self):
+        """Open a user-triggered overview of dates and milestones across courses."""
+        try:
+            if __package__:
+                from .weekly_planner_ui import WeeklyPlannerDialog
+            else:
+                from weekly_planner_ui import WeeklyPlannerDialog
+            WeeklyPlannerDialog(self.store, self).exec_()
+            self.refresh_dashboard()
+            self.load_assignments()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Weekly planner", str(error))
+
+    def open_course_readings(self):
+        """Browse manually imported documents for the selected course only."""
+        if not self.current_course_id:
+            self.status.setText("Select a course before opening its reading library.")
+            return
+        try:
+            if __package__:
+                from .reading_library_ui import ReadingLibraryDialog
+            else:
+                from reading_library_ui import ReadingLibraryDialog
+            ReadingLibraryDialog(self.store, self.current_course_id, self).exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Course Readings", str(error))
+
+    def open_study_coach(self):
+        """Study Coach only sees explicitly previewed and selected materials."""
+        try:
+            if __package__:
+                from .study_coach_ui import StudyCoachDialog
+            else:
+                from study_coach_ui import StudyCoachDialog
+            course = self.store.course(self.current_course_id) if self.current_course_id else None
+            assignment_id = self.selected_assignment_id() if course else None
+            row = self.store.assignment_record(assignment_id) if assignment_id else None
+            fields = self.store.get_assignment_workspace(assignment_id) if row else None
+            preview = "\n\n".join(
+                f"{name.upper()}:\n{fields[name]}"
+                for name in ("instructions", "rubric", "research")
+                if fields and fields[name].strip())
+            dialog = StudyCoachDialog(
+                self, course=course["name"] if course else "General Study",
+                topic=row["title"] if row else "",
+                materials=preview,
+                notes=self.store.get_notes(self.current_course_id) if course else "",
+                store=self.store if course else None,
+                course_id=self.current_course_id if course else None)
+            dialog.exec_()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Study Coach", str(error))
+
+    def open_study_progress(self):
+        """Private, manually entered scores and logged study sessions."""
+        if not self.current_course_id:
+            self.status.setText("Choose a course for your progress tracker.")
+            return
+        try:
+            if __package__:
+                from .study_progress_ui import StudyProgressDialog
+            else:
+                from study_progress_ui import StudyProgressDialog
+            dialog = StudyProgressDialog(self.store, self.current_course_id, self)
+            dialog.exec_()
+        except (ValueError, OSError) as error:
+            QMessageBox.warning(self, "Study progress", str(error))
+
     def complete_assignment(self):
         assignment_id = (
             self.selected_assignment_id()
@@ -1028,10 +1248,26 @@ class StudyWindow(QMainWindow):
         if not assignment_id:
             return
 
-        self.store.delete_assignment(
-            assignment_id
-        )
-
+        record = self.store.assignment_record(assignment_id)
+        if not record:
+            return
+        sections = self.store.get_assignment_workspace(assignment_id)
+        has_related = bool(self.store.assignment_steps(assignment_id) or
+                           self.store.assignment_sources(assignment_id))
+        if any(text.strip() for text in sections.values()) or has_related:
+            warning = ("This assignment contains saved coursework. Deleting "
+                       "removes its local Study notebook, saved sources, checklist steps and drafts from the "
+                       "Study database. Documents already saved in the course "
+                       "folder are not deleted.")
+        else:
+            warning = ("Delete this assignment from Study? Existing course "
+                       "files are preserved.")
+        if QMessageBox.question(
+            self, "Confirm assignment deletion",
+            f"{record['title']}\n\n{warning}"
+        ) != QMessageBox.Yes:
+            return
+        self.store.delete_assignment(assignment_id)
         self.load_assignments()
 
     # --------------------------------------------------------
@@ -1188,7 +1424,8 @@ class StudyWindow(QMainWindow):
     def refresh_dashboard(self):
         summary = overview(self.store.all_assignments())
         text = (f"Across all courses: {summary['open']} open · {summary['complete']} complete · "
-                f"{summary['overdue']} overdue · {summary['undated']} need an ISO date")
+                f"{summary['overdue']} overdue · {summary['today']} due today · "
+                f"{summary['next_7_days']} due in 7 days · {summary['undated']} need an ISO date")
         if summary['upcoming']:
             next_due = summary['upcoming'][0]
             text += f"\nNext outstanding: {next_due['course']} / {next_due['title']} / {next_due['due']}"
@@ -1199,23 +1436,50 @@ class StudyWindow(QMainWindow):
         self.school_portal.open()
 
     def open_homework(self):
-        """Open Webbie's writing editor for the currently selected course."""
+        """Webbie gets the selected assignment's saved context, with explicit handoff."""
         try:
             if __package__:
                 from .homework_ui import HomeworkDialog
+                from .assignment_workflow import webbie_directions, webbie_materials
+                from .draft_storage import save_snapshot
             else:
                 from homework_ui import HomeworkDialog
+                from assignment_workflow import webbie_directions, webbie_materials
+                from draft_storage import save_snapshot
             course = self.store.course(self.current_course_id) if self.current_course_id else None
-            selected_row = self.assignment_table.currentRow()
-            selected = self.assignment_table.item(selected_row, 0) if selected_row >= 0 else None
+            selected_id = self.selected_assignment_id() if course else None
+            record = self.store.assignment_record(selected_id) if selected_id else None
+            workspace = self.store.get_assignment_workspace(selected_id) if record else None
+            folder = self.store.course_folder(self.current_course_id)
             dialog = HomeworkDialog(
                 self,
                 course=course["name"] if course else "",
-                assignment=selected.text() if selected else "",
+                assignment=record["title"] if record else "",
                 notes=self.store.get_notes(self.current_course_id) if course else "",
-                folder=self.store.course_folder(self.current_course_id),
+                folder=folder,
+                store=self.store if course else None,
+                course_id=self.current_course_id if course else None,
             )
+            if workspace:
+                if workspace["instructions"].strip() or workspace["rubric"].strip():
+                    dialog.directions.setPlainText(webbie_directions(workspace))
+                dialog.materials.setPlainText(webbie_materials(workspace))
+                dialog.draft.setPlainText(workspace["draft"])
             dialog.exec_()
+            if workspace:
+                candidate = dialog.draft.toPlainText()
+                previous = workspace["draft"]
+                if candidate.strip() and candidate != previous:
+                    answer = QMessageBox.question(
+                        self, "Save Webbie draft to assignment",
+                        "Copy the edited draft to the selected assignment workspace? "
+                        "The previous draft will be backed up first.")
+                    if answer == QMessageBox.Yes:
+                        if previous.strip():
+                            save_snapshot(folder, record["title"], previous)
+                        updated = dict(workspace, draft=candidate)
+                        self.store.save_assignment_workspace(selected_id, updated)
+                        self.status.setText("Webbie draft copied into the saved assignment workspace.")
         except Exception as error:
             QMessageBox.warning(self, "Webbie Homework", str(error))
 
@@ -1311,7 +1575,7 @@ class StudyWindow(QMainWindow):
         try:
             self.save_notes(quiet=True)
         except Exception as error:
-            QMessageBox.warning(self, "Notes not saved", str(error))
+            self.status.setText('Notes could not be saved: ' + str(error))
             event.ignore()
             return
         self.store.close()

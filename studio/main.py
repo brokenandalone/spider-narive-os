@@ -28,9 +28,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .tools import TOOLS, resolve_tool
     from .ai_panel import StudioAIPanel
+    from .band_mixer_panel import BandMixerPanel
+    from .release_panel import ReleasePanel
+    from .production_board_panel import ProductionBoardPanel
+    from .audio_quality_panel import AudioQualityPanel
 else:
     from tools import TOOLS, resolve_tool
     from ai_panel import StudioAIPanel
+    from band_mixer_panel import BandMixerPanel
+    from release_panel import ReleasePanel
+    from production_board_panel import ProductionBoardPanel
+    from audio_quality_panel import AudioQualityPanel
 STUDIO_HOME = Path.home() / 'Documents' / 'Spider Studio'
 
 
@@ -142,6 +150,38 @@ class SpiderStudio(QMainWindow):
         self.tool_tabs.addTab(ai_scroll, 'Studio AI')
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
+        # Preserve the owner-reviewed Studio layout while activating the
+        # October 11 production, band mixing and quality-control workspaces.
+        self.band_mixer_panel = BandMixerPanel(ai_panel=self.ai_panel)
+        band_scroll = QScrollArea()
+        band_scroll.setWidgetResizable(True)
+        band_scroll.setWidget(self.band_mixer_panel)
+        self.tool_tabs.addTab(band_scroll, 'Band Mixer')
+
+        self.release_panel = ReleasePanel(band_mixer=self.band_mixer_panel)
+        release_scroll = QScrollArea()
+        release_scroll.setWidgetResizable(True)
+        release_scroll.setWidget(self.release_panel)
+        self.tool_tabs.addTab(release_scroll, 'Release Desk')
+
+        self.production_board_panel = ProductionBoardPanel(
+            ai_panel=self.ai_panel, band_mixer=self.band_mixer_panel,
+            release_panel=self.release_panel, tool_tabs=self.tool_tabs,
+        )
+        production_scroll = QScrollArea()
+        production_scroll.setWidgetResizable(True)
+        production_scroll.setWidget(self.production_board_panel)
+        self.tool_tabs.addTab(production_scroll, 'Production Board')
+
+        self.quality_panel = AudioQualityPanel(
+            production_board=self.production_board_panel,
+        )
+        quality_scroll = QScrollArea()
+        quality_scroll.setWidgetResizable(True)
+        quality_scroll.setWidget(self.quality_panel)
+        self.tool_tabs.addTab(quality_scroll, 'Audio Quality')
+        self.production_board_panel.quality_panel = self.quality_panel
+        self.production_board_panel.quality_tab = quality_scroll
         self.tool_buttons = []
         for category, tools in TOOLS.items():
             page = QWidget(); grid = QGridLayout(page)
@@ -160,7 +200,6 @@ class SpiderStudio(QMainWindow):
         content.addWidget(refresh)
         self.refresh_tools()
 
-        # Owner's installed layout distinguishes resident Webbie from Media.
         content.addSpacing(8)
         note = QLabel(
             'Spider Media Center is the Media module.\n'

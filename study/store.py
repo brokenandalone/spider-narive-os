@@ -80,6 +80,92 @@ class StudyStore:
                     REFERENCES courses(id)
                     ON DELETE CASCADE
             );
+
+            -- Additive storage. No existing coursework is changed or migrated.
+            CREATE TABLE IF NOT EXISTS assignment_workspaces (
+                assignment_id INTEGER PRIMARY KEY,
+                instructions TEXT NOT NULL DEFAULT '',
+                rubric TEXT NOT NULL DEFAULT '',
+                research TEXT NOT NULL DEFAULT '',
+                outline TEXT NOT NULL DEFAULT '',
+                draft TEXT NOT NULL DEFAULT '',
+                "references" TEXT NOT NULL DEFAULT '',
+                feedback TEXT NOT NULL DEFAULT '',
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS flashcards (
+                id INTEGER PRIMARY KEY,
+                course_id INTEGER NOT NULL,
+                front TEXT NOT NULL,
+                back TEXT NOT NULL,
+                correct INTEGER NOT NULL DEFAULT 0,
+                incorrect INTEGER NOT NULL DEFAULT 0,
+                last_review TEXT NOT NULL DEFAULT '',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE,
+                UNIQUE(course_id, front, back)
+            );
+            CREATE TABLE IF NOT EXISTS assignment_scores (
+                assignment_id INTEGER PRIMARY KEY,
+                earned TEXT NOT NULL,
+                possible TEXT NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id)
+                    ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS study_sessions (
+                id INTEGER PRIMARY KEY,
+                course_id INTEGER NOT NULL,
+                topic TEXT NOT NULL,
+                minutes INTEGER NOT NULL CHECK(minutes BETWEEN 1 AND 600),
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS assignment_steps (
+                id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                due TEXT NOT NULL DEFAULT '',
+                completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)),
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
+                UNIQUE(assignment_id, title)
+            );
+            CREATE TABLE IF NOT EXISTS assignment_sources (
+                id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                reference TEXT NOT NULL,
+                locator TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
+                UNIQUE(assignment_id, reference)
+            );
+            CREATE TABLE IF NOT EXISTS course_readings (
+                id INTEGER PRIMARY KEY,
+                course_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                excerpt TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE,
+                UNIQUE(course_id, sha256),
+                UNIQUE(course_id, relative_path)
+            );
+            CREATE TABLE IF NOT EXISTS course_reading_passages (
+                reading_id INTEGER NOT NULL,
+                passage_index INTEGER NOT NULL CHECK(passage_index BETWEEN 1 AND 90),
+                start_char INTEGER NOT NULL,
+                end_char INTEGER NOT NULL,
+                body TEXT NOT NULL,
+                PRIMARY KEY(reading_id, passage_index),
+                FOREIGN KEY(reading_id) REFERENCES course_readings(id) ON DELETE CASCADE,
+                CHECK(start_char >= 0 AND end_char > start_char)
+            );
+            CREATE INDEX IF NOT EXISTS course_reading_passages_index
+                ON course_reading_passages(reading_id, passage_index);
             """
         )
 
@@ -246,6 +332,18 @@ class StudyStore:
 
         self.db.commit()
 
+    def add_assignments_bulk(self, course_id, rows):
+        """Insert a confirmed batch atomically with no schema or folder changes."""
+        if not self.course(course_id):
+            raise ValueError("Selected course does not exist.")
+        values = [(course_id, title, due) for title, due in rows]
+        with self.db:
+            self.db.executemany(
+                "INSERT INTO assignments(course_id, title, due) VALUES (?, ?, ?)",
+                values,
+            )
+        return len(values)
+
     def set_assignment_status(
         self,
         assignment_id,
@@ -327,6 +425,367 @@ class StudyStore:
         )
 
         self.db.commit()
+
+    def assignment_record(self, assignment_id):
+        return self.db.execute(
+            "SELECT a.id, a.course_id, a.title, a.due, a.status, c.name AS course "
+            "FROM assignments a JOIN courses c ON c.id=a.course_id "
+            "WHERE a.id = ?", (assignment_id,),
+        ).fetchone()
+
+    def get_assignment_workspace(self, assignment_id):
+        fields = ("instructions", "rubric", "research", "outline", "draft",
+                  "references", "feedback")
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment does not exist.")
+        record = self.db.execute(
+            'SELECT instructions, rubric, research, outline, draft, "references", '
+            'feedback FROM assignment_workspaces WHERE assignment_id=?',
+            (assignment_id,),
+        ).fetchone()
+        return {name: record[name] if record else "" for name in fields}
+
+    def save_assignment_workspace(self, assignment_id, values):
+        fields = ("instructions", "rubric", "research", "outline", "draft",
+                  "references", "feedback")
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment was deleted before saving.")
+        if set(values) != set(fields):
+            raise ValueError("The assignment workspace fields are incomplete.")
+        for name in fields:
+            value = values[name]
+            if (not isinstance(value, str) or len(value) > 120000
+                    or "\x00" in value):
+                raise ValueError("Invalid assignment section: " + name)
+        with self.db:
+            self.db.execute(
+                'INSERT INTO assignment_workspaces '
+                '(assignment_id, instructions, rubric, research, outline, draft, '
+                '"references", feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?) '
+                'ON CONFLICT(assignment_id) DO UPDATE SET '
+                'instructions=excluded.instructions, rubric=excluded.rubric, '
+                'research=excluded.research, outline=excluded.outline, '
+                'draft=excluded.draft, "references"=excluded."references", '
+                'feedback=excluded.feedback, updated_at=CURRENT_TIMESTAMP',
+                (assignment_id,) + tuple(values[name] for name in fields),
+            )
+
+    def flashcards(self, course_id):
+        return self.db.execute(
+            "SELECT id, course_id, front, back, correct, incorrect, last_review "
+            "FROM flashcards WHERE course_id=? ORDER BY id", (course_id,),
+        ).fetchall()
+
+    def add_flashcards(self, course_id, cards):
+        if not self.course(course_id):
+            raise ValueError("Course does not exist.")
+        checked = []
+        for front, back in cards:
+            if (not isinstance(front, str) or not isinstance(back, str)
+                    or not front.strip() or not back.strip()
+                    or len(front) > 1500 or len(back) > 1500
+                    or "\x00" in front or "\x00" in back):
+                raise ValueError("Invalid flashcard contents.")
+            checked.append((course_id, front.strip(), back.strip()))
+        with self.db:
+            previous = self.db.total_changes
+            self.db.executemany(
+                "INSERT OR IGNORE INTO flashcards(course_id, front, back) "
+                "VALUES (?, ?, ?)", checked)
+            return self.db.total_changes - previous
+
+    def record_flashcard_review(self, card_id, correct):
+        with self.db:
+            cursor = self.db.execute(
+                "UPDATE flashcards SET correct=correct+?, incorrect=incorrect+?, "
+                "last_review=CURRENT_TIMESTAMP WHERE id=?",
+                (1 if correct else 0, 0 if correct else 1, card_id),
+            )
+            return cursor.rowcount == 1
+
+    def delete_flashcard(self, course_id, card_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM flashcards WHERE course_id=? AND id=?",
+                (course_id, card_id),
+            )
+
+    def assignment_scores(self, course_id):
+        """Manual points for assignments in one course, including ungraded work."""
+        return self.db.execute(
+            "SELECT a.id, a.title, a.due, s.earned, s.possible "
+            "FROM assignments a LEFT JOIN assignment_scores s "
+            "ON s.assignment_id=a.id WHERE a.course_id=? "
+            "ORDER BY a.due, a.title", (course_id,),
+        ).fetchall()
+
+    def set_assignment_score(self, assignment_id, earned, possible):
+        try:
+            from .study_progress import valid_score
+        except ImportError:
+            from study_progress import valid_score
+        earned, possible = valid_score(earned, possible)
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("The assignment no longer exists.")
+        with self.db:
+            self.db.execute(
+                "INSERT INTO assignment_scores(assignment_id, earned, possible) "
+                "VALUES(?, ?, ?) ON CONFLICT(assignment_id) DO UPDATE SET "
+                "earned=excluded.earned, possible=excluded.possible, "
+                "updated_at=CURRENT_TIMESTAMP",
+                (assignment_id, str(earned), str(possible)),
+            )
+
+    def clear_assignment_score(self, assignment_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM assignment_scores WHERE assignment_id=?",
+                (assignment_id,),
+            )
+
+    def study_sessions(self, course_id):
+        return self.db.execute(
+            "SELECT id, topic, minutes, created_at FROM study_sessions "
+            "WHERE course_id=? ORDER BY created_at DESC, id DESC LIMIT 100",
+            (course_id,),
+        ).fetchall()
+
+    def add_study_session(self, course_id, topic, minutes):
+        try:
+            from .study_progress import valid_study_session
+        except ImportError:
+            from study_progress import valid_study_session
+        topic, minutes = valid_study_session(topic, minutes)
+        if self.course(course_id) is None:
+            raise ValueError("The course no longer exists.")
+        with self.db:
+            return self.db.execute(
+                "INSERT INTO study_sessions(course_id, topic, minutes) "
+                "VALUES (?, ?, ?)", (course_id, topic, minutes),
+            ).lastrowid
+
+    def delete_study_session(self, course_id, session_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM study_sessions WHERE course_id=? AND id=?",
+                (course_id, session_id),
+            )
+
+    def assignment_steps(self, assignment_id):
+        return self.db.execute(
+            "SELECT id, assignment_id, title, due, completed "
+            "FROM assignment_steps WHERE assignment_id=? "
+            "ORDER BY completed ASC, CASE WHEN due = '' THEN 1 ELSE 0 END, due, id",
+            (assignment_id,),
+        ).fetchall()
+
+    def add_assignment_step(self, assignment_id, title, due=""):
+        return self.add_assignment_steps(assignment_id, [(title, due)]) > 0
+
+    def add_assignment_steps(self, assignment_id, items):
+        try:
+            from .milestones import valid_step
+        except ImportError:
+            from milestones import valid_step
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment no longer exists.")
+        if len(items) > 100:
+            raise ValueError("Add at most 100 steps at once.")
+        checked = [(assignment_id,) + valid_step(title, due)
+                   for title, due in items]
+        with self.db:
+            previous = self.db.total_changes
+            self.db.executemany(
+                "INSERT OR IGNORE INTO assignment_steps(assignment_id, title, due) "
+                "VALUES (?, ?, ?)", checked)
+            return self.db.total_changes - previous
+
+    def set_step_completed(self, assignment_id, step_id, completed):
+        if not isinstance(completed, bool):
+            raise ValueError("Step completion must be True or False.")
+        with self.db:
+            return self.db.execute(
+                "UPDATE assignment_steps SET completed=? "
+                "WHERE assignment_id=? AND id=?",
+                (int(completed), assignment_id, step_id),
+            ).rowcount == 1
+
+    def delete_assignment_step(self, assignment_id, step_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM assignment_steps WHERE assignment_id=? AND id=?",
+                (assignment_id, step_id),
+            )
+
+    def assignment_sources(self, assignment_id):
+        return self.db.execute(
+            "SELECT id, assignment_id, reference, locator, notes "
+            "FROM assignment_sources WHERE assignment_id=? ORDER BY id",
+            (assignment_id,),
+        ).fetchall()
+
+    def assignment_source(self, assignment_id, source_id):
+        return self.db.execute(
+            "SELECT id, reference, locator, notes FROM assignment_sources "
+            "WHERE assignment_id=? AND id=?",
+            (assignment_id, source_id),
+        ).fetchone()
+
+    def add_assignment_source(self, assignment_id, reference, locator="", notes=""):
+        try:
+            from .milestones import valid_source
+        except ImportError:
+            from milestones import valid_source
+        reference, locator, notes = valid_source(reference, locator, notes)
+        if self.assignment_record(assignment_id) is None:
+            raise ValueError("Assignment no longer exists.")
+        with self.db:
+            return self.db.execute(
+                "INSERT OR IGNORE INTO assignment_sources "
+                "(assignment_id, reference, locator, notes) VALUES (?, ?, ?, ?)",
+                (assignment_id, reference, locator, notes),
+            ).rowcount == 1
+
+    def delete_assignment_source(self, assignment_id, source_id):
+        with self.db:
+            self.db.execute(
+                "DELETE FROM assignment_sources WHERE assignment_id=? AND id=?",
+                (assignment_id, source_id),
+            )
+
+    def planner_rows(self):
+        """Every course, dates entered locally, with next incomplete step."""
+        return self.db.execute(
+            "SELECT a.id, a.course_id, c.name AS course, a.title, a.due, a.status, "
+            "(SELECT COUNT(*) FROM assignment_steps s WHERE s.assignment_id=a.id) "
+            "AS steps_total, "
+            "(SELECT COUNT(*) FROM assignment_steps s WHERE s.assignment_id=a.id "
+            "AND s.completed=1) AS steps_done, "
+            "(SELECT s.title FROM assignment_steps s "
+            "WHERE s.assignment_id=a.id AND s.completed=0 "
+            "ORDER BY CASE WHEN s.due='' THEN 1 ELSE 0 END, s.due, s.id LIMIT 1) "
+            "AS next_step "
+            "FROM assignments a JOIN courses c ON c.id=a.course_id ORDER BY a.id"
+        ).fetchall()
+
+    def course_readings(self, course_id):
+        """Only private reading records associated with the selected course."""
+        return self.db.execute(
+            "SELECT id, course_id, title, relative_path, sha256, excerpt, created_at "
+            "FROM course_readings WHERE course_id=? ORDER BY title COLLATE NOCASE, id",
+            (course_id,),
+        ).fetchall()
+
+    def course_reading(self, course_id, reading_id):
+        return self.db.execute(
+            "SELECT id, course_id, title, relative_path, sha256, excerpt, created_at "
+            "FROM course_readings WHERE course_id=? AND id=?",
+            (course_id, reading_id),
+        ).fetchone()
+
+    def find_course_reading_by_hash(self, course_id, checksum):
+        return self.db.execute(
+            "SELECT id, relative_path FROM course_readings WHERE course_id=? AND sha256=?",
+            (course_id, checksum),
+        ).fetchone()
+
+    def add_course_reading(self, course_id, title, relative_path, checksum, excerpt, *, passages=None):
+        """Private metadata for a successfully copied, user-selected document."""
+        from pathlib import PurePosixPath
+        from string import hexdigits
+        path = PurePosixPath(str(relative_path))
+        if (self.course(course_id) is None or not isinstance(title, str)
+                or len(title) > 180 or not title.strip()
+                or not isinstance(excerpt, str) or not excerpt.strip()
+                or len(excerpt) > 12000
+                or not isinstance(checksum, str) or len(checksum) != 64
+                or any(char not in hexdigits for char in checksum)
+                or len(path.parts) != 2 or path.parts[0] != "Readings"
+                or any(part in ("", ".", "..") or "\\" in part
+                       for part in path.parts)):
+            raise ValueError("Invalid course reading record.")
+        passages = list(passages or [])
+        self._validate_reading_passages(passages)
+        with self.db:
+            cursor = self.db.execute(
+                "INSERT OR IGNORE INTO course_readings"
+                "(course_id, title, relative_path, sha256, excerpt) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (course_id, title, relative_path, checksum.lower(), excerpt),
+            )
+            if cursor.rowcount != 1:
+                return False
+            if passages:
+                self.db.executemany(
+                    "INSERT INTO course_reading_passages "
+                    "(reading_id, passage_index, start_char, end_char, body) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    [(cursor.lastrowid, number, first, end, body)
+                     for number, first, end, body in passages])
+            return True
+
+    @staticmethod
+    def _validate_reading_passages(passages):
+        if len(passages) > 90:
+            raise ValueError("Only 90 reading passages can be indexed.")
+        for i, row in enumerate(passages, 1):
+            if (not isinstance(row, (tuple, list)) or len(row) != 4
+                    or type(row[0]) is not int or row[0] != i
+                    or type(row[1]) is not int or type(row[2]) is not int
+                    or row[1] < 0 or row[2] <= row[1] or row[2] > 240000
+                    or not isinstance(row[3], str) or not row[3].strip()
+                    or len(row[3]) > 5000 or len(row[3]) != row[2] - row[1]):
+                raise ValueError("Invalid indexed reading passage.")
+
+    def reading_passages(self, course_id, reading_id):
+        return self.db.execute(
+            "SELECT p.reading_id, p.passage_index, p.start_char, p.end_char, "
+            "p.body FROM course_reading_passages p JOIN course_readings r "
+            "ON r.id=p.reading_id WHERE r.course_id=? AND p.reading_id=? "
+            "ORDER BY p.passage_index", (course_id, reading_id),
+        ).fetchall()
+
+    def reading_passage(self, course_id, reading_id, passage_index):
+        return self.db.execute(
+            "SELECT p.reading_id, p.passage_index, p.start_char, p.end_char, "
+            "p.body FROM course_reading_passages p JOIN course_readings r "
+            "ON r.id=p.reading_id WHERE r.course_id=? "
+            "AND p.reading_id=? AND p.passage_index=?",
+            (course_id, reading_id, passage_index),
+        ).fetchone()
+
+    def reading_passage_candidates(self, course_id):
+        """Local text only, scoped to the current course; never network access."""
+        return self.db.execute(
+            "SELECT p.reading_id, r.title, p.passage_index, "
+            "p.start_char, p.end_char, p.body "
+            "FROM course_reading_passages p JOIN course_readings r "
+            "ON r.id=p.reading_id WHERE r.course_id=? "
+            "ORDER BY r.title COLLATE NOCASE, p.passage_index",
+            (course_id,),
+        ).fetchall()
+
+    def update_reading_passages(self, course_id, reading_id, checksum, passages):
+        """Reindex only the owner-selected original; no change on failed validation."""
+        passages = list(passages)
+        self._validate_reading_passages(passages)
+        row = self.course_reading(course_id, reading_id)
+        if row is None or row["sha256"] != checksum:
+            raise ValueError("Reading identity changed during the reindex.")
+        with self.db:
+            previous = self.db.execute(
+                "SELECT COUNT(*) FROM course_reading_passages WHERE reading_id=?",
+                (reading_id,),
+            ).fetchone()[0]
+            if previous:
+                raise ValueError("The reading already has passages indexed.")
+            self.db.executemany(
+                "INSERT INTO course_reading_passages "
+                "(reading_id, passage_index, start_char, end_char, body) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(reading_id, n, first, end, body)
+                 for n, first, end, body in passages],
+            )
 
     def all_assignments(self):
         return self.db.execute(

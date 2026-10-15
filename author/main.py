@@ -15,10 +15,18 @@ if __package__:
     from .store import AuthorStore
     from .web_features import AuthorToolkit
     from .control_socket import AuthorCommandServer
+    from .project_map import ProjectMap
+    from .atlas_widget import AtlasWidget
+    from .master_canon_widget import MasterCanonWidget
+    from .canon_intelligence_widget import CanonIntelligenceWidget
 else:
     from store import AuthorStore
     from web_features import AuthorToolkit
     from control_socket import AuthorCommandServer
+    from project_map import ProjectMap
+    from atlas_widget import AtlasWidget
+    from master_canon_widget import MasterCanonWidget
+    from canon_intelligence_widget import CanonIntelligenceWidget
 
 
 class AuthorWindow(QMainWindow):
@@ -27,7 +35,7 @@ class AuthorWindow(QMainWindow):
         self.store = AuthorStore(root)
         self.book_id = self.chapter_id = None
         self.setWindowTitle('Author | Spider OS')
-        # Preserve owner-reviewed readable UI on smaller displays.
+        # Keep owner-reviewed bounds for KDE on smaller available screens.
         screen = QApplication.primaryScreen()
         available = screen.availableGeometry() if screen else None
         self.resize(min(1200, available.width()) if available else 1200,
@@ -41,12 +49,15 @@ class AuthorWindow(QMainWindow):
         action_rows = (QHBoxLayout(), QHBoxLayout())
         for row in action_rows:
             bar.addLayout(row)
-        for index, (label, action) in enumerate([('New book', self.new_book), ('New chapter', self.new_chapter),
-                ('Import text', self.import_text), ('Import library', self.import_bundle), ('Save', self.flush),
-                ('Restore snapshot', self.restore), ('Backup library', self.backup), ('Focus', self.toggle_focus)]):
+        for index, (label, action) in enumerate([
+                ('New book', self.new_book), ('New chapter', self.new_chapter),
+                ('Import text', self.import_text), ('Import DOCX', self.import_docx),
+                ('Import library', self.import_bundle), ('Save', self.flush),
+                ('Restore snapshot', self.restore), ('Backup library', self.backup),
+                ('Focus', self.toggle_focus)]):
             button = QPushButton(label); button.clicked.connect(action)
             button.setMinimumHeight(36)
-            action_rows[index // 4].addWidget(button)
+            action_rows[index // 5].addWidget(button)
             if label == 'Focus': self.focus_button = button
         split = QSplitter(); self.split = split; layout.addWidget(split)
         self.books = QListWidget(); self.books.setMinimumWidth(125); split.addWidget(self.books)
@@ -65,6 +76,21 @@ class AuthorWindow(QMainWindow):
         tabs.addTab(self.toolkit, 'Writing Studio')
         self.native_max_tools = NativeWorkspaceTools('author', self)
         tabs.addTab(self.native_max_tools, 'Atlas, canon & analysis')
+        self.project_map = ProjectMap(self.store)
+        self.project_map.chapterRequested.connect(self.jump_to_chapter_id)
+        self.project_map.statusChanged.connect(self.project_map_status)
+        tabs.addTab(self.project_map, 'Project Map')
+        self.atlas_widget = AtlasWidget(self.store)
+        self.atlas_widget.chapterRequested.connect(self.jump_to_chapter_id)
+        tabs.addTab(self.atlas_widget, 'Story Atlas')
+        self.master_canon_widget = MasterCanonWidget(self.store)
+        self.master_canon_widget.chapterRequested.connect(self.jump_to_canon_source)
+        tabs.addTab(self.master_canon_widget, 'Master Canon')
+        self.canon_intelligence = CanonIntelligenceWidget(
+            self.store, self.current_chapter, self.flush)
+        self.canon_intelligence.sourceRequested.connect(self.jump_to_canon_source)
+        tabs.addTab(self.canon_intelligence, 'Canon Intelligence')
+        tabs.currentChanged.connect(self.on_tab_changed)
         self.editor.setEnabled(False); self.canon.setEnabled(False)
         self.status = QLabel('Choose a book or create one.'); layout.addWidget(self.status)
         self.books.currentItemChanged.connect(self.select_book)
@@ -98,6 +124,18 @@ class AuthorWindow(QMainWindow):
             self.toolkit.reader.resume()
         elif action == 'stop_reading':
             self.toolkit.reader.stop()
+        elif action == 'open_project_map':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.project_map)
+        elif action == 'open_story_atlas':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.atlas_widget)
+        elif action == 'open_master_canon':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.master_canon_widget)
+        elif action == 'open_canon_intelligence':
+            if self.flush():
+                self.editor_tabs.setCurrentWidget(self.canon_intelligence)
 
     def action(self, function):
         try:
@@ -120,6 +158,8 @@ class AuthorWindow(QMainWindow):
             if self.book_id is not None:
                 self.store.save_canon(self.book_id, self.canon.toPlainText())
             self.toolkit.save_current()
+            if not self.project_map.save_pending():
+                return False
             self.status.setText('Saved locally. ' + str(len(self.editor.toPlainText().split())) + ' words.')
             return True
         return self.action(save)
@@ -138,6 +178,10 @@ class AuthorWindow(QMainWindow):
         self.canon.setPlainText(self.store.canon(self.book_id) if item else '')
         self.load_chapters()
         self.toolkit.set_book(self.book_id)
+        self.project_map.set_book(self.book_id)
+        self.atlas_widget.set_book(self.book_id)
+        self.master_canon_widget.set_book(self.book_id)
+        self.canon_intelligence.set_book(self.book_id)
 
     def load_chapters(self):
         self.chapters.blockSignals(True); self.chapters.clear()
@@ -154,6 +198,69 @@ class AuthorWindow(QMainWindow):
         self.editor.setEnabled(item is not None)
         self.editor.setPlainText(self.store.chapter(self.chapter_id)['content'] if item else '')
 
+    def project_map_status(self, message):
+        if message.startswith('Chapter plan save failed:'):
+            self.status.setText(message)
+
+    def on_tab_changed(self, index):
+        target = self.editor_tabs.widget(index)
+        if (target in (self.project_map, self.atlas_widget,
+                       self.master_canon_widget)
+                and self.book_id is not None and self.flush()):
+            target.refresh()
+
+    def jump_to_chapter_id(self, chapter_id):
+        """Navigate only within the selected book; never open unrelated books."""
+        if not self.flush():
+            return
+        for index in range(self.chapters.count()):
+            if self.chapters.item(index).data(Qt.UserRole) == chapter_id:
+                self.chapters.setCurrentRow(index)
+                self.editor_tabs.setCurrentWidget(self.editor)
+                self.editor.setFocus()
+                return
+        self.status.setText('Chapter is no longer in the selected book.')
+
+    def jump_to_canon_source(self, chapter_id, quote, digest):
+        """Navigate to a source across books, refusing stale quotation highlights."""
+        try:
+            chapter = self.store.chapter(int(chapter_id))
+        except (ValueError, TypeError):
+            self.status.setText('Canon source chapter is missing.')
+            return
+        if not self.flush():
+            return
+        book_id = chapter['book_id']
+        if self.book_id != book_id:
+            for index in range(self.books.count()):
+                if self.books.item(index).data(Qt.UserRole) == book_id:
+                    self.books.setCurrentRow(index)
+                    break
+        if self.book_id != book_id:
+            self.status.setText('Could not open the source book.')
+            return
+        self.jump_to_chapter_id(chapter['id'])
+        content = self.editor.toPlainText()
+        if not quote:
+            self.status.setText('Opened referenced chapter. No exact quote was recorded.')
+            return
+        if (hashlib.sha256(content.encode('utf-8')).hexdigest() != digest
+                or quote not in content):
+            self.status.setText(
+                'Opened source chapter. Canon quotation is outdated or source changed; '
+                'nothing was highlighted or edited.'
+            )
+            return
+        start = content.find(quote)
+        qt_start = len(content[:start].encode('utf-16-le')) // 2
+        qt_end = len(content[:start + len(quote)].encode('utf-16-le')) // 2
+        cursor = self.editor.textCursor()
+        cursor.setPosition(qt_start)
+        cursor.setPosition(qt_end, QTextCursor.KeepAnchor)
+        self.editor.setTextCursor(cursor)
+        self.editor.ensureCursorVisible()
+        self.status.setText('Selected verified canon quotation. No text changed.')
+
     def new_book(self):
         title, ok = QInputDialog.getText(self, 'New book', 'Title:')
         if ok and title.strip() and self.flush():
@@ -167,6 +274,7 @@ class AuthorWindow(QMainWindow):
         if ok and title.strip() and self.flush():
             if self.action(lambda: self.store.create_chapter(self.book_id, title)) is not False:
                 self.load_chapters(); self.chapters.setCurrentRow(self.chapters.count() - 1)
+                self.project_map.refresh()
 
     def import_text(self):
         if self.book_id is None or not self.flush():
@@ -174,6 +282,58 @@ class AuthorWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, 'Import as a new chapter', '', 'Text (*.txt *.md *.markdown)')
         if path and self.action(lambda: self.store.import_text(self.book_id, path)) is not False:
             self.load_chapters(); self.chapters.setCurrentRow(self.chapters.count() - 1)
+            self.project_map.refresh()
+
+    def import_docx(self):
+        """Confirm a read-only preview before creating a separate new book."""
+        if not self.flush():
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, 'Import Word manuscript as a new book', '',
+            'Word manuscripts (*.docx)'
+        )
+        if not path:
+            return
+        try:
+            if __package__:
+                from .manuscript_import import parse_docx
+            else:
+                from manuscript_import import parse_docx
+            preview = parse_docx(path)
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, 'DOCX preview', str(error))
+            return
+        headings = ', '.join(title for title, _ in preview.chapters[:5])
+        if len(preview.chapters) > 5:
+            headings += ', ...'
+        message = (
+            f"Book: {preview.title}\n"
+            f"Chapters: {len(preview.chapters)} | Words: {preview.word_count}\n"
+            f"Detected: {headings}\n\n"
+            "Import text only. Word formatting, pictures, annotations, and "
+            "tracked changes are not imported. Chapter breaks use Heading 1; "
+            "without them the entire document becomes one chapter.\n\n"
+            "Create a NEW book? Your current manuscripts will not be overwritten."
+        )
+        if QMessageBox.question(
+            self, 'Preview Word manuscript', message,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        ) != QMessageBox.Yes:
+            return
+        book_id = self.action(
+            lambda: self.store.import_docx(path, preview.fingerprint)
+        )
+        if book_id is False:
+            return
+        self.load_books()
+        for index in range(self.books.count()):
+            if self.books.item(index).data(Qt.UserRole) == book_id:
+                self.books.setCurrentRow(index)
+                break
+        self.status.setText(
+            f"Imported {len(preview.chapters)} chapters into a new book. "
+            "Your previous library is unchanged."
+        )
 
     def import_bundle(self):
         if not self.flush():
@@ -344,6 +504,12 @@ class AuthorWindow(QMainWindow):
                 self.status.setText('Library backup saved.')
 
     def closeEvent(self, event):
+        if not self.canon_intelligence.shutdown():
+            self.status.setText(
+                'Canon Intelligence is cancelling the running local review. '
+                'Close Author after the model request finishes.')
+            event.ignore()
+            return
         if not self.toolkit.shutdown():
             self.status.setText(
                 'Webbie is stopping the active review or narration. '

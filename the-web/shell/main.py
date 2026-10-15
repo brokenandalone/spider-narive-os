@@ -2,12 +2,13 @@
 """The Web desktop: native workspace tabs, installed applications and taskbar."""
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 
-from PyQt5.QtCore import Qt, QTimer, QSize, QDateTime
+from PyQt5.QtCore import Qt, QTimer, QSize, QDateTime, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGridLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
@@ -38,6 +39,12 @@ from volume_panel import VolumePanel
 from quick_settings import QuickSettingsPanel
 from window_overview import WindowOverview
 from appearance import LIGHT_STYLE, appearance_file, load_theme, save_theme
+from readability import load_menu_size, save_menu_size, readability_css
+from navigation_core import INTERNAL_ACTIONS
+from navigation_state import (navigation_file, load_navigation, save_navigation,
+                              record_recent, toggle_favorite)
+from desktop_state import read_desktop_state, write_desktop_state
+from command_palette import CommandPalette
 from notification_center import NotificationCenter
 from notification_toast import NotificationToast
 from tray_panel import TrayPanel
@@ -61,6 +68,33 @@ QTabBar::tab { background:#17111f; padding:10px 14px; color:#c7b9d1; }
 QTabBar::tab:selected { background:#6b21a8; color:white; }
 QScrollArea { background:transparent; border:none; }
 '''
+
+
+class AppCatalogWorker(QThread):
+    """Scan user/system XDG launchers without blocking input or painting."""
+    found = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def run(self):
+        try:
+            self.found.emit(discover_apps(desktops='TheWeb:KDE'))
+        except (OSError, RuntimeError, ValueError) as error:
+            self.failed.emit(str(error)[:160])
+
+
+class WindowScanWorker(QThread):
+    """Fetch wmctrl window titles without stalling the desktop taskbar."""
+    found = pyqtSignal(object)
+
+    def __init__(self, excluded, parent=None):
+        super().__init__(parent)
+        self.excluded = tuple(excluded)
+
+    def run(self):
+        try:
+            self.found.emit(list_tasks(self.excluded))
+        except (OSError, RuntimeError, ValueError):
+            self.found.emit([])
 
 
 class WallpaperWidget(QWidget):
@@ -104,13 +138,16 @@ class StartMenu(QDialog):
     def __init__(self, shell):
         super().__init__(shell, Qt.Popup)
         self.shell = shell
-        self.setObjectName('panel'); self.setStyleSheet(STYLE); self.resize(580, 650)
+        self.setObjectName('panel'); self.setStyleSheet(shell._appearance_style()); self.resize(580, 650)
         layout = QVBoxLayout(self)
         heading = QLabel('SPIDER OS  /  Start'); heading.setFont(QFont('Sans Serif', 22, QFont.Bold)); layout.addWidget(heading)
         self.search = QLineEdit(); self.search.setPlaceholderText('Find a workspace or installed app'); layout.addWidget(self.search)
         self.results = QListWidget(); self.results.setIconSize(QSize(28, 28)); layout.addWidget(self.results, 1)
         self.search.textChanged.connect(self.populate); self.results.itemActivated.connect(self.activate)
+        self.search.returnPressed.connect(self.activate_first)
+        self.search.setToolTip('Type a workspace or application name, then press Enter to open the first result.')
         actions = QHBoxLayout(); layout.addLayout(actions)
+        actions.addWidget(button('Quick Launch', shell.toggle_command_palette))
         actions.addWidget(button('Refresh apps', shell.refresh_apps))
         actions.addWidget(button('Windows', shell.toggle_window_overview))
         actions.addWidget(button('Lock', shell.lock_session))
@@ -128,6 +165,15 @@ class StartMenu(QDialog):
                 item.setData(Qt.UserRole, ('app', app.desktop_id)); self.results.addItem(item)
         if self.results.count():
             self.results.setCurrentRow(0)
+        else:
+            empty = QListWidgetItem('No matching workspaces or installed apps.')
+            empty.setFlags(Qt.NoItemFlags)
+            self.results.addItem(empty)
+
+    def activate_first(self):
+        item = self.results.currentItem()
+        if item is not None and item.flags() & Qt.ItemIsEnabled:
+            self.activate(item)
 
     def activate(self, item):
         kind, ident = item.data(Qt.UserRole); self.hide()
@@ -137,18 +183,28 @@ class StartMenu(QDialog):
     def show_menu(self, dock):
         if self.isVisible():
             self.hide(); return
-        self.populate(); self.move(dock.x(), max(dock.screen().geometry().top(), dock.y() - self.height() - 8))
+        self.populate()
+        bounds = dock.screen().availableGeometry()
+        width = min(self.width(), max(320, bounds.width() - 16))
+        height = min(self.height(), max(280, bounds.height() - 16))
+        self.resize(width, height)
+        xpos = min(max(dock.x(), bounds.left() + 8), bounds.right() - width - 8)
+        ypos = min(max(dock.y() - height - 8, bounds.top() + 8), bounds.bottom() - height - 8)
+        self.move(xpos, ypos)
         self.show(); self.raise_(); self.search.setFocus()
 
 
 class Taskbar(QWidget):
     def __init__(self, shell):
         super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
-        self.shell = shell; self.setObjectName('panel'); self.setStyleSheet(STYLE)
+        self.shell = shell; self.setObjectName('panel'); self.setStyleSheet(shell._appearance_style())
         self.setWindowTitle('The Web Taskbar')
         layout = QHBoxLayout(self); layout.setContentsMargins(8, 4, 8, 4)
         self.start = button('Start', lambda: shell.start_menu.show_menu(self)); self.start.setIcon(QIcon(str(SPIDER_ROOT / 'branding/icons/spider-os-logo.png'))); layout.addWidget(self.start)
         layout.addWidget(button('The Web', shell.show_desktop))
+        launch_button = button('Find', shell.toggle_command_palette)
+        launch_button.setToolTip('Quick Launch: Ctrl+K when The Web has focus')
+        layout.addWidget(launch_button)
         webbie = button('Webbie', shell.open_webbie); webbie.setIcon(QIcon(str(SPIDER_ROOT / 'branding/webbie/webbie-face-v1.png'))); layout.addWidget(webbie)
         self.tasks = QHBoxLayout(); layout.addLayout(self.tasks, 1)
         layout.addWidget(button('Quick', shell.toggle_quick_settings))
@@ -158,7 +214,8 @@ class Taskbar(QWidget):
         layout.addWidget(button('Audio', shell.open_audio))
         layout.addWidget(button('Lock', shell.lock_session))
         self.clock = QLabel(); self.clock.setMinimumWidth(155); layout.addWidget(self.clock)
-        self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(2000)
+        self.window_scan_worker = None
+        self.timer = QTimer(self); self.timer.timeout.connect(self.refresh); self.timer.start(3000)
         self.last_tasks = None; self.refresh()
 
     def position(self):
@@ -168,10 +225,25 @@ class Taskbar(QWidget):
 
     def refresh(self):
         self.clock.setText(QDateTime.currentDateTime().toString('ddd d MMM  HH:mm'))
+        if not self.shell.desktop_mode:
+            self.render_tasks([])
+            return
+        if self.window_scan_worker is not None and self.window_scan_worker.isRunning():
+            return
         excluded = {f'0x{int(self.winId()):08x}', f'0x{int(self.shell.winId()):08x}'}
-        tasks = list_tasks(excluded) if self.shell.desktop_mode else []
+        worker = WindowScanWorker(excluded, self)
+        self.window_scan_worker = worker
+        worker.found.connect(self.render_tasks)
+        worker.finished.connect(self.window_scan_finished)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def window_scan_finished(self):
+        self.window_scan_worker = None
+
+    def render_tasks(self, tasks):
         screen_width = QApplication.primaryScreen().geometry().width()
-        visible_count = max(0, min(2, (screen_width - 800) // 210))
+        visible_count = max(0, min(5, (screen_width - 870) // 185))
         signature = (screen_width, tuple((task.ident, task.title) for task in tasks))
         if signature == self.last_tasks: return
         self.last_tasks = signature
@@ -215,22 +287,36 @@ class TheWeb(QMainWindow):
         self.state_path = self.wallpaper_catalog.config.parent / 'desktop.json'
         self.appearance_path = appearance_file()
         self.appearance = load_theme(self.appearance_path)
-        self.installed_apps = discover_apps(desktops='TheWeb:KDE')
+        self.menu_text_size = load_menu_size()
+        self.navigation_path = navigation_file()
+        self.navigation_state = load_navigation(self.navigation_path, WORKSPACES)
+        self.installed_apps = []
+        self.app_scan_worker = None
         self.setWindowTitle('The Web | Spider OS'); self.resize(1280, 820); self.setMinimumSize(900, 600); self.setStyleSheet(self._appearance_style())
         if desktop_mode: self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.build_ui(); self.background_surface.set_appearance(self.appearance); self.setup_webbie_assistant(); self.webbie_assistant.set_face_sleeping(face_asleep()); self.face_button.setText('Wake Webbie' if face_asleep() else 'Put Webbie to sleep'); self.start_menu = StartMenu(self); self.taskbar = Taskbar(self)
         self.start_menu.setStyleSheet(self._appearance_style())
         self.taskbar.setStyleSheet(self._appearance_style())
+        self.command_palette = CommandPalette(self)
         self.launch_webbie_floating_face()
         self.notifications_process = self.start_notification_bridge()
         self.notification_toast = NotificationToast(self) if self.desktop_mode else None
         self._shortcut = QShortcut(QKeySequence('Ctrl+Esc'), self); self._shortcut.activated.connect(lambda: self.start_menu.show_menu(self.taskbar))
         self._close_shortcut = QShortcut(QKeySequence('Ctrl+W'), self); self._close_shortcut.activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
+        self._palette_shortcut = QShortcut(QKeySequence('Ctrl+K'), self)
+        self._palette_shortcut.activated.connect(self.toggle_command_palette)
+        self._pinned_shortcuts = []
+        for number in range(1, 9):
+            shortcut = QShortcut(QKeySequence(f'Ctrl+Alt+{number}'), self)
+            shortcut.activated.connect(
+                lambda slot=number - 1: self.open_pinned_slot(slot))
+            self._pinned_shortcuts.append(shortcut)
         self.tabs.currentChanged.connect(self.tab_changed); self.tabs.tabCloseRequested.connect(self.close_tab)
         self.set_workspace('default')
         if restore: self.restore_state()
         self.timer = QTimer(self); self.timer.timeout.connect(self.refresh_status); self.timer.start(15000)
         QTimer.singleShot(0, self.refresh_status)
+        QTimer.singleShot(0, self.refresh_apps)
 
     def build_ui(self):
         root = WallpaperWidget(); root.setObjectName('root'); self.background_surface = root; self.setCentralWidget(root)
@@ -249,11 +335,22 @@ class TheWeb(QMainWindow):
             self.toggle_webbie_display)
         header.addWidget(self.face_display_button)
         header.addWidget(button('Workspaces', lambda: self.start_menu.show_menu(self.taskbar)))
-        self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(False); outer.addWidget(self.tabs, 1)
+        header.addWidget(button('Quick Launch', self.toggle_command_palette))
+        self.tabs = QTabWidget(); self.tabs.setObjectName('workspaceTabs'); self.tabs.setProperty('home', True); self.tabs.setTabsClosable(True); self.tabs.setMovable(True); outer.addWidget(self.tabs, 1)
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
         welcome = QLabel('Your workspaces'); welcome.setFont(QFont('Sans Serif', 22, QFont.Bold)); home_layout.addWidget(welcome)
+        self.pinned_title = QLabel('Pinned workspaces  ·  customize in Quick Launch')
+        self.pinned_title.setAccessibleName('Pinned Spider OS workspaces')
+        home_layout.addWidget(self.pinned_title)
+        self.pinned_row = QGridLayout()
+        home_layout.addLayout(self.pinned_row)
+        self.render_pinned_workspaces()
+        self.recent_title = QLabel('Recent workspaces and applications')
+        home_layout.addWidget(self.recent_title)
+        self.recent_grid = QGridLayout()
+        home_layout.addLayout(self.recent_grid)
+        self.render_recent_shortcuts()
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
-        # The Web's own MAX operations live in the real home page, not an app.
         home_actions = button('The Web: advanced tools & tasks', self.toggle_home_tools)
         home_layout.addWidget(home_actions)
         self.home_max_tools = NativeWorkspaceTools('default', home)
@@ -265,6 +362,8 @@ class TheWeb(QMainWindow):
             grid.addWidget(shortcut, index // 4, index % 4)
         home.setProperty('workspace', 'default'); self.tabs.addTab(home, 'The Web'); self.workspace_widgets['default'] = home
         self.tabs.tabBar().setTabButton(0, self.tabs.tabBar().RightSide, None)
+        self._restoring_home_tab = False
+        self.tabs.tabBar().tabMoved.connect(self.tab_moved)
         wallpaper_row = QHBoxLayout(); outer.addLayout(wallpaper_row)
         self.background_picker = QComboBox()
         for name, label in WORKSPACES.items(): self.background_picker.addItem(label, name)
@@ -294,6 +393,8 @@ class TheWeb(QMainWindow):
 
     def setup_webbie_assistant(self):
         self.webbie_assistant = WebbiePanel(SPIDER_ROOT)
+        # Owner-clicked workflow steps can navigate only registered workspaces.
+        self.webbie_assistant.workspace_navigator = self.open_workspace
         self.webbie_dock = QDockWidget('WEBBIE | WORKSPACE ASSISTANT', self)
         self.webbie_dock.setObjectName('webbieWorkspaceDock')
         self.webbie_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -385,8 +486,17 @@ class TheWeb(QMainWindow):
                 summary = str(native.webbie_context())[:600]
             except Exception:
                 summary = ''
+        # Give Webbie the currently OPEN workspace names, not document
+        # contents, titles from other windows, or privileged screen data.
+        open_names = [
+            WORKSPACES.get(self.tabs.widget(index).property('workspace'), 'Workspace')
+            for index in range(self.tabs.count())
+            if self.tabs.widget(index) is not None
+        ]
+        tabs_context = 'Open workspace tabs: ' + ', '.join(open_names)
+        summary = tabs_context + ('. Selected: ' + summary if summary else '')
         self.webbie_assistant.set_workspace_context(
-            label, mode=self.WEBBIE_MODES.get(name, 'Normal'), summary=summary
+            label, mode=self.WEBBIE_MODES.get(name, 'Normal'), summary=summary[:600]
         )
         self.webbie_dock.setWindowTitle('WEBBIE | ' + label)
 
@@ -424,9 +534,175 @@ class TheWeb(QMainWindow):
             item = QListWidgetItem('No installed apps found.'); item.setToolTip('Refresh after installing an app in this workspace.'); item.setFlags(Qt.NoItemFlags); apps.addItem(item)
 
     def refresh_apps(self):
-        self.installed_apps = discover_apps(desktops='TheWeb:KDE')
-        for name in self.app_lists: self.populate_app_list(name)
-        self.start_menu.populate(); self.status.setText(f'{len(self.installed_apps)} installed apps found.')
+        """Discover potentially hundreds of XDG files off the UI thread."""
+        if self.app_scan_worker is not None and self.app_scan_worker.isRunning():
+            self.status.setText('Application discovery is already running.')
+            return
+        self.status.setText('Finding installed applications in the background…')
+        worker = AppCatalogWorker(self)
+        self.app_scan_worker = worker
+        worker.found.connect(self.apps_discovered)
+        worker.failed.connect(lambda detail: self.status.setText(
+            'Application discovery failed: ' + detail))
+        worker.finished.connect(self.app_scan_finished)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def apps_discovered(self, applications):
+        self.installed_apps = applications
+        for name in list(self.app_lists):
+            self.populate_app_list(name)
+        self.start_menu.populate()
+        self.command_palette.refresh()
+        self.render_recent_shortcuts()
+        self.status.setText(f'{len(applications)} installed applications found.')
+
+    def app_scan_finished(self):
+        self.app_scan_worker = None
+
+    def visible_launcher_windows(self):
+        """Read-only snapshot of user-visible window IDs; no arbitrary targets."""
+        try:
+            tasks = list_tasks()
+        except (OSError, RuntimeError, ValueError):
+            return []
+        return [
+            task for task in tasks[:100]
+            if re.fullmatch(r'0x[0-9a-fA-F]{1,16}', str(getattr(task, 'ident', '')))
+            and int(task.ident, 16) != 0
+            and str(getattr(task, 'title', '')).strip()
+        ]
+
+    def activate_launcher_window(self, ident):
+        """Switch only to a window verified in a fresh X11 task snapshot."""
+        if not isinstance(ident, str) or not re.fullmatch(r'0x[0-9a-fA-F]{1,16}', ident):
+            return False
+        available = {task.ident for task in self.visible_launcher_windows()}
+        if ident not in available:
+            return False
+        wm_command('-i', '-a', ident)
+        return True
+
+    def workspaces_for_navigation(self):
+        return WORKSPACES
+
+    def render_pinned_workspaces(self):
+        """Keep quick access predictable without changing existing tabs."""
+        row = getattr(self, 'pinned_row', None)
+        if row is None:
+            return
+        while row.count():
+            item = row.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        shown = 0
+        for kind, ident in self.navigation_state.get('favorites', []):
+            if kind != 'workspace' or ident not in WORKSPACES:
+                continue
+            shortcut = button('★ ' + WORKSPACES[ident],
+                              lambda checked=False, name=ident: self.open_workspace(name))
+            shortcut.setAccessibleName('Pinned workspace ' + WORKSPACES[ident])
+            shortcut.setToolTip('Ctrl+Alt+' + str(shown + 1) +
+                                ' while The Web is focused, or click to open.')
+            shortcut.setToolTip('Pinned workspace · use Quick Launch to unpin')
+            row.addWidget(shortcut, shown // 4, shown % 4)
+            shown += 1
+            if shown >= 8:
+                break
+        if not shown:
+            row.addWidget(QLabel('No pinned workspaces. Ctrl+K opens Quick Launch.'), 0, 0)
+
+    def render_recent_shortcuts(self):
+        grid = getattr(self, 'recent_grid', None)
+        if grid is None:
+            return
+        while grid.count():
+            item = grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        added = 0
+        for kind, ident in self.navigation_state.get('recent', []):
+            if kind == 'workspace' and ident in WORKSPACES:
+                label = WORKSPACES[ident]
+                callback = lambda checked=False, name=ident: self.open_workspace(name)
+            elif kind == 'app':
+                app = next((a for a in self.installed_apps if a.desktop_id == ident), None)
+                if app is None:
+                    continue
+                label = app.name
+                callback = lambda checked=False, name=ident: self.open_installed(name)
+            else:
+                continue
+            shortcut = button(label, callback)
+            shortcut.setToolTip(('App' if kind == 'app' else 'Workspace') + ' · ' + label)
+            grid.addWidget(shortcut, added // 4, added % 4)
+            added += 1
+            if added >= 8:
+                break
+        if not added:
+            grid.addWidget(QLabel('Open a workspace to build your recent list.'), 0, 0)
+
+    def open_pinned_slot(self, slot):
+        pinned = [ident for kind, ident in self.navigation_state.get('favorites', [])
+                  if kind == 'workspace' and ident in WORKSPACES]
+        if 0 <= slot < min(len(pinned), 8):
+            self.open_workspace(pinned[slot])
+
+    def toggle_navigation_pin(self, kind, ident):
+        if not toggle_favorite(self.navigation_state, kind, ident, WORKSPACES):
+            self.status.setText('Pin unavailable. You may have reached the 24-item limit.')
+            return
+        try:
+            save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Could not save pinned items: ' + str(error))
+        self.render_pinned_workspaces()
+
+    def remember_navigation(self, kind, ident):
+        if getattr(self, '_restoring', False):
+            return
+        if record_recent(self.navigation_state, kind, ident, WORKSPACES):
+            self.render_recent_shortcuts()
+            try:
+                save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
+            except OSError:
+                # A read-only home should not prevent app and workspace launches.
+                pass
+
+    def clear_recent_navigation(self):
+        """Owner-requested clearing of launcher history only.
+
+        Favorites and installed apps remain untouched.  A settings write
+        failure is reported instead of claiming the list was persisted.
+        """
+        self.navigation_state['recent'] = []
+        self.render_recent_shortcuts()
+        try:
+            save_navigation(self.navigation_path, self.navigation_state, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Recent launcher history not saved: ' + str(error))
+            return False
+        return True
+
+    def toggle_command_palette(self):
+        self.command_palette.show_palette()
+
+    def execute_palette_action(self, ident):
+        """Only explicitly registered desktop actions can be dispatched."""
+        actions = {
+            'windows': self.toggle_window_overview,
+            'webbie': self.toggle_webbie_assistant,
+            'quick-settings': self.toggle_quick_settings,
+            'notifications': self.toggle_notifications,
+            'tray': self.toggle_tray,
+            'refresh-apps': self.refresh_apps,
+            'desktop': self.show_desktop,
+            'system-settings': self.open_settings,
+            'lock': self.lock_session,
+        }
+        action = actions.get(ident)
+        if action is not None and ident in {key for key, _, _ in INTERNAL_ACTIONS}:
+            action()
 
     def toggle_home_tools(self):
         shown = not self.home_max_tools.isVisible()
@@ -439,12 +715,10 @@ class TheWeb(QMainWindow):
         if name not in self.workspace_widgets:
             page = QWidget(); page.setObjectName('root'); page.setProperty('workspace', name)
             layout = QVBoxLayout(page); layout.setContentsMargins(8, 8, 8, 8)
-            # Render this scene IN the existing native bay, never over its tools.
             if name in SCENES:
                 layout.addWidget(ImmersiveBay(name, page))
             bay_row = QHBoxLayout(); layout.addLayout(bay_row, 1)
             bay_row.addWidget(self.application_panel(name))
-            # Native tabs keep the original application AND its advanced MAX tools.
             workspace_tabs = QTabWidget(page) if name in WORKSPACE_TO_MAX else None
             if workspace_tabs is not None:
                 workspace_tabs.setObjectName('nativeBayToolsTabs')
@@ -454,7 +728,7 @@ class TheWeb(QMainWindow):
                 elif name == 'media': native = MediaPanel(self.launch_media)
                 else: native = create_native(name, SPIDER_ROOT)
             except Exception as error:
-                native = None; self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
+                native = None; page.native_error = str(error); self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
             page.native = native
             if name == 'author' and native is not None and hasattr(native, 'show_webbie_review') is False:
                 native.show_webbie_review = self.show_author_review
@@ -492,6 +766,8 @@ class TheWeb(QMainWindow):
                     workspace_tabs.addTab(extra, 'Backup & integrity tools')
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
+        if name != 'default':
+            self.remember_navigation('workspace', name)
         self.update_webbie_context()
         # Workspace navigation must never activate KDE Show Desktop, which hides
         # normal application windows, including Firefox and the file manager.
@@ -508,19 +784,21 @@ class TheWeb(QMainWindow):
         app = next((a for a in self.installed_apps if a.desktop_id == ident), None)
         if not app: return
         self.open_workspace(app.workspace)
-        try: self.launch(launch_command(app), app.workspace, 'Opened ' + app.name + '.')
+        try:
+            self.launch(launch_command(app), app.workspace, 'Opened ' + app.name + '.')
+            self.remember_navigation('app', app.desktop_id)
         except RuntimeError as error: self.status.setText(str(error))
 
     def can_close(self, page):
-        # Do not destroy worker threads running a MAX operation in this bay.
-        extra_tools = [getattr(page, 'advanced_tools', None)] + list(
-            getattr(page, 'extra_max_tools', ()))
-        for advanced in extra_tools:
-            worker = getattr(advanced, 'worker', None)
-            if worker and worker.isRunning():
-                self.status.setText('Wait for the workspace analysis to finish before closing this bay.')
-                return False
         native = getattr(page, 'native', None)
+        live_tools = [getattr(page, 'advanced_tools', None)] + list(
+            getattr(page, 'extra_max_tools', ()))
+        live_tools.append(getattr(native, 'native_max_tools', None))
+        for tool in live_tools:
+            worker = getattr(tool, 'worker', None)
+            if worker and worker.isRunning():
+                self.status.setText('Finish workspace analysis before closing this bay.')
+                return False
         worker = getattr(native, 'worker', None)
         if worker and worker.isRunning():
             self.status.setText('A workspace task is still running. Keep this tab open until it finishes.'); return False
@@ -532,8 +810,34 @@ class TheWeb(QMainWindow):
 
     def close_tab(self, index):
         page = self.tabs.widget(index)
+        if page is None:
+            return
         if page.property('workspace') == 'default' or not self.can_close(page): return
         name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); page.deleteLater(); self.save_state()
+
+    def tab_moved(self, old_index, new_index):
+        """Allow workspace rearrangement, but always pin The Web home at zero."""
+        if self._restoring_home_tab:
+            return
+        home = self.workspace_widgets.get('default')
+        if home is None:
+            return
+        home_index = self.tabs.indexOf(home)
+        if home_index > 0:
+            self._restoring_home_tab = True
+            try:
+                # Let QTabWidget receive both Qt tabMoved signals so the tab
+                # bar and stacked widgets remain in the same order.
+                self.tabs.tabBar().moveTab(home_index, 0)
+            finally:
+                self._restoring_home_tab = False
+        self.save_state()
+
+    def cycle_tab(self, direction):
+        """Cycle through displayed workspace tabs without changing their order."""
+        count = self.tabs.count()
+        if count and direction in (-1, 1):
+            self.tabs.setCurrentIndex((self.tabs.currentIndex() + direction) % count)
 
     def tab_changed(self, index):
         if index >= 0:
@@ -555,22 +859,29 @@ class TheWeb(QMainWindow):
         except (OSError, ValueError) as error: self.status.setText('Could not save wallpaper: ' + str(error))
 
     def save_state(self):
-        if getattr(self, '_restoring', False): return
+        if getattr(self, '_restoring', False):
+            return
         try:
-            self.state_path.parent.mkdir(parents=True, exist_ok=True); temporary = self.state_path.with_suffix('.tmp')
-            temporary.write_text(json.dumps({'open': list(self.workspace_widgets), 'active': self.current_workspace})); temporary.replace(self.state_path)
-        except OSError as error: self.status.setText('Could not save desktop state: ' + str(error))
+            write_desktop_state(self.state_path, {
+                'open': [self.tabs.widget(i).property('workspace')
+                         for i in range(self.tabs.count())],
+                'active': self.current_workspace,
+            }, WORKSPACES)
+        except OSError as error:
+            self.status.setText('Could not save desktop state: ' + str(error))
 
     def restore_state(self):
         self._restoring = True
         try:
-            data = json.loads(self.state_path.read_text())
-            for name in data.get('open', []):
-                if name in WORKSPACES and name != 'default': self.open_workspace(name)
-            name = data.get('active', 'default')
-            if name in self.workspace_widgets: self.open_workspace(name)
-        except (OSError, ValueError, TypeError): pass
-        finally: self._restoring = False
+            data = read_desktop_state(self.state_path, WORKSPACES)
+            for name in data['open']:
+                if name != 'default':
+                    self.open_workspace(name)
+            name = data['active']
+            if name in self.workspace_widgets:
+                self.open_workspace(name)
+        finally:
+            self._restoring = False
 
     def launch(self, command, workspace='default', message='Opened.'):
         self.set_workspace(workspace)
@@ -619,7 +930,30 @@ class TheWeb(QMainWindow):
             panel.raise_()
 
     def _appearance_style(self):
-        return LIGHT_STYLE if self.appearance == 'light' else STYLE
+        base = LIGHT_STYLE if self.appearance == 'light' else STYLE
+        return base + readability_css(self.appearance, self.menu_text_size)
+
+    def _refresh_chrome_style(self):
+        # Qt menus and combo drop-downs may live in their own popup windows.
+        # Restyle The Web's windows explicitly, not KDE or GTK applications.
+        sheet = self._appearance_style()
+        self.setStyleSheet(sheet)
+        self.start_menu.setStyleSheet(sheet)
+        self.taskbar.setStyleSheet(sheet)
+        for panel_name in ('command_palette', 'quick_settings_panel', 'window_overview',
+                           'notification_center', 'tray_panel', 'quick_volume'):
+            panel = getattr(self, panel_name, None)
+            if panel is not None:
+                panel.setStyleSheet(sheet)
+
+    def choose_menu_text_size(self, size):
+        if size == self.menu_text_size:
+            return
+        save_menu_size(size)
+        self.menu_text_size = size
+        self._refresh_chrome_style()
+        self.status.setText('Menu text set to ' + size.replace('-', ' ') +
+                            '. The setting will remain after sign-in.')
 
     def _brand_style(self):
         color = '#4c1674' if self.appearance == 'light' else '#e9d5ff'
@@ -634,12 +968,9 @@ class TheWeb(QMainWindow):
             return
         save_theme(theme, self.appearance_path)
         self.appearance = theme
-        stylesheet = self._appearance_style()
-        self.setStyleSheet(stylesheet)
+        self._refresh_chrome_style()
         self.brand_title.setStyleSheet(self._brand_style())
         self.background_surface.set_appearance(theme)
-        self.start_menu.setStyleSheet(stylesheet)
-        self.taskbar.setStyleSheet(stylesheet)
         self.status.setText('The Web appearance: ' + theme + '. KDE/GTK applications unchanged.')
 
     def toggle_window_overview(self):
@@ -666,7 +997,9 @@ class TheWeb(QMainWindow):
         if panel is None:
             self.quick_settings_panel=QuickSettingsPanel(
                 self, appearance_reader=lambda: self.appearance,
-                appearance_writer=self.choose_appearance)
+                appearance_writer=self.choose_appearance,
+                menu_size_reader=lambda: self.menu_text_size,
+                menu_size_writer=self.choose_menu_text_size)
             panel=self.quick_settings_panel
         if panel.isVisible():
             panel.hide()
@@ -732,6 +1065,13 @@ class TheWeb(QMainWindow):
             x11_properties(self, 'DESKTOP'); self.lower()
 
     def closeEvent(self, event):
+        task_worker = getattr(self.taskbar, 'window_scan_worker', None)
+        app_worker = getattr(self, 'app_scan_worker', None)
+        if (task_worker is not None and task_worker.isRunning()) or (
+                app_worker is not None and app_worker.isRunning()):
+            self.status.setText('A desktop refresh is still finishing. Close again afterward.')
+            event.ignore()
+            return
         assistant = getattr(self, 'webbie_assistant', None)
         if assistant is not None and ((assistant.worker and assistant.worker.isRunning()) or
                                       (assistant.camera_worker and assistant.camera_worker.isRunning()) or
@@ -757,7 +1097,11 @@ class TheWeb(QMainWindow):
         if bridge is not None and bridge.poll() is None:
             bridge.terminate()
         if self.notification_toast is not None: self.notification_toast.close()
-        self.taskbar.timer.stop(); self.taskbar.close(); self.start_menu.close(); event.accept()
+        self.taskbar.timer.stop()
+        self.command_palette.close()
+        self.taskbar.close()
+        self.start_menu.close()
+        event.accept()
 
 
 def main():
