@@ -213,6 +213,7 @@ def parse_musicxml(source, title="Imported MusicXML"):
         division = 1
         part_base = Fraction(0)
         transpose = 0
+        current_velocity = 95
         pending_ties = {}
         for measure in children(node, "measure"):
             position = Fraction(0)
@@ -245,7 +246,26 @@ def parse_musicxml(source, title="Imported MusicXML"):
                             warnings.append("Changing time signatures require a dedicated review")
                         measure_quarters = Fraction(numerator * 4, denominator)
                 elif kind == "direction":
+                    # Dynamics annotations set the performance velocity for
+                    # subsequent notes, so scores play with written expression.
+                    dynamic_values = {
+                        "ppp": 32, "pp": 44, "p": 56, "mp": 69,
+                        "mf": 87, "f": 102, "ff": 116, "fff": 124,
+                        "sfz": 120, "fp": 82,
+                    }
+                    for direction_type in children(item, "direction-type"):
+                        dynamic = child(direction_type, "dynamics")
+                        if dynamic is not None:
+                            marks = [local(node.tag) for node in dynamic]
+                            for mark in marks:
+                                if mark in dynamic_values:
+                                    current_velocity = dynamic_values[mark]
                     sound = child(item, "sound")
+                    if sound is not None and "dynamics" in sound.attrib:
+                        try:
+                            current_velocity = max(1, min(127, round(float(sound.attrib["dynamics"]))))
+                        except (ValueError, OverflowError):
+                            raise ValueError("Invalid MusicXML dynamic level") from None
                     if sound is not None and "tempo" in sound.attrib:
                         try:
                             tempo = round(float(sound.attrib["tempo"]))
@@ -293,6 +313,19 @@ def parse_musicxml(source, title="Imported MusicXML"):
                             raise ValueError("Unsupported MusicXML note without pitch")
                         active_key = (pitch, int(part_index))
                         ties = {tie.attrib.get("type") for tie in children(item, "tie")}
+                        note_velocity = current_velocity
+                        played_duration = duration
+                        for notation in children(item, "notations"):
+                            for articulations in children(notation, "articulations"):
+                                for articulation in articulations:
+                                    marking = local(articulation.tag)
+                                    if marking in ("accent", "strong-accent"):
+                                        note_velocity = min(127, note_velocity + (
+                                            23 if marking == "strong-accent" else 12))
+                                    elif marking == "staccato" and not ties:
+                                        played_duration = max(Fraction(1, 64), duration * Fraction(1, 2))
+                                    elif marking == "staccatissimo" and not ties:
+                                        played_duration = max(Fraction(1, 64), duration * Fraction(1, 4))
                         # Stop/continue tie merges duration into one sustained
                         # note; a stop+start is an intermediate continuation.
                         if "stop" in ties and active_key in pending_ties:
@@ -304,7 +337,8 @@ def parse_musicxml(source, title="Imported MusicXML"):
                             if "start" not in ties:
                                 del pending_ties[active_key]
                         elif "stop" not in ties:
-                            note = Note(part_index, pitch, absolute, duration)
+                            note = Note(part_index, pitch, absolute, played_duration,
+                                        note_velocity)
                             notes.append(note)
                             if "start" in ties:
                                 pending_ties[active_key] = len(notes) - 1
