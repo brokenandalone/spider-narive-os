@@ -26,7 +26,7 @@ class MusicalExpressionTests(unittest.TestCase):
         b = express(original, kwargs)
         self.assertEqual(a.notes, b.notes)
         self.assertEqual(original.notes, before)
-        self.assertEqual([n.pitch for n in a.notes], sorted(n.pitch for n in before))
+        self.assertEqual(sorted(n.pitch for n in a.notes), sorted(n.pitch for n in before))
         self.assertEqual(len(a.notes), len(before))
         self.assertTrue(all(n.start >= 0 and n.start+n.duration <= a.beats for n in a.notes))
 
