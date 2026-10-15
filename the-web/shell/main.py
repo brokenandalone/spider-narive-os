@@ -469,6 +469,14 @@ class TheWeb(QMainWindow):
                 advanced = NativeWorkspaceTools(name, workspace_tabs)
                 page.advanced_tools = advanced
                 workspace_tabs.addTab(advanced, 'Advanced tools & tasks')
+                if name == 'media':
+                    workspace_tabs.addTab(
+                        NativeWorkspaceTools('bcn-nova', workspace_tabs),
+                        'BCN / Nova radio tools')
+                elif name == 'system':
+                    workspace_tabs.addTab(
+                        NativeWorkspaceTools('backups', workspace_tabs),
+                        'Backup & integrity tools')
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
         self.update_webbie_context()
