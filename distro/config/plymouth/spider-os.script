@@ -1,15 +1,68 @@
+# Spider OS Plymouth: keep the LUKS passphrase visible and keyboard-driven.
 Window.SetBackgroundTopColor(0.02, 0.01, 0.03);
 Window.SetBackgroundBottomColor(0.00, 0.00, 0.00);
 
 logo = Image("spider-os-splash.png");
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+if (logo.GetWidth() > screen_width || logo.GetHeight() > screen_height) {
+    ratio = Math.Min(screen_width / logo.GetWidth(),
+                     screen_height / logo.GetHeight());
+    logo = logo.Scale(Math.Int(logo.GetWidth() * ratio),
+                      Math.Int(logo.GetHeight() * ratio));
+}
 sprite = Sprite(logo);
+sprite.SetX(screen_width / 2 - logo.GetWidth() / 2);
+sprite.SetY(screen_height / 2 - logo.GetHeight() / 2);
 
-sprite.SetX(
-    Window.GetWidth() / 2 -
-    logo.GetWidth() / 2
-);
+# Important for LUKS2: an image-only theme can hide the disk unlock prompt.
+# Plymouth still owns the actual passphrase input; we draw only the prompt
+# and a count of masked characters. No password content is captured or logged.
+password_title = null;
+password_bullets = null;
+question_title = null;
+question_answer = null;
 
-sprite.SetY(
-    Window.GetHeight() / 2 -
-    logo.GetHeight() / 2
-);
+fun show_password(prompt, bullet_count) {
+    password_title = null;
+    password_bullets = null;
+    if (prompt == "") {
+        prompt = "Unlock encrypted disk";
+    }
+    prompt_image = Image.Text(prompt, 1, 1, 1);
+    password_title = Sprite(prompt_image);
+    password_title.SetX(screen_width / 2 - prompt_image.GetWidth() / 2);
+    password_title.SetY(screen_height * 0.77);
+
+    marks = "";
+    for (i = 0; i < bullet_count && i < 48; i++) {
+        marks = marks + "*";
+    }
+    marks_image = Image.Text(marks, 1, 1, 1);
+    password_bullets = Sprite(marks_image);
+    password_bullets.SetX(screen_width / 2 - marks_image.GetWidth() / 2);
+    password_bullets.SetY(screen_height * 0.83);
+}
+Plymouth.SetDisplayPasswordFunction(show_password);
+
+fun show_question(prompt, entry_text) {
+    question_title = null;
+    question_answer = null;
+    q_image = Image.Text(prompt, 1, 1, 1);
+    question_title = Sprite(q_image);
+    question_title.SetX(screen_width / 2 - q_image.GetWidth() / 2);
+    question_title.SetY(screen_height * 0.77);
+    a_image = Image.Text(entry_text, 1, 1, 1);
+    question_answer = Sprite(a_image);
+    question_answer.SetX(screen_width / 2 - a_image.GetWidth() / 2);
+    question_answer.SetY(screen_height * 0.83);
+}
+Plymouth.SetDisplayQuestionFunction(show_question);
+
+fun restore_normal() {
+    password_title = null;
+    password_bullets = null;
+    question_title = null;
+    question_answer = null;
+}
+Plymouth.SetDisplayNormalFunction(restore_normal);
