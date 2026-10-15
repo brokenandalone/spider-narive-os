@@ -1,6 +1,6 @@
 """Native sheet-music and tablature self-playing workspace for Spider Studio."""
 from pathlib import Path
-from PyQt5.QtCore import QThread,pyqtSignal
+from PyQt5.QtCore import QThread,pyqtSignal,QUrl
 from PyQt5.QtWidgets import (
     QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QTextEdit,
     QSpinBox,QComboBox,QFileDialog,QLineEdit,QMessageBox,
@@ -11,6 +11,11 @@ try:
 except ImportError:
     from score_performance import import_score_file,import_ascii_tab
     from score_audio_render import export_performance_midi,render_soundfont,soundfont_ready
+
+try:
+    from PyQt5.QtMultimedia import QMediaPlayer,QMediaContent
+except ImportError:
+    QMediaPlayer=QMediaContent=None
 
 class ScoreRenderThread(QThread):
     done=pyqtSignal(bool,str)
@@ -29,6 +34,8 @@ class AutoPerformancePanel(QWidget):
         super().__init__(parent)
         self.score=None
         self.worker=None
+        self.player=QMediaPlayer(self) if QMediaPlayer is not None else None
+        self.last_render=None
         self.setObjectName("spiderAutoPerformance")
         self.setStyleSheet("""QWidget#spiderAutoPerformance{background:#100e1d;color:#eee3ff}
             QLabel{color:#f1e6ff} QPushButton{background:#322447;color:white;
@@ -86,6 +93,12 @@ class AutoPerformancePanel(QWidget):
         wav=QPushButton("Render full performance as sampled WAV")
         wav.clicked.connect(self.render_wav)
         exports.addWidget(wav)
+        listen=QPushButton("▶ Play performed WAV")
+        listen.clicked.connect(self.play_rendered)
+        exports.addWidget(listen)
+        stop=QPushButton("■ Stop")
+        stop.clicked.connect(self.stop)
+        exports.addWidget(stop)
         root.addLayout(exports)
         self.status=QLabel("Spider follows the written notes. Quality depends on the configured SoundFont.")
         self.status.setWordWrap(True)
@@ -148,11 +161,31 @@ class AutoPerformancePanel(QWidget):
         if not filename:return
         self.worker=ScoreRenderThread(self.score,self.bank.text().strip(),filename,self)
         self.worker.done.connect(
-            lambda ok,msg:self.status.setText(msg if ok else "Performance failed: "+msg))
+            lambda ok,msg,output=filename:self._render_finished(ok,msg,output))
         self.worker.start()
         self.status.setText("Rendering the written performance using the chosen SoundFont.")
+    def _render_finished(self,ok,msg,output):
+        if ok:
+            self.last_render=Path(output)
+        self.status.setText(msg if ok else "Performance failed: "+msg)
+    def play_rendered(self):
+        if self.last_render is None or not self.last_render.is_file():
+            self.status.setText("Render the score to WAV before playing it.")
+            return
+        if self.player is None:
+            self.status.setText("Qt Multimedia playback is unavailable. Exported WAV plays in other music software.")
+            return
+        self.player.setMedia(QMediaContent(QUrl.fromLocalFile(str(self.last_render))))
+        self.player.setVolume(75)
+        self.player.play()
+        self.status.setText("Playing the rendered performance from its saved WAV file.")
+    def stop(self):
+        if self.player is not None:
+            self.player.stop()
+
     def closeEvent(self,event):
         if self.worker is not None and self.worker.isRunning():
             event.ignore()
         else:
+            self.stop()
             super().closeEvent(event)
