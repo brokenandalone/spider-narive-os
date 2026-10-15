@@ -131,8 +131,67 @@ def workspace_for(desktop_id, name, categories):
     return "system"
 
 
+# Specific, visible in-bay explanations. No application is launched simply
+# to generate this description or to discover whether it was installed.
+APP_TASKS = (
+    ("ardour", "Record and arrange multitrack audio, edit takes, mix sessions and export masters."),
+    ("qtractor", "Arrange MIDI and audio tracks in a Linux recording session."),
+    ("audacity", "Edit and clean up individual WAV recordings and voice tracks."),
+    ("carla", "Host instruments and audio-effect plugins inside Studio."),
+    ("qjackctl", "Inspect and route JACK audio and MIDI connections."),
+    ("qpwgraph", "Inspect and connect PipeWire audio and video nodes."),
+    ("helvum", "Connect PipeWire streams in a patchbay-style view."),
+    ("hydrogen", "Build drum patterns, rhythm sections and percussion demos."),
+    ("mixxx", "DJ with decks and cueing for sets and live shows."),
+    ("musescore", "Write, play back and print sheet music and arrangements."),
+    ("rosegarden", "Compose and edit MIDI scores and orchestrations."),
+    ("yoshimi", "Design and play synthesizer sounds."),
+    ("guitarix", "Use guitar amplifiers and effects for recording."),
+    ("easyeffects", "Apply effects and processing to PipeWire audio."),
+    ("kdenlive", "Edit multitrack video, sound, transitions and titles."),
+    ("shotcut", "Cut and render edited video."),
+    ("openshot", "Assemble video clips and basic motion graphics."),
+    ("obs studio", "Record the screen, webcam and media for a video or live stream."),
+    ("obs-studio", "Record the screen, webcam and media for a video or live stream."),
+    ("handbrake", "Transcode video into compatible playback formats."),
+    ("blender", "Build and render 3D sets, city scenes, objects and animation."),
+    ("krita", "Paint character art, backgrounds and cinematic concept illustrations."),
+    ("gimp", "Retouch photographs, composite images and edit raster artwork."),
+    ("inkscape", "Design scalable logos, maps, icons and vector graphics."),
+    ("darktable", "Develop and color-grade RAW photographs."),
+    ("digikam", "Organize and review photographic libraries."),
+    ("scribus", "Lay out multi-page printable documents and publishing artwork."),
+    ("libreoffice writer", "Write and format essays, manuscripts and DOCX documents."),
+    ("focuswriter", "Write prose in a distraction-free editor."),
+    ("ghostwriter", "Draft Markdown text and long-form writing."),
+    ("libreoffice calc", "Work with spreadsheets, formulas and budgets."),
+    ("libreoffice impress", "Create presentation slides."),
+    ("okular", "Read and annotate PDFs and reference documents."),
+    ("thunderbird", "Read, draft and send email in your connected mail account."),
+    ("firefox", "Browse websites, verify sources and use online services."),
+    ("konsole", "Run terminal commands and inspect local system processes."),
+    ("kate", "Edit code, scripts and text with syntax highlighting."),
+    ("kdevelop", "Work on software projects with an IDE."),
+    ("kde connect", "Pair compatible devices for transfers and shared controls."),
+    ("kdeconnect", "Pair compatible devices for transfers and shared controls."),
+    ("partition manager", "Inspect partitions with graphical disk-management tools. Changes require explicit approval."),
+    ("partitionmanager", "Inspect partitions with graphical disk-management tools. Changes require explicit approval."),
+    ("timeshift", "Inspect or manage system restore snapshots."),
+    ("backintime", "Review backed-up versions of personal files."),
+    ("vlc", "Play local video, audio and compatible network streams."),
+    ("mpv", "Play video and audio with a lightweight media player."),
+    ("steam", "Run installed games without moving game files into a different workspace."),
+    ("wireshark", "Review captured packets in authorized network investigations."),
+    ("nmap", "Inspect networks and hosts only with explicit authorization."),
+)
+
+
 def app_purpose(app):
-    """Human-facing explanation of why an installed app is in this bay."""
+    """Answer 'why do I need this installed app?' in its actual native bay."""
+    identity = (app.desktop_id + " " + app.name).casefold()
+    for token, explanation in APP_TASKS:
+        if _has_name(identity, token):
+            return explanation
     return APP_PURPOSES.get(app.workspace, "Installed application for this workspace")
 
 
