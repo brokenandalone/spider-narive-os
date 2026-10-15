@@ -250,6 +250,9 @@ APP_FILES = (
     'studio/dj_deck_engine.py',
     'studio/dj_deck_panel.py',
     'studio/midi_input_panel.py',
+    'studio/score_performance.py',
+    'studio/score_audio_render.py',
+    'studio/auto_performance_panel.py',
     # Score-driven autonomous instrument performance, opt-in samples only.
     'studio/score_performer.py',
     'studio/score_midi.py',
