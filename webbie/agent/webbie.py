@@ -7,6 +7,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -32,10 +33,36 @@ sys.path.insert(
     0,
     str(WEBBIE_ROOT / "voice")
 )
+sys.path.insert(0,str(WEBBIE_ROOT / "actions"))
 
-
+from owner_authorization_store import read_policy,update_policy
 from brain import respond
-from tts import speak
+from model_resilience import MODEL_GOVERNOR, model_health_message
+from jarvis_context import read_context, context_summary, advisory_context
+from focus_tasks import focus_answer, advisory_focus, WORKSPACES
+from privacy_controls import private_session_active, privacy_explanation
+from interruptible_speech import InterruptibleSpeech
+from interrupt_intent import is_direct_stop
+from stop_signal import request_stop
+from app_open_route import installed_app_request, request_approved_website, request_navigation_preview
+from browser_routes import parse_browser_command
+from voice_turns import VoiceTurnTracker
+from voice_queue import VoiceTurnCoordinator
+from proactive_checks import ProactiveMonitor, status_message, quiet_now, configure
+from local_reminders import ReminderScheduler
+from voice_supervisor import VoiceSupervisor
+from voice_metrics import VOICE_INTAKE
+from launch_intents import direct_launch_intent
+from console_bridge import parse_console_request,perform_console_request
+from workspace_launchers import workspace_command
+from jarvis_commands import is_capability_question, voice_guide
+from voice_trust import voice_permission, trust_status
+from speaker_provider_loader import speaker_gate_from_config
+from runtime_readiness import inspect_readiness, render_report
+from dialogue_state import next_window, is_end_conversation
+from workspace_names import context_name
+from night_mode import asleep as quiet_asleep, set_mode as set_quiet_mode, spoken_mode
+from vision_query import visual_question, ask_vision
 
 
 CONFIG_FILE = (
@@ -84,6 +111,9 @@ STATE_FILE = (
 
 running = True
 speech_lock = threading.Lock()
+state_lock = threading.RLock()
+speech_playback = InterruptibleSpeech()
+voice_turns = VoiceTurnTracker()
 awaiting_command_until = 0.0
 
 
@@ -101,6 +131,8 @@ def load_config():
             "wake_words": [
                 "hey webbie",
                 "webbie",
+                "hey webby",
+                "webby",
                 "hey web",
                 "web",
             ],
@@ -148,64 +180,65 @@ def current_workspace():
 
 
 def current_name():
-    workspace = current_workspace()
-
-    names = CONFIG.get(
-        "context_names",
-        {},
-    )
-
-    return names.get(
-        workspace,
-        CONFIG.get(
-            "default_user_name",
-            "Cory",
-        ),
-    )
+    # Preserve explicit owner choices; Author defaults to Writer.
+    return context_name(current_workspace(), CONFIG)
 
 
 def write_state(**updates):
-    state = {
-        "online": True,
-        "pid": os.getpid(),
-        "workspace": current_workspace(),
-        "user_name": current_name(),
-        "updated": datetime.now().isoformat(),
-    }
-
-    try:
-        if STATE_FILE.exists():
-            old = json.loads(
-                STATE_FILE.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-            if isinstance(old, dict):
-                state.update(old)
-
-    except Exception:
-        pass
-
-    state.update(updates)
-
-    state["online"] = True
-    state["pid"] = os.getpid()
-    state["workspace"] = current_workspace()
-    state["user_name"] = current_name()
-    state["updated"] = datetime.now().isoformat()
-
-    try:
-        STATE_FILE.write_text(
-            json.dumps(
-                state,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-    except Exception:
-        pass
+    """Persist small status snapshots atomically, with owner-only permissions."""
+    with state_lock:
+        state = {
+            "online": True,
+            "pid": os.getpid(),
+            "workspace": current_workspace(),
+            "user_name": current_name(),
+            "updated": datetime.now().isoformat(),
+        }
+        try:
+            if STATE_FILE.exists() and not STATE_FILE.is_symlink():
+                old = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+                if isinstance(old, dict):
+                    state.update(old)
+        except (OSError, ValueError, TypeError):
+            pass
+        state.update(updates)
+        # Only redacted coarse counters and local model state are persisted.
+        # No microphone transcript, model prompt, or speaker name is added.
+        state["voice_intake"] = VOICE_INTAKE.snapshot()
+        state["local_model"] = MODEL_GOVERNOR.status()
+        if private_session_active():
+            # The resident status file must not persist new private exchanges.
+            state.pop("last_heard", None)
+            state.pop("last_reply", None)
+            state.pop("last_input", None)
+        state["online"] = updates.get("online", True)
+        state["pid"] = os.getpid()
+        state["workspace"] = current_workspace()
+        state["user_name"] = current_name()
+        state["updated"] = datetime.now().isoformat()
+        temporary = None
+        try:
+            STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if (STATE_DIR.is_symlink() or STATE_FILE.is_symlink()
+                    or STATE_DIR.stat().st_uid != os.getuid()):
+                raise PermissionError("Unsafe Webbie status path")
+            fd, temporary = tempfile.mkstemp(prefix=".webbie-state-", dir=STATE_DIR)
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, STATE_FILE)
+            temporary = None
+        except (OSError, TypeError, ValueError):
+            pass
+        finally:
+            if temporary is not None:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
 
 
 def notify(title, message):
@@ -224,11 +257,15 @@ def notify(title, message):
         pass
 
 
-def say(text):
+def say(text, *, expected_turn=None):
     text = str(text or "").strip()
 
-    if not text:
+    if not text or (expected_turn is not None and
+                    not voice_turns.current(expected_turn)):
         return
+
+    def may_start():
+        return expected_turn is None or voice_turns.current(expected_turn)
 
     write_state(
         last_reply=text,
@@ -251,7 +288,7 @@ def say(text):
                 encoding="utf-8",
             )
 
-            speak(text)
+            speech_playback.speak(text, may_start=may_start)
 
         finally:
             try:
@@ -296,6 +333,44 @@ def set_workspace(name):
 
 def handle_builtin(command):
     lower = command.lower().strip()
+    # Reject descriptions, indirect questions and NEGATED launch phrases.
+    # Only an exact direct request reaches the legacy launch branches.
+    if re.search(r"\b(?:open|launch|start|enter|run)\b", lower):
+        if direct_launch_intent(command) is None:
+            return None
+    stripped = re.sub(
+        r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
+    if stripped in ("ai model health", "brain health",
+                    "is your ai stuck", "how is your brain doing"):
+        return model_health_message(MODEL_GOVERNOR.status())
+    if stripped in ("readiness status", "jarvis readiness",
+                    "what is working right now", "diagnose your systems",
+                    "diagnose webbie", "what is your health status"):
+        return render_report(inspect_readiness())
+    if stripped in ("voice trust status", "who can talk to you",
+                    "are you verifying voices"):
+        return trust_status()
+    if stripped in ("private session status", "is private session on",
+                    "is privacy mode on", "what is your privacy status"):
+        return privacy_explanation()
+    if stripped in ("what is my focus", "what am i focused on",
+                    "what should i work on next", "what is my next task",
+                    "what is my next focus step"):
+        workspace = current_workspace()
+        return focus_answer(workspace if workspace in WORKSPACES else "default")
+    if is_capability_question(command):
+        return voice_guide()
+    # Read-only live snapshot. Status text never authorizes a desktop action.
+    check_phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", lower)).strip()
+    if re.fullmatch(
+        r"(?:hey )?(?:webbie|webby|web) "
+        r"(?:proactive status|check status|system check status|system health|"
+        r"what have you checked|what did you check|how are your checks|"
+        r"what are you checking|are your checks working)",
+        check_phrase,
+    ):
+        return status_message()
+
 
     if re.search(
         r"\b(open|launch|start)\b.*\bthe web\b",
@@ -406,18 +481,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("media")
-
-        if launch(
-            [
-                "/usr/local/bin/spider-media-player"
-            ]
-        ):
-            return "Opening Media."
-
-        return (
-            "Spider Media Player is not installed yet."
-        )
+        command_line = workspace_command("media")
+        if command_line and launch(command_line):
+            set_workspace("media")
+            return "Spider Media Center launch requested."
+        return ("Spider Media Center launcher was not found. "
+                "No application was started.")
 
     if (
         "study" in lower
@@ -455,12 +524,12 @@ def handle_builtin(command):
             )
         )
     ):
-        set_workspace("studio")
-
-        return (
-            "Studio selected. "
-            "I'll call you Justin here."
-        )
+        command_line = workspace_command("studio")
+        if command_line and launch(command_line):
+            set_workspace("studio")
+            return "Spider Studio launch requested."
+        return ("Spider Studio launcher was not found. "
+                "No application was started.")
 
     if "terminal" in lower and any(
         word in lower
@@ -508,10 +577,77 @@ def handle_builtin(command):
     return None
 
 
-def handle_command(command, voice=False):
+def verified_workspace_voice_action(command, *, speaker_verified=False,
+                                    workspace=None):
+    """Only a separately verified speaker can trigger Author/Kali operations.
+
+    Neither voice recognition, a wake phrase, a friendly workspace name nor
+    model-generated text counts as speaker verification. The existing voice
+    listener has not yet supplied a verified identity signal, so voice actions
+    remain disabled until that PC-specific gate is deliberately wired.
+    """
+    if speaker_verified is not True or quiet_asleep():
+        return None
+    workspace = current_workspace() if workspace is None else workspace
+    if workspace == 'author':
+        from author_voice_bridge import dispatch_verified_author_voice
+        return dispatch_verified_author_voice(
+            command, speaker_verified=True, workspace='author'
+        )
+    if workspace == 'kali-bay':
+        from kali_assistant import handle_kali_request
+        # The existing ten featured Kali GUI workbench launches retain their
+        # previously tested exact-command dispatch.
+        if "kali app " not in command.casefold():
+            return handle_kali_request(command)
+    elif 'kali' not in command.casefold().split():
+        return None
+    # New installed-app launch path requires saved owner permission AND
+    # trusted, verified speech; the model cannot create this instruction.
+    from kali_assistant import handle_kali_request
+    from owner_authorization_store import read_policy as saved_auth
+    grant=saved_auth()
+    enabled=(grant.get('authorized') is True and
+             grant.get('paused') is False and
+             grant.get('kali_on_demand') is True)
+    if enabled:
+        return handle_kali_request(command,allow_named_apps=True)
+    return (handle_kali_request(command) if workspace=='kali-bay'
+            else None)
+
+
+def handle_command(command, voice=False, expected_turn=None,
+                   speaker_evidence=None, speaker_verified=False):
     command = str(command or "").strip()
 
     if not command:
+        return ""
+
+    # Stop is a direct, strictly matched intervention, not a generated answer.
+    if is_direct_stop(command):
+        voice_turns.interrupted()
+        speech_playback.stop()
+        # A STOP received by the resident agent must pause saved standing
+        # authorization even if The Web GUI isn't running.
+        try:
+            if read_policy().get("authorized"):
+                update_policy("pause")
+        except (OSError,PermissionError,ValueError):
+            pass
+        try:
+            request_stop()
+        except (OSError, PermissionError):
+            pass
+        return "Stopped."
+
+    # Explicit policy: only Cory/Shayna's fresh, locally verified speaker
+    # evidence may run ANY voice request, including benign chat. Whisper
+    # transcription, wake words and face similarity are not authentication.
+    # STOP above remains universally available. Until the on-PC verifier is
+    # actually connected, fail quietly. Do not record overheard speech.
+    if not voice_permission(
+            voice=voice, speaker_verified=speaker_verified,
+            evidence=speaker_evidence):
         return ""
 
     write_state(
@@ -519,19 +655,72 @@ def handle_command(command, voice=False):
         last_input="voice" if voice else "text",
     )
 
-    built_in = handle_builtin(command)
-
-    if built_in:
-        reply = built_in
-
+    # Natural navigation phrases can stage an owner-reviewed mission.
+    # This callback cannot send keys or create a desktop task grant.
+    navigation_reply = request_navigation_preview(command) if voice else None
+    # Jarvis browser actions never execute in the agent. A literal user
+    # request may propose a URL to the existing GUI, which confirms it.
+    browser = parse_browser_command(command) if voice else None
+    console_reply=None
+    if voice and parse_console_request(command) is not None:
+        grant=read_policy()
+        allowed=(grant.get('authorized') is True and
+                 grant.get('paused') is False)
+        console_reply=perform_console_request(command,authorized=allowed)
+    if console_reply is not None:
+        reply=console_reply
+    elif navigation_reply is not None:
+        reply = navigation_reply
+    elif browser is not None:
+        reply = (request_approved_website(browser.url) if browser.url else
+                 "That website address is blocked. Use a public HTTPS address.")
+    elif re.fullmatch(
+        r"(?:(?:hey )?(?:webbie|webby|web)[ ,]+)?"
+        r"(?:what am i working on|what is my current task|what workspace am i in|"
+        r"what is on my screen|what are we doing|what step are we on|"
+        r"what is the next step|what is our navigation status|"
+        r"what did you just do|what did you open|"
+        r"what happened with the last action|"
+        r"what is our workflow status|what is the workflow status|"
+        r"where are we in the workflow|what is the next workflow step)", command, re.I,
+    ):
+        reply = context_summary(read_context())
+    # Speech-triggered camera questions work only with consent granted in
+    # The Web GUI. They cannot enable the webcam or bypass quiet sleep.
+    elif voice and visual_question(command):
+        reply = ask_vision(command)
     else:
-        reply = respond(
-            command,
-            context_name=current_name(),
+        verified_reply = (
+            verified_workspace_voice_action(
+                command, speaker_verified=speaker_verified
+            ) if voice else None
         )
+        if verified_reply is not None:
+            reply = verified_reply
+        else:
+            built_in = handle_builtin(command)
+            if built_in:
+                reply = built_in
+            else:
+                # Spoken installed-app launches only request the existing
+                # owner's GUI grant; they cannot create one or run commands.
+                app_reply = installed_app_request(command) if voice else None
+                focus_workspace = current_workspace()
+                if focus_workspace not in WORKSPACES:
+                    focus_workspace = "default"
+                extra_context = advisory_context(read_context())
+                if not private_session_active():
+                    extra_context += "\n" + advisory_focus(focus_workspace)
+                reply = (app_reply if app_reply is not None else
+                         respond(
+                             command, context_name=current_name(),
+                             advisory_context=extra_context))
 
     if voice:
-        say(reply)
+        # A completed model request cannot resume speaking after STOP.
+        if expected_turn is not None and not voice_turns.current(expected_turn):
+            return 'Stopped.'
+        say(reply, expected_turn=expected_turn)
 
     else:
         write_state(
@@ -557,33 +746,20 @@ def clean_phrase(text):
 
 
 def remove_wake_word(phrase):
-    phrase = clean_phrase(phrase)
-
+    """Keep URL punctuation intact after an explicitly addressed wake word."""
+    original = str(phrase or "").strip()
     wake_words = sorted(
-        CONFIG.get(
-            "wake_words",
-            [],
-        ),
-        key=len,
-        reverse=True,
-    )
-
+        CONFIG.get("wake_words", []), key=len, reverse=True)
     for wake in wake_words:
-        wake = clean_phrase(wake)
-
-        index = phrase.find(wake)
-
-        if index >= 0:
-            remainder = (
-                phrase[
-                    index + len(wake):
-                ]
-                .strip()
-            )
-
-            return True, remainder
-
-    return False, phrase
+        word = clean_phrase(wake)
+        if not word:
+            continue
+        parts = [re.escape(token) for token in word.split()]
+        pattern = r"^\s*" + r"\s+".join(parts) + r"\b[\s,:.!?]*"
+        match = re.match(pattern, original, flags=re.I)
+        if match:
+            return True, original[match.end():].strip()
+    return False, original
 
 
 def voice_listener():
@@ -620,34 +796,114 @@ def voice_listener():
         voice_error=None,
     )
 
-    def on_text(phrase):
+    # Single running model worker, plus one short-lived latest correction.
+    # This queue NEVER asserts a speaker identity. The owner-local verified
+    # speaker adapter remains a separate, fail-closed integration gate.
+    speaker_gate = speaker_gate_from_config(CONFIG)
+    coordinator = VoiceTurnCoordinator(
+        lambda command, expected_turn, speaker_verified, evidence: handle_command(
+            command, voice=True, expected_turn=expected_turn,
+            speaker_evidence=evidence, speaker_verified=speaker_verified),
+        voice_turns,
+        can_run=lambda: not quiet_asleep(),
+        on_error=lambda error: write_state(
+            voice_turn_error=type(error).__name__),
+        on_supersede=speech_playback.stop,
+        carry_evidence=True,
+    )
+
+    def start_voice_turn(command, evidence):
+        result = coordinator.submit(
+            command, speaker_verified=True, speaker_evidence=evidence)
+        if result == "queued":
+            VOICE_INTAKE.count("queued_command")
+        write_state(voice_turn_status=result)
+
+    def on_interrupt(phrase):
+        global awaiting_command_until
+        if not is_direct_stop(phrase):
+            return
+        VOICE_INTAKE.count("emergency_stop")
+        awaiting_command_until = next_window(
+            awaiting_command_until, 'stop', time.time())
+        coordinator.cancel()
+        speech_playback.stop()
+        # The live listener intercepts STOP before handle_command().
+        # Persist the PAUSED state here too, even without an open GUI or
+        # a configured speaker verifier. Never undo owner revocation.
+        try:
+            if read_policy().get('authorized'):
+                update_policy('pause')
+        except (OSError, PermissionError, ValueError):
+            pass
+        try:
+            request_stop()
+        except (OSError, PermissionError):
+            pass
+        write_state(last_reply='Voice interruption requested',
+                    voice_turn_status='interrupted')
+
+    def on_text(phrase, evidence=None):
         global awaiting_command_until
 
-        phrase = clean_phrase(
-            phrase
-        )
-
+        original_phrase = str(phrase or "").strip()
+        phrase = clean_phrase(original_phrase)
         if not phrase:
+            return
+        VOICE_INTAKE.count("heard_transcript")
+        # Emergency STOP is universal even when audio cannot identify a user.
+        if is_direct_stop(phrase):
+            on_interrupt(phrase)
+            return
+        # No wake, sleep, greetings or follow-up from a TV, other speaker,
+        # model TTS or an unauthenticated transcript. The actual local
+        # speaker adapter must verify the SAME captured WAV first.
+        if not voice_permission(
+                voice=True, speaker_verified=evidence is not None,
+                evidence=evidence):
+            VOICE_INTAKE.count("rejected_unverified")
+            return
+        VOICE_INTAKE.count("verified_input")
+
+        # Stay operational at night without answering TV, casual speech or
+        # wake words alone. Only an exact, deliberate wake phrase reopens chat.
+        sleeping = quiet_asleep()
+        mode = spoken_mode(phrase, sleeping=sleeping)
+        if sleeping:
+            VOICE_INTAKE.count("ignored_sleeping")
+            awaiting_command_until = 0
+            if mode == 'wake':
+                set_quiet_mode('wake')
+                say("I'm awake.")
+            return
+        if mode == 'sleep':
+            awaiting_command_until = 0
+            coordinator.cancel()
+            speech_playback.stop()
+            say("Goodnight. I'll keep everything running quietly.")
+            set_quiet_mode('sleep')
             return
 
         now = time.time()
 
-        if (
-            now
-            < awaiting_command_until
-        ):
-            awaiting_command_until = 0
+        if is_end_conversation(phrase):
+            coordinator.cancel()
+            speech_playback.stop()
+            awaiting_command_until = next_window(
+                awaiting_command_until, 'end', now)
+            return
 
-            handle_command(
-                phrase,
-                voice=True,
-            )
-
+        if now < awaiting_command_until:
+            woke, command = remove_wake_word(original_phrase)
+            awaiting_command_until = next_window(
+                awaiting_command_until, 'command', now)
+            start_voice_turn(command if woke and command else original_phrase,
+                             evidence)
             return
 
         woke, command = (
             remove_wake_word(
-                phrase
+                original_phrase
             )
         )
 
@@ -655,16 +911,13 @@ def voice_listener():
             return
 
         if command:
-            handle_command(
-                command,
-                voice=True,
-            )
-
+            awaiting_command_until = next_window(
+                awaiting_command_until, 'command', now)
+            start_voice_turn(command, evidence)
             return
 
-        awaiting_command_until = (
-            time.time() + 10
-        )
+        awaiting_command_until = next_window(
+            awaiting_command_until, 'wake', now)
 
         say(
             f"I'm here, "
@@ -675,6 +928,8 @@ def voice_listener():
         listen_forever(
             on_text=on_text,
             should_continue=lambda: running,
+            on_interrupt=on_interrupt,
+            verifier=speaker_gate.verify_file,
         )
 
     except Exception as error:
@@ -683,6 +938,18 @@ def voice_listener():
             voice_engine="whisper.cpp",
             voice_error=str(error),
         )
+
+
+def supervised_voice_listener():
+    """Keep the speech recognizer alive with bounded retries, not a service restart."""
+    supervisor = VoiceSupervisor(
+        voice_listener,
+        lambda: running,
+        notify=lambda reason, delay: write_state(
+            voice_listener=False, voice_retry_in_seconds=delay,
+            voice_retry_reason=reason),
+    )
+    supervisor.serve()
 
 
 def session_is_active():
@@ -695,6 +962,7 @@ def session_is_active():
             ],
             text=True,
             stderr=subprocess.DEVNULL,
+            timeout=4,
         )
 
         for line in output.splitlines():
@@ -738,10 +1006,8 @@ def session_is_active():
                 stderr=subprocess.DEVNULL,
             ).strip()
 
-            return (
-                active == "yes"
-                and idle != "yes"
-            )
+            if active == "yes" and idle != "yes":
+                return True
 
     except Exception:
         pass
@@ -750,61 +1016,81 @@ def session_is_active():
 
 
 def proactive_loop():
-    if CONFIG.get(
-        "greet_on_login",
-        True,
-    ):
-        time.sleep(8)
+    """Run real, local health checks even when Webbie is sleeping.
 
-        hour = datetime.now().hour
-
-        if hour < 12:
-            greeting = "Good morning"
-
-        elif hour < 18:
-            greeting = "Good afternoon"
-
-        else:
-            greeting = "Good evening"
-
-        say(
-            f"{greeting}, {current_name()}. "
-            "Webbie is online."
-        )
-
-    minutes = max(
-        15,
-        int(
-            CONFIG.get(
-                "check_in_minutes",
-                45,
-            )
+    The desktop stays in control of user-facing notifications. No model calls,
+    browser queries, raw audio, camera capture, or automatic desktop actions.
+    """
+    raw = CONFIG.get("proactive", {})
+    if not isinstance(raw, dict):
+        raw = {}
+    settings = dict(raw)
+    settings.setdefault("check_in_minutes", CONFIG.get("check_in_minutes", 45))
+    monitor = ProactiveMonitor(
+        settings=settings,
+        on_alert=lambda message: subprocess.run(
+            ["notify-send", "Webbie system check", message],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4, check=True,
         ),
     )
-
-    next_check = (
-        time.time()
-        + minutes * 60
+    config = configure(settings)
+    reminders = ReminderScheduler(
+        on_alert=lambda message: subprocess.run(
+            ["notify-send", "Webbie reminder", message],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4, check=True,
+        ),
     )
+    # Start after the microphone listener has had a chance to report status.
+    time.sleep(8)
+    if (CONFIG.get("greet_on_login", True) and not quiet_asleep()
+            and session_is_active()
+            and not quiet_now(time.time(), config["quiet_start"],
+                              config["quiet_end"])):
+        hour = datetime.now().hour
+        greeting = ("Good morning" if hour < 12 else
+                    "Good afternoon" if hour < 18 else "Good evening")
+        say(f"{greeting}, {current_name()}. Webbie is online.")
 
     while running:
-        time.sleep(30)
-
-        if time.time() < next_check:
-            continue
-
-        next_check = (
-            time.time()
-            + minutes * 60
-        )
-
-        if not session_is_active():
-            continue
-
-        say(
-            f"{current_name()}, "
-            "do you need anything?"
-        )
+        desktop_active = session_is_active()
+        sleeping = quiet_asleep()
+        try:
+            report = monitor.tick(
+                session_active=desktop_active,
+                sleeping=sleeping,
+            )
+            statuses = {key: entry["status"]
+                        for key, entry in report["checks"].items()}
+            write_state(
+                proactive_enabled=report["enabled"],
+                proactive_last_run=report["last_run"],
+                proactive_pending_alerts=report["pending_count"],
+                proactive_check_statuses=statuses,
+                proactive_error=None,
+            )
+        except Exception as error:
+            # Keep Webbie's core chat and wake-word loop alive if a local
+            # monitor or desktop notification service fails.
+            write_state(proactive_error=type(error).__name__)
+        try:
+            scheduled = reminders.tick(
+                session_active=desktop_active, sleeping=sleeping,
+                quiet_start=config["quiet_start"],
+                quiet_end=config["quiet_end"],
+            )
+            write_state(
+                local_reminders_scheduled=scheduled["scheduled"],
+                local_reminders_due=scheduled["due"],
+                local_reminder_error=None,
+            )
+        except Exception as error:
+            write_state(local_reminder_error=type(error).__name__)
+        for _ in range(15):
+            if not running:
+                break
+            time.sleep(2)
 
 
 def socket_server():
@@ -915,7 +1201,7 @@ def main():
             daemon=True,
         ),
         threading.Thread(
-            target=voice_listener,
+            target=supervised_voice_listener,
             name="webbie-voice",
             daemon=True,
         ),

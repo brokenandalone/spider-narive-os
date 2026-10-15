@@ -4,7 +4,9 @@
     "hey webbie",
     "webbie",
     "hey web",
-    "web"
+    "web",
+    "hey webby",
+    "webby"
   ],
   "greet_on_login": true,
   "check_in_minutes": 45,
@@ -12,7 +14,10 @@
   "context_names": {
     "default": "Cory",
     "studio": "Justin",
-    "kali-bay": "Spider"
+    "author": "Writer",
+    "kali-bay": "Spider",
+    "study": "Student",
+    "school": "Student"
   },
   "voice": {
     "online": "en-AU-NatashaNeural",
@@ -23,6 +28,11 @@
     "url": "http://127.0.0.1:11434/api/chat",
     "model": "qwen3:1.7b"
   },
+  "speaker_verification": {
+    "enabled": false,
+    "provider_sha256": "",
+    "note": "Requires separately installed and owner-audited offline verifier; do not enable without enrollment and live testing"
+  },
   "speech_recognition": {
     "engine": "whisper.cpp",
     "model": "base.en",
@@ -30,5 +40,15 @@
     "language": "en",
     "chunk_seconds": 4,
     "offline": true
+  },
+  "proactive": {
+    "enabled": true,
+    "check_in_minutes": 45,
+    "alert_cooldown_minutes": 180,
+    "quiet_start": "22:00",
+    "quiet_end": "08:00",
+    "disk_warning_free_gib": 5,
+    "watch_ai_dj": false,
+    "notify_recovery": true
   }
 }

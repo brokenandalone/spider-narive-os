@@ -163,7 +163,7 @@ rsync -a \
     "${ROOT}/kali-bay/" \
     "${ROOTFS}/usr/local/lib/spider-os/kali-bay/"
 
-for component in study media; do
+for component in study media system studio author spider_max_source; do
     rsync -a "${ROOT}/${component}/" "${ROOTFS}/usr/local/lib/spider-os/${component}/"
 done
 rsync -a "${ROOT}/branding/" "${ROOTFS}/usr/local/lib/spider-os/branding/"
@@ -171,7 +171,10 @@ chmod +x "${ROOTFS}/usr/local/lib/spider-os/study/bin/study" \
     "${ROOTFS}/usr/local/lib/spider-os/kali-bay/bin/kali-bay"
 install -Dm644 "${ROOT}/distro/systemd/ollama.service" \
     "${ROOTFS}/usr/lib/systemd/system/ollama.service"
-for app in webbie study forage deep-forage kali-bay; do
+for unit in spider-vault.service spider-vault.timer; do
+    install -Dm644 "${ROOT}/system/service/${unit}" "${ROOTFS}/usr/lib/systemd/user/${unit}"
+done
+for app in webbie study forage deep-forage kali-bay spider-guardian spider-vault studio author; do
     install -Dm644 "${ROOT}/distro/config/applications/${app}.desktop" \
         "${ROOTFS}/usr/share/applications/${app}.desktop"
 done
@@ -332,6 +335,10 @@ GRUB_DISTRIBUTOR="Spider OS"
 GRUB_BACKGROUND="/usr/share/backgrounds/spider-os-wallpaper.png"
 SPIDER_GRUB
 
+# The Web is a selectable desktop session; existing Plasma sessions remain.
+install -Dm755 "${ROOT}/the-web/session/the-web-session" "${ROOTFS}/usr/local/bin/the-web-session"
+install -Dm644 "${ROOT}/distro/config/sessions/the-web.desktop" "${ROOTFS}/usr/share/xsessions/the-web.desktop"
+
 echo "Installing Spider OS visual branding..."
 
 install -Dm644 \
@@ -411,9 +418,7 @@ install -Dm644 \
   "${SPIDER_REPO_ROOT}/distro/config/autostart/the-web.desktop" \
   "${ROOTFS}/etc/xdg/autostart/the-web.desktop"
 
-install -Dm644 \
-  "${SPIDER_REPO_ROOT}/distro/config/autostart/the-web.desktop" \
-  "${ROOTFS}/usr/share/applications/the-web.desktop"
+# The Web is listed in the desktop session chooser, not Lost and Found.
 
 install -Dm644 \
   "${SPIDER_REPO_ROOT}/distro/config/autostart/the-web.desktop" \
@@ -445,7 +450,7 @@ rsync -a \
     "${ROOT}/kali-bay/" \
     "${LIVE_ROOTFS}/usr/local/lib/spider-os/kali-bay/"
 
-for component in study media; do
+for component in study media system studio author spider_max_source; do
     rsync -a "${ROOT}/${component}/" "${LIVE_ROOTFS}/usr/local/lib/spider-os/${component}/"
 done
 rsync -a "${ROOT}/branding/" "${LIVE_ROOTFS}/usr/local/lib/spider-os/branding/"
@@ -453,7 +458,10 @@ chmod +x "${LIVE_ROOTFS}/usr/local/lib/spider-os/study/bin/study" \
     "${LIVE_ROOTFS}/usr/local/lib/spider-os/kali-bay/bin/kali-bay"
 install -Dm644 "${ROOT}/distro/systemd/ollama.service" \
     "${LIVE_ROOTFS}/usr/lib/systemd/system/ollama.service"
-for app in webbie study forage deep-forage kali-bay; do
+for unit in spider-vault.service spider-vault.timer; do
+    install -Dm644 "${ROOT}/system/service/${unit}" "${LIVE_ROOTFS}/usr/lib/systemd/user/${unit}"
+done
+for app in webbie study forage deep-forage kali-bay spider-guardian spider-vault studio author; do
     install -Dm644 "${ROOT}/distro/config/applications/${app}.desktop" \
         "${LIVE_ROOTFS}/usr/share/applications/${app}.desktop"
 done
@@ -581,6 +589,9 @@ install -Dm644 \
     "${ROOT}/branding/splash/spider-os-splash.png" \
     "${LIVE_ROOTFS}/usr/share/spider-os/branding/spider-os-splash.png"
 
+install -Dm755 "${ROOT}/the-web/session/the-web-session" "${LIVE_ROOTFS}/usr/local/bin/the-web-session"
+install -Dm644 "${ROOT}/distro/config/sessions/the-web.desktop" "${LIVE_ROOTFS}/usr/share/xsessions/the-web.desktop"
+
 # Live desktop branding and The Web startup.
 install -Dm755 \
     "${ROOT}/distro/config/branding/apply-spider-branding.sh" \
@@ -658,7 +669,7 @@ chmod 755 \
 while IFS= read -r desktop_file; do
     sed -i \
         -e 's/Install Ubuntu Studio/Install Spider OS/g' \
-        -e 's/Install Ubuntu [0-9][0-9]\.[0-9][0-9][^/]*/Install Spider OS/g' \
+        -e 's/Install Ubuntu 24\.04\.5 LTS/Install Spider OS/g' \
         -e 's/Install Ubuntu/Install Spider OS/g' \
         "${desktop_file}"
 done < <(

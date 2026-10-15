@@ -1,5 +1,7 @@
 # Spider OS 26.10 Master Plan
 
+Canonical repository: `brokenandalone/spider-narive-os`
+
 Status: Canonical roadmap  
 Date locked: 2026-10-04  
 Owner intent: Spider OS must remain bootable while evolving into a Jarvis-style personal operating system centered around Webbie.
@@ -696,3 +698,8 @@ Only after this qualification does Spider OS 26.10 become the new baseline.
 13. Perform final full-system qualification.
 
 This order is intentionally conservative around boot and aggressive around capability only after the 26.10 foundation proves reliable.
+
+
+## Repository baseline note
+
+This repository already contains the mature native Spider OS builder, installer validation, installed-VM boot qualification, Spider Core, Webbie, Forage/Deep Forage, Study, Kali Bay, Media integration, workspace backgrounds, and The Web launcher. The 26.10 migration must preserve those working tests and extend them rather than replacing them with the earlier Spider-OS1 scaffold.
