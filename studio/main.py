@@ -193,6 +193,12 @@ class SpiderStudio(QMainWindow):
         dj_scroll.setWidgetResizable(True)
         dj_scroll.setWidget(self.dj_deck_panel)
         self.tool_tabs.addTab(dj_scroll, 'DJ Decks')
+        if __package__:
+            from .auto_performer_panel import AutoPerformerPanel
+        else:
+            from auto_performer_panel import AutoPerformerPanel
+        self.auto_performer_panel = AutoPerformerPanel(self)
+        self.tool_tabs.addTab(self.auto_performer_panel, 'Auto Performer · Scores & TAB')
 
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
@@ -351,7 +357,8 @@ class SpiderStudio(QMainWindow):
         # Do not destroy a QThread while it is exporting the owner's song or
         # WAV. Preserve the existing MAX worker closure protection as well.
         for panel in (self.native_max_tools, self.song_production_panel,
-                      self.waveform_edit_panel, self.dj_deck_panel):
+                      self.waveform_edit_panel, self.dj_deck_panel,
+                      self.auto_performer_panel):
             worker = getattr(panel, 'worker', None)
             if worker is not None and worker.isRunning():
                 self.status.setText('Finish the current export or analysis before closing Spider Studio.')
@@ -366,6 +373,7 @@ class SpiderStudio(QMainWindow):
         self.instrument_workbench.timer.stop()
         self.waveform_edit_panel.stop_preview()
         self.dj_deck_panel.stop()
+        self.auto_performer_panel.stop()
         for audio, _data in list(self.instrument_workbench._voices):
             audio.stop()
         self.instrument_workbench._voices.clear()
