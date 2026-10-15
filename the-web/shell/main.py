@@ -35,6 +35,8 @@ from webbie_face import (asleep as face_asleep, set_sleep as set_face_sleep,
 from media_panel import MediaPanel
 from immersive_bays import ImmersiveBay, SCENES
 from bay_mission_panel import BayMissionPanel
+from native_utility_bays import (ArtLabPanel, CommunicationsPanel, DevBayPanel,
+                                 DevicesPanel, ProductivityPanel)
 from app_catalog import VISIBLE_WORKSPACES
 from workspace_max_native import NativeWorkspaceTools, WORKSPACE_TO_MAX
 from volume_panel import VolumePanel
@@ -729,6 +731,11 @@ class TheWeb(QMainWindow):
             try:
                 if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
                 elif name == 'media': native = MediaPanel(self.launch_media)
+                elif name == 'art-lab': native = ArtLabPanel()
+                elif name == 'communications': native = CommunicationsPanel()
+                elif name == 'dev-bay': native = DevBayPanel()
+                elif name == 'productivity': native = ProductivityPanel()
+                elif name == 'devices': native = DevicesPanel()
                 else: native = create_native(name, SPIDER_ROOT)
             except Exception as error:
                 native = None; page.native_error = str(error); self.status.setText(f'Could not open {WORKSPACES[name]}: {error}')
