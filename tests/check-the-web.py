@@ -60,6 +60,25 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
     assert window.tabs.count()==len(main.WORKSPACES)
+    for bay, widget in (
+        ('devices', main.DevicesPanel),
+        ('productivity', main.ProductivityPanel),
+        ('art-lab', main.ArtLabPanel),
+        ('communications', main.CommunicationsPanel),
+        ('dev-bay', main.DevBayPanel),
+    ):
+        assert isinstance(window.workspace_widgets[bay].native, widget), bay
+    for bay in main.WORKSPACES:
+        if bay == 'default':
+            continue
+        assert isinstance(window.workspace_widgets[bay].mission_desk, main.BayMissionPanel), bay
+    research = window.workspace_widgets['webbie'].findChildren(main.WebbieResearchPanel)
+    assert len(research) == 1, 'Webbie research mind not present in native bay'
+    mission_store = window.workspace_widgets['studio'].mission_desk.store
+    saved = mission_store.add('studio', 'Mix session for Qt integration test')
+    assert any(m['id'] == saved['id'] for m in mission_store.for_bay('studio'))
+    mission_store.update(saved['id'], destination='productivity', status='active')
+    assert any(m['id'] == saved['id'] for m in mission_store.for_bay('productivity'))
     for name in ['system', 'recovery']:
         panel = window.workspace_widgets[name].native
         assert panel is not None and panel.tables['storage'].rowCount() > 0
