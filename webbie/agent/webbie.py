@@ -53,6 +53,7 @@ from local_reminders import ReminderScheduler
 from voice_supervisor import VoiceSupervisor
 from voice_metrics import VOICE_INTAKE
 from launch_intents import direct_launch_intent
+from app_bay_lookup import lookup_installed_app
 from console_bridge import parse_console_request,perform_console_request
 from workspace_launchers import workspace_command
 from jarvis_commands import is_capability_question, voice_guide
@@ -338,6 +339,11 @@ def handle_builtin(command):
     if re.search(r"\b(?:open|launch|start|enter|run)\b", lower):
         if direct_launch_intent(command) is None:
             return None
+    # Answer explicit app-location questions from the actual installed XDG
+    # registry without opening a program or changing task permissions.
+    app_location = lookup_installed_app(command)
+    if app_location is not None:
+        return app_location
     stripped = re.sub(
         r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
     if stripped in ("ai model health", "brain health",
