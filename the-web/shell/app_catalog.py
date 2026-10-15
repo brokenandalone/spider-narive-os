@@ -81,13 +81,13 @@ KNOWN_APPLICATIONS = (
        "libreoffice draw", "libreoffice base", "libreoffice math",
        "okular", "evince", "atril", "onlyoffice", "calligra",
        "korganizer", "kontact", "calibre", "ktimetracker",
-       "filelight", "kcalc", "calculator", "xournalpp", "xournal++")),
+       "filelight", "xournalpp", "xournal++")),
     ("communications", ("thunderbird", "geary", "evolution", "discord",
        "element", "signal desktop", "signal-desktop", "telegram",
        "filezilla", "hexchat", "konversation", "neochat")),
     ("forage", ("firefox", "chromium", "google chrome", "brave browser",
        "vivaldi", "tor browser", "falkon", "librewolf")),
-    ("study", ("anki", "klavaro", "kturtle", "marble", "kalzium",
+    ("study", ("anki", "klavaro", "kcalc", "calculator", "kturtle", "marble", "kalzium",
        "kstars", "stellarium")),
     ("kali-bay", ("wireshark", "nmap", "zenmap", "burpsuite",
        "burp suite", "ettercap", "maltego", "kali bay")),
@@ -146,7 +146,7 @@ def application_directories():
 
 
 ASSIGNMENT_LIMIT = 40960
-APP_ID_PATTERN = re.compile(r"[A-Za-z0-9_.+@-]{1,160}\\Z")
+APP_ID_PATTERN = re.compile(r"[A-Za-z0-9_.+@-]{1,160}\Z")
 
 
 def app_assignment_file(config_home=None):
