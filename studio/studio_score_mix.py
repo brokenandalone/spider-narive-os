@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 import math
 import os
+import random
 from pathlib import Path
 import sys
 import tempfile
@@ -59,8 +60,15 @@ def _audio_layout(path, rate):
             raise ValueError("SoundFont part did not render stereo 16-bit audio at matching sample rate")
         return reader.getnframes()
 
-def _mix_readers(readers, settings, total_frames):
-    """Emit compressed PCM bytes per chunk; read files instead of loading all stems."""
+def _mix_readers(readers, settings, total_frames, bit_depth=16):
+    """Stream 16/24-bit stereo PCM after high-precision float summing.
+
+    A 24-bit export preserves additional *mixing* precision, but cannot
+    manufacture 24-bit fidelity from the underlying 16-bit samples.
+    """
+    if bit_depth not in (16, 24):
+        raise ValueError("Unsupported final PCM bit depth")
+    rng = random.Random(313)
     solo_active = any(m.solo and not m.mute for m in settings)
     for offset in range(0, total_frames, BLOCK):
         count = min(BLOCK, total_frames - offset)
@@ -84,16 +92,30 @@ def _mix_readers(readers, settings, total_frames):
             for k in range(frames):
                 accum_l[k] += data[2*k] / 32768 * gl
                 accum_r[k] += data[2*k+1] / 32768 * gr
-        samples = array("h")
-        for l, r in zip(accum_l, accum_r):
-            samples.append(round(32767 * math.tanh(l * 0.72)))
-            samples.append(round(32767 * math.tanh(r * 0.72)))
-        if sys.byteorder != "little":
-            samples.byteswap()
-        yield samples.tobytes()
+        if bit_depth == 16:
+            samples = array("h")
+            for l, r in zip(accum_l, accum_r):
+                samples.append(round(32767 * math.tanh(l * 0.72)))
+                samples.append(round(32767 * math.tanh(r * 0.72)))
+            if sys.byteorder != "little":
+                samples.byteswap()
+            yield samples.tobytes()
+        else:
+            payload = bytearray()
+            for l, r in zip(accum_l, accum_r):
+                for value in (l, r):
+                    limited = math.tanh(value * 0.72)
+                    # Deterministic TPDF dither at the 24-bit output LSB.
+                    # Preserve digital silence instead of dithering empty bars.
+                    noise = (rng.random() - rng.random()) if limited else 0.0
+                    sample = round(limited * 8388607 + noise)
+                    sample = max(-8388608, min(8388607, sample))
+                    payload.extend(sample.to_bytes(3, "little", signed=True))
+            yield bytes(payload)
 
 def render_score_mix(performance, default_bank, destination, part_banks=None,
-                     channels=None, rate=48000, part_renderer=None):
+                     channels=None, rate=48000, part_renderer=None,
+                     bit_depth=16):
     """Render + master a score from individual instrument banks (atomic output).
 
     part_banks is {score-part-index: path-to-bank}. Unspecified parts use
@@ -103,6 +125,8 @@ def render_score_mix(performance, default_bank, destination, part_banks=None,
     p = performance.validated()
     if rate not in (44100, 48000):
         raise ValueError("Studio mixing supports 44.1 or 48 kHz")
+    if type(bit_depth) is not int or bit_depth not in (16, 24):
+        raise ValueError("Studio output supports 16/24-bit integer PCM")
     if not p.notes:
         raise ValueError("No notes to perform")
     if p.duration_seconds > 300:
@@ -159,9 +183,9 @@ def render_score_mix(performance, default_bank, destination, part_banks=None,
                 with os.fdopen(fd, "wb") as stream:
                     with wave.open(stream, "wb") as output:
                         output.setnchannels(2)
-                        output.setsampwidth(2)
+                        output.setsampwidth(bit_depth // 8)
                         output.setframerate(rate)
-                        for block in _mix_readers(aligned, mixer, frames):
+                        for block in _mix_readers(aligned, mixer, frames, bit_depth=bit_depth):
                             output.writeframesraw(block)
                         output.writeframes(b"")
                     stream.flush()
