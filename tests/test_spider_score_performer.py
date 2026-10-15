@@ -93,6 +93,40 @@ class TestScorePerformer(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_ascii_tab("e|--0-|\nB|--0-|\nG|--0-|\nD|--0-|")  # wrong bass string order
 
+    def test_musicxml_drums_and_embedded_gm_programs(self):
+        xml = """<score-partwise>
+          <part-list>
+            <score-part id="DR">
+              <part-name>Drums</part-name>
+              <score-instrument id="KICK"><instrument-name>Bass Drum</instrument-name></score-instrument>
+              <midi-instrument id="KICK">
+                <midi-channel>10</midi-channel><midi-unpitched>37</midi-unpitched>
+              </midi-instrument>
+            </score-part>
+            <score-part id="EL">
+              <part-name>Guitar</part-name>
+              <score-instrument id="ELEC"><instrument-name>Electric</instrument-name></score-instrument>
+              <midi-instrument id="ELEC"><midi-program>31</midi-program></midi-instrument>
+            </score-part>
+          </part-list>
+          <part id="DR"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><unpitched><display-step>A</display-step><display-octave>2</display-octave></unpitched>
+              <duration>1</duration><instrument id="KICK"/></note>
+          </measure></part>
+          <part id="EL"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>
+          </measure></part>
+        </score-partwise>"""
+        p = parse_musicxml(xml)
+        self.assertEqual(p.parts[0].channel, 9)
+        self.assertEqual(p.parts[1].program, 30)  # 1-based MusicXML -> MIDI patch 30
+        self.assertEqual(p.notes[0].pitch, 36)
+        raw = encode_performance_midi(p)
+        self.assertIn(bytes((0x99, 36, 95)), raw)
+        self.assertIn(bytes((0xC0, 30)), raw)
+
     def test_performance_midi_tracks_note_off_and_tempo(self):
         p = parse_musicxml(SCORE)
         raw = encode_performance_midi(p)
