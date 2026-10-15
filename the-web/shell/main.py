@@ -20,7 +20,8 @@ if not SPIDER_ROOT.exists():
     SPIDER_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
-from app_catalog import WORKSPACES, discover_apps, launch_command
+from app_catalog import (WORKSPACES, discover_apps, launch_command,
+                         app_purpose, save_app_assignment)
 from desktop import list_tasks, wm_command, close_window, minimize_window, maximize_window, x11_properties
 from wallpapers import WallpaperCatalog
 from workspaces import create_native
@@ -287,7 +288,7 @@ class Taskbar(QWidget):
 class TheWeb(QMainWindow):
     def __init__(self, desktop_mode=False, restore=True):
         super().__init__()
-        self.desktop_mode = desktop_mode; self.current_workspace = 'default'; self.workspace_widgets = {}; self.app_lists = {}
+        self.desktop_mode = desktop_mode; self.current_workspace = 'default'; self.workspace_widgets = {}; self.app_lists = {}; self.app_queries = {}; self.app_scopes = {}; self.app_counts = {}
         self.wallpaper_catalog = WallpaperCatalog(SPIDER_ROOT); self.wallpaper = None
         self.state_path = self.wallpaper_catalog.config.parent / 'desktop.json'
         self.appearance_path = appearance_file()
@@ -507,13 +508,57 @@ class TheWeb(QMainWindow):
         self.webbie_dock.setWindowTitle('WEBBIE | ' + label)
 
     def application_panel(self, workspace):
-        panel = QWidget(); panel.setObjectName('panel'); layout = QVBoxLayout(panel)
-        help_label = QLabel('Optional installed programs for ' + WORKSPACES[workspace] + '.\nYour native bay works without adding a desktop launcher. Select a program only when its specialized tools are needed.')
-        help_label.setWordWrap(True); layout.addWidget(help_label)
-        apps = QListWidget(); apps.setMinimumWidth(230); apps.setMaximumWidth(340); apps.setIconSize(QSize(28, 28)); layout.addWidget(apps)
-        apps.itemActivated.connect(lambda item: self.open_installed(item.data(Qt.UserRole)))
-        self.app_lists[workspace] = apps; self.populate_app_list(workspace)
-        layout.addWidget(button('Refresh installed apps', self.refresh_apps))
+        """An optional shelf for real installed tools, never a substitute bay."""
+        panel = QWidget(); panel.setObjectName('panel')
+        layout = QVBoxLayout(panel)
+        help_label = QLabel(
+            'Ubuntu Studio programs remain installed and usable. '
+            'Each appears in its recommended bay, and every available '
+            'application remains searchable from every bay. Moving an app '
+            'here only changes its Spider OS category, not its files.')
+        help_label.setWordWrap(True)
+        layout.addWidget(help_label)
+        scope_row = QHBoxLayout()
+        scope = QComboBox()
+        scope.addItem('Tools assigned to this bay', 'here')
+        scope.addItem('All available applications', 'all')
+        scope_row.addWidget(scope, 1)
+        search = QLineEdit()
+        search.setPlaceholderText('Search installed programs by name')
+        search.setAccessibleName('Search available Ubuntu Studio applications')
+        scope_row.addWidget(search, 2)
+        layout.addLayout(scope_row)
+        apps = QListWidget()
+        apps.setMinimumWidth(250)
+        apps.setIconSize(QSize(28, 28))
+        apps.setAccessibleName('Available installed applications')
+        apps.itemActivated.connect(
+            lambda item: self.open_installed(item.data(Qt.UserRole)))
+        layout.addWidget(apps, 1)
+        count = QLabel('')
+        layout.addWidget(count)
+        self.app_lists[workspace] = apps
+        self.app_queries[workspace] = search
+        self.app_scopes[workspace] = scope
+        self.app_counts[workspace] = count
+        scope.currentIndexChanged.connect(
+            lambda index, bay=workspace: self.populate_app_list(bay))
+        search.textChanged.connect(
+            lambda text, bay=workspace: self.populate_app_list(bay))
+        actions = QHBoxLayout()
+        actions.addWidget(button('Refresh programs', self.refresh_apps))
+        move = button('Use selected app in this bay',
+                      lambda checked=False, bay=workspace:
+                      self.assign_selected_app(bay))
+        move.setToolTip('Only changes this app’s Spider OS workspace category. '
+                        'Nothing is moved or uninstalled.')
+        actions.addWidget(move)
+        reset = button('Restore recommended placement',
+                       lambda checked=False, bay=workspace:
+                       self.assign_selected_app(bay, reset=True))
+        actions.addWidget(reset)
+        layout.addLayout(actions)
+        self.populate_app_list(workspace)
         folders = workspace_folders(workspace)
         if folders:
             layout.addWidget(QLabel('Workspace files'))
@@ -521,24 +566,88 @@ class TheWeb(QMainWindow):
             for title, location in folders:
                 locations.addItem(title, str(location))
             layout.addWidget(locations)
-            open_files = button('Open files in Dolphin', lambda checked=False, picker=locations: self.open_workspace_folder(picker.currentData(), workspace))
-            open_files.setToolTip('Opens existing local files; never moves, replaces or uploads documents.')
+            open_files = button(
+                'Open files in Dolphin',
+                lambda checked=False, picker=locations:
+                self.open_workspace_folder(picker.currentData(), workspace))
+            open_files.setToolTip(
+                'Opens an existing folder, never copies, removes or uploads files.')
             layout.addWidget(open_files)
-        if workspace == 'media': layout.addWidget(button('Open Spider Media Center', self.launch_media))
-        if workspace == 'system': layout.addWidget(button('System settings', self.open_settings))
-        if workspace == 'dev-bay': layout.addWidget(button('Terminal', self.open_terminal))
+        if workspace == 'media':
+            layout.addWidget(button('Open Spider Media Center', self.launch_media))
+        if workspace == 'system':
+            layout.addWidget(button('System settings', self.open_settings))
+        if workspace == 'dev-bay':
+            layout.addWidget(button('Terminal', self.open_terminal))
         if workspace == 'recovery':
-            for label, path in [('Guardian', 'system/bin/spider-guardian'), ('Vault', 'system/bin/spider-vault')]:
-                if (SPIDER_ROOT / path).is_file(): layout.addWidget(button(label, lambda checked=False, p=path: self.launch([SPIDER_ROOT / p], workspace)))
+            for label, path in [('Guardian', 'system/bin/spider-guardian'),
+                                ('Vault', 'system/bin/spider-vault')]:
+                if (SPIDER_ROOT / path).is_file():
+                    layout.addWidget(button(
+                        label, lambda checked=False, p=path:
+                        self.launch([SPIDER_ROOT / p], workspace)))
         return panel
 
+    def selected_app_id(self, workspace):
+        listing = self.app_lists.get(workspace)
+        item = listing.currentItem() if listing else None
+        return item.data(Qt.UserRole) if item else None
+
+    def assign_selected_app(self, workspace, reset=False):
+        ident = self.selected_app_id(workspace)
+        if not ident or not any(app.desktop_id == ident for app in self.installed_apps):
+            self.status.setText('Select an installed application first.')
+            return
+        if workspace in ('default', 'recovery', 'games') and not reset:
+            self.status.setText('Choose a first-class bay for this application.')
+            return
+        try:
+            save_app_assignment(ident, None if reset else workspace)
+            self.status.setText(
+                'Restoring recommended placement for ' + ident
+                if reset else 'Categorized ' + ident + ' in ' + WORKSPACES[workspace] +
+                '. The program stays installed where it was.')
+            self.refresh_apps()
+        except (OSError, ValueError) as error:
+            self.status.setText('Unable to save app placement: ' + str(error))
+
     def populate_app_list(self, workspace):
-        apps = self.app_lists[workspace]; apps.clear()
+        apps = self.app_lists[workspace]
+        chosen = self.selected_app_id(workspace)
+        apps.clear()
+        query = self.app_queries[workspace].text().casefold().strip()
+        show_all = self.app_scopes[workspace].currentData() == 'all'
+        matches = []
         for app in self.installed_apps:
-            if app.workspace == workspace:
-                item = QListWidgetItem(QIcon.fromTheme(app.icon), app.name); item.setData(Qt.UserRole, app.desktop_id); item.setToolTip(app.comment); apps.addItem(item)
-        if not apps.count():
-            item = QListWidgetItem('No installed apps found.'); item.setToolTip('Refresh after installing an app in this workspace.'); item.setFlags(Qt.NoItemFlags); apps.addItem(item)
+            if not show_all and app.workspace != workspace:
+                continue
+            if query and query not in (
+                    app.name + ' ' + app.comment + ' ' + app.desktop_id +
+                    ' ' + WORKSPACES.get(app.workspace, '')).casefold():
+                continue
+            matches.append(app)
+        for app in matches:
+            caption = app.name
+            if show_all and app.workspace != workspace:
+                caption += '  ·  ' + WORKSPACES.get(app.workspace, 'System')
+            item = QListWidgetItem(QIcon.fromTheme(app.icon), caption)
+            item.setData(Qt.UserRole, app.desktop_id)
+            item.setToolTip(
+                app_purpose(app) + '\\n' + (app.comment or '') +
+                '\\nApplication ID: ' + app.desktop_id)
+            apps.addItem(item)
+            if app.desktop_id == chosen:
+                apps.setCurrentItem(item)
+        if not matches:
+            message = ('No matching applications. Try a different search.'
+                       if query else
+                       'No programs assigned here. Choose All available applications.')
+            placeholder = QListWidgetItem(message)
+            placeholder.setFlags(Qt.NoItemFlags)
+            apps.addItem(placeholder)
+        self.app_counts[workspace].setText(
+            '{} listed here  ·  {} available overall  ·  nothing uninstalled'.format(
+                len(matches), len(self.installed_apps)))
 
     def refresh_apps(self):
         """Discover potentially hundreds of XDG files off the UI thread."""
@@ -846,7 +955,7 @@ class TheWeb(QMainWindow):
         if page is None:
             return
         if page.property('workspace') == 'default' or not self.can_close(page): return
-        name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); page.deleteLater(); self.save_state()
+        name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); self.app_queries.pop(name, None); self.app_scopes.pop(name, None); self.app_counts.pop(name, None); page.deleteLater(); self.save_state()
 
     def tab_moved(self, old_index, new_index):
         """Allow workspace rearrangement, but always pin The Web home at zero."""
