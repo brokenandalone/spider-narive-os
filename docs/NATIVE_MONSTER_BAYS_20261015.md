@@ -362,6 +362,60 @@ non-invasive merge plan. Staged `installed/`, `candidate/` and
 `diffs/` contain actual local code, so keep them private. The strict
 33-file reconciliation gate stays in place throughout.
 
+## Verified five-file method conflict count and protected merge preview
+
+The owner ran the private AST comparison of actual installed and GitHub
+desktop code. It identifies **29 shared differing method/function bodies**,
+**20 candidate-only definitions**, and **2 owner-only Webbie methods**:
+
+| File | Shared differences | Candidate-only | Owner-only |
+| --- | ---: | ---: | ---: |
+| `the-web/shell/main.py` | 11 | 5 | 0 |
+| `the-web/shell/app_catalog.py` | 2 | 6 | 0 |
+| `the-web/shell/workspace_files.py` | 1 | 0 | 0 |
+| `the-web/shell/webbie_panel.py` | 13 | 9 | 0 |
+| `the-web/shell/webbie_cognitive_center.py` | 2 | 0 | **2** |
+
+Crucially, the installed `WebbieCognitiveDialog.offer_workflow` and
+`WebbieCognitiveDialog.open_workflows` are missing from the candidate.
+The cognitive constructor also differs in both body and signature;
+preserving these methods alone is not sufficient to retain safe behavior.
+The installed Webbie panel has **one owner-only import** alongside 13
+overlapping changes, including STOP, computer control, screen consent
+and message sending.
+
+A new owner-private `tools/draft_native_desktop_merge.py` creates a
+**NON-INSTALLABLE source review overlay**, not a release. It preserves
+owner-only class methods and imports inside a private copy of candidate
+files, retains candidate-only methods, and explicitly reports unresolved
+shared differences. It never edits the installed files or commits
+any local owner code to public GitHub.
+
+Run with the previously prepared private five-file stage:
+
+```bash
+git -C "$HOME/spider-os-native-wave" pull --ff-only
+
+python3 -B "$HOME/spider-os-native-wave/tools/draft_native_desktop_merge.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Merge-20261015" \
+  --output "$HOME/SpiderOS-Private-Desktop-Draft-20261015"
+```
+
+The output includes a private `draft/` tree and
+`merge-review.json`. Draft modules must **NOT** be executed or
+installed: the 29 overlapping methods still need semantic reconciliation.
+A successful syntax parse alone is no evidence that grants, voice,
+Nova radio, camera or local files remain safe. Existing application
+packages and menus are untouched.
+
+**Owner privacy rule:** do not upload `installed/`, `candidate/`,
+`diffs/`, `draft/` or the full private report to public GitHub.
+Only paste the terminal's method-name and unresolved-count summary
+when planning the next step. A true deployable merge requires the
+contents of the conflicting methods to be inspected *locally* and
+validated with tests, preserving all prior host behavior. The guarded
+33-file install gate stays BLOCKED.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
