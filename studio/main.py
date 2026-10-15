@@ -194,15 +194,6 @@ class SpiderStudio(QMainWindow):
         dj_scroll.setWidget(self.dj_deck_panel)
         self.tool_tabs.addTab(dj_scroll, 'DJ Decks')
         if __package__:
-            from .auto_performance_panel import AutoPerformancePanel
-        else:
-            from auto_performance_panel import AutoPerformancePanel
-        self.auto_performance_panel = AutoPerformancePanel(self)
-        auto_scroll = QScrollArea()
-        auto_scroll.setWidgetResizable(True)
-        auto_scroll.setWidget(self.auto_performance_panel)
-        self.tool_tabs.addTab(auto_scroll, 'Sheet Music & TAB Autoplay')
-        if __package__:
             from .auto_performer_panel import AutoPerformerPanel
         else:
             from auto_performer_panel import AutoPerformerPanel
