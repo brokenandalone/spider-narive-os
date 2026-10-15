@@ -322,6 +322,46 @@ before reviewing Webbie voice and safety, Studio, Author, Nova, Kali,
 and the rest of the **33 protected customized files**.
 The strict installer remains BLOCKED regardless of staged output.
 
+## Desktop staged AST overlap review (after five-file private staging)
+
+The first private owner-host staging completed successfully, with five
+paired desktop files and no installed source changed:
+
+- `main.py`: no local-only top-level definitions; **ten candidate-only
+  native imports** not present in installed The Web.
+- `app_catalog.py`: six candidate-only top-level functions supporting
+  category placement, application descriptions and private assignments.
+- `webbie_panel.py`: candidate-only `ConsoleWorker` class, whose
+  grant/trust handling must be inspected before activation.
+- `workspace_files.py` and `webbie_cognitive_center.py`: shared
+  definitions exist but may have differing bodies or module settings.
+
+**A zero local-only top-level definition count does NOT prove compatibility.**
+A function with the same name can contain a locally essential audio, camera,
+permission or state fix; a class can have differing methods without changing
+the class's top-level name.
+
+New tool `tools/review_staged_desktop_methods.py` makes a **read-only**
+structural comparison of the staged private file pairs, after verifying
+manifest identities, original source SHA256 hashes and stage permissions.
+It prints only method/definition names, counts for shared changed methods,
+argument/decorator changes, module settings/import changes and class bases.
+It reads no projects, models, recordings or other files. It never imports
+or executes owner Python code, writes a merge, or authorizes installation.
+
+Run from the current separate GitHub checkout as the standard user:
+
+```bash
+git -C "$HOME/spider-os-native-wave" pull --ff-only
+python3 -B "$HOME/spider-os-native-wave/tools/review_staged_desktop_methods.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Merge-20261015"
+```
+
+Only this **names-and-counts** terminal report should be shared for a
+non-invasive merge plan. Staged `installed/`, `candidate/` and
+`diffs/` contain actual local code, so keep them private. The strict
+33-file reconciliation gate stays in place throughout.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
