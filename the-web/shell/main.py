@@ -253,6 +253,12 @@ class TheWeb(QMainWindow):
         home = QWidget(); home.setObjectName('root'); home_layout = QVBoxLayout(home)
         welcome = QLabel('Your workspaces'); welcome.setFont(QFont('Sans Serif', 22, QFont.Bold)); home_layout.addWidget(welcome)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.viewport().setAutoFillBackground(False); home_layout.addWidget(scroll, 1)
+        # The Web's own MAX operations live in the real home page, not an app.
+        home_actions = button('The Web: advanced tools & tasks', self.toggle_home_tools)
+        home_layout.addWidget(home_actions)
+        self.home_max_tools = NativeWorkspaceTools('default', home)
+        self.home_max_tools.setVisible(False)
+        home_layout.addWidget(self.home_max_tools, 1)
         content = QWidget(); content.setObjectName('root'); scroll.setWidget(content); grid = QGridLayout(content); grid.setAlignment(Qt.AlignTop | Qt.AlignLeft); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(14)
         for index, (workspace, label) in enumerate((k, v) for k, v in WORKSPACES.items() if k != 'default'):
             shortcut = button(label, lambda checked=False, name=workspace: self.open_workspace(name)); shortcut.setFixedWidth(175)
@@ -422,6 +428,12 @@ class TheWeb(QMainWindow):
         for name in self.app_lists: self.populate_app_list(name)
         self.start_menu.populate(); self.status.setText(f'{len(self.installed_apps)} installed apps found.')
 
+    def toggle_home_tools(self):
+        shown = not self.home_max_tools.isVisible()
+        self.home_max_tools.setVisible(shown)
+        if shown:
+            self.home_max_tools.reload()
+
     def open_workspace(self, name):
         if name not in WORKSPACES: return
         if name not in self.workspace_widgets:
@@ -469,14 +481,15 @@ class TheWeb(QMainWindow):
                 advanced = NativeWorkspaceTools(name, workspace_tabs)
                 page.advanced_tools = advanced
                 workspace_tabs.addTab(advanced, 'Advanced tools & tasks')
+                page.extra_max_tools = []
                 if name == 'media':
-                    workspace_tabs.addTab(
-                        NativeWorkspaceTools('bcn-nova', workspace_tabs),
-                        'BCN / Nova radio tools')
+                    extra = NativeWorkspaceTools('bcn-nova', workspace_tabs)
+                    page.extra_max_tools.append(extra)
+                    workspace_tabs.addTab(extra, 'BCN / Nova radio tools')
                 elif name == 'system':
-                    workspace_tabs.addTab(
-                        NativeWorkspaceTools('backups', workspace_tabs),
-                        'Backup & integrity tools')
+                    extra = NativeWorkspaceTools('backups', workspace_tabs)
+                    page.extra_max_tools.append(extra)
+                    workspace_tabs.addTab(extra, 'Backup & integrity tools')
             self.workspace_widgets[name] = page; self.tabs.addTab(page, WORKSPACES[name])
         self.tabs.setCurrentWidget(self.workspace_widgets[name]); self.set_workspace(name); self.save_state()
         self.update_webbie_context()
@@ -500,11 +513,13 @@ class TheWeb(QMainWindow):
 
     def can_close(self, page):
         # Do not destroy worker threads running a MAX operation in this bay.
-        advanced = getattr(page, 'advanced_tools', None)
-        worker = getattr(advanced, 'worker', None)
-        if worker and worker.isRunning():
-            self.status.setText('Wait for the workspace analysis to finish before closing this bay.')
-            return False
+        extra_tools = [getattr(page, 'advanced_tools', None)] + list(
+            getattr(page, 'extra_max_tools', ()))
+        for advanced in extra_tools:
+            worker = getattr(advanced, 'worker', None)
+            if worker and worker.isRunning():
+                self.status.setText('Wait for the workspace analysis to finish before closing this bay.')
+                return False
         native = getattr(page, 'native', None)
         worker = getattr(native, 'worker', None)
         if worker and worker.isRunning():
