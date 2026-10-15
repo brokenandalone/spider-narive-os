@@ -199,7 +199,8 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 app = QApplication([])
 window = module.KaliBayWindow()
-assert window.security_tabs.count() == 6
+assert window.security_tabs.count() == 7
+assert window.security_tabs.tabText(6) == 'EVIDENCE & LAB ANALYSIS'
 assert window.security_tabs.tabText(0) == 'DESKTOP HUB'
 assert window.security_tabs.tabText(1) == 'OFFENSIVE'
 assert window.security_tabs.tabText(2) == 'PURPLE DEFENSE'
