@@ -96,9 +96,13 @@ def main(argv=None):
                         help="Compare to a previous inventory manifest")
     parser.add_argument("--list", action="store_true",
                         help="List discovered menu applications and their recommended bays")
+    parser.add_argument("--strict", action="store_true",
+                        help="Exit nonzero when expected XDG menu entries vanish; never change packages")
     parser.add_argument("--json", action="store_true",
                         help="Print machine-readable inventory summary")
     args = parser.parse_args(argv)
+    if args.strict and not args.compare:
+        parser.error("--strict requires --compare and a saved baseline")
     app_catalog = catalog_module()
     apps = app_catalog.discover_apps(desktops="TheWeb:KDE")
     current = manifest(apps)
@@ -115,6 +119,12 @@ def main(argv=None):
     if args.compare:
         prior = json.loads(args.compare.read_text(encoding="utf-8"))
         report["comparison"] = compare(prior, current)
+        report["comparison"]["changes"] = [
+            {"id": old["id"], "name": old["name"], "before": old["bay"],
+             "after": next(app["bay"] for app in current["entries"] if app["id"] == old["id"])}
+            for old in prior.get("entries", [])
+            if old["id"] in report["comparison"]["reclassified_without_removal"]
+        ]
     if args.json:
         print(json.dumps(report, indent=2))
     else:
@@ -132,10 +142,22 @@ def main(argv=None):
                 print("  REVIEW:", entry)
             print("App category changes:",
                   len(result["reclassified_without_removal"]))
+            for item in result["changes"]:
+                print("  RELOCATE MENU ENTRY: {} | {} -> {} | {}".format(
+                    item["name"], item["before"], item["after"], item["id"]))
+            if result["changed_desktop_metadata"]:
+                print("Modified desktop entries (review):",
+                      ", ".join(result["changed_desktop_metadata"]))
         if args.list:
             for app in apps:
                 print("{} | {} | {}".format(app.workspace, app.name, app.desktop_id))
         print(report["note"])
+    if args.strict and args.compare:
+        result = report["comparison"]
+        if result["missing_menu_entries"]:
+            print("PRESERVATION GATE: FAIL, missing application menu entries.")
+            return 2
+        print("PRESERVATION GATE: PASS, all baseline menu entries still available.")
     return 0
 
 
