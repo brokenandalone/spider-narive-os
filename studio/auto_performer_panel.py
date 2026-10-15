@@ -243,9 +243,12 @@ class AutoPerformerPanel(QWidget):
         actions = QHBoxLayout()
         self.play_button = self._button("▶ Play score automatically", self.play)
         self.stop_button = self._button("■ Stop", self.stop)
-        self.midi_button = self._button("Export accurate MIDI notes", self.export_midi)
+        self.midi_button = self._button("Export written MIDI notes", self.export_midi)
+        self.expressive_midi_button = self._button(
+            "Export humanized MIDI performance", self.export_expressive_midi)
         self.wav_button = self._button("Export SoundFont WAV", self.export_wav)
-        for button in (self.play_button, self.stop_button, self.midi_button, self.wav_button):
+        for button in (self.play_button, self.stop_button, self.midi_button,
+                       self.expressive_midi_button, self.wav_button):
             actions.addWidget(button)
         layout.addLayout(actions)
         self.status = QLabel(
@@ -435,6 +438,29 @@ class AutoPerformerPanel(QWidget):
             self.status.setText("Exported full multi-part MIDI: " + Path(filename).name)
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, "MIDI export failed", str(error)[:300])
+
+    def export_expressive_midi(self):
+        if self.performance is None:
+            self.status.setText("Import notation or MIDI first.")
+            return
+        try:
+            performance = express(self.performance, Expression(
+                groove=self.groove.currentText(), energy=self.energy.value(),
+                strum_ms=self.strum_ms.value()))
+        except ValueError as error:
+            self.status.setText("Invalid performance feel settings: " + str(error)[:220])
+            return
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Save musician-style MIDI performance",
+            str(Path.home() / "Music" / "Spider-Humanized-Performance.mid"),
+            "Standard MIDI (*.mid)")
+        if filename:
+            try:
+                export_performance_midi(performance, filename)
+                self.status.setText(
+                    "Saved your expressive MIDI performance: " + Path(filename).name)
+            except (OSError, ValueError) as error:
+                QMessageBox.warning(self, "Expressive MIDI export failed", str(error)[:300])
 
     def _start_render(self, destination, preview):
         if self.performance is None:
