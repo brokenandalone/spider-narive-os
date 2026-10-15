@@ -24,10 +24,12 @@ except ImportError:
 
 try:
     from .score_performer import parse_musicxml, parse_ascii_tab, load_notation
+    from .chord_chart_performer import parse_chord_chart
     from .score_midi import export_performance_midi
     from .soundfont_render import quality_backend_available, render_soundfont
 except ImportError:
     from score_performer import parse_musicxml, parse_ascii_tab, load_notation
+    from chord_chart_performer import parse_chord_chart
     from score_midi import export_performance_midi
     from soundfont_render import quality_backend_available, render_soundfont
 
@@ -85,7 +87,7 @@ class AutoPerformerPanel(QWidget):
         note.setWordWrap(True)
         layout.addWidget(note)
         row = QHBoxLayout()
-        self.load_button = self._button("Import MusicXML / MXL / TXT TAB", self.import_file)
+        self.load_button = self._button("Import MusicXML / MXL / TXT TAB / .chords", self.import_file)
         row.addWidget(self.load_button)
         self.soundfont_button = self._button("Select instrument SoundFont (.sf2/.sf3)", self.choose_soundfont)
         row.addWidget(self.soundfont_button)
@@ -105,13 +107,16 @@ class AutoPerformerPanel(QWidget):
         config.addWidget(self.grid)
         config.addStretch()
         layout.addLayout(config)
-        layout.addWidget(QLabel("PASTE TEXT GUITAR OR BASS TAB (example below)"))
+        layout.addWidget(QLabel("PASTE TAB OR CHORD CHART (e.g., Am | F | C | G)"))
         self.tab_text = QPlainTextEdit()
         self.tab_text.setPlainText(TAB_EXAMPLE)
         self.tab_text.setMinimumHeight(125)
         self.tab_text.setAccessibleName("Guitar or bass ASCII TAB input")
         layout.addWidget(self.tab_text)
-        layout.addWidget(self._button("Interpret pasted tab as performance", self.interpret_tab))
+        interpret_row = QHBoxLayout()
+        interpret_row.addWidget(self._button("Interpret as Guitar/Bass TAB", self.interpret_tab))
+        interpret_row.addWidget(self._button("Arrange as Chord Chart", self.interpret_chords))
+        layout.addLayout(interpret_row)
         self.info = QLabel("No score loaded. MusicXML supports chords, rests, voices, ties, "
                            "transposition and a fixed tempo; complex notation may need review.")
         self.info.setWordWrap(True)
@@ -215,7 +220,7 @@ class AutoPerformerPanel(QWidget):
         filename, _ = QFileDialog.getOpenFileName(
             self, "Open MusicXML sheet music or guitar/bass TAB",
             str(Path.home() / "Music"),
-            "Notation and tab (*.mxl *.musicxml *.xml *.txt)")
+            "Notation and tab (*.mxl *.musicxml *.xml *.txt *.chords)")
         if not filename:
             return
         try:
@@ -229,6 +234,13 @@ class AutoPerformerPanel(QWidget):
                                        self.tempo.value(), self.grid.currentData()))
         except ValueError as error:
             QMessageBox.warning(self, "TAB error", str(error)[:400])
+
+    def interpret_chords(self):
+        try:
+            self._load(parse_chord_chart(self.tab_text.toPlainText(),
+                                         bpm=self.tempo.value()))
+        except ValueError as error:
+            QMessageBox.warning(self, "Chord chart error", str(error)[:400])
 
     def choose_soundfont(self):
         filename, _ = QFileDialog.getOpenFileName(
