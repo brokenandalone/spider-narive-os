@@ -27,6 +27,8 @@ class StudioProductionGUITests(unittest.TestCase):
         cls.wave_class = WaveformEditPanel
         from studio.dj_deck_panel import DJDeckPanel
         cls.dj_class = DJDeckPanel
+        from studio.auto_performer_panel import AutoPerformerPanel
+        cls.score_class = AutoPerformerPanel
 
     def test_capture_edit_and_mixer_controls(self):
         workbench = self.workbench_class()
@@ -70,6 +72,7 @@ class StudioProductionGUITests(unittest.TestCase):
         self.assertIn("self.song_production_panel,", source)
         self.assertIn("self.waveform_edit_panel, self.dj_deck_panel", source)
         self.assertIn("midi.disconnect()", source)
+        self.assertIn("self.tool_tabs.addTab(self.auto_performer_panel", source)
         self.assertIn("from .song_production_panel import SongProductionPanel", source)
         self.assertIn("from .waveform_edit_panel import WaveformEditPanel", source)
         w = self.wave_class()
@@ -96,6 +99,14 @@ class StudioProductionGUITests(unittest.TestCase):
             self.assertEqual(deck.gains[0].value(), 100)
         finally:
             deck.close()
+        panel = self.score_class()
+        try:
+            panel.interpret_tab()
+            self.assertIsNotNone(panel.performance)
+            self.assertEqual(panel.performance.parts[0].name, "Guitar")
+            self.assertGreater(len(panel.performance.notes), 12)
+        finally:
+            panel.close()
 
 if __name__ == "__main__":
     unittest.main()
