@@ -124,6 +124,13 @@ fi
 if command -v dpkg-query >/dev/null 2>&1; then
   dpkg-query -W -f='${binary:Package}\t${Version}\n' > "$OUT/installed-packages.tsv" 2>/dev/null || true
 fi
+# Inventory pre-existing Ubuntu Studio and creative apps; do not install them.
+{
+  for pkg in ubuntustudio-desktop ubuntustudio-audio ardour audacity              carla hydrogen mixxx qjackctl qtractor krita gimp kdenlive              blender inkscape scribus obs-studio yoshimi zynaddsubfx              lmms supercollider sonic-pi; do
+    dpkg-query -W -f='\${binary:Package}\t\${Status}\t\${Version}\n' "$pkg" 2>/dev/null || true
+  done
+} > "$OUT/creative-apps-baseline.tsv"
+mark INFO "Creative applications" "Pre-upgrade package baseline saved for post-upgrade comparison"
 if command -v systemctl >/dev/null 2>&1; then
   systemctl list-unit-files --type=service --no-pager > "$OUT/installed-system-services.txt" 2>/dev/null || true
   systemctl --user list-unit-files --type=service --no-pager > "$OUT/installed-user-services.txt" 2>/dev/null || true
@@ -144,7 +151,7 @@ fi
   [[ -f /etc/apt/sources.list ]] && echo /etc/apt/sources.list
   find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name "*.sources" -o -name "*.list" \) -print 2>/dev/null || true
 } > "$OUT/apt-source-filenames.txt"
-mark INFO "APT source files" "File names saved; review third-party repos before release upgrade"
+mark REVIEW "APT source files" "Inspect source file names; third-party repos may be disabled or incompatible"
 mark REVIEW "Backup" "Verify separately accessible backups of your home, all bays, models, Kali volumes, and LUKS recovery details"
 mark REVIEW "Rollback" "No USB required, but plan for recovery if GRUB/LUKS boot fails; same-disk files are not enough"
 mark REVIEW "Actual release upgrade" "The 26.10 package removal proposal is not known until do-release-upgrade runs; inspect before accepting"
