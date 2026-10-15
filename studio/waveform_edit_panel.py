@@ -6,7 +6,7 @@ the offline edit/export functions continue working without a sound device.
 from __future__ import annotations
 
 from pathlib import Path
-from PyQt5.QtCore import Qt, QBuffer, QByteArray, QIODevice, QRectF
+from PyQt5.QtCore import Qt, QBuffer, QByteArray, QIODevice, QRectF, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QPainter, QPen
 from PyQt5.QtWidgets import (
     QCheckBox, QDoubleSpinBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
@@ -52,6 +52,22 @@ class WaveformCanvas(QWidget):
             p.drawText(self.rect(), Qt.AlignCenter, "Import a PCM WAV to inspect its waveform")
         p.end()
 
+class ClipExportWorker(QThread):
+    done = pyqtSignal(bool, str)
+
+    def __init__(self, clip, destination, parent=None):
+        super().__init__(parent)
+        self.clip = clip
+        self.destination = destination
+
+    def run(self):
+        try:
+            export_clip(self.clip, self.destination)
+            self.done.emit(True, "Exported edit: " + Path(self.destination).name)
+        except (OSError, ValueError, RuntimeError) as error:
+            self.done.emit(False, str(error)[:300])
+
+
 class WaveformEditPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -59,6 +75,7 @@ class WaveformEditPanel(QWidget):
         self.clip = None
         self._audio = None
         self._audio_buffer = None
+        self.worker = None
         self._preview_supported = QAudioOutput is not None
         self.setObjectName("spiderWaveformEditor")
         self.setStyleSheet("""
@@ -233,12 +250,19 @@ class WaveformEditPanel(QWidget):
             "WAV audio (*.wav)")
         if not filename:
             return
-        try:
-            export_clip(self.clip, filename)
-            self.status.setText("Exported non-destructive edit: " + Path(filename).name)
-        except (ValueError, RuntimeError, OSError) as error:
-            QMessageBox.warning(self, "Export failed", str(error)[:300])
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("A waveform export is already running.")
+            return
+        self.worker = ClipExportWorker(self.clip, filename, self)
+        self.worker.done.connect(
+            lambda ok, msg: self.status.setText(msg if ok else "Export failed: " + msg))
+        self.worker.start()
+        self.status.setText("Exporting edited WAV in the background; original stays unchanged.")
 
     def closeEvent(self, event):
+        if self.worker is not None and self.worker.isRunning():
+            event.ignore()
+            self.status.setText("Waveform export is still running; window preserved.")
+            return
         self.stop_preview()
         super().closeEvent(event)
