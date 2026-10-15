@@ -16,6 +16,44 @@
 
 The 26.04 reconciliation branch inherits recent work on The Web, Webbie, School/Study, Author, Studio, Media Center integration, Forage, Deep Forage, Kali Bay, and immersive bays from the migration snapshot. **Inherited code is not evidence those features are installed or working on the PC.**
 
+## First trial on the existing PC: no installer, no root writes
+
+The candidate source contains a **read-only trial command**. It verifies the
+installed 26.04 base, checks audit tooling, inventories source upgrades and
+reports file-level differences against the real native program directory.
+
+Run this as the normal desktop user, **without** `sudo`. It does not switch
+or reset your existing working Git checkout:
+
+```bash
+git clone --depth 1 --single-branch \
+  --branch reconciliation/ubuntu-studio-26.04-lts-20261015 \
+  https://github.com/brokenandalone/spider-narive-os.git \
+  "$HOME/spider-os-2604-trial"
+bash "$HOME/spider-os-2604-trial/tools/try-native-26-04.sh"
+```
+
+If the trial folder exists already, do not overwrite it automatically.
+Review the code-difference counts and relevant local files before installing
+*any* update. This is a trial **comparison**, not an applied upgrade.
+Do not run `do-release-upgrade` on an already installed 26.04 base.
+
+## Confirmed ISO builder blocker, 2026-10-15
+
+Ubuntu Studio's official 26.04.1 ISO file listing specifies
+`/casper/minimal.squashfs`, `/casper/minimal.standard.squashfs` and
+`/casper/minimal.standard.live.squashfs`:
+
+https://cdimage.ubuntu.com/ubuntustudio/releases/26.04/release/ubuntustudio-26.04.1-desktop-amd64.list
+
+Our older builder and verifier currently require `standard.squashfs` and
+`standard.live.squashfs` and rewrite the old `standard` install source.
+Those source names **do not exist** on this release. The new three-layer
+install source has not been reconstructed and installation-tested. **Do not
+build or flash this custom ISO as an upgrade path** until its installer
+catalog, layer overlay logic, ISO verification and disposable VM install pass.
+A successful 26.04 release-signature check alone does not cover this blocker.
+
 ## How to compare the local PC without touching it
 
 From the Spider OS machine, first save outstanding work and inspect the real version:
