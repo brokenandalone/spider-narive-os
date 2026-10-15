@@ -50,7 +50,8 @@ class ScoreRenderWorker(QThread):
     finished_score = pyqtSignal(bool, str, str)
 
     def __init__(self, performance, soundfont, output, preview=False, parent=None,
-                 banks=None, channels=None, studio_mix=False, rate=48000):
+                 banks=None, channels=None, studio_mix=False, rate=48000,
+                 bit_depth=16):
         super().__init__(parent)
         self.performance = performance
         self.soundfont = soundfont
@@ -60,13 +61,15 @@ class ScoreRenderWorker(QThread):
         self.channels = list(channels or [])
         self.studio_mix = bool(studio_mix)
         self.rate = rate
+        self.bit_depth = bit_depth
 
     def run(self):
         try:
             if self.studio_mix or self.banks:
                 result = render_score_mix(
                     self.performance, self.soundfont, self.output,
-                    part_banks=self.banks, channels=self.channels, rate=self.rate)
+                    part_banks=self.banks, channels=self.channels,
+                    rate=self.rate, bit_depth=self.bit_depth)
             else:
                 result = render_soundfont(self.performance, self.soundfont, self.output,
                                           rate=self.rate)
@@ -224,6 +227,13 @@ class AutoPerformerPanel(QWidget):
         self.rate_select.addItem("48 kHz", 48000)
         self.rate_select.addItem("44.1 kHz", 44100)
         groove_row.addWidget(self.rate_select)
+        groove_row.addWidget(QLabel("WAV depth"))
+        self.depth_select = QComboBox()
+        self.depth_select.addItem("16-bit PCM", 16)
+        self.depth_select.addItem("24-bit PCM mix", 24)
+        self.depth_select.setCurrentIndex(1)
+        self.depth_select.setAccessibleName("Export bit depth")
+        groove_row.addWidget(self.depth_select)
         layout.addLayout(groove_row)
         self.studio_mix = QCheckBox(
             "Studio multi-bank mix · render each part separately (more CPU, enables per-part pan/volume)")
@@ -448,11 +458,18 @@ class AutoPerformerPanel(QWidget):
         except (ValueError, TypeError) as error:
             self.status.setText("Performance settings invalid: " + str(error)[:200])
             return
+        # Qt preview requires 16-bit audio; saved studio mixes may use 24.
+        chosen_depth = 16 if preview else self.depth_select.currentData()
+        if chosen_depth == 24 and not self.studio_mix.isChecked():
+            self.status.setText(
+                "24-bit WAV export requires Studio multi-bank mix. Enable its checkbox.")
+            return
         self._play_after = preview
         self.worker = ScoreRenderWorker(
             snapshot, self.soundfont, destination, preview, self,
             banks=dict(self.part_banks), channels=list(self.mix_channels),
-            studio_mix=self.studio_mix.isChecked(), rate=self.rate_select.currentData())
+            studio_mix=self.studio_mix.isChecked(), rate=self.rate_select.currentData(),
+            bit_depth=chosen_depth)
         self.worker.finished_score.connect(self._done)
         self.worker.start()
         self.status.setText(
