@@ -7,6 +7,11 @@ on:
       - 'the-web/shell/main.py'
       - 'tests/test_immersive_native_bays_v8.py'
       - 'tests/test_workspace_max_native_integrated.py'
+      - 'tests/test_max_real_native_apps.py'
+      - 'studio/main.py'
+      - 'author/main.py'
+      - 'study/study.py'
+      - 'kali-bay/ui/kali_bay.py'
       - 'the-web/shell/workspace_max_native.py'
       - '.github/workflows/verify-immersive-bays.yml'
   push:
@@ -30,9 +35,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile and verify source
         run: |
-          /usr/bin/python3 -m py_compile the-web/shell/immersive_bays.py the-web/shell/workspace_max_native.py the-web/shell/main.py
+          /usr/bin/python3 -m py_compile the-web/shell/immersive_bays.py the-web/shell/workspace_max_native.py the-web/shell/main.py studio/main.py author/main.py study/study.py kali-bay/ui/kali_bay.py
           /usr/bin/python3 -m unittest discover -s tests -p 'test_immersive_native_bays_v8.py' -v
           /usr/bin/python3 -m unittest discover -s tests -p 'test_workspace_max_native_integrated.py' -v
+          /usr/bin/python3 -m unittest discover -s tests -p 'test_max_real_native_apps.py' -v
       - name: Install Qt for offscreen smoke test
         run: |
           sudo apt-get update -qq
