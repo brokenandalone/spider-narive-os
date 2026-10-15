@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert studio_rack.mode.count() == 4
     assert len(studio_rack.steps['Kick']) == 16
     studio_rack.mode.setCurrentText('Drums')
-    assert studio_rack.drums_group.isVisible()
+    assert not studio_rack.drums_group.isHidden()
     assert studio_rack.wav().startswith(b'RIFF')
     studio_rack.mode.setCurrentText('Guitar')
     assert studio_rack.wav('E').startswith(b'RIFF')
