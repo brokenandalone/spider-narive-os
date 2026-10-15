@@ -88,7 +88,7 @@ class StudioScoreMixTests(unittest.TestCase):
                 self.assertEqual(result.getnframes(), 256)
                 raw = result.readframes(256)
                 self.assertEqual(len(raw), 256 * 6)
-                self.assertNotEqual(raw, b"\\0" * len(raw))
+                self.assertNotEqual(raw, bytes(len(raw)))
             with self.assertRaises(ValueError):
                 render_score_mix(make_score(), bank, target,
                                  part_renderer=fake_renderer, bit_depth=20)
