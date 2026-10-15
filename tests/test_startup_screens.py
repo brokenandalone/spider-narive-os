@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 STAGER = ROOT / "distro/config/branding/install-startup-screens.sh"
+HOST_INSTALLER = ROOT / "distro/install-startup-screens-inplace.sh"
 EXPECTED = {
     "spider-purple",
     "spider-crimson",
@@ -17,6 +18,17 @@ EXPECTED = {
 class StartupScreensTests(unittest.TestCase):
     def test_shell_syntax(self):
         subprocess.run(["bash", "-n", str(STAGER)], check=True)
+        subprocess.run(["bash", "-n", str(HOST_INSTALLER)], check=True)
+
+    def test_inplace_preview_does_not_require_usb_or_privileges(self):
+        for selected in sorted(EXPECTED):
+            with self.subTest(selected=selected):
+                result = subprocess.run(
+                    ["bash", str(HOST_INSTALLER), "--check", selected],
+                    capture_output=True, text=True, check=True,
+                )
+                self.assertIn("has NOT changed", result.stdout)
+                self.assertIn(selected, result.stdout)
 
     def test_all_designed_sets_stage_without_host_changes(self):
         for selected in sorted(EXPECTED):
