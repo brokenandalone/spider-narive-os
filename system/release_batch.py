@@ -255,6 +255,7 @@ APP_FILES = (
     'studio/score_midi.py',
     'studio/soundfont_render.py',
     'studio/auto_performer_panel.py',
+    'studio/chord_chart_performer.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
