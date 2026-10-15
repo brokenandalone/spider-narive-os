@@ -57,10 +57,120 @@ APP_PURPOSES = {
     "system": "System settings, health, backup and recovery",
     "webbie": "Webbie-specific AI control and assistive tools",
 }
+# Validated against the owner's real 174-entry Ubuntu Studio 26.04
+# application-menu inventory, 2026-10-15. These are *placements only*.
+# They never delete, move or replace the underlying installed programs.
+# Specific XDG desktop IDs fix cases where broad AudioVideo/Graphics
+# categories don't distinguish synths from players or Linux audio
+# hardware mixers from music production.
+UBUNTU_STUDIO_DESKTOP_IDS = {
+    "studio": (
+        "spider-studio.desktop",
+        "studio.desktop",
+        "idjc.desktop",
+        "aeolus.desktop",
+        "zita-at1.desktop",
+        "devede_ng.py.desktop",
+        "dgedit.desktop",
+        "din.desktop",
+        "qlcplus-fixtureeditor.desktop",
+        "fluidsynth-dssi.desktop",
+        "fmit.desktop",
+        "freewheeling.desktop",
+        "hexter.desktop",
+        "jack_mixer.desktop",
+        "meterbridge.desktop",
+        "patchance.desktop",
+        "phasex.desktop",
+        "qlcplus.desktop",
+        "com.cuperino.qprompt.desktop",
+        "org.kde.krecorder.desktop",
+        "setbfree.desktop",
+        "sooperlooper.desktop",
+        "xjadeo.desktop",
+        "zita-mu1.desktop",
+        "zita-rev1.desktop",
+        "org.jacktrip.JackTrip.desktop",
+        "ubuntustudio-audio-config.desktop",
+    ),
+    "media": (
+        "org.kde.kid3.desktop",
+        "org.kde.kid3-qt.desktop",
+        "freeshow_freeshow.desktop",
+        "openlp.desktop",
+        "spider-media-player.desktop",
+    ),
+    "devices": (
+        "envy24control.desktop",
+        "org.ffado.FfadoMixer.desktop",
+        "hdajackretask.desktop",
+        "hdspconf.desktop",
+        "hdspmixer.desktop",
+        "mudita24.desktop",
+        "qasconfig.desktop",
+        "qashctl.desktop",
+        "qasmixer.desktop",
+        "org.kde.qrca.desktop",
+        "kde_wacom_tabletfinder.desktop",
+    ),
+    "art-lab": (
+        "org.kde.spectacle.desktop",
+        "org.gnome.ColorProfileViewer.desktop",
+    ),
+    "author": (
+        "author.desktop",
+    ),
+    "forage": (
+        "forage.desktop",
+    ),
+    "deep-forage": (
+        "deep-forage.desktop",
+    ),
+    "study": (
+        "study.desktop",
+    ),
+    "webbie": (
+        "webbie.desktop",
+        "webbie-face-sleep-tonight.desktop",
+        "webbie-face-wake.desktop",
+        "webbie-onedrive-connect.desktop",
+        "spider-webbie-intelligence.desktop",
+    ),
+    "kali-bay": (
+        "kali-bay.desktop",
+    ),
+    "system": (
+        "spider-os-universal.desktop",
+        "spider-os-workspace-max.desktop",
+    ),
+    "dev-bay": (
+        "virt-manager.desktop",
+    ),
+}
+
+# Every exact ID is unique. User-selected placements still override these
+# recommendations through app-placement.json.
+EXACT_BAYS = {
+    ident.casefold(): bay
+    for bay, entries in UBUNTU_STUDIO_DESKTOP_IDS.items()
+    for ident in entries
+}
+
 # Exact-ish token/phrase matching avoids a word inside another word being
 # mistaken for an app. Priorities explicitly separate creation from playback.
 KNOWN_APPLICATIONS = (
-    ("studio", ("ardour", "qtractor", "reaper", "audacity", "mixxx",
+    ("webbie", ("spider webbie", "webbie", "webby intelligence center")),
+    ("deep-forage", ("deep forage", "deep-forage")),
+    ("forage", ("forage",)),
+    ("kali-bay", ("kali bay", "kali-bay")),
+    ("studio", ("spider studio", "spider-studio", "internet dj console",
+       "aeolus", "zita-at1", "zita-rev1", "zita-mu1", "dgEdit",
+       "ffado mixer studio", "fluidsynth", "jack mixer", "jack_mixer",
+       "jacktrip", "patchance", "phaseX", "freewheeling",
+       "setbfree", "sooperlooper", "fmit", "hexter", "xjadeo",
+       "qprompt", "devedeng", "devede", "recorder", "meterbridge",
+       "qlcplus", "q light controller plus",
+       "ardour", "qtractor", "reaper", "audacity", "mixxx",
        "hydrogen", "rosegarden", "musescore", "guitarix", "rakarrack",
        "carla", "cadence", "catia", "claudia", "agordejo", "raysession",
        "ray session", "helm", "yoshimi", "zynaddsubfx", "zrythm",
@@ -69,13 +179,13 @@ KNOWN_APPLICATIONS = (
        "calf", "lsp plugin", "kdenlive", "shotcut", "openshot",
        "olive editor", "olive video", "obs studio", "obs-studio",
        "obsidian video", "handbrake", "k3b", "brasero")),
-    ("media", ("vlc", "audacious", "mpv", "smplayer", "dragon player",
+    ("media", ("kid3", "freeShow", "openlp", "vlc", "audacious", "mpv", "smplayer", "dragon player",
        "elisa", "rhythmbox", "strawberry", "clementine", "haruna",
        "parole", "steam", "lutris", "retroarch", "spider media center")),
-    ("art-lab", ("krita", "gimp", "inkscape", "blender", "darktable",
+    ("art-lab", ("spectacle", "color profile viewer", "krita", "gimp", "inkscape", "blender", "darktable",
        "digikam", "rawtherapee", "scribus", "fontforge", "mypaint",
        "pencil2d", "synfig", "freecad", "kcolorchooser", "kolourpaint")),
-    ("author", ("libreoffice writer", "writer", "focuswriter", "scribus writer",
+    ("author", ("author", "libreoffice writer", "writer", "focuswriter", "scribus writer",
        "ghostwriter", "manuskript", "novelwriter", "sigil")),
     ("productivity", ("libreoffice calc", "libreoffice impress",
        "libreoffice draw", "libreoffice base", "libreoffice math",
@@ -94,7 +204,9 @@ KNOWN_APPLICATIONS = (
     ("dev-bay", ("konsole", "kate", "kdevelop", "vscodium",
        "visual studio code", "codium", "qtcreator", "qt creator",
        "meld", "git cola", "git-cola", "gitg", "dbeaver")),
-    ("devices", ("bluetooth", "kdeconnect", "kde connect", "partitionmanager",
+    ("devices", ("hdajackretask", "envy24", "mudita24", "hdspmixer",
+       "hdspconf", "qasconfig", "qashctl", "qasmixer", "ffado mixer",
+       "wacom tablet finder", "kde qrca", "bluetooth", "kdeconnect", "kde connect", "partitionmanager",
        "partition manager", "gparted", "gsmartcontrol", "pavucontrol",
        "pulse audio volume control", "input-remapper", "usbview",
        "usb creator", "usb-creator", "kde partition manager")),
@@ -111,6 +223,9 @@ def _has_name(identity, term):
 
 def workspace_for(desktop_id, name, categories):
     """Choose one PRIMARY bay, without removing an app from global search."""
+    matched = EXACT_BAYS.get(str(desktop_id).casefold())
+    if matched is not None:
+        return matched
     identity = (str(desktop_id) + " " + str(name)).casefold()
     values = {str(category).casefold() for category in categories}
     for bay, needles in KNOWN_APPLICATIONS:
