@@ -244,6 +244,7 @@ APP_FILES = (
     'the-web/shell/bay_missions.py',
     'the-web/shell/bay_mission_panel.py',
     'the-web/shell/app_catalog.py',
+    'webbie/agent/app_bay_lookup.py',
     'the-web/shell/workspace_files.py',
     'tools/ubuntu_studio_app_inventory.py',
     'the-web/shell/native_utility_bays.py',
