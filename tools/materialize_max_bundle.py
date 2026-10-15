@@ -39,8 +39,6 @@ def expected_modules():
 
 
 def main():
-    if BUNDLE.is_symlink():
-        raise ValueError("Refusing a source-bundle symlink")
     # Chunks are ordinary Git blobs. Concatenation restores one SHA-pinned bundle.
     parts = [ROOT / "tools/native_max_payload" / ("part%02d.b85" % i)
              for i in range(1, 7)]
