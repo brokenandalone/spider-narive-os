@@ -39,6 +39,8 @@ from bay_mission_panel import BayMissionPanel
 from webbie_research_panel import WebbieResearchPanel
 from native_utility_bays import (ArtLabPanel, CommunicationsPanel, DevBayPanel,
                                  DevicesPanel, ProductivityPanel)
+sys.path.insert(0, str(SPIDER_ROOT / 'studio'))
+from instrument_panel import InstrumentRack
 from app_catalog import VISIBLE_WORKSPACES
 from workspace_max_native import NativeWorkspaceTools, WORKSPACE_TO_MAX
 from volume_panel import VolumePanel
@@ -888,6 +890,10 @@ class TheWeb(QMainWindow):
                     workspace_tabs.addTab(surface, 'Native workspace')
                 else:
                     bay_row.addWidget(surface, 1)
+            if name == 'studio':
+                rack = InstrumentRack(workspace_tabs)
+                page.instrument_rack = rack
+                workspace_tabs.addTab(rack, 'Drums · Guitar · Bass · Keys')
             mission_desk = BayMissionPanel({'recovery': 'system', 'games': 'media'}.get(name, name), workspace_tabs)
             page.mission_desk = mission_desk
             workspace_tabs.addTab(mission_desk, 'Projects & missions')
