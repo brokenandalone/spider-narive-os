@@ -65,6 +65,31 @@ Build with a different set by setting SPIDER_STARTUP_SET, for example:
 
 The original wallpaper library and native functional workspaces remain distinct and are not removed or replaced. No standalone app launcher is added.
 
+## USB-free, post-upgrade native splash installation
+
+These instructions work on the currently installed PC, not from an ISO.
+The source checkout must include the existing branding PNG files.
+
+Read-only preview, safe on either 26.04 or 26.10:
+
+    bash distro/install-startup-screens-inplace.sh --check spider-purple
+
+After the *official* in-place upgrade has completed successfully, after
+verifying the system reports VERSION_ID=26.10, and after Plasma/SDDM work:
+
+    sudo bash distro/install-startup-screens-inplace.sh --apply spider-purple
+
+Use spider-crimson or spider-nightfall instead to select another designed set.
+The installer retains a private backup of the system files it replaces under
+/var/backups/spider-os/startup/. It does not change user-level overrides,
+restart SDDM, call update-initramfs, update GRUB, or enable Plymouth. The
+Plasma splash and SDDM backdrop should appear on the next sign-in. No
+USB, repartitioning, ISO file, or clean install is involved.
+
+The Plymouth background is copied but not made the default during this
+in-place operation because the real LUKS passphrase prompt must be tested
+before changing the initramfs boot experience.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
