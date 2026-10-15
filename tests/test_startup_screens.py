@@ -50,6 +50,10 @@ class StartupScreensTests(unittest.TestCase):
                     self.assertEqual(meta["KPackageStructure"], "Plasma/LookAndFeel")
                     self.assertTrue((theme / "contents/splash/Splash.qml").is_file())
                     self.assertEqual(
+                        (target / "boot/grub/themes/spider-os/background.png").read_bytes(),
+                        (base / "startup-sets" / (selected + ".png")).read_bytes(),
+                    )
+                    self.assertEqual(
                         (theme / "contents/splash/images/background.png").read_bytes(),
                         (base / "startup-sets" / (selected + ".png")).read_bytes(),
                     )
