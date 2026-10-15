@@ -66,6 +66,7 @@ class Performance:
     beats: Fraction
     warnings: list[str] = field(default_factory=list)
     meter: tuple[int, int] = (4, 4)
+    origin: Path | None = None
 
     @property
     def duration_seconds(self):
@@ -449,14 +450,17 @@ def load_notation(path, bpm=110, slots_per_beat=2):
     """Read supported files; plain TXT TAB and uncompressed MusicXML only."""
     filename = Path(path)
     if filename.suffix.lower() == ".mxl":
-        return load_compressed_musicxml(filename)
-    if filename.suffix.lower() in (".musicxml", ".xml"):
+        performance = load_compressed_musicxml(filename)
+    elif filename.suffix.lower() in (".musicxml", ".xml"):
         if filename.stat().st_size > MAX_BYTES:
             raise ValueError("MusicXML exceeds the 2 MB limit")
-        return parse_musicxml(filename.read_bytes(), filename.stem)
-    if filename.suffix.lower() == ".txt":
+        performance = parse_musicxml(filename.read_bytes(), filename.stem)
+    elif filename.suffix.lower() == ".txt":
         if filename.stat().st_size > 40_000:
             raise ValueError("TAB exceeds the 40 KB limit")
-        return parse_ascii_tab(filename.read_text(encoding="utf-8"),
-                               bpm=bpm, slots_per_beat=slots_per_beat)
-    raise ValueError("Use .mxl/.musicxml/.xml for notation, or .txt for guitar/bass TAB")
+        performance = parse_ascii_tab(filename.read_text(encoding="utf-8"),
+                                      bpm=bpm, slots_per_beat=slots_per_beat)
+    else:
+        raise ValueError("Use .mxl/.musicxml/.xml for notation, or .txt for guitar/bass TAB")
+    performance.origin = filename.resolve()
+    return performance
