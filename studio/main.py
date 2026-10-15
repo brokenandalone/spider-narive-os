@@ -348,10 +348,27 @@ class SpiderStudio(QMainWindow):
 
 
     def closeEvent(self, event):
-        worker = getattr(self.native_max_tools, 'worker', None)
-        if worker is not None and worker.isRunning():
+        # Do not destroy a QThread while it is exporting the owner's song or
+        # WAV. Preserve the existing MAX worker closure protection as well.
+        for panel in (self.native_max_tools, self.song_production_panel,
+                      self.waveform_edit_panel, self.dj_deck_panel):
+            worker = getattr(panel, 'worker', None)
+            if worker is not None and worker.isRunning():
+                self.status.setText('Finish the current export or analysis before closing Spider Studio.')
+                event.ignore()
+                return
+        midi = self.instrument_workbench.midi_input
+        midi.disconnect()
+        if midi.worker is not None and midi.worker.isRunning():
+            self.status.setText('MIDI connection is still closing.')
             event.ignore()
             return
+        self.instrument_workbench.timer.stop()
+        self.waveform_edit_panel.stop_preview()
+        self.dj_deck_panel.stop()
+        for audio, _data in list(self.instrument_workbench._voices):
+            audio.stop()
+        self.instrument_workbench._voices.clear()
         super().closeEvent(event)
 
 
