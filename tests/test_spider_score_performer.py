@@ -4,6 +4,7 @@ import struct
 from types import SimpleNamespace
 import tempfile
 import unittest
+from zipfile import ZipFile
 from unittest.mock import patch
 import wave
 
@@ -107,6 +108,25 @@ class TestScorePerformer(unittest.TestCase):
             notation = Path(directory) / "score.musicxml"
             notation.write_text(SCORE)
             self.assertEqual(load_notation(notation).bpm, 96)
+
+    def test_safe_compressed_mxl_and_reject_path_traversal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            src = Path(directory) / "score.mxl"
+            container = ('<container><rootfiles><rootfile '
+                         'full-path="Notation/music.xml"/></rootfiles></container>')
+            with ZipFile(src, "w") as package:
+                package.writestr("META-INF/container.xml", container)
+                package.writestr("Notation/music.xml", SCORE)
+            self.assertEqual(load_notation(src).bpm, 96)
+            self.assertEqual(len(load_notation(src).notes), 6)
+            with ZipFile(src, "w") as package:
+                package.writestr(
+                    "META-INF/container.xml",
+                    '<container><rootfiles><rootfile full-path="../outside.musicxml"/>'
+                    '</rootfiles></container>')
+                package.writestr("../outside.musicxml", SCORE)
+            with self.assertRaises(ValueError):
+                load_notation(src)
 
     def test_optional_soundfont_renderer_and_no_unapproved_device(self):
         p = parse_musicxml(SCORE)
