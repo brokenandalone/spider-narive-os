@@ -71,7 +71,7 @@ else:
     from paper_dialog import PaperDialog
 
 
-sys.path.insert(0, str(SPIDER_ROOT / 'the-web' / 'shell'))
+sys.path.insert(0, str(SCRIPT_ROOT.parent / 'the-web' / 'shell'))
 from workspace_max_native import NativeWorkspaceTools
 
 WALLPAPER = (
@@ -1572,6 +1572,10 @@ class StudyWindow(QMainWindow):
         self,
         event,
     ):
+        worker = getattr(self.native_max_tools, 'worker', None)
+        if worker is not None and worker.isRunning():
+            event.ignore()
+            return
         try:
             self.save_notes(quiet=True)
         except Exception as error:
