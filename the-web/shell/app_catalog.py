@@ -12,6 +12,16 @@ WORKSPACES = {
     'art-lab': 'Art Lab', 'dev-bay': 'Dev Bay', 'study': 'School',
     'media': 'Media', 'communications': 'Communications', 'kali-bay': 'Kali Bay',
     'system': 'System', 'recovery': 'Recovery', 'games': 'Games',
+    'productivity': 'Productivity', 'devices': 'Devices',
+}
+
+# Existing Recovery/Games tabs remain loadable for older saved sessions.
+# They are not new competing first-class bays. Recovery belongs to System,
+# and the Media Center can access installed games without creating another
+# desktop shortcut or sacrificing any game save directory.
+VISIBLE_WORKSPACES = {
+    key: label for key, label in WORKSPACES.items()
+    if key not in {'recovery', 'games'}
 }
 
 @dataclass(frozen=True)
@@ -28,19 +38,21 @@ def workspace_for(desktop_id, name, categories):
     identity = (desktop_id + ' ' + name).lower()
     categories = set(categories)
     if any(word in identity for word in ('timeshift', 'backintime', 'spider-guardian', 'spider-vault')):
-        return 'recovery'
+        return 'system'
     if any(word in identity for word in ('ardour', 'qtractor', 'audacity', 'lmms', 'carla', 'hydrogen', 'mixxx', 'qjackctl', 'easyeffects', 'helvum', 'kdenlive', 'shotcut', 'openshot', 'handbrake', 'obs-studio')):
         return 'studio'
     if 'Security' in categories or any(word in identity for word in ('kali-bay', 'wireshark', 'nmap', 'burpsuite')): return 'kali-bay'
     if 'Graphics' in categories: return 'art-lab'
     if categories & {'Development', 'TerminalEmulator'}: return 'dev-bay'
     if categories & {'Education', 'Science'}: return 'study'
-    if 'Office' in categories: return 'author'
+    if 'Office' in categories: return 'productivity'
     if categories & {'AudioVideoEditing', 'AudioEditing', 'Midi', 'Sequencer'}: return 'studio'
     if categories & {'AudioVideo', 'Audio', 'Video', 'Player'}: return 'media'
     if 'WebBrowser' in categories: return 'forage'
+    if categories & {'Calendar', 'ContactManagement', 'ProjectManagement'}: return 'productivity'
+    if any(word in identity for word in ('bluetooth', 'partitionmanager', 'kdeconnect', 'gparted', 'pavucontrol', 'input-remapper', 'usbview')): return 'devices'
     if 'Network' in categories: return 'communications'
-    if 'Game' in categories: return 'games'
+    if 'Game' in categories: return 'media'
     return 'system'
 
 
