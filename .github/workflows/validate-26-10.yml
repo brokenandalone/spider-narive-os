@@ -16,7 +16,7 @@ permissions:
 
 concurrency:
   group: validate-26-10-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   final-image:

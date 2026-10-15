@@ -36,16 +36,28 @@ def normalize(catalog):
 
 def normalize_grub(directory):
     replacements = {}
+    boot_entries = 0
     for path in Path(directory).rglob('*.cfg'):
         text = path.read_text()
         paths = set(re.findall(r'layerfs-path=([^\s"\x27]+)', text))
         if paths - {'minimal.standard.live.squashfs'}:
             raise ValueError(f'Unverified live boot layer selection: {paths}')
-        if paths:
-            replacements[path] = text.replace('layerfs-path=minimal.standard.live.squashfs',
-                                              'layerfs-path=standard.live.squashfs')
-    if not replacements:
-        raise ValueError('No verified upstream live-layer boot argument')
+        text = text.replace('layerfs-path=minimal.standard.live.squashfs',
+                            'layerfs-path=standard.live.squashfs')
+        def select_live(match):
+            nonlocal boot_entries
+            boot_entries += 1
+            kernel, arguments = match.groups()
+            if 'layerfs-path=' not in arguments:
+                arguments = ' layerfs-path=standard.live.squashfs' + arguments
+            return kernel + arguments
+        # The final Studio ISO omits an explicit leaf argument. Insert it
+        # directly after the kernel path, before any '---' separator.
+        text = re.sub(r'^(\s*linux(?:efi)?\s+\S*/casper/vmlinuz)([^\n]*)$',
+                      select_live, text, flags=re.MULTILINE)
+        replacements[path] = text
+    if not boot_entries:
+        raise ValueError('No verified upstream Casper kernel boot entry')
     # Validate every menu before writing any of them.
     for path, text in replacements.items():
         path.write_text(text)

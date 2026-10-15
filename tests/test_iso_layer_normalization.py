@@ -11,6 +11,16 @@ spec.loader.exec_module(layout)
 
 
 class LayerNormalizationTests(unittest.TestCase):
+    def test_final_iso_menus_get_explicit_leaf_before_separator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'grub.cfg').write_text('linux /casper/vmlinuz --- quiet splash\n'
+                                        'linux (loop)/casper/vmlinuz nomodeset --- quiet\n')
+            layout.normalize_grub(root)
+            text = (root/'grub.cfg').read_text()
+            self.assertIn('/casper/vmlinuz layerfs-path=standard.live.squashfs ---', text)
+            self.assertIn('(loop)/casper/vmlinuz layerfs-path=standard.live.squashfs nomodeset', text)
+
     def test_grub_updates_normal_and_loopback_menus(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -23,6 +23,14 @@ kernel metadata. Only that customized full source is offered, preserving Studio
 applications rather than offering an unmodified upstream minimal installation.
 Unrecognized default paths, language layers or source types fail closed.
 
+The captured final catalog selects `ubuntustudio-desktop` at
+`minimal.standard.squashfs` (15,256,940,544 installed bytes). The final GRUB
+normal and safe-graphics entries omit `layerfs-path`; normalization adds the
+explicit `standard.live.squashfs` leaf before the `---` separator. Both actual
+upstream menus and the catalog were tested against the normalization helper.
+Authenticated upstream ISO SHA256:
+`00d1fb881501101b9f7e9fe5b22c5473f6c96fa4bb2b69f9c00e9ee69f537fe7`.
+
 The probe saves the original catalog, normalized catalog, GRUB configuration
 and all squashfs superblocks. A synthetic mounted-image test checks base files,
 overrides, deletions, hardlinks and symlinks before the real build begins.
