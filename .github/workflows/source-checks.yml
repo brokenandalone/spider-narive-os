@@ -19,7 +19,7 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_*.py'
       - name: Check complete native upgrade coverage and packaged payload
         run: |
-          python3 tools/audit_upgrade_coverage.py --json
+          python3 tools/audit_upgrade_coverage.py --json --target 26.10
           python3 -m py_compile tools/audit_upgrade_coverage.py
       - name: Validate feature scripts
         run: |

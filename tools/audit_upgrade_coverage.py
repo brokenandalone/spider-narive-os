@@ -118,7 +118,7 @@ TARGET_WORKSPACES = {
 }
 
 
-def audit(root: Path = ROOT) -> dict:
+def audit(root: Path = ROOT, target: str = "26.04") -> dict:
     root = root.resolve()
     missing = {}
     for name, paths in SOURCE_AREAS.items():
@@ -158,9 +158,14 @@ def audit(root: Path = ROOT) -> dict:
     scene_gaps = sorted(IMMERSIVE - scenes)
     manifest = root / "distro/config/base.env"
     base = manifest.read_text() if manifest.is_file() else ""
+    targets = {
+        "26.04": ("resolute", "26.04.1", "Ubuntu Studio 26.04.1 LTS build target"),
+        "26.10": ("stonking", "26.10", "Ubuntu Studio 26.10 experimental build target"),
+    }
+    codename, image, target_label = targets[target]
     lts_pinned = all(entry in base for entry in (
-        'UBUNTU_RELEASE="26.04"', 'UBUNTU_CODENAME="resolute"',
-        'UBUNTU_IMAGE_VERSION="26.04.1"'
+        f'UBUNTU_RELEASE="{target}"', f'UBUNTU_CODENAME="{codename}"',
+        f'UBUNTU_IMAGE_VERSION="{image}"', 'UBUNTU_CHANNEL="release"'
     ))
     # Check the actual The Web registry, not only mockups or docs.
     catalog_file = root / "the-web/shell/app_catalog.py"
@@ -180,7 +185,7 @@ def audit(root: Path = ROOT) -> dict:
     external_media = ("CANDIDATES=" in media_source
                       and "ZIP=" in media_source)
     return {
-        "base": "Ubuntu Studio 26.04.1 LTS build target",
+        "base": target_label,
         "base_config_pinned": lts_pinned,
         "source_areas": {k: "source present" if k not in missing
                          else "missing source" for k in SOURCE_AREAS},
@@ -209,8 +214,9 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", type=Path, default=ROOT)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--target", choices=("26.04", "26.10"), default="26.04")
     args = ap.parse_args(argv)
-    report = audit(args.root)
+    report = audit(args.root, args.target)
     if args.json:
         print(json.dumps(report, indent=2))
     else:
