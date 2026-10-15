@@ -32,7 +32,8 @@ class StudioProductionGUITests(unittest.TestCase):
         workbench = self.workbench_class()
         arranger = self.arranger_class(workbench)
         try:
-            self.assertEqual(workbench.tabs.count(), 4)
+            self.assertEqual(workbench.tabs.count(), 5)
+            self.assertIsNotNone(workbench.midi_input)
             workbench.pattern.set("guitar", 0, 64)
             arranger.capture_bar()
             self.assertEqual(len(arranger.song.bars), 1)
