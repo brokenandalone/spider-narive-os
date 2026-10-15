@@ -38,6 +38,9 @@ class StartupScreensTests(unittest.TestCase):
                     self.assertGreater(
                         (base / "branding/spider-os-splash.png").stat().st_size, 1000
                     )
+                    self.assertGreater(
+                        (target / "usr/share/plymouth/themes/spider-os/spider-os-background.png").stat().st_size, 1000
+                    )
                     for name in EXPECTED:
                         self.assertGreater(
                             (base / "startup-sets" / (name + ".png")).stat().st_size, 1000
