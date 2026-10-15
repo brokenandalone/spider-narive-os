@@ -154,6 +154,39 @@ The upgraded host-readiness script now checks these items. Do not
 infer that the 26.10 UEFI encrypted boot path is safe from existing
 kernel files alone.
 
+## Confirmed host boot and brain-volume results (Oct 15)
+
+The owner has now run the actual firmware and GRUB checks:
+
+- `mokutil --sb-state` reports **SecureBoot disabled**. Canonical says
+  the restriction on LUKS/LVM `/boot` applies to signed GRUB under
+  Secure Boot and that full GRUB features remain available when it is
+  disabled; this is not by itself a boot incompatibility on the PC.
+  Source: https://ubuntu.com/blog/ubuntu-26-10-security
+- `findmnt -T /boot` resolves to the ext4 root on
+  `/dev/mapper/kali--vg-root`; the root is inside an LVM volume on
+  LUKS2. Current GRUB config explicitly includes `insmod cryptodisk`,
+  `insmod luks2`, `insmod lvm`, and a `cryptomount` against the
+  LUKS root. The 26.10 upgrader may upgrade GRUB; preserve the working
+  UEFI `EFI/SpiderOS` grub binary, minimal config and current
+  `/boot/grub` setup. Do not install a signed-only GRUB that cannot
+  reach the encrypted root. Never change firmware Secure Boot settings.
+- The root disk inventory (`sda`, with EFI `sda2`, encrypted
+  `sda5`, LVM root/swap) contains **no filesystem with UUID
+  `bf0d0a18-68ed-4d28-b8b7-d26f6ec967f0`**. This UUID is in
+  `/etc/fstab` for `/var/lib/spider-os/webbie-brain`
+  with `nofail` and `x-systemd.device-timeout=10`; the mount is
+  not active. It may be a missing storage drive or obsolete config.
+  Inspect directory contents and `blkid` before attempting a
+  repair. Do not create a new volume, format one, or overwrite data.
+- The source-check workflow succeeded for commit
+  `f6a72f1c1a085aa6ded09b7f86306af168ebfc80`; this doesn't
+  certify the actual GRUB upgrade or backup restorability.
+
+User-facing USB policy remains: do not make installer media. No 26.10
+package upgrade should start before independent backup and a
+clear way to restore the working EFI plus encrypted boot chain.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
