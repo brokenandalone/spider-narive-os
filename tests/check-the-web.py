@@ -7,7 +7,7 @@ from unittest.mock import patch
 root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'the-web/shell'))
 from PyQt5.QtWidgets import QApplication, QPushButton
-from PyQt5.QtGui import QColor,QPixmap
+from PyQt5.QtGui import QColor,QPixmap,QImage
 from PyQt5.QtCore import Qt
 import main
 main.SPIDER_ROOT = root
@@ -79,10 +79,10 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     art_workbench = window.workspace_widgets['art-lab'].art_workbench
     assert isinstance(art_workbench, main.ArtWorkbench)
     assert art_workbench.mode.count() == 5
-    image = main.QImage(16, 16, main.QImage.Format_RGB32)
-    image.fill(main.QColor('white'))
+    image = QImage(16, 16, QImage.Format_RGB32)
+    image.fill(QColor('white'))
     for pixel in range(16):
-        image.setPixelColor(8, pixel, main.QColor('black'))
+        image.setPixelColor(8, pixel, QColor('black'))
     art_workbench.canvas.load_outline(image)
     assert art_workbench.canvas.undo()
     studio_rack = window.workspace_widgets['studio'].instrument_rack
