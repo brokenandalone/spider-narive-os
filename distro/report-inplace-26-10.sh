@@ -127,7 +127,7 @@ fi
 # Inventory pre-existing Ubuntu Studio and creative apps; do not install them.
 {
   for pkg in ubuntustudio-desktop ubuntustudio-audio ardour audacity              carla hydrogen mixxx qjackctl qtractor krita gimp kdenlive              blender inkscape scribus obs-studio yoshimi zynaddsubfx              lmms supercollider sonic-pi; do
-    dpkg-query -W -f='\${binary:Package}\t\${Status}\t\${Version}\n' "$pkg" 2>/dev/null || true
+    dpkg-query -W -f='${binary:Package}\t${Status}\t${Version}\n' "$pkg" 2>/dev/null || true
   done
 } > "$OUT/creative-apps-baseline.tsv"
 mark INFO "Creative applications" "Pre-upgrade package baseline saved for post-upgrade comparison"
