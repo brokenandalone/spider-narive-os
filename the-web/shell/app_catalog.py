@@ -203,7 +203,7 @@ def save_app_assignment(desktop_id, bay=None, path=None):
     if len(settings) > 200:
         raise ValueError("Too many manual app placements")
     output = json.dumps({"version": 1, "assignments": settings},
-                        sort_keys=True, indent=2) + "\\n"
+                        sort_keys=True, indent=2) + "\n"
     if len(output.encode("utf-8")) > ASSIGNMENT_LIMIT:
         raise ValueError("App placement settings too large")
     path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
