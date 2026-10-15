@@ -21,7 +21,6 @@ CONFIRMED = {
     "studio": {
         "spider-studio.desktop": "Spider Studio",
         "studio.desktop": "Spider Studio",
-        "idjc.desktop": "Internet DJ Console",
         "aeolus.desktop": "Aeolus",
         "zita-at1.desktop": "AT1",
         "devede_ng.py.desktop": "DevedeNG",
@@ -61,6 +60,7 @@ CONFIRMED = {
         "kde_wacom_tabletfinder.desktop": "Wacom Tablet finder",
     },
     "media": {
+        "idjc.desktop": "Internet DJ Console",
         "org.kde.kid3.desktop": "Kid3",
         "org.kde.kid3-qt.desktop": "Kid3-qt",
         "freeshow_freeshow.desktop": "FreeShow",
