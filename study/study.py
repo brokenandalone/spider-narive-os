@@ -71,6 +71,10 @@ else:
     from paper_dialog import PaperDialog
 
 
+sys.path.insert(0, str(SPIDER_ROOT / 'the-web' / 'shell'))
+from workspace_max_native import NativeWorkspaceTools
+
+
 WALLPAPER = (
     SPIDER_ROOT
     / "branding"
@@ -574,6 +578,9 @@ class StudyWindow(QMainWindow):
             notes_tab,
             "Notes",
         )
+
+        self.native_max_tools = NativeWorkspaceTools('study', self)
+        self.tabs.addTab(self.native_max_tools, 'Coursework analysis & tasks')
 
         main_layout.addWidget(
             self.tabs,
