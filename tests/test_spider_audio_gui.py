@@ -109,6 +109,11 @@ class StudioProductionGUITests(unittest.TestCase):
             self.assertEqual(panel.patch_select.currentIndex(), 24)
             panel.patch_select.setCurrentIndex(30)
             self.assertEqual(panel.performance.parts[0].program, 30)
+            panel.tab_text.setPlainText("Am | F | C | G")
+            panel.interpret_chords()
+            self.assertEqual(len(panel.performance.parts), 4)
+            self.assertEqual(panel.performance.beats, 16)
+            self.assertGreater(len(panel.performance.notes), 100)
         finally:
             panel.close()
 
