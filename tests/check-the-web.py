@@ -60,6 +60,10 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
     assert window.tabs.count()==len(main.WORKSPACES)
+    assert isinstance(window.home_dashboard, main.SpiderHomeDashboard)
+    assert len(window.home_dashboard.buttons) == 14
+    assert 'studio' in window.home_dashboard.buttons
+    assert 'webbie' in window.home_dashboard.buttons
     for bay, widget in (
         ('devices', main.DevicesPanel),
         ('productivity', main.ProductivityPanel),
@@ -72,6 +76,15 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
         if bay == 'default':
             continue
         assert isinstance(window.workspace_widgets[bay].mission_desk, main.BayMissionPanel), bay
+    art_workbench = window.workspace_widgets['art-lab'].art_workbench
+    assert isinstance(art_workbench, main.ArtWorkbench)
+    assert art_workbench.mode.count() == 5
+    image = main.QImage(16, 16, main.QImage.Format_RGB32)
+    image.fill(main.QColor('white'))
+    for pixel in range(16):
+        image.setPixelColor(8, pixel, main.QColor('black'))
+    art_workbench.canvas.load_outline(image)
+    assert art_workbench.canvas.undo()
     studio_rack = window.workspace_widgets['studio'].instrument_rack
     assert isinstance(studio_rack, main.InstrumentRack)
     assert studio_rack.mode.count() == 4
