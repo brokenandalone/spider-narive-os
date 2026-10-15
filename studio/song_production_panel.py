@@ -15,12 +15,14 @@ from PyQt5.QtWidgets import (
 )
 try:
     from .instruments_engine import TRACKS, Pattern
+    from .midi_song_export import write_song_midi
     from .song_arranger_engine import (
         MAX_BARS, Bar, Channel, Song, export_stems, load_song, save_song,
         song_duration, write_song_wav,
     )
 except ImportError:
     from instruments_engine import TRACKS, Pattern
+    from midi_song_export import write_song_midi
     from song_arranger_engine import (
         MAX_BARS, Bar, Channel, Song, export_stems, load_song, save_song,
         song_duration, write_song_wav,
@@ -152,6 +154,7 @@ class SongProductionPanel(QWidget):
             ("Open song project", self.open),
             ("Export stereo WAV", self.export_mix),
             ("Export all 7 stems", self.export_stems),
+            ("Export standard MIDI", self.export_midi),
         ]):
             button = QPushButton(label)
             button.clicked.connect(handler)
@@ -339,6 +342,21 @@ class SongProductionPanel(QWidget):
             str(Path.home() / "Music"))
         if folder:
             self._start_export(folder, stems=True)
+
+    def export_midi(self):
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export Spider song to standard MIDI",
+            str(Path.home() / "Music" / "Spider-Song.mid"),
+            "Standard MIDI (*.mid)")
+        if not filename:
+            return
+        try:
+            song = self._song_validated()
+            write_song_midi(song, filename)
+            self.status.setText(
+                "Exported MIDI format 1: separate drums, guitar, bass and piano tracks.")
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "MIDI export failed", str(error)[:300])
 
     def closeEvent(self, event):
         if self.worker is not None and self.worker.isRunning():
