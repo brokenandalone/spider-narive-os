@@ -68,7 +68,7 @@ class InstrumentEngineTests(unittest.TestCase):
         self.assertEqual(one, two)
         source = (ROOT / "studio/instrument_engine.py").read_text()
         for forbidden in ("subprocess", "socket", "requests", "urlopen",
-                          "os.system(", "open(", "unlink("):
+                          "os.system(", "Path(", "unlink("):
             self.assertNotIn(forbidden, source)
 
 
