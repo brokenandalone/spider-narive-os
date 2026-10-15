@@ -254,6 +254,7 @@ APP_FILES = (
     'the-web/shell/legacy_control_centers.py',
     'the-web/shell/art_workbench.py',
     'the-web/shell/home_dashboard.py',
+    'tools/audit_legacy_shortcuts.py',
     'studio/instrument_engine.py',
     'studio/instrument_panel.py',
     'webbie/brain/research_agenda.py',
