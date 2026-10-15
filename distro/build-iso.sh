@@ -701,7 +701,6 @@ do
     if [[ -f "${grub_cfg}" ]]; then
         sed -i \
             -e 's/Ubuntu Studio/Spider OS/g' \
-            -e 's/quiet splash/quiet splash/g' \
             "${grub_cfg}"
     fi
 done
