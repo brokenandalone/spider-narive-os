@@ -56,6 +56,8 @@ def render_soundfont(performance, soundfont, destination, rate=44100, runner=Non
     dest = Path(destination)
     if not dest.parent.is_dir():
         raise FileNotFoundError("WAV output directory does not exist")
+    if p.origin is not None and p.origin.resolve() == dest.resolve():
+        raise ValueError("Refusing to replace original sheet music or tab")
     if sf.resolve() == dest.resolve():
         raise ValueError("Cannot overwrite the selected SoundFont")
     execute = runner or subprocess.run
