@@ -30,6 +30,10 @@ def encode_performance_midi(performance):
         (0, 0, bytes((0xFF, 0x58, 4, p.meter[0], denominator_exponent, 24, 8))),
         (0, 1, b"\xff\x51\x03" + tempo.to_bytes(3, "big")),
     ]
+    for beat, bpm in p.tempo_changes:
+        microseconds = round(60_000_000 / bpm)
+        tempo_events.append((_tick(beat), 1,
+                             b"\xff\x51\x03" + microseconds.to_bytes(3, "big")))
     output = [chunk(b"MThd", struct.pack(">HHH", 1, len(p.parts) + 1, PPQ)),
               track_bytes(tempo_events, "Spider Auto Performer Tempo", end_tick)]
     for index, part in enumerate(p.parts):
