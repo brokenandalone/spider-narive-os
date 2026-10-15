@@ -24,6 +24,7 @@ jobs:
       - name: Validate feature scripts
         run: |
           bash distro/validate-feature-complete.sh
+          bash -n tools/try-native-26-04.sh
           bash -n system/bin/spider-guardian
           bash -n system/bin/spider-vault
           python3 -m py_compile system/guardian.py system/vault.py
