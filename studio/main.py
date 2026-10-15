@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
     QApplication,
     QFrame, QGridLayout, QScrollArea, QTabWidget,
@@ -54,7 +54,10 @@ class StudioButton(QPushButton):
 class SpiderStudio(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Spider Studio | Spider OS')
+        self.setWindowTitle('Spider Audio Studio | Spider OS')
+        app_icon = SPIDER_ROOT / 'branding/spider-apps/icons/spider-audio-studio.svg'
+        if app_icon.is_file():
+            self.setWindowIcon(QIcon(str(app_icon)))
         self.resize(1180, 760)
 
         self.setStyleSheet("""
