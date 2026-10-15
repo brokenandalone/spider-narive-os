@@ -146,8 +146,9 @@ with tempfile.TemporaryDirectory() as d:
          patch.object(ui.subprocess, "run",
                       return_value=CompletedProcess([],0,"missing","")):
         win=ui.KaliBayWindow()
-        assert win.security_tabs.count()==6
+        assert win.security_tabs.count()==7
         assert win.security_tabs.tabText(5)=="EVIDENCE LEDGER"
+        assert win.security_tabs.tabText(6)=="EVIDENCE & LAB ANALYSIS"
         assert win.findChild(ui.QWidget,"kaliEvidenceLedgerPage")
         lab=ui.kali_store.create_lab("Sandbox custody")
         win.refresh_labs(select_id=lab["id"])
