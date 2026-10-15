@@ -302,6 +302,14 @@ class SpiderStudio(QMainWindow):
         )
 
 
+    def closeEvent(self, event):
+        worker = getattr(self.native_max_tools, 'worker', None)
+        if worker is not None and worker.isRunning():
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName('Spider Studio')
