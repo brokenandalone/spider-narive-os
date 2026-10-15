@@ -41,6 +41,7 @@ from webbie_native_operations import WebbieNativeOperations
 from legacy_control_centers import destination as legacy_destination
 from native_utility_bays import (ArtLabPanel, CommunicationsPanel, DevBayPanel,
                                  DevicesPanel, ProductivityPanel)
+from art_workbench import ArtWorkbench
 sys.path.insert(0, str(SPIDER_ROOT / 'studio'))
 from instrument_panel import InstrumentRack
 from app_catalog import VISIBLE_WORKSPACES
@@ -893,6 +894,10 @@ class TheWeb(QMainWindow):
                     workspace_tabs.addTab(surface, 'Native workspace')
                 else:
                     bay_row.addWidget(surface, 1)
+            if name == 'art-lab':
+                painting = ArtWorkbench(workspace_tabs)
+                page.art_workbench = painting
+                workspace_tabs.addTab(painting, 'Painting & photo outlines')
             if name == 'studio':
                 rack = InstrumentRack(workspace_tabs)
                 page.instrument_rack = rack
