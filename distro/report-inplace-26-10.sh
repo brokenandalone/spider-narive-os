@@ -44,18 +44,39 @@ fi
     findmnt -n -o SOURCE,FSTYPE,TARGET --target "$p" || true
   done
 } > "$OUT/boot-mounts.txt" 2>&1
-# A /boot directory on an encrypted-LVM root can depend on GRUB
-# loading its kernel from LUKS. Ubuntu 26.10's signed GRUB build has
-# restricted support for encrypted/LVM /boot under Secure Boot.
-# Never change boot configuration automatically in this read-only audit.
+# Ubuntu 26.10 signed GRUB restricts some encrypted/LVM /boot layouts.
+# This check is read-only. It never changes EFI, crypttab or GRUB.
+boot_on_encrypted_root=0
 if findmnt -rn --mountpoint /boot >/dev/null 2>&1; then
-  mark INFO "Separate /boot" "A distinct mounted /boot exists; still verify firmware loader"
+  mark INFO "Separate /boot" "Separate mount exists; verify EFI bootloader"
 else
-  mark REVIEW "/boot location" "/boot is not a separate mount; identify EFI loader and GRUB kernel path"
+  mark REVIEW "/boot location" "/boot is not separately mounted; determine loader/kernel path"
   root_device="$(findmnt -nr -o SOURCE --target / 2>/dev/null || true)"
-  boot_on_encrypted_root=0
   if [[ -n "$root_device" ]] && command -v lsblk >/dev/null 2>&1; then
-    if lsblk -ns -o FSTYPE -- "$root_device" 2>/dev/null | grep -qE '^crypto_LUKS[[:space:]]*
+    if lsblk -ns -o FSTYPE -- "$root_device" 2>/dev/null | grep -q 'crypto_LUKS'; then
+      boot_on_encrypted_root=1
+      mark REVIEW "Encrypted /boot" "Encrypted root contains /boot; verify how GRUB loads kernel"
+    fi
+  fi
+fi
+if command -v mokutil >/dev/null 2>&1; then
+  sb_state="$(mokutil --sb-state 2>&1 || true)"
+  printf "%s\n" "$sb_state" > "$OUT/secure-boot.txt"
+  if grep -qi "SecureBoot enabled" <<< "$sb_state"; then
+    mark INFO "Secure Boot" "Enabled"
+    if (( boot_on_encrypted_root == 1 )); then
+      mark BLOCK "Encrypted boot with Secure Boot" "Investigate Ubuntu 26.10 signed-GRUB support before upgrading"
+    fi
+  elif grep -qi "SecureBoot disabled" <<< "$sb_state"; then
+    mark INFO "Secure Boot" "Disabled"
+  else
+    mark REVIEW "Secure Boot" "State unclear; see secure-boot.txt"
+  fi
+else
+  mark REVIEW "Secure Boot" "mokutil not installed; state unverified"
+fi
+ls -l /boot/vmlinuz* /boot/initrd.img* /boot/grub/grub.cfg > "$OUT/boot-kernel-files.txt" 2>&1 || true
+if [[ -s /etc/crypttab ]]; then
   mark INFO "LUKS" "Nonempty crypttab; disk unlock must be verified before and after"
 else
   mark REVIEW "LUKS" "No readable crypttab entries; inspect encrypted-root mapping"
