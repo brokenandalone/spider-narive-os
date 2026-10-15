@@ -243,6 +243,9 @@ APP_FILES = (
     # known-version preflight and atomic rollback, never blind deployment.
     'the-web/shell/bay_missions.py',
     'the-web/shell/bay_mission_panel.py',
+    'the-web/shell/app_catalog.py',
+    'the-web/shell/workspace_files.py',
+    'tools/ubuntu_studio_app_inventory.py',
     'the-web/shell/native_utility_bays.py',
     'the-web/shell/webbie_research_panel.py',
     'webbie/brain/research_agenda.py',
