@@ -37,6 +37,8 @@ from media_panel import MediaPanel
 from immersive_bays import ImmersiveBay, SCENES
 from bay_mission_panel import BayMissionPanel
 from webbie_research_panel import WebbieResearchPanel
+from webbie_native_operations import WebbieNativeOperations
+from legacy_control_centers import destination as legacy_destination
 from native_utility_bays import (ArtLabPanel, CommunicationsPanel, DevBayPanel,
                                  DevicesPanel, ProductivityPanel)
 sys.path.insert(0, str(SPIDER_ROOT / 'studio'))
@@ -855,6 +857,7 @@ class TheWeb(QMainWindow):
             bay_row = QHBoxLayout(); layout.addLayout(bay_row, 1)
             workspace_tabs = QTabWidget(page)
             workspace_tabs.setObjectName('nativeBayToolsTabs')
+            page.workspace_tabs = workspace_tabs
             workspace_tabs.setDocumentMode(True)
             bay_row.addWidget(workspace_tabs, 1)
             try:
@@ -911,6 +914,11 @@ class TheWeb(QMainWindow):
                     page.extra_max_tools.append(extra)
                     workspace_tabs.addTab(extra, 'Backup & integrity tools')
             if name == 'webbie':
+                operations = WebbieNativeOperations(
+                    native, workspace_callback=lambda: self.current_workspace,
+                    parent=workspace_tabs)
+                page.webbie_operations = operations
+                workspace_tabs.addTab(operations, 'Webbie controls')
                 research_panel = WebbieResearchPanel(workspace_tabs)
                 research_panel.questionRequested.connect(self.request_webbie_research)
                 workspace_tabs.addTab(research_panel, 'Research mind')
@@ -946,6 +954,20 @@ class TheWeb(QMainWindow):
             self.status.setText(str(error))
 
     def open_installed(self, ident):
+        legacy = legacy_destination(ident)
+        if legacy is not None:
+            # Legacy Universal/MAX/Intelligence shortcuts are intentionally
+            # redirected into existing native bays. Nothing is uninstalled.
+            self.open_workspace(legacy.workspace)
+            page = self.workspace_widgets[legacy.workspace]
+            tabs = page.workspace_tabs
+            for index in range(tabs.count()):
+                if tabs.tabText(index) == legacy.tab_title:
+                    tabs.setCurrentIndex(index)
+                    break
+            self.status.setText(legacy.message)
+            self.remember_navigation('app', ident)
+            return
         app = next((a for a in self.installed_apps if a.desktop_id == ident), None)
         if not app: return
         self.open_workspace(app.workspace)
@@ -955,6 +977,10 @@ class TheWeb(QMainWindow):
         except RuntimeError as error: self.status.setText(str(error))
 
     def can_close(self, page):
+        controls = getattr(page, 'webbie_operations', None)
+        if controls is not None and not controls.can_close():
+            self.status.setText('A Webbie mission or voice diagnostic is active. Finish it before leaving the bay.')
+            return False
         native = getattr(page, 'native', None)
         live_tools = [getattr(page, 'advanced_tools', None)] + list(
             getattr(page, 'extra_max_tools', ()))
