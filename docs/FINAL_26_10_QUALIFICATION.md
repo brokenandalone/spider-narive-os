@@ -2,6 +2,22 @@
 
 Prepared 2026-10-15. Pending CI results; not approved for installation.
 
+## Evening integration and confirmed blocker
+
+The migration snapshot now includes `feature/native-monster-bays-20261015`
+at `1441ca934a2270d86e714007493ff6b662846f18`, preserving its native bay
+integration and source-test fixes while keeping the migration base at 26.10.
+This does not reconcile or replace the installed PC's 33 locally customized files.
+
+Run 38756210018 passed source tests and the offscreen desktop checks, and
+authenticated the final upstream ISO using Ubuntu's signed checksum list.
+Its recorded Casper listing contains `minimal.squashfs`,
+`minimal.standard.squashfs`, and `minimal.standard.live.squashfs`.
+The builder's two-layer `standard.*` assumption is therefore incompatible.
+The qualification gate stays closed and now saves the installer catalog,
+GRUB configuration and all squashfs superblocks before rejecting that layout.
+No successful image build, installation, or boot is claimed.
+
 Source integration:
 - migration foundation: 8fb4030b0591c3496529ebfade0021eb60e92b0e
 - native bay feature snapshot: 7b9ba3851300db8739bc677c30b2423721431501

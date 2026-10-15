@@ -127,6 +127,16 @@ jobs:
           trap 'sudo umount build/iso-mount' EXIT
           find build/iso-mount/casper -maxdepth 1 -type f -printf '%f %s bytes\n' | sort > build/upstream-probe/casper-files.txt
           xorriso -indev "build/$UBUNTU_IMAGE_NAME" -report_el_torito plain > build/upstream-probe/boot-metadata.txt 2>&1
+          cp build/iso-mount/casper/install-sources.yaml build/upstream-probe/
+          cp build/iso-mount/boot/grub/grub.cfg build/upstream-probe/upstream-grub.cfg
+          for image in build/iso-mount/casper/*.squashfs; do
+            unsquashfs -s "$image" > "build/upstream-probe/$(basename "$image").superblock.txt"
+          done
+          if [[ ! -s build/iso-mount/casper/standard.squashfs ]]; then
+            echo '::error::Upstream uses a different installed filesystem chain. Catalog and GRUB diagnostics were saved; do not build or install until layer reconstruction is adapted.'
+            cat build/upstream-probe/install-sources.yaml
+            exit 1
+          fi
           for layer in standard.squashfs standard.live.squashfs; do
             test -s "build/iso-mount/casper/$layer"
             unsquashfs -s "build/iso-mount/casper/$layer" > "build/upstream-probe/$layer.superblock.txt"
