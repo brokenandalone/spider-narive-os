@@ -31,6 +31,7 @@ WORKSPACE_TO_MAX = {
     "media": "Media Center", "communications": "Communications",
     "kali-bay": "Kali Bay", "dev-bay": "Dev Bay",
     "system": "System", "recovery": "Recovery",
+    "bcn-nova": "BCN / Nova", "backups": "Backups",
 }
 V4_SHA256 = "ac9af96ea33201817a43190d4cc622621f386002bae79b493ac068625e1cf391"
 V4_NAMES = (
