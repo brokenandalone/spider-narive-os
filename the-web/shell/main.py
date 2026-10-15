@@ -35,6 +35,7 @@ from webbie_face import (asleep as face_asleep, set_sleep as set_face_sleep,
 from media_panel import MediaPanel
 from immersive_bays import ImmersiveBay, SCENES
 from bay_mission_panel import BayMissionPanel
+from webbie_research_panel import WebbieResearchPanel
 from native_utility_bays import (ArtLabPanel, CommunicationsPanel, DevBayPanel,
                                  DevicesPanel, ProductivityPanel)
 from app_catalog import VISIBLE_WORKSPACES
@@ -777,6 +778,10 @@ class TheWeb(QMainWindow):
                     extra = NativeWorkspaceTools('backups', workspace_tabs)
                     page.extra_max_tools.append(extra)
                     workspace_tabs.addTab(extra, 'Backup & integrity tools')
+            if name == 'webbie':
+                research_panel = WebbieResearchPanel(workspace_tabs)
+                research_panel.questionRequested.connect(self.request_webbie_research)
+                workspace_tabs.addTab(research_panel, 'Research mind')
             if name == 'system':
                 recovery_panel = SystemPanel(SPIDER_ROOT, recovery=True)
                 workspace_tabs.addTab(recovery_panel, 'Recovery & backups')
@@ -789,6 +794,17 @@ class TheWeb(QMainWindow):
         # Workspace navigation must never activate KDE Show Desktop, which hides
         # normal application windows, including Firefox and the file manager.
         self.raise_(); self.activateWindow()
+
+    def request_webbie_research(self, question):
+        # Only an explicit button press submits this request to the existing
+        # resident AI chat. No new authority, privileges or microphone access.
+        assistant = self.webbie_assistant
+        if getattr(assistant, 'pending', False):
+            self.status.setText('Webbie is still answering. Finish that request first.')
+            return
+        self.webbie_dock.show()
+        assistant.entry.setText(question)
+        assistant.send()
 
     def open_workspace_folder(self, path, workspace):
         try:
