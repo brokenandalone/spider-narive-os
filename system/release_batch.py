@@ -233,6 +233,33 @@ APP_FILES = (
     'the-web/shell/navigation_core.py',
     'the-web/shell/navigation_state.py',
     'the-web/shell/readability.py',
+    # Ubuntu Studio 26.04 reconciliation: missing real in-bay immersive
+    # surfaces and the verified bundled Workspace MAX analysis engine.
+    # Each addition goes through the same drift gate and rollback receipt.
+    # Do not overwrite installed art, models, service configurations or data.
+    'the-web/shell/immersive_bays.py',
+    'the-web/shell/workspace_max_native.py',
+    'spider_max_source/spider_monster/__init__.py',
+    'spider_max_source/spider_monster/max_art.py',
+    'spider_max_source/spider_monster/max_author.py',
+    'spider_max_source/spider_monster/max_backups.py',
+    'spider_max_source/spider_monster/max_board.py',
+    'spider_max_source/spider_monster/max_catalog.py',
+    'spider_max_source/spider_monster/max_comms.py',
+    'spider_max_source/spider_monster/max_core.py',
+    'spider_max_source/spider_monster/max_dev.py',
+    'spider_max_source/spider_monster/max_forage.py',
+    'spider_max_source/spider_monster/max_gui.py',
+    'spider_max_source/spider_monster/max_kali.py',
+    'spider_max_source/spider_monster/max_media.py',
+    'spider_max_source/spider_monster/max_nova.py',
+    'spider_max_source/spider_monster/max_recovery.py',
+    'spider_max_source/spider_monster/max_studio.py',
+    'spider_max_source/spider_monster/max_study.py',
+    'spider_max_source/spider_monster/max_system.py',
+    'spider_max_source/spider_monster/max_theweb.py',
+    'spider_max_source/spider_monster/max_webbie.py',
+    'spider_max_source/spider_monster/security.py',
 )
 # Exact recognized historical Study source blobs from the prior guarded
 # installer. Unknown owner PC edits still block the entire transaction.
