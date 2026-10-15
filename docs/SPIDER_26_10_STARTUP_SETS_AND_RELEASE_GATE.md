@@ -187,6 +187,47 @@ User-facing USB policy remains: do not make installer media. No 26.10
 package upgrade should start before independent backup and a
 clear way to restore the working EFI plus encrypted boot chain.
 
+## New authoritative boot stub and Webbie storage findings
+
+The owner's October 15 read-only results now prove the installed
+`/boot/efi/EFI/SpiderOS/grub.cfg` contains:
+
+    search.fs_uuid b8b48e84-c748-4741-9b94-a2f5bab50ca6 root hd0,gpt1
+    set prefix=($root)'/grub'
+    configfile $prefix/grub.cfg
+
+UUID `b8b48e84-c748-4741-9b94-a2f5bab50ca6` identifies unmounted
+**`/dev/sda1` ext4, 449 MB**. Hence the EFI stub expects a
+`/grub/grub.cfg` file **on `sda1`**, a partition omitted from
+`/etc/fstab`. Do not assume the large root's
+`/boot/grub/grub.cfg` is the config that the firmware actually runs.
+The current root config contains `cryptodisk`, `luks2`, `lvm`, and
+`cryptomount`, but the **effective config on sda1 is not yet inspected**.
+The machine currently boots, so the partition may be part of the active
+boot chain; preserve all three locations: EFI on sda2, potential
+`sda1:/grub/`, and encrypted root's `/boot` files.
+
+Safest next inspection: `sudo debugfs -R 'ls -l /' /dev/sda1` and
+`sudo debugfs -R 'ls -l /grub' /dev/sda1`, followed by a read-only
+`debugfs -R 'cat /grub/grub.cfg'` check if present. **Never pass
+`-w`**, mount the partition read-write, run `grub-install`,
+or rewrite this EFI stub until its boot chain is documented. Debugfs
+opens ext filesystems read-only by default.
+
+The dedicated `/var/lib/spider-os/webbie-brain` ext4 fstab UUID
+`bf0d0a18-68ed-4d28-b8b7-d26f6ec967f0` was not found by
+`blkid`; `findmnt -T` resolves the directory to the *main encrypted
+root filesystem*, and `du -sh` shows **40 MB** currently under
+`research/` and `voice/`. No evidence yet verifies all running
+Webbie models, settings or research are there. **Do not mount a
+different filesystem over this directory**, which would hide existing
+data, or delete its `nofail` fstab line until its intended use has
+been assessed. Back up current files on independent storage.
+
+Upgrade decision: **HOLD**, pending inspection of sda1, independent
+backup, compatibility checks of actual 26.10 release-upgrader removals,
+and an official upgrade offer. No installer USB requested or required.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
