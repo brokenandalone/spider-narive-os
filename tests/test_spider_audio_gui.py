@@ -171,6 +171,11 @@ class StudioProductionGUITests(unittest.TestCase):
             self.assertTrue(editor.editor.can_undo)
             self.assertTrue(any(n.pitch==original.pitch+2
                                 for n in performer.performance.notes))
+            performer.patch_select.setCurrentIndex(30)
+            self.assertEqual(performer.performance.parts[0].program,30)
+            editor.undo()
+            self.assertEqual(performer.performance.parts[0].program,24)
+            self.assertEqual(performer.patch_select.currentIndex(),24)
         finally:
             editor.close()
             performer.close()
