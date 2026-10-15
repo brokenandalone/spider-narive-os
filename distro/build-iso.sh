@@ -406,6 +406,9 @@ cat > "${ROOTFS}/usr/share/sddm/themes/breeze/theme.conf.user" <<'SDDM_THEME'
 background=/usr/share/backgrounds/spider-os-wallpaper.png
 SDDM_THEME
 
+# Stage the selected Spider OS startup set in the installed-system image.
+bash "${ROOT}/distro/config/branding/install-startup-screens.sh" "${ROOTFS}" "${ROOT}" "${SPIDER_STARTUP_SET:-spider-purple}"
+
 "${ROOT}/distro/install-spm.sh" "${ROOTFS}" "${ROOT}" "${SPM_PROFILE}"
 
 echo "Installing Spider OS desktop integration..."
@@ -589,6 +592,9 @@ install -Dm644 \
     "${ROOT}/branding/splash/spider-os-splash.png" \
     "${LIVE_ROOTFS}/usr/share/spider-os/branding/spider-os-splash.png"
 
+# Stage the same startup artwork and Plasma splash for the live session.
+bash "${ROOT}/distro/config/branding/install-startup-screens.sh" "${LIVE_ROOTFS}" "${ROOT}" "${SPIDER_STARTUP_SET:-spider-purple}"
+
 install -Dm755 "${ROOT}/the-web/session/the-web-session" "${LIVE_ROOTFS}/usr/local/bin/the-web-session"
 install -Dm644 "${ROOT}/distro/config/sessions/the-web.desktop" "${LIVE_ROOTFS}/usr/share/xsessions/the-web.desktop"
 
@@ -695,7 +701,7 @@ do
     if [[ -f "${grub_cfg}" ]]; then
         sed -i \
             -e 's/Ubuntu Studio/Spider OS/g' \
-            -e 's/quiet splash/quiet plymouth.enable=0/g' \
+            -e 's/quiet splash/quiet splash/g' \
             "${grub_cfg}"
     fi
 done
