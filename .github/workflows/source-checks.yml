@@ -17,6 +17,10 @@ jobs:
           sudo apt-get install -y python3-yaml python3-docx python3-pyqt5 dbus-bin
       - name: Source and recovery regression tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Check complete native upgrade coverage and packaged payload
+        run: |
+          python3 tools/audit_upgrade_coverage.py --json
+          python3 -m py_compile tools/audit_upgrade_coverage.py
       - name: Validate feature scripts
         run: |
           bash distro/validate-feature-complete.sh
