@@ -262,6 +262,7 @@ APP_FILES = (
     'studio/performance_expression.py',
     'studio/studio_score_mix.py',
     'studio/soundfont_library.py',
+    'studio/midi_score_import.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
