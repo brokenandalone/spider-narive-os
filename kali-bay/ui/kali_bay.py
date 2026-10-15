@@ -1241,6 +1241,10 @@ class KaliBayWindow(QMainWindow):
         self.webbie_chat_entry.setFocus()
 
     def closeEvent(self, event):
+        worker = getattr(self.native_max_tools, 'worker', None)
+        if worker is not None and worker.isRunning():
+            event.ignore()
+            return
         if self.evidence_worker and self.evidence_worker.isRunning():
             event.ignore()
             self.lab_status.setText(
