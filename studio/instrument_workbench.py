@@ -11,13 +11,18 @@ import os
 from pathlib import Path
 import tempfile
 
-from PyQt5.QtCore import Qt, QBuffer, QByteArray, QIODevice, QTimer
+from PyQt5.QtCore import Qt, QBuffer, QByteArray, QIODevice, QTimer, QRectF
 from PyQt5.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QKeySequence
 from PyQt5.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
     QMessageBox, QPushButton, QScrollArea, QShortcut, QSpinBox, QTabWidget,
     QVBoxLayout, QWidget,
 )
+
+try:
+    from PyQt5.QtSvg import QSvgRenderer
+except ImportError:
+    QSvgRenderer = None
 
 try:
     from PyQt5.QtMultimedia import QAudio, QAudioFormat, QAudioOutput
@@ -45,6 +50,8 @@ class InstrumentWorkbench(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("spiderAudioInstrumentWorkbench")
+        art = Path(__file__).resolve().parents[1] / "branding/spider-apps/backgrounds/spider-audio-studio.svg"
+        self._background = QSvgRenderer(str(art)) if QSvgRenderer is not None and art.is_file() else None
         self.setMinimumSize(670, 430)
         self.pattern = Pattern.preset("Rock")
         self.selected = dict(DEFAULT_MIDI)
@@ -112,6 +119,11 @@ class InstrumentWorkbench(QWidget):
         fade.setColorAt(0, QColor("#080715"))
         fade.setColorAt(.5, QColor("#17112a"))
         fade.setColorAt(1, QColor("#090816"))
+        if self._background is not None and self._background.isValid():
+            self._background.render(painter, QRectF(self.rect()))
+            painter.fillRect(self.rect(), QColor(8, 7, 18, 115))
+            painter.end()
+            return
         painter.fillRect(self.rect(), fade)
         painter.setPen(QPen(QColor(138, 89, 220, 55), 1))
         for x in range(0, self.width(), 36):
