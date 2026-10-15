@@ -4,6 +4,7 @@
 
 One **native Spider Studio window** now contains new panels:
 1. **Play Instruments**: drum machine, 6-string guitar fretboard, 4-string bass fretboard, 2-octave keys, 16-step note/pattern editor.
+   - **External MIDI Keyboard**: manually refreshed and connected MIDI input on an optional mido/python-rtmidi backend. Incoming notes trigger keys, bass or guitar only after the user explicitly clicks Connect; no controller opens at startup. Not validated on the user's hardware.
 2. **Song Arranger & Mixer**: capture patterns, rearrange/duplicate/edit 1-bar sections (32-bar limit), seven channel levels/pans/mutes/solos; JSON song projects, whole-song stereo WAV and seven-track stereo stem export, standard MIDI format-1 export.
 3. **Waveform Editor**: inspect one PCM WAV, apply source-preserving trims, fades, gain and reversal; preview and export to a **different** WAV file. Original input stays untouched.
 4. **DJ Decks**: two original-PCM decks, static equal-power crossfade, independent volume, preview first five seconds and full-length stereo WAV bounce without affecting Nova.
@@ -12,7 +13,7 @@ One **native Spider Studio window** now contains new panels:
 ## Honest limitations
 
 This is a functional *source-stage prototype*, NOT a real-time DAW comparable to mature Ardour, Audacity or Mixxx yet. Studio still needs:
-- Low-latency PipeWire/JACK backend; glitch testing; audio/MIDI device selection and USB MIDI controller recording.
+- Low-latency PipeWire/JACK backend; glitch testing, robust audio/MIDI device selection, velocity-sensitive sound and USB MIDI **recording**. Initial optional manual MIDI note-input source exists but has no real-hardware qualification.
 - Non-destructive multi-track clip timeline, destructive editor undo/redo, multichannel live recording, plugin automation.
 - Real drum samples and guitar/bass multisample libraries with legal provenance. Current instruments are original synthesized prototypes, not sampled acoustic instruments.
 - A live DJ streaming mixer with beat grids, sync, jog wheels, cue points, latency controls and rights/licensing for radio content. Nova's existing live service is NOT linked to the offline DJ panel.
