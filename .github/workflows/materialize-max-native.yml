@@ -6,6 +6,7 @@ on:
       - feature/native-immersive-bays-v8-20261015
     paths:
       - 'tools/native_max_payload/part*.b85'
+      - 'tools/materialize_max_bundle.py'
   workflow_dispatch:
 
 permissions:
