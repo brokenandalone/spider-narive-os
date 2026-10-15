@@ -88,6 +88,22 @@ else
   mark REVIEW "EFI boot entry" "efibootmgr unavailable"
 fi
 
+# SpiderOS has a custom EFI GRUB stub. It can chainload an unmounted
+# filesystem instead of the current root's /boot/grub/grub.cfg.
+# Inspect its textual reference only; do not install or regenerate GRUB.
+stub="/boot/efi/EFI/SpiderOS/grub.cfg"
+if [[ -r "$stub" ]]; then
+  cp -- "$stub" "$OUT/spider-efi-boot-stub.txt"
+  stub_uuid="$(awk '$1=="search.fs_uuid" {print $2; exit}' "$stub")"
+  if [[ -n "$stub_uuid" ]]; then
+    mark REVIEW "SpiderOS EFI stub" "References filesystem UUID $stub_uuid; inspect its effective grub.cfg before 26.10"
+  else
+    mark REVIEW "SpiderOS EFI stub" "Cannot identify GRUB filesystem target; inspect spider-efi-boot-stub.txt"
+  fi
+else
+  mark REVIEW "SpiderOS EFI stub" "Custom EFI GRUB text stub absent or unreadable"
+fi
+
 # A separate mounted data volume may hold Webbie state; verify it exists
 # before a release upgrade. Never mount, format or edit it automatically.
 brain_target="/var/lib/spider-os/webbie-brain"
