@@ -288,7 +288,7 @@ class Taskbar(QWidget):
 class TheWeb(QMainWindow):
     def __init__(self, desktop_mode=False, restore=True):
         super().__init__()
-        self.desktop_mode = desktop_mode; self.current_workspace = 'default'; self.workspace_widgets = {}; self.app_lists = {}; self.app_queries = {}; self.app_scopes = {}; self.app_counts = {}
+        self.desktop_mode = desktop_mode; self.current_workspace = 'default'; self.workspace_widgets = {}; self.app_lists = {}; self.app_queries = {}; self.app_scopes = {}; self.app_counts = {}; self.app_purposes = {}
         self.wallpaper_catalog = WallpaperCatalog(SPIDER_ROOT); self.wallpaper = None
         self.state_path = self.wallpaper_catalog.config.parent / 'desktop.json'
         self.appearance_path = appearance_file()
@@ -537,6 +537,14 @@ class TheWeb(QMainWindow):
         layout.addWidget(apps, 1)
         count = QLabel('')
         layout.addWidget(count)
+        purpose = QLabel('Select an application to see exactly what it is useful for.')
+        purpose.setWordWrap(True)
+        purpose.setMinimumHeight(48)
+        layout.addWidget(purpose)
+        apps.currentItemChanged.connect(
+            lambda current, previous, bay=workspace:
+            self.show_app_purpose(bay, current))
+        self.app_purposes[workspace] = purpose
         self.app_lists[workspace] = apps
         self.app_queries[workspace] = search
         self.app_scopes[workspace] = scope
@@ -587,6 +595,15 @@ class TheWeb(QMainWindow):
                         label, lambda checked=False, p=path:
                         self.launch([SPIDER_ROOT / p], workspace)))
         return panel
+
+    def show_app_purpose(self, workspace, item):
+        ident = item.data(Qt.UserRole) if item else None
+        app = next((one for one in self.installed_apps
+                    if one.desktop_id == ident), None)
+        self.app_purposes[workspace].setText(
+            app.name + ': ' + app_purpose(app)
+            if app is not None else
+            'Select an application to see what it can do in Spider OS.')
 
     def selected_app_id(self, workspace):
         listing = self.app_lists.get(workspace)
@@ -955,7 +972,7 @@ class TheWeb(QMainWindow):
         if page is None:
             return
         if page.property('workspace') == 'default' or not self.can_close(page): return
-        name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); self.app_queries.pop(name, None); self.app_scopes.pop(name, None); self.app_counts.pop(name, None); page.deleteLater(); self.save_state()
+        name = page.property('workspace'); self.tabs.removeTab(index); self.workspace_widgets.pop(name); self.app_lists.pop(name, None); self.app_queries.pop(name, None); self.app_scopes.pop(name, None); self.app_counts.pop(name, None); self.app_purposes.pop(name, None); page.deleteLater(); self.save_state()
 
     def tab_moved(self, old_index, new_index):
         """Allow workspace rearrangement, but always pin The Web home at zero."""
