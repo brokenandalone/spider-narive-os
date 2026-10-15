@@ -183,6 +183,15 @@ class SpiderStudio(QMainWindow):
         waveform_scroll.setWidgetResizable(True)
         waveform_scroll.setWidget(self.waveform_edit_panel)
         self.tool_tabs.addTab(waveform_scroll, 'Waveform Editor')
+        if __package__:
+            from .dj_deck_panel import DJDeckPanel
+        else:
+            from dj_deck_panel import DJDeckPanel
+        self.dj_deck_panel = DJDeckPanel(self)
+        dj_scroll = QScrollArea()
+        dj_scroll.setWidgetResizable(True)
+        dj_scroll.setWidget(self.dj_deck_panel)
+        self.tool_tabs.addTab(dj_scroll, 'DJ Decks')
 
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
