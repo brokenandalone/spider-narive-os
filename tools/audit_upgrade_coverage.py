@@ -30,6 +30,15 @@ SOURCE_AREAS = {
         "webbie/agent/app_bay_lookup.py",
         "tools/ubuntu_studio_app_inventory.py",
     ),
+    "Spider Studio playable instruments and art workbench": (
+        "studio/instrument_engine.py",
+        "studio/instrument_panel.py",
+        "the-web/shell/art_workbench.py",
+    ),
+    "Native Webbie control center integration": (
+        "the-web/shell/webbie_native_operations.py",
+        "the-web/shell/legacy_control_centers.py",
+    ),
     "Native bay mission desks and shared project workflow": (
         "the-web/shell/bay_missions.py",
         "the-web/shell/bay_mission_panel.py",
