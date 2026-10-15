@@ -253,6 +253,7 @@ APP_FILES = (
     'the-web/shell/webbie_native_operations.py',
     'the-web/shell/legacy_control_centers.py',
     'the-web/shell/art_workbench.py',
+    'the-web/shell/home_dashboard.py',
     'studio/instrument_engine.py',
     'studio/instrument_panel.py',
     'webbie/brain/research_agenda.py',
