@@ -20,6 +20,58 @@ remove user-created desktop shortcuts without reviewing the live system.
 A remaining `.desktop` file in `/usr/share/applications` is a normal
 application-menu registration, not an icon placed on the desktop.
 
+## Ubuntu Studio original applications: preservation is mandatory
+
+**Every app already installed on the user's Ubuntu Studio 26.04 machine
+stays installed.** Do not run apt autoremove, purge, replace, reinstall,
+or delete desktop entries to make a bay look cleaner. The real host inventory,
+not a default distro marketing list, is authoritative.
+
+The Web's **Optional installed tools** tab now provides:
+
+- The app's recommended primary native bay, from a specific Ubuntu Studio
+  recording/video/graphics/MIDI/software taxonomy.
+- Search within the bay **or across all available installed applications**,
+  including apps currently assigned to another bay.
+- A plain-English reason to use named programs such as Ardour, Carla,
+  QjackCtl, OBS Studio, Kdenlive, Krita, GIMP, Blender, LibreOffice,
+  Firefox, VLC, Konsole, KDE Connect and Timeshift.
+- A user-controlled **Use selected app in this bay** action. Only
+  `~/.config/spider-os/app-placement.json` changes; neither the binary nor
+  its XDG `.desktop` file is moved or modified.
+- A **Restore recommended placement** action, removing the private override
+  and reusing the deterministic standard category map.
+- Webbie read-only responses to questions such as
+  “Which bay has Ardour?” based on actual available desktop applications.
+
+An application-menu entry and an OS package are **not equivalent**.
+Some Ubuntu Studio plugins, command-line binaries and non-GUI libraries
+have no `.desktop` file, and some user-hidden/desktop-incompatible launchers
+must remain hidden. Absence from The Web's app browser does **not** prove
+an application was uninstalled. KDE and Ubuntu Studio application menus
+remain available as fallback.
+
+Before any future **approved** installation, make a private, read-only
+inventory of visible application menu entries on the owner machine:
+
+```bash
+python3 -B ~/spider-os-2604-trial/tools/ubuntu_studio_app_inventory.py \
+  --snapshot "$HOME/spider-studio-apps-before.json" --list
+```
+
+After installing a separately qualified release, compare the preserved
+snapshot to the actual host (missing entries are reviewed, not assumed
+to be uninstalled):
+
+```bash
+python3 -B /usr/local/lib/spider-os/tools/ubuntu_studio_app_inventory.py \
+  --compare "$HOME/spider-studio-apps-before.json" --list
+```
+
+Those commands inspect names, menu IDs and file checksums; they never
+execute or remove a program. The live system's 31 customized code files
+remain release-blocked until reconciled with backup and rollback.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
