@@ -50,6 +50,8 @@ def encode_performance_midi(performance):
 
 def export_performance_midi(p, destination):
     target = Path(destination)
+    if p.origin is not None and target.resolve() == p.origin.resolve():
+        raise ValueError("Refusing to replace original sheet music or tab")
     if not target.parent.is_dir():
         raise FileNotFoundError("Destination directory missing")
     data = encode_performance_midi(p)
