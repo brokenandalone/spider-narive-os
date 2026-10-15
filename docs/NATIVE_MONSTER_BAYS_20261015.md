@@ -55,7 +55,12 @@ Before any future **approved** installation, make a private, read-only
 inventory of visible application menu entries on the owner machine:
 
 ```bash
-python3 -B ~/spider-os-2604-trial/tools/ubuntu_studio_app_inventory.py \
+git clone --depth 1 --single-branch \
+  --branch feature/native-monster-bays-20261015 \
+  https://github.com/brokenandalone/spider-narive-os.git \
+  "$HOME/spider-os-native-wave"
+
+python3 -B "$HOME/spider-os-native-wave/tools/ubuntu_studio_app_inventory.py" \
   --snapshot "$HOME/spider-studio-apps-before.json" --list
 ```
 
