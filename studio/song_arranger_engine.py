@@ -17,9 +17,10 @@ import sys
 import tempfile
 import wave
 
-from .instruments_engine import (
-    RATE, DRUMS, TRACKS, Pattern, STEPS, synthesize,
-)
+try:
+    from .instruments_engine import RATE, DRUMS, TRACKS, Pattern, STEPS, synthesize
+except ImportError:
+    from instruments_engine import RATE, DRUMS, TRACKS, Pattern, STEPS, synthesize
 
 MAX_BARS = 32
 DEFAULT_NAME = "Untitled Spider Song"
