@@ -24,6 +24,7 @@ sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
 sys.path.insert(0, str(SPIDER_ROOT / 'the-web' / 'shell'))
 from workspace_max_native import NativeWorkspaceTools
+from instrument_panel import InstrumentRack
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 if __package__:
     from .tools import TOOLS, resolve_tool
@@ -143,6 +144,8 @@ class SpiderStudio(QMainWindow):
 
         self.tool_tabs = QTabWidget()
         content.addWidget(self.tool_tabs, 1)
+        self.instrument_rack = InstrumentRack(self)
+        self.tool_tabs.addTab(self.instrument_rack, 'Drums · Guitar · Bass · Keys')
         self.ai_panel = StudioAIPanel()
         ai_scroll = QScrollArea()
         ai_scroll.setWidgetResizable(True)
