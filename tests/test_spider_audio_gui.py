@@ -77,6 +77,14 @@ class StudioProductionGUITests(unittest.TestCase):
             self.assertIsNone(w.original_clip)
             self.assertIsNone(w.clip)
             self.assertGreaterEqual(w.canvas.minimumHeight(), 220)
+            from PyQt5.QtGui import QImage, QPainter
+            w.canvas.set_peaks([(-.35, .45)] * 180)
+            bitmap = QImage(720, 260, QImage.Format_ARGB32)
+            bitmap.fill(0)
+            painter = QPainter(bitmap)
+            w.canvas.render(painter)
+            painter.end()
+            self.assertFalse(bitmap.isNull())
         finally:
             w.close()
         deck = self.dj_class()
