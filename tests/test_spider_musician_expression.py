@@ -43,6 +43,22 @@ class MusicalExpressionTests(unittest.TestCase):
         guitar_starts = sorted(n.start for n in out.notes if n.part == 0)
         self.assertEqual(len(set(guitar_starts)), 3)
 
+    def test_expression_milliseconds_respect_local_score_tempo(self):
+        from dataclasses import replace
+        from studio.performance_expression import _tempo_at
+        original = self.score()
+        score = replace(original, tempo_changes=[(Fraction(1), 60)]).validated()
+        self.assertEqual(_tempo_at(score, Fraction(0)), 120)
+        self.assertEqual(_tempo_at(score, Fraction(1)), 60)
+        groove = Expression("Behind the beat", 75, 0, 313)
+        slower = express(score, groove)
+        fixed = express(original, groove)
+        # Written note on beat 1 moves by fewer quarter-note ticks at
+        # the slower tempo for the same ~24 ms real-time delay.
+        slow_drum = next(n for n in slower.notes if n.part == 2)
+        fast_drum = next(n for n in fixed.notes if n.part == 2)
+        self.assertLess(slow_drum.start - 1, fast_drum.start - 1)
+
     def test_velocity_bounds_and_invalid_config(self):
         src = self.score()
         strong = express(src, Expression("Driving rock", 100, 0))
