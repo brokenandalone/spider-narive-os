@@ -7,6 +7,7 @@ Finding a big file does not prove its fidelity or distribution rights.
 from __future__ import annotations
 
 from pathlib import Path
+from itertools import islice
 from typing import Iterable
 
 try:
@@ -44,7 +45,7 @@ def discover_soundfonts(roots=None, max_items=MAX_CANDIDATES):
         if root.is_symlink() or not root.is_dir():
             continue
         try:
-            candidates = sorted(root.iterdir(), key=lambda p: p.name.casefold())
+            candidates = sorted(islice(root.iterdir(), MAX_CANDIDATES), key=lambda p: p.name.casefold())
         except OSError:
             continue
         for path in candidates:
