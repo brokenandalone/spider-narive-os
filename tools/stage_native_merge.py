@@ -295,7 +295,7 @@ def main(argv=None):
               ", ".join(entry.get("local_only_definitions", [])[:8]) or "none")
         print("  Candidate-only definitions:",
               ", ".join(entry.get("candidate_only_definitions", [])[:8]) or "none")
-        print("  Missing native imports:", len(entry["integration_gaps"]))
+        print("  Missing native imports:", len(entry.get("integration_gaps", [])))
         for marker in entry["integration_gaps"]:
             print("    NEEDS MERGE:", marker)
     print("Private folder:", args.output)
