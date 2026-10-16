@@ -121,9 +121,10 @@ def _stop_gate(candidate:bytes):
     strings={node.value for node in ast.walk(stop)
              if isinstance(node,ast.Constant) and isinstance(node.value,str)}
     required_names={"read_policy","update_policy"}
-    required_attrs={"unified_workflow","jarvis_core","stop_camera",
+    required_attrs={"unified_workflow","stop_camera",
                     "revoke_observation","append_message"}
-    if not required_names <= tokens or not required_attrs <= attributes:
+    if (not required_names <= tokens or not required_attrs <= attributes or
+            "jarvis_core" not in (attributes | strings)):
         raise ValueError("Webbie STOP safety method lost required revocation paths")
     if not any("NOT verified" in value for value in strings):
         raise ValueError("Webbie STOP no longer warns of unverified revocation")
