@@ -153,6 +153,18 @@ class StudioProductionGUITests(unittest.TestCase):
                 self.assertIsNone(panel.worker)
                 panel._levels(-6.,-13.,2.5)
                 self.assertGreater(panel.peak.value(),85)
+                from tempfile import TemporaryDirectory
+                with TemporaryDirectory() as root:
+                    panel._recorded({
+                        "path":root+"/take01.wav","role":"lead_vocal",
+                        "duration_seconds":2.5,"sample_rate":48000,
+                        "channels":1,"sample_width_bits":24}, "")
+                    self.assertEqual(len(panel.takes),1)
+                    self.assertEqual(panel.take_list.count(),1)
+                    self.assertFalse(panel.mix_btn.isEnabled())
+                    panel._recorded(root,"")
+                    self.assertTrue(panel.mix_btn.isEnabled())
+                    self.assertIsNotNone(panel.last_session)
             finally:
                 panel.close()
 
