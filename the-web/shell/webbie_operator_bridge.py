@@ -42,6 +42,7 @@ def private_socket_directory(runtime=None):
 
 class OperatorBridge(QObject):
     openRequested = pyqtSignal(str)
+    bayRequested = pyqtSignal(str)
     webRequested = pyqtSignal(str)
     navigationProposed = pyqtSignal(str)
 
@@ -92,6 +93,22 @@ class OperatorBridge(QObject):
             self.finish(peer, 'Desktop task authorization is not active')
             return
         if data.get('wide'):
+            if packet.startswith('BAY:'):
+                # Switching The Web's OWN tab is not a new program launch.
+                # It requires an already-active owner-approved grant.
+                bay = packet[4:]
+                if (bay not in frozenset((
+                        'default', 'webbie', 'forage', 'deep-forage',
+                        'studio', 'author', 'art-lab', 'dev-bay', 'study',
+                        'media', 'communications', 'kali-bay',
+                        'system', 'recovery', 'games'))
+                        or not self.grant.wide.authorize(
+                            'workspace.switch', 'workspace_id=' + bay)):
+                    self.finish(peer, 'Native workspace switch not authorized')
+                    return
+                self.pending = peer
+                self.bayRequested.emit(bay)
+                return
             # This local bridge accepts only OWNER-authenticated agent requests.
             # No arbitrary key, clipboard, prompt, tool parameter or script.
             if packet.startswith('WEB:'):
