@@ -29,6 +29,12 @@ class TriageTests(unittest.TestCase):
         self.assertEqual(triage.category(
             "webbie/brain/brain.py", "installed_only"
         ), "review_source")
+        self.assertEqual(triage.category(
+            "webbie/vendor/numpy/_core/numeric.py", "installed_only"
+        ), "third_party_vendor")
+        self.assertEqual(triage.category(
+            "webbie/vendor/sherpa_onnx/__init__.py", "installed_only"
+        ), "third_party_vendor")
 
     def test_runtime_receipts_and_source_build_files(self):
         self.assertEqual(triage.category(
