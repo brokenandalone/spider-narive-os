@@ -1,9 +1,10 @@
-name: Spider Audio Studio private source preview
+name: Spider Audio Studio gated beta package
 
 on:
   push:
     branches:
       - feature/spider-audio-instruments-20261015
+      - feature/spider-audio-product-beta-20261016
     paths:
       - 'studio/**'
       - 'system/apps.py'
@@ -33,12 +34,16 @@ jobs:
       - name: Verify extracted runtime and manifest
         run: |
           mkdir -p "$RUNNER_TEMP/verified"
-          tar -xzf "$RUNNER_TEMP/Spider-Audio-Studio-0.13.0-dev.tar.gz" -C "$RUNNER_TEMP/verified"
-          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.13.0-dev/run_spider_audio_studio.py" --verify-only
+          tar -xzf "$RUNNER_TEMP/Spider-Audio-Studio-0.14.0-beta.tar.gz" -C "$RUNNER_TEMP/verified"
+          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.14.0-beta/run_spider_audio_studio.py" --verify-only
+      - name: Validate no-overwrite user installer and commercial release gate
+        run: |
+          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.14.0-beta/install_for_user.py" --check
+          python3 studio/package/commercial_release_gate.py --assert-blocked
       - name: Publish private developer preview archive
         uses: actions/upload-artifact@v4
         with:
-          name: Spider-Audio-Studio-0.13.0-dev
-          path: ${{ runner.temp }}/Spider-Audio-Studio-0.13.0-dev.tar.gz
+          name: Spider-Audio-Studio-0.14.0-beta
+          path: ${{ runner.temp }}/Spider-Audio-Studio-0.14.0-beta.tar.gz
           if-no-files-found: error
           retention-days: 14
