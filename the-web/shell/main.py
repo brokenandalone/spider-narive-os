@@ -866,7 +866,26 @@ class TheWeb(QMainWindow):
             workspace_tabs.setDocumentMode(True)
             bay_row.addWidget(workspace_tabs, 1)
             try:
-                if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)
+                if name == 'webbie':
+                    # The resident dock owns THE WebbiePanel. Creating another
+                    # one here duplicates voice/camera/grant state, so the bay
+                    # provides a native view and reuses that same assistant.
+                    native = QWidget()
+                    native.setObjectName('webbieResidentBayOverview')
+                    resident = QVBoxLayout(native)
+                    resident.addWidget(QLabel(
+                        'WEBBIE / ONE RESIDENT AI · ALL WORKSPACES'))
+                    guidance = QLabel(
+                        'This bay and the floating Webbie dock share one '
+                        'assistant, one supervised workflow, and one set of '
+                        'privacy controls. Webbie does not open a second '
+                        'microphone, camera or computer-control session here.')
+                    guidance.setWordWrap(True)
+                    resident.addWidget(guidance)
+                    resident.addWidget(button(
+                        'Open resident Webbie conversation',
+                        lambda checked=False: self.webbie_dock.show()))
+                    resident.addStretch(1)
                 elif name == 'media': native = MediaPanel(self.launch_media)
                 elif name == 'art-lab': native = ArtLabPanel()
                 elif name == 'communications': native = CommunicationsPanel()
@@ -924,7 +943,8 @@ class TheWeb(QMainWindow):
                     workspace_tabs.addTab(extra, 'Backup & integrity tools')
             if name == 'webbie':
                 operations = WebbieNativeOperations(
-                    native, workspace_callback=lambda: self.current_workspace,
+                    self.webbie_assistant,
+                    workspace_callback=lambda: self.current_workspace,
                     workspace_opener=self.open_workspace,
                     parent=workspace_tabs)
                 page.webbie_operations = operations
