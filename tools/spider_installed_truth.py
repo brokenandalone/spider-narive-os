@@ -128,6 +128,8 @@ def local_service_fingerprints() -> dict:
 
 
 def make_report(installed_root: Path, repo: Path, out: Path) -> dict:
+    if out.resolve().is_relative_to(repo.resolve()):
+        raise RuntimeError('Refusing to write local machine fingerprints inside the Git checkout')
     installed, skipped = installed_sources(installed_root)
     tracked = tracked_sources(repo)
     groups = compare(installed, tracked)
