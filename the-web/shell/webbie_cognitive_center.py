@@ -58,7 +58,7 @@ class HearingTestWorker(QThread):
 class WebbieCognitiveDialog(QDialog):
     def __init__(self,parent=None,*,workspace_callback=None,
                  emergency_callback=None,workflow_callback=None,
-                 mission_callback=None):
+                 mission_callback=None,workspace_opener=None):
         super().__init__(parent)
         self.setWindowTitle("Webbie · Jarvis Control Center")
         self.setMinimumWidth(600)
@@ -72,6 +72,13 @@ class WebbieCognitiveDialog(QDialog):
                 border-radius:6px; }
         """)
         self.workspace_callback=workspace_callback or (lambda:"default")
+        # Owner-installed workflow compatibility: opening a workspace is
+        # different from asking which workspace is currently selected.
+        # Do not substitute workspace_callback here: that getter cannot navigate.
+        self.workspace_opener=workspace_opener if callable(workspace_opener) else None
+        # The existing/embedded supervised workflow can bind its real dialog.
+        # Never manufacture or authorize a second computer-control session.
+        self.workflow_dialog=None
         self.emergency_callback=emergency_callback
         self.workflow_callback=workflow_callback
         self.mission_callback=mission_callback
