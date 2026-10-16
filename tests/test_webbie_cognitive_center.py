@@ -43,6 +43,34 @@ class CognitiveCenterTests(unittest.TestCase):
         finally:
             center.close()
 
+    def test_preserved_owner_workflow_slots_are_distinct_from_workspace_getter(self):
+        opened = Mock()
+        guided = Mock()
+        getter = Mock(return_value="studio")
+        center = WebbieCognitiveDialog(
+            workspace_callback=getter, workspace_opener=opened,
+            workflow_callback=guided)
+        try:
+            self.assertIs(center.workspace_opener, opened)
+            self.assertIsNone(center.workflow_dialog)
+            self.assertEqual(center.workspace_callback(), "studio")
+            center.open_workflow()
+            guided.assert_called_once_with()
+            opened.assert_not_called()
+            # Old workspace-opener and active supervised workflow slots can
+            # coexist without triggering any navigation on constructor entry.
+        finally:
+            center.close()
+
+    def test_cognitive_does_not_treat_workspace_getter_as_navigation_grant(self):
+        getter = Mock(return_value="webbie")
+        center = WebbieCognitiveDialog(workspace_callback=getter)
+        try:
+            self.assertIsNone(center.workspace_opener)
+            self.assertIsNone(center.workflow_dialog)
+        finally:
+            center.close()
+
     def test_sleep_revokes_desktop_grant_and_turns_camera_off(self):
         mock=SimpleNamespace(
             awareness=SimpleNamespace(sleep=Mock()),
