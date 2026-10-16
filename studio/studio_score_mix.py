@@ -144,8 +144,10 @@ def render_score_mix(performance, default_bank, destination, part_banks=None,
     bank_paths = [validate_soundfont(selected.get(i, default_bank)).resolve()
                   for i in range(len(p.parts))]
     dest = Path(destination)
-    if not dest.parent.is_dir():
-        raise FileNotFoundError("Output directory missing")
+    if not dest.parent.is_dir() or dest.parent.is_symlink():
+        raise FileNotFoundError("SoundFont mix output requires an existing real directory")
+    if dest.exists() or dest.is_symlink() or dest.suffix.lower() != ".wav":
+        raise FileExistsError("SoundFont mix must use a NEW .wav filename")
     if any(dest.resolve() == bank for bank in bank_paths):
         raise ValueError("Refusing to overwrite an instrument soundbank")
     if p.origin is not None and dest.resolve() == p.origin.resolve():
@@ -190,8 +192,9 @@ def render_score_mix(performance, default_bank, destination, part_banks=None,
                         output.writeframes(b"")
                     stream.flush()
                     os.fsync(stream.fileno())
-                os.replace(temporary, dest)
-                temporary = None
+                # Hard-link creates only NEW files even if another worker
+                # races us to the output filename. Never replace a song.
+                os.link(temporary, dest, follow_symlinks=False)
             finally:
                 if temporary is not None:
                     Path(temporary).unlink(missing_ok=True)
