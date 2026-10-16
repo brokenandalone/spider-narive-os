@@ -40,6 +40,11 @@ jobs:
         run: |
           python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.15.0-beta/install_for_user.py" --check
           python3 studio/package/commercial_release_gate.py --assert-blocked
+      - name: Install real FFmpeg in disposable CI runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
       - name: Run real offline music-engine self-test in packaged app
         run: |
           python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.15.0-beta/run_spider_audio_studio.py" --self-test
