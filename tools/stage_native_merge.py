@@ -210,17 +210,35 @@ def stage(source: Path, installed: Path, output: Path, *,
         live = safe_leaf(installed, relative)
         if candidate is None or live is None:
             raise ValueError("Symlinked source or local file; review separately: " + relative)
-        ours, theirs = limited_file(live), limited_file(candidate)
-        if ours is None or theirs is None:
-            raise ValueError("Missing, oversize or unsafe owner/source file: " + relative)
+        theirs = limited_file(candidate)
+        if theirs is None:
+            raise ValueError("Missing, oversize or unsafe candidate file: " + relative)
+        # New additive modules legitimately have no installed counterpart.
+        # Only genuinely absent paths are allowed; unsafe existing files
+        # (directories, hardlinks, oversize data) still block staging.
+        if not live.exists():
+            if live.is_symlink():
+                raise ValueError("Symlinked installed file: " + relative)
+            result.append({
+                "component": relative, "state": "new_candidate_only",
+                "installed_sha256": None,
+                "candidate_sha256": hashlib.sha256(theirs).hexdigest(),
+                "requires_owner_review": True,
+            })
+            pairs.append((relative, None, theirs))
+            continue
+        ours = limited_file(live)
+        if ours is None:
+            raise ValueError("Unsafe existing owner file: " + relative)
         result.append(summary(ours, theirs, relative))
         pairs.append((relative, ours, theirs))
     _private_folder(output, home=Path.home() if home is None else Path(home),
                     source=source, installed=installed)
     for relative, ours, theirs in pairs:
-        _private_write(output, "installed/" + relative, ours)
+        if ours is not None:
+            _private_write(output, "installed/" + relative, ours)
         _private_write(output, "candidate/" + relative, theirs)
-        old = ours.decode("utf-8", "replace").splitlines(keepends=True)
+        old = (ours or b"").decode("utf-8", "replace").splitlines(keepends=True)
         new = theirs.decode("utf-8", "replace").splitlines(keepends=True)
         patch = "".join(difflib.unified_diff(
             old, new, fromfile="INSTALLED/" + relative,
