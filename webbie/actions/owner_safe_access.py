@@ -40,7 +40,7 @@ BENIGN_KEYS=frozenset((
 ))
 ROUTINE_ACTIONS=frozenset((
     "observe.apps","observe.windows","app.open","web.open",
-    "window.focus","window.target","keyboard.key","task.begin",
+    "window.focus","window.target","keyboard.key","task.begin","workspace.switch",
 ))
 # No service permission is granted by this module. Service adapters
 # will need action-by-action audited read-only contracts elsewhere.
@@ -172,7 +172,17 @@ class OwnerSafeAccess:
                 return False
             if not isinstance(preview,str) or len(preview)>300:
                 return False
-            if action=="app.open":
+            if action=="workspace.switch":
+                # Only pre-registered native tabs. No application execution.
+                if preview.removeprefix("workspace_id=") not in frozenset((
+                        "default", "webbie", "forage", "deep-forage",
+                        "studio", "author", "art-lab", "dev-bay", "study",
+                        "media", "communications", "kali-bay",
+                        "system", "recovery", "games")):
+                    return False
+                if not preview.startswith("workspace_id="):
+                    return False
+            elif action=="app.open":
                 if not preview.startswith("app_id="):
                     return False
                 if preview[7:] not in self._apps:
