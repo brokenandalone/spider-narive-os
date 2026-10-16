@@ -465,6 +465,65 @@ Before actual integration:
    the remaining 28 owner-customized release files. **Do not call
    this source preview a complete merge or lift the installation gate.**
 
+## Owner-host Webbie workflow dependency gap confirmed; candidate compatibility bridged
+
+The owner ran the latest private class-method dependency checker:
+
+```text
+PRESERVE OWNER METHOD: WebbieCognitiveDialog.offer_workflow
+  Candidate constructor missing owner-initialized fields:
+    workflow_dialog, workspace_opener
+  Constructor changed; verify callback/state compatibility
+PRESERVE OWNER METHOD: WebbieCognitiveDialog.open_workflows
+  Candidate constructor missing owner-initialized fields: none detected
+  Constructor changed; verify callback/state compatibility
+```
+
+The candidate source is now adjusted **without changing owner-installed code**:
+
+- `WebbieCognitiveDialog.__init__` supports optional
+  `workspace_opener` as a distinct callback from
+  `workspace_callback` (current workspace **getter**, not a navigation grant).
+  It initializes `self.workflow_dialog=None` for backward compatibility,
+  while preserving existing owner-click authorization rules.
+- `WebbieNativeOperations` forwards the real workspace-opening callback and
+  binds `cognitive.workflow_dialog` to its **one already-constructed supervised
+  embedded workflow**, preventing duplicate control windows or sessions.
+- `TheWeb.open_workspace` passes `self.open_workspace` through to the
+  native Webbie controls. The existing `WebbiePanel.open_unified_workflow`
+  path remains available for its own dialog flow.
+- Offscreen GUI tests verify the distinct getter/opener roles and original
+  callback is not invoked by constructing the dialog; Qt integration tests
+  check the embedded widget alias and opener wiring.
+
+**Important:** The actual contents of the owner's two locally preserved
+`offer_workflow`/`open_workflows` methods have not been copied into public
+GitHub, so their semantic compatibility with new callbacks is still
+**unverified**. Nor are any of the 29 changed shared method bodies merged.
+No claim of installability, live speaker verification, or working host
+integration follows from this update. The 33-file release guard remains
+BLOCKED.
+
+To re-evaluate the changed candidate source against the same owner-installed
+files, generate a new, different **private** stage directory:
+
+```bash
+git -C "$HOME/spider-os-native-wave" pull --ff-only
+python3 -B "$HOME/spider-os-native-wave/tools/stage_native_merge.py" \
+  --source "$HOME/spider-os-native-wave" \
+  --installed-root /usr/local/lib/spider-os \
+  --focus desktop \
+  --output "$HOME/SpiderOS-Private-Desktop-Merge-Bridge-20261015"
+python3 -B "$HOME/spider-os-native-wave/tools/review_staged_desktop_methods.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Merge-Bridge-20261015" \
+  | sed -n '/^FILE: the-web\/shell\/webbie_cognitive_center.py/,$p'
+```
+
+The output should no longer list those two owner-initialized fields as
+absent from candidate `__init__` **if** the current candidate is checked
+out. It can still report constructor differences and must not be interpreted
+as authorization to merge or install.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
