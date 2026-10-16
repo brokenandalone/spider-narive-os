@@ -416,6 +416,55 @@ contents of the conflicting methods to be inspected *locally* and
 validated with tests, preserving all prior host behavior. The guarded
 33-file install gate stays BLOCKED.
 
+## Actual owner-private preservation draft results and constructor review
+
+Owner ran `tools/draft_native_desktop_merge.py` on the five staged
+desktop files. The private `merge-review.json` records:
+
+- **Three** unique installed imports retained: one each in
+  `the-web/shell/main.py`, `webbie_panel.py`, and
+  `webbie_cognitive_center.py`.
+- Installed Webbie workflow methods
+  `WebbieCognitiveDialog.offer_workflow` and
+  `WebbieCognitiveDialog.open_workflows` retained.
+- **29 shared method/function implementations unresolved** across
+  `main.py` (11), `app_catalog.py` (2), `workspace_files.py` (1),
+  `webbie_panel.py` (13) and `webbie_cognitive_center.py` (2).
+- The private draft says `installed_modified=false`,
+  `release_installable=false`, `safe_to_overwrite=false` and
+  `install_allowed=false` for all five files. This is CORRECT.
+
+Copying the two local-only Webbie workflow methods is insufficient:
+their bodies might rely on instance fields removed from the candidate's
+changed `__init__`, or call into candidate versions of changed
+methods. We added a local-only AST review
+`preservation_dependencies()` to
+`tools/review_staged_desktop_methods.py`, which reports missing
+owner-initialized constructor attributes and calls into changed shared
+methods **by name only**. It does not execute owner code, open the
+camera or change permission grants, but it may miss dynamic attributes.
+A clean report is never approval to install.
+
+```bash
+git -C "$HOME/spider-os-native-wave" pull --ff-only
+python3 -B "$HOME/spider-os-native-wave/tools/review_staged_desktop_methods.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Merge-20261015"
+```
+
+Before actual integration:
+1. Use a local diff editor such as Meld to inspect the three private
+   copies of Webbie's constructor/workflow methods. Do not publish
+   private `installed/` or `draft/` files unreviewed.
+2. Resolve `TheWeb.build_ui` and `TheWeb.open_workspace` against
+   the working PC so the new bays are actually constructed without
+   breaking navigation or restoring state.
+3. Preserve permission-sensitive Webbie
+   `stop_sensitive_actions`, `open_computer_dialog`,
+   `send`, `set_face_sleeping` and resident voice gates.
+4. Run all source/Qt tests and hardware smoke tests, then reconcile
+   the remaining 28 owner-customized release files. **Do not call
+   this source preview a complete merge or lift the installation gate.**
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
