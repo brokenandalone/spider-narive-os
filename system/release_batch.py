@@ -204,6 +204,8 @@ APP_FILES = (
     'studio/session_master.py',
     'studio/session_mix.py',
     'studio/session_mix_dialog.py',
+    'studio/stem_import_panel.py',
+    'studio/session_mix_player.py',
     'studio/session_presets.py',
     'studio/session_project.py',
     'studio/session_qc.py',
