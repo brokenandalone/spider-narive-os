@@ -150,6 +150,9 @@ class StudioProductionGUITests(unittest.TestCase):
                 self.assertFalse(panel.record_btn.isEnabled())
                 self.assertFalse(panel.overdub_btn.isEnabled())
                 self.assertFalse(panel.include_cue.isChecked())
+                self.assertEqual(panel.count_in_bars.value(),0)
+                self.assertEqual(panel.beats_per_bar.currentData(),4)
+                self.assertFalse(panel.punch_enable.isChecked())
                 self.assertFalse(panel.stop_btn.isEnabled())
                 self.assertEqual(panel.takes,[])
                 self.assertIsNone(panel.worker)
@@ -180,6 +183,33 @@ class StudioProductionGUITests(unittest.TestCase):
                     panel._recorded(root,"")
                     self.assertTrue(panel.mix_btn.isEnabled())
                     self.assertIsNotNone(panel.last_session)
+            finally:
+                panel.close()
+
+    def test_overdub_punch_preflight_does_not_open_mic(self):
+        import wave
+        from tempfile import TemporaryDirectory
+        from studio.audio_capture_panel import AudioCapturePanel
+        with TemporaryDirectory() as root:
+            cue=Path(root)/"Backing.wav"
+            with wave.open(str(cue),"wb") as writer:
+                writer.setnchannels(2)
+                writer.setsampwidth(2)
+                writer.setframerate(44100)
+                writer.writeframes(bytes(44100*4))
+            panel=AudioCapturePanel()
+            try:
+                panel.input.addItem("Mock microphone", (0,1))
+                panel.output_device.addItem("Mock headphones",(1,2))
+                self.assertTrue(panel.load_generated_cue(str(cue),44100))
+                self.assertEqual(panel.punch_end.value(),1.0)
+                panel.count_in_bars.setValue(2)
+                panel.punch_enable.setChecked(True)
+                panel.punch_start.setValue(.75)
+                panel.punch_end.setValue(.5)
+                panel.record_overdub()
+                self.assertIsNone(panel.worker)
+                self.assertIn("Could not begin overdub",panel.status.text())
             finally:
                 panel.close()
 
