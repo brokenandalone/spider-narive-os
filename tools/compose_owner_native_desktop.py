@@ -33,6 +33,38 @@ DEFERRED = (
 )
 VERSION = "spider-native-partial-owner-semantic-merge-v1"
 
+def _check_live_candidate_snapshot(stage: Path, source: Path):
+    """Fail closed if the staged GitHub half predates the checked-out code.
+
+    Importing or executing local owner code is unnecessary. Compare only
+    bytes of the five exact guarded desktop files after verifying their
+    stage hashes with inspect_stage. This catches an old Bridge snapshot
+    being mistaken for the current fixes to Webbie STOP and native bays.
+    """
+    root = Path(source).expanduser()
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError("Checked-out GitHub source root is unsafe")
+    stale = []
+    for relative in DESKTOP:
+        item = root
+        for part in Path(relative).parts:
+            item = item / part
+            if item.is_symlink():
+                raise ValueError("Symlink in current GitHub source: " + relative)
+        if not item.is_file() or item.stat().st_size > MAX_BYTES:
+            raise ValueError("Current GitHub source missing/oversize: " + relative)
+        current = item.read_bytes()
+        staged = read_regular(stage, "candidate/" + relative, MAX_BYTES)
+        if hashlib.sha256(current).digest() != hashlib.sha256(staged).digest():
+            stale.append(relative)
+    if stale:
+        raise ValueError(
+            "OLD STAGE: GitHub candidate files changed since staging: " +
+            ", ".join(stale) +
+            ". Create a NEW private desktop stage from current checkout.")
+    return True
+
+
 
 def _module(tree, name):
     for node in tree.body:
@@ -164,11 +196,12 @@ def _check_catalog(old,new):
             "owner_assignments_supported":True}
 
 
-def generate(stage:Path,output:Path,home=None):
+def generate(stage:Path,output:Path,home=None,source=None):
     stage=Path(stage).expanduser()
     existing=inspect_stage(stage)
     if tuple(result["file"] for result in existing)!=DESKTOP:
         raise ValueError("Stage manifest does not match this desktop source set")
+    _check_live_candidate_snapshot(stage, Path(__file__).resolve().parents[1] if source is None else source)
     resolved=[]
     for name in RESOLVED:
         owner=read_regular(stage,"installed/"+name,MAX_BYTES)
@@ -244,6 +277,7 @@ def main(argv=None):
     for row in result["webbie_safety_blocks"]:
         print("PRESERVED FOR SAFETY REVIEW:",row["component"])
     print("Owner source unchanged. Full 33-file installation guard remains active.")
+    print("Current GitHub source snapshot VERIFIED against all five staged candidates.")
     print("Private candidate only:",args.output)
     return 0
 
