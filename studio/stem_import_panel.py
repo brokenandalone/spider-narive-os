@@ -21,22 +21,22 @@ except ImportError:
 
 
 def infer_role(filename):
-    """Filename suggestion only. Owner can always correct via the UI."""
+    """Suggest conventional file roles; owner must verify dropdown choice."""
     name=Path(filename).stem.casefold().replace("_"," ").replace("-"," ")
-    if re.search(r"\b(rhythm|rhyth|rhy)\b",name) and "guitar" in name:
-        return "rhythm_guitar"
-    if re.search(r"\b(lead|solo)\b",name) and "guitar" in name:
-        return "lead_guitar"
+    if re.search(r"\b(voice|vocals?|singer)\b",name):
+        return "lead_vocal"
     if re.search(r"\bbass\b",name):
         return "bass"
     if re.search(r"\b(drums?|percussion)\b",name):
         return "drums"
-    if re.search(r"\b(voice|vocals?|singer)\b",name):
-        return "lead_vocal"
     if re.search(r"\b(piano|keys?|keyboard)\b",name):
         return "piano_keys"
-    if "guitar" in name:
-        return "other_instrument"
+    # Broken Sorrow instrument stems identify guitar roles with either
+    # "Rhythm_L"/"Rhythm_R" or full "Rhythm_Guitar" labels.
+    if re.search(r"\b(rhythm|rhyth|rhy)\b",name):
+        return "rhythm_guitar"
+    if re.search(r"\b(lead|solo)\b",name):
+        return "lead_guitar"
     return "other_instrument"
 
 
