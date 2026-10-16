@@ -86,6 +86,19 @@ def verify(bundle):
             raise ValueError("Packaged application source checksum mismatch.")
     if total>80*1024*1024:
         raise ValueError("Package is unexpectedly large.")
+    extras=data.get("extras")
+    if type(extras) is not dict or not 4<=len(extras)<=12:
+        raise ValueError("Missing beta launcher disclosures or installer metadata.")
+    for name,digest in extras.items():
+        if (not _safe_relative(name) or "/" in name or
+                type(digest) is not str or
+                re.fullmatch(r"[0-9a-f]{64}",digest) is None):
+            raise ValueError("Invalid beta installer or legal notice manifest.")
+        item=bundle/name
+        if item.is_symlink() or not item.is_file() or item.stat().st_size>1_000_000:
+            raise ValueError("Missing or linked beta installer or legal notice.")
+        if hashlib.sha256(item.read_bytes()).hexdigest()!=digest:
+            raise ValueError("Beta installer or legal notice checksum mismatch.")
     completed=subprocess.run(
         [sys.executable,str(entry),"--verify-only"],
         stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
@@ -156,6 +169,8 @@ def install(bundle,home=None):
                 _copy_checked(bundle/"app"/name,target,digest)
             for name in COPIED:
                 _copy_checked(bundle/name,stage/name)
+            for name,digest in sorted(info["extras"].items()):
+                _copy_checked(bundle/name,stage/name,digest)
             # Verify the completed staged installation before publishing.
             result=subprocess.run(
                 [sys.executable,str(stage/"run_spider_audio_studio.py"),
