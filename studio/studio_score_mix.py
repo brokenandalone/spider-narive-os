@@ -146,12 +146,14 @@ def render_score_mix(performance, default_bank, destination, part_banks=None,
     dest = Path(destination)
     if not dest.parent.is_dir() or dest.parent.is_symlink():
         raise FileNotFoundError("SoundFont mix output requires an existing real directory")
-    if dest.exists() or dest.is_symlink() or dest.suffix.lower() != ".wav":
-        raise FileExistsError("SoundFont mix must use a NEW .wav filename")
+    # Preserve the specific source-protection errors that older Studio
+    # callers rely on, then apply the new-only export rule to all other WAVs.
     if any(dest.resolve() == bank for bank in bank_paths):
         raise ValueError("Refusing to overwrite an instrument soundbank")
     if p.origin is not None and dest.resolve() == p.origin.resolve():
         raise ValueError("Refusing to overwrite imported notation")
+    if dest.exists() or dest.is_symlink() or dest.suffix.lower() != ".wav":
+        raise FileExistsError("SoundFont mix must use a NEW .wav filename")
     perform_part = part_renderer or render_soundfont
     temporary = None
     with tempfile.TemporaryDirectory(prefix="spider-studio-mix-") as folder:
