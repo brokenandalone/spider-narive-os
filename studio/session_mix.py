@@ -132,9 +132,11 @@ def ffmpeg_command(ffmpeg, plan, output):
                 "aformat=sample_fmts=fltp:channel_layouts=stereo"
                 f"[source{index}]")
             pad=f"[source{index}]"
+        # FFmpeg rejects a comma immediately following an input label.
+        # An input pad must connect directly to the first filter name.
         filters.append(
-            f"{pad}{','+effect_section[:-1] if effect_section else ''}"
-            f",volume={entry['gain']:.4f},"
+            f"{pad}{effect_section}"
+            f"volume={entry['gain']:.4f},"
             f"pan=stereo|c0={left:.4f}*c0|c1={right:.4f}*c1"
             f"{delay}[track{index}]"
         )
