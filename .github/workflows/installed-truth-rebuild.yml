@@ -15,6 +15,7 @@ on:
       - 'tests/test_stage_installed_source.py'
       - 'tests/test_prepare_installed_review.py'
       - 'tests/test_webbie_ai_v2_reconciliation.py'
+      - 'tests/test_webbie_ipc_concurrent_reconciliation.py'
       - 'webbie/agent/webbie.py'
       - 'webbie/agent/webbie_ai_isolation.py'
       - 'webbie/agent/webbie_ai_worker.py'
@@ -47,6 +48,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_prepare_installed_review.py' -v
       - name: Regression-check the merged Webbie AI V2 and owner voice permissions
         run: python3 -m unittest discover -s tests -p 'test_webbie_ai_v2_reconciliation.py' -v
+      - name: Verify built-in IPC remains responsive during a slow AI request
+        run: python3 -m unittest discover -s tests -p 'test_webbie_ipc_concurrent_reconciliation.py' -v
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
