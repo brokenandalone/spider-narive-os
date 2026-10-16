@@ -146,6 +146,33 @@ class TransportPlanTests(unittest.TestCase):
             self.assertEqual(cue.stat().st_size,44+8*4)
             self.assertFalse(list(root.glob("*.part")))
 
+    def test_stalled_audio_driver_is_rejected_without_a_half_take(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            cue=root/"cue.wav"
+            with wave.open(str(cue),"wb") as out:
+                out.setnchannels(2)
+                out.setsampwidth(2)
+                out.setframerate(44100)
+                out.writeframes(as_pcm([5]*32,2))
+            class SilentAudioBackend:
+                def RawStream(self,**kwargs):
+                    class Idle:
+                        def __enter__(self): return self
+                        def __exit__(self,*unused): return False
+                    return Idle()
+            with patch("studio.audio_overdub_engine.CALLBACK_WATCHDOG_SECONDS",.15):
+                with self.assertRaisesRegex(CaptureError,"stopped providing"):
+                    capture_overdub(
+                        root/"not-a-take.wav",cue=cue,
+                        input_device=0,output_device=1,
+                        role="lead_vocal",channels=1,
+                        rate=44100,max_seconds=1,
+                        backend=SilentAudioBackend())
+            self.assertFalse((root/"not-a-take.wav").exists())
+            self.assertFalse(list(root.glob("*.part")))
+
     def test_punch_preflight_precedes_input_or_headphone_stream(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
