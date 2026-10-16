@@ -209,6 +209,7 @@ APP_FILES = (
     'studio/welcome_panel.py',
     'studio/session_library.py',
     'studio/saved_songs_dialog.py',
+    'studio/session_archive.py',
     'studio/session_presets.py',
     'studio/session_project.py',
     'studio/session_qc.py',
