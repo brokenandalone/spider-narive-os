@@ -136,20 +136,23 @@ class PrivateWebbieSafetyTests(unittest.TestCase):
                              (output/"summary.json").read_text())
 
     def test_refuses_unverified_old_webbie_stage(self):
+        # All five candidate files must exist and be individually well-formed
+        # to exercise the STALE-stage check, rather than missing-source error.
         with tempfile.TemporaryDirectory() as root:
             here=Path(root)
             source=here/"src"
             source.mkdir()
             stage=here/"private"
             stage.mkdir()
-            item=source/mod.DESKTOP[0]
-            item.parent.mkdir(parents=True)
-            item.write_bytes(b"new")
-            staged=stage/"candidate"/mod.DESKTOP[0]
-            staged.parent.mkdir(parents=True)
-            staged.write_bytes(b"old")
+            for rel in mod.DESKTOP:
+                current=sample(rel)
+                live=source/rel
+                live.parent.mkdir(parents=True,exist_ok=True)
+                live.write_bytes(current)
+                saved=stage/"candidate"/rel
+                saved.parent.mkdir(parents=True,exist_ok=True)
+                saved.write_bytes(current+(b"\n# stale\n" if rel==mod.DESKTOP[0] else b""))
             with self.assertRaisesRegex(ValueError,"OLD STAGE"):
-                # Snapshot check ends as soon as first file differs.
                 mod._check_live_candidate_snapshot(stage,source)
 
     def test_no_install_commands_in_webbie_composer(self):
