@@ -56,6 +56,27 @@ def dashboard_rows(missions, installed_apps):
         for ident in VISIBLE_WORKSPACES if ident in PURPOSES
     ]
 
+def focus_queue(missions, limit=6):
+    """Stable, bounded queue of pending cross-bay work, without reading folders."""
+    if type(limit) is not int or not 1 <= limit <= 20:
+        raise ValueError("Queue limit must be 1..20")
+    priority = {"blocked": 0, "active": 1, "next": 2}
+    selected = []
+    for index, item in enumerate(missions):
+        if not isinstance(item, dict):
+            continue
+        bay, status = item.get("bay"), item.get("status")
+        title = item.get("title")
+        if (bay not in PURPOSES or status not in priority
+                or not isinstance(title, str) or not title.strip()):
+            continue
+        selected.append((priority[status], index, {
+            "bay": bay, "status": status, "title": title[:140],
+            "bay_name": BLUEPRINTS[bay][0],
+        }))
+    selected.sort(key=lambda entry: (entry[0], entry[1]))
+    return [row for _priority, _index, row in selected[:limit]]
+
 
 class SpiderHomeDashboard(QWidget):
     def __init__(self, workspace_opener, installed_supplier, parent=None, store=None):
@@ -82,6 +103,18 @@ class SpiderHomeDashboard(QWidget):
         refresh = QPushButton("Refresh workspaces and installed tools")
         refresh.clicked.connect(self.refresh)
         root.addWidget(refresh)
+        focus_title = QLabel("MISSION CONTROL  /  WHAT NEEDS ATTENTION")
+        focus_title.setStyleSheet("font-weight:bold;color:#dcb8ff")
+        root.addWidget(focus_title)
+        self.focus_status = QLabel("No pending missions.")
+        self.focus_status.setWordWrap(True)
+        root.addWidget(self.focus_status)
+        self.focus_buttons = []
+        for _ in range(6):
+            focus_button = QPushButton("")
+            focus_button.hide()
+            root.addWidget(focus_button)
+            self.focus_buttons.append(focus_button)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -129,6 +162,24 @@ class SpiderHomeDashboard(QWidget):
             applications = self.installed_supplier()
         except (ValueError, OSError, TypeError):
             applications = []
+        focus = focus_queue(missions)
+        self.focus_status.setText(
+            f"{len(focus)} priorities shown. Blocked work appears first."
+            if focus else "No pending missions. Open a bay to create one.")
+        for index, button in enumerate(self.focus_buttons):
+            try:
+                button.clicked.disconnect()
+            except TypeError:
+                pass
+            if index >= len(focus):
+                button.hide()
+                continue
+            item = focus[index]
+            button.setText(
+                f'[{item["status"].upper()}] {item["bay_name"]}: {item["title"]}')
+            button.clicked.connect(
+                lambda checked=False, bay=item["bay"]: self.workspace_opener(bay))
+            button.show()
         rows = dashboard_rows(missions, applications)
         for row in rows:
             self.summaries[row["bay"]].setText(
