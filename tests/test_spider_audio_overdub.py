@@ -121,13 +121,11 @@ class FullDuplexOverdubTests(unittest.TestCase):
             root=Path(folder)
             cue=root/"cue.wav"
             create_cue(cue,[1]*200,rate=44100,channels=2)
-            for offset, expected in (
-                (1,[1044,1045,1046,1047,0,0,0,0]),
-                (-1,[0,0,0,0,0,0,0,0])):
+            for offset in (1,-1):
                 with self.subTest(ms=offset):
                     target=root/f"shift-{offset}.wav"
                     stop=threading.Event()
-                    fake=FakeDuplex(stop,partial=8)
+                    fake=FakeDuplex(stop,partial=100)
                     result=capture_overdub(
                         target,cue=cue,input_device=0,output_device=1,
                         role="bass",channels=1,rate=44100,
@@ -137,9 +135,12 @@ class FullDuplexOverdubTests(unittest.TestCase):
                         data=unpack16(wav.readframes(200))
                         self.assertEqual(len(data),200)
                         if offset==1:
-                            self.assertEqual(data[:8],[0]*8)
+                            self.assertEqual(data[:4],[1044,1045,1046,1047])
+                            self.assertEqual(data[56:],[0]*144)
                         else:
-                            self.assertEqual(data[:8],[0]*8)
+                            self.assertEqual(data[:44],[0]*44)
+                            self.assertEqual(data[44:48],[1000,1001,1002,1003])
+                            self.assertEqual(data[144:],[0]*56)
                     self.assertEqual(result["compensation_ms"],offset)
 
     def test_partial_stop_pads_remaining_duration_without_mixing_cue(self):
