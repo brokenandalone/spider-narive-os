@@ -38,7 +38,7 @@ class TakeEffects:
             raise CaptureError("Room intensity must be 0 to 40 percent")
         return self
 
-def effects_graph(settings):
+def effects_graph(settings, *, final_limiter=True):
     s=settings.validate()
     pipeline=[]
     if s.bass_db:
@@ -54,7 +54,10 @@ def effects_graph(settings):
         delay=68
         decay=round(s.room/250,3)
         pipeline.append(f"aecho=in_gain=0.8:out_gain=0.8:delays={delay}:decays={decay:.3f}")
-    pipeline.append("alimiter=limit=0.95:level=0")
+    if type(final_limiter) is not bool:
+        raise CaptureError("Final limiter toggle must be true or false")
+    if final_limiter:
+        pipeline.append("alimiter=limit=0.95:level=0")
     return ",".join(pipeline)
 
 def apply_take_effects(source,destination,settings=TakeEffects(),*,
