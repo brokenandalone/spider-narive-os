@@ -1,4 +1,4 @@
-# Spider Audio Studio 0.14 private Linux beta
+# Spider Audio Studio 0.15 private Linux beta
 
 **Record. Arrange. Mix. Own your sound.**
 
@@ -40,7 +40,7 @@ SoundFont-backed instrument workflows. Their absence will be reported by the
 doctor and corresponding features may not work.
 
 Download the PRIVATE beta artifact and unpack its inner .tar.gz file. From the
-extracted `Spider-Audio-Studio-0.14.0-beta` folder:
+extracted `Spider-Audio-Studio-0.15.0-beta` folder:
 
 ```bash
 python3 run_spider_audio_studio.py --verify-only
