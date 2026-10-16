@@ -329,7 +329,7 @@ class AudioCapturePanel(QWidget):
             import math
             seconds=math.ceil(info["seconds"])
             self.seconds.setValue(max(self.seconds.value(),seconds))
-            self.punch_end.setValue(min(300,info["seconds"]))
+            self.punch_end.setValue(min(300,math.floor(info["seconds"]*100)/100))
             self.project_title.setText(Path(path).stem[:100])
             self.status.setText(
                 f"Virtual band backing is ready ({info['seconds']:.1f}s, "
@@ -355,7 +355,7 @@ class AudioCapturePanel(QWidget):
                 self.rate.setCurrentIndex(0 if info["rate"]==48000 else 1)
                 import math
                 self.seconds.setValue(max(self.seconds.value(),math.ceil(info["seconds"])))
-                self.punch_end.setValue(min(300,info["seconds"]))
+                self.punch_end.setValue(min(300,math.floor(info["seconds"]*100)/100))
             except (CaptureError,OSError,ValueError):
                 pass  # Explicit Record runs strict file validation before device opens.
             self.status.setText(
