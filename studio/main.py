@@ -212,6 +212,18 @@ class SpiderStudio(QMainWindow):
         self.auto_performer_panel.attach_editor(
             self.score_timeline_panel,
             lambda: self.tool_tabs.setCurrentWidget(self.score_timeline_panel))
+        # Explicit hardware-only recording stays inside the original Studio,
+        # never as a separate launcher or automatic background microphone.
+        if __package__:
+            from .audio_capture_panel import AudioCapturePanel
+        else:
+            from audio_capture_panel import AudioCapturePanel
+        self.audio_capture_panel = AudioCapturePanel(self)
+        capture_scroll = QScrollArea()
+        capture_scroll.setWidgetResizable(True)
+        capture_scroll.setWidget(self.audio_capture_panel)
+        self.tool_tabs.addTab(capture_scroll, 'Record Audio · Multitrack')
+
 
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
@@ -371,10 +383,12 @@ class SpiderStudio(QMainWindow):
         # WAV. Preserve the existing MAX worker closure protection as well.
         for panel in (self.native_max_tools, self.song_production_panel,
                       self.waveform_edit_panel, self.dj_deck_panel,
-                      self.auto_performer_panel):
+                      self.auto_performer_panel, self.audio_capture_panel):
             worker = getattr(panel, 'worker', None)
             if worker is not None and worker.isRunning():
-                self.status.setText('Finish the current export or analysis before closing Spider Studio.')
+                if panel is self.audio_capture_panel:
+                    self.audio_capture_panel.stop()
+                self.status.setText('Finish or safely stop the current recording/export before closing Spider Studio.')
                 event.ignore()
                 return
         midi = self.instrument_workbench.midi_input
