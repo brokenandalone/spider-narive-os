@@ -18,10 +18,12 @@ try:
     from .session_project import inspect_session
     from .multitrack import SessionError
     from .session_track_fx import normalize_track_effects,track_effects_filter
+    from .session_clip_edit import normalize_clip_edit,clip_ffmpeg_filters
 except ImportError:
     from session_project import inspect_session
     from multitrack import SessionError
     from session_track_fx import normalize_track_effects,track_effects_filter
+    from session_clip_edit import normalize_clip_edit,clip_ffmpeg_filters
 
 DEFAULT_OUTPUT = Path.home() / "Documents/Spider Studio/Music/Session Mixes"
 MAX_RENDER_SECONDS = 2 * 3600
@@ -43,7 +45,7 @@ def mix_plan(session, controls=None, *, include_reference=False):
     for track in session["tracks"]:
         choices = controls.get(track["filename"], {})
         if not isinstance(choices, dict) or not set(choices).issubset(
-                {"gain", "pan", "mute", "solo", "delay_ms", "effects"}):
+                {"gain", "pan", "mute", "solo", "delay_ms", "effects", "clip"}):
             raise SessionError("Unknown per-track mixing control.")
         gain, pan = choices.get("gain", 1.0), choices.get("pan", 0.0)
         delay = choices.get("delay_ms", 0)
@@ -59,9 +61,11 @@ def mix_plan(session, controls=None, *, include_reference=False):
         if type(mute) is not bool or type(solo) is not bool:
             raise SessionError("Mute and solo must be yes or no.")
         effects=normalize_track_effects(choices.get("effects"))
+        clip,region=normalize_clip_edit(
+            track,choices.get("clip"),delay_ms=delay)
         planned.append({**track, "gain": float(gain), "pan": float(pan),
                         "delay_ms": delay, "mute": mute, "solo": solo,
-                        "effects":effects})
+                        "effects":effects, "clip":clip, "clip_region":region})
     # Reference mixes risk doubling tracks; click guides must never enter a release mix.
     eligible = [t for t in planned if not t["mute"] and t["role"] != "click_guide"
                 and (include_reference or t["role"] != "reference_mix")]
@@ -71,7 +75,8 @@ def mix_plan(session, controls=None, *, include_reference=False):
         raise SessionError("No independent unmuted WAVs selected; reference mix is excluded.")
     if all(t["role"] == "reference_mix" for t in eligible) and not include_reference:
         raise SessionError("An AI reference mix is not independently editable stems.")
-    if max(t["duration_seconds"] + t["delay_ms"] / 1000 for t in eligible) > MAX_RENDER_SECONDS:
+    if max(t["clip_region"].duration_seconds + t["delay_ms"] / 1000
+           for t in eligible) > MAX_RENDER_SECONDS:
         raise SessionError("A finished session cannot exceed two hours.")
     return {"active": eligible, "settings": planned,
             "reference_included": any(t["role"] == "reference_mix" for t in eligible),
@@ -100,8 +105,13 @@ def ffmpeg_command(ffmpeg, plan, output):
         delay = f",adelay={entry['delay_ms']}:all=1" if entry["delay_ms"] else ""
         channel_fx=track_effects_filter(entry.get("effects"))
         effect_section=channel_fx+"," if channel_fx else ""
+        region=entry.get("clip_region")
+        if region is None:
+            _,region=normalize_clip_edit(entry,entry.get("clip"),
+                                          delay_ms=entry["delay_ms"])
+        clip_filters=clip_ffmpeg_filters(region)
         filters.append(
-            f"[{index}:a:0]aresample=48000,"
+            f"[{index}:a:0]{clip_filters},aresample=48000,"
             "aformat=sample_fmts=fltp:channel_layouts=stereo,"
             f"{effect_section}volume={entry['gain']:.4f},"
             f"pan=stereo|c0={left:.4f}*c0|c1={right:.4f}*c1"
@@ -174,7 +184,7 @@ def render_session(folder, *, controls=None, include_reference=False,
             "verified_before_render": True,
             "tracks": [{key: item[key] for key in
                         ("filename", "role", "sha256", "gain", "pan",
-                         "delay_ms", "mute", "solo", "effects")} for item in plan["settings"]],
+                         "delay_ms", "mute", "solo", "effects", "clip")} for item in plan["settings"]],
             "active_filenames": [track["filename"] for track in plan["active"]],
         }
         with (destination / "mix-receipt.json").open("x", encoding="utf-8") as file:
