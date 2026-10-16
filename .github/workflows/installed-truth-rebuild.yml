@@ -20,6 +20,10 @@ on:
       - 'tests/test_webbie_project_review.py'
       - 'tests/test_webbie_kali_doctor.py'
       - 'tests/test_webbie_speaker_provider.py'
+      - 'tests/test_webbie_heretic_lab.py'
+      - 'webbie/brain/heretic_lab.py'
+      - 'the-web/shell/webbie_cognitive_center.py'
+      - 'tools/setup_heretic_lab.sh'
       - 'webbie/voice/speaker_voice_provider.py'
       - 'webbie/agent/kali_assistant.py'
       - 'webbie/actions/jarvis_orchestrator.py'
@@ -80,6 +84,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_webbie_speaker_provider.py' -v
       - name: Verify guarded daily release policy imports and compiles
         run: python3 -m py_compile system/daily_install_policy.py system/release_batch.py
+      - name: Check optional Heretic setup script syntax
+        run: bash -n tools/setup_heretic_lab.sh
+      - name: Verify owner-approved Heretic lab never replaces resident Webbie
+        run: python3 -m unittest discover -s tests -p 'test_webbie_heretic_lab.py' -v
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
