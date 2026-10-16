@@ -18,7 +18,7 @@ from studio.package.doctor import report
 
 class BetaPackageTests(unittest.TestCase):
     def test_beta_archive_contains_license_disclosures_and_safe_installer(self):
-        self.assertEqual(VERSION,"0.14.0-beta")
+        self.assertEqual(VERSION,"0.15.0-beta")
         with tempfile.TemporaryDirectory() as scratch:
             root=Path(scratch)
             artifact=build(root)
@@ -42,6 +42,9 @@ class BetaPackageTests(unittest.TestCase):
             self.assertIn("studio/stem_import_panel.py",data["files"])
             self.assertTrue(data["private_developer_preview"])
             self.assertIn("PyQt5", (app/"THIRD_PARTY_NOTICE.md").read_text())
+            self.assertIn("extras",data)
+            self.assertGreaterEqual(len(data["extras"]),6)
+            self.assertTrue((app/"START_HERE.sh").is_file())
             self.assertIn("MIT", (app/"LICENSE").read_text())
             # The real installed desktop entry points to the original native app.
             home=root/"person"
@@ -57,6 +60,8 @@ class BetaPackageTests(unittest.TestCase):
             self.assertIn("Spider Audio Studio",desktop.read_text())
             self.assertEqual(keep.read_bytes(),b"OWNER ORIGINAL AUDIO")
             self.assertTrue((location/"app"/"studio"/"main.py").is_file())
+            self.assertTrue((location/"LICENSE").is_file())
+            self.assertTrue((location/"THIRD_PARTY_NOTICE.md").is_file())
             verified=subprocess.run(
                 [sys.executable,str(location/"run_spider_audio_studio.py"),
                  "--verify-only"],text=True,capture_output=True,timeout=45)
@@ -71,6 +76,60 @@ class BetaPackageTests(unittest.TestCase):
                 handle.write("\n# unexpected app source edit")
             with self.assertRaises(ValueError):
                 verify(app)
+
+    def test_midcopy_failure_cleans_private_staging_and_can_retry_safely(self):
+        from studio.package import install_for_user as installer
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as scratch:
+            root=Path(scratch)
+            archive=build(root)
+            extracted=root/"unpacked"
+            extracted.mkdir()
+            with tarfile.open(archive,"r:gz") as tar:
+                tar.extractall(extracted,filter="data")
+            app=extracted/PACKAGE
+            home=root/"person"
+            home.mkdir()
+            original=home/"original-mix.wav"
+            original.write_bytes(b"PRESERVE ORIGINAL")
+            original_copy=installer._copy_checked
+            copied=0
+            def break_during_copy(*args,**kwargs):
+                nonlocal copied
+                copied+=1
+                if copied==5:
+                    raise OSError("Simulated disk/copy failure in staging")
+                return original_copy(*args,**kwargs)
+            with patch.object(installer,"_copy_checked",side_effect=break_during_copy):
+                with self.assertRaises(OSError):
+                    installer.install(app,home=home)
+            versions=home/".local"/"share"/"spider-audio-studio"/"versions"
+            self.assertEqual(
+                list(versions.glob(".installing-*")),[])
+            self.assertFalse((versions/VERSION).exists())
+            menu=home/".local"/"share"/"applications"
+            self.assertFalse(list(menu.glob("com.spideros.AudioStudio.Beta-*")))
+            self.assertEqual(original.read_bytes(),b"PRESERVE ORIGINAL")
+            # The *same exact version* can be retried with no manual cleanup.
+            installed,shortcut=installer.install(app,home=home)
+            self.assertTrue(installed.is_dir())
+            self.assertTrue(shortcut.is_file())
+            self.assertEqual(original.read_bytes(),b"PRESERVE ORIGINAL")
+
+    def test_modified_licensing_notice_blocks_an_installer(self):
+        from studio.package.install_for_user import verify
+        with tempfile.TemporaryDirectory() as scratch:
+            root=Path(scratch)
+            archive=build(root)
+            unpack=root/"unpack"
+            unpack.mkdir()
+            with tarfile.open(archive,"r:gz") as tar:
+                tar.extractall(unpack,filter="data")
+            folder=unpack/PACKAGE
+            with (folder/"THIRD_PARTY_NOTICE.md").open("a") as file:
+                file.write("\nThis document was changed after packaging.")
+            with self.assertRaises(ValueError):
+                verify(folder)
 
     def test_linux_user_path_redirect_and_binary_exec_injection_rejected(self):
         from studio.package.install_for_user import _safe_under,_quote_exec
@@ -112,6 +171,14 @@ class BetaSetupGuiTests(unittest.TestCase):
             self.assertIsNone(gui.installed)
             self.assertIn("Nothing has been installed",gui.result.text())
             gui.ack.setChecked(True)
+            self.assertFalse(gui.install_button.isEnabled())
+            with patch("studio.package.installer_gui.verify",
+                       return_value={"version":VERSION}),patch(
+                       "studio.package.installer_gui.subprocess.run") as check:
+                check.return_value.returncode=0
+                check.return_value.stdout='{"required_ready": true}'
+                check.return_value.stderr=""
+                gui.check_computer()
             self.assertTrue(gui.install_button.isEnabled())
             with patch("studio.package.installer_gui.install") as save:
                 save.return_value=(Path("/tmp/spider-studio-app"),
