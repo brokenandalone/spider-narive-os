@@ -36,6 +36,7 @@ except ImportError:
 
 MAX_CUE_BYTES = MAX_SECONDS * 48000 * 2 * 2
 CHUNK = 32768
+CALLBACK_WATCHDOG_SECONDS = 4.0
 
 def available_outputs(backend=None):
     """List devices on explicit request, without opening audio streams."""
@@ -120,7 +121,7 @@ def capture_overdub(destination, *, cue, input_device, output_device,
     api = _backend(backend)
     raw_queue = queue.Queue(maxsize=QUEUE_LIMIT)
     cue_view = memoryview(cue_data)
-    state = {"sent": 0, "fault": None}
+    state = {"sent": 0, "fault": None, "last_callback": time.monotonic()}
     # The callback must never block on disk writes or synthesize metronome.
     # Intro frames have NO recorded content and do not shift song timeline.
     def callback(indata, outdata, frames, stream_time, status):
@@ -134,6 +135,7 @@ def capture_overdub(destination, *, cue, input_device, output_device,
             state["fault"] = "Invalid full-duplex audio callback frame layout"
             stopped.set()
             return
+        state["last_callback"]=time.monotonic()
         remaining=max(0,transport.total_frames-state["sent"])
         wanted=min(frames,remaining) if not stopped.is_set() else 0
         if not wanted:
@@ -175,6 +177,13 @@ def capture_overdub(destination, *, cue, input_device, output_device,
                     channels=(channels, 2), dtype="int16", callback=callback):
                     last_level = time.monotonic()
                     while True:
+                        if (not stopped.is_set()
+                                and time.monotonic()-state["last_callback"]
+                                > CALLBACK_WATCHDOG_SECONDS):
+                            state["fault"] = (
+                                "Audio device stopped providing full-duplex frames; "
+                                "the incomplete take was rejected")
+                            stopped.set()
                         if stopped.is_set() and raw_queue.empty():
                             break
                         try:
