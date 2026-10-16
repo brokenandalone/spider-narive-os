@@ -97,3 +97,34 @@ Do not blindly `git add -A && git push`. This is a code review stage, not a
 release or public source approval. GitHub-only Art Lab and packaging files are
 left untouched. All source remains in the PC's installed form until a later,
 separately reviewed release is produced.
+
+## Assemble private review input (after the local 47-file overlay)
+
+GitHub has **not** received the installed source yet. To enable actual source
+reconciliation without blindly publishing the owner PC's source, keep the 47
+files modified/untracked in the separate checkout, then run:
+
+```bash
+cd ~/Downloads/Spider_OS_Installed_Truth_Rebuild
+git pull --ff-only
+python3 -m unittest discover -s tests -p 'test_prepare_installed_review.py' -v
+python3 tools/prepare_installed_review.py
+```
+
+The resulting `~/Downloads/Spider_OS_Owner_Source_Review_20261016.zip` contains
+the exact installed code **diff patch** and eight additional source files.
+It is generated outside Git checkout with user-only permissions; no Git commit,
+push, network transfer, services, or installed files are touched.
+
+**Private until reviewed.** An automated scan of known token formats is NOT
+complete. Inspect the ZIP and its contents for embedded credentials and private
+information before sharing. It can be attached to this ChatGPT conversation for
+code review instead of uploading to the public GitHub repository.
+
+A strong red flag in the owner-reported diff is that GitHub has substantial
+extra work in `webbie/actions/task_grants.py`,
+`the-web/shell/webbie_panel.py`, `studio/main.py`, and
+`forage/deep-forage/deep_forage.py` relative to what is currently installed.
+Do **not** merge the PC overlay wholesale. Review changed symbols,
+interfaces, tests, and live runtime behavior, then integrate differences in
+component-specific commits after code review.
