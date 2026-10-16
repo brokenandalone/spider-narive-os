@@ -18,7 +18,7 @@ from studio.package.doctor import report
 
 class BetaPackageTests(unittest.TestCase):
     def test_beta_archive_contains_license_disclosures_and_safe_installer(self):
-        self.assertEqual(VERSION,"0.15.0-beta")
+        self.assertEqual(VERSION,"0.16.0-beta")
         with tempfile.TemporaryDirectory() as scratch:
             root=Path(scratch)
             artifact=build(root)
