@@ -48,6 +48,52 @@ class TheWeb:
         self.assertNotIn("PRIVATE-OWNER-SECRET", str(result))
         self.assertNotIn("LOCAL ONLY, PRESERVE ME", str(result))
 
+    def test_flags_owner_method_reliance_on_removed_constructor_fields(self):
+        installed = b"""class WebbieCognitiveDialog:
+    def __init__(self):
+        self.workflow_window = "OWNER PRIVATE VALUE"
+    def open_workflow(self):
+        return "owner behavior"
+    def offer_workflow(self):
+        return self.workflow_window, self.open_workflow()
+    def open_workflows(self):
+        return self.offer_workflow()
+"""
+        candidate = b"""class WebbieCognitiveDialog:
+    def __init__(self, callback=None):
+        self.workflow_callback = callback
+    def open_workflow(self):
+        return self.workflow_callback
+"""
+        risks = tool.preservation_dependencies(installed, candidate)
+        self.assertEqual([item["owner_only_method"] for item in risks], [
+            "WebbieCognitiveDialog.offer_workflow",
+            "WebbieCognitiveDialog.open_workflows",
+        ])
+        offer = risks[0]
+        self.assertEqual(offer["locally_initialized_fields_missing_from_candidate"],
+                         ["workflow_window"])
+        self.assertEqual(offer["calls_to_changed_shared_methods"],
+                         ["WebbieCognitiveDialog.open_workflow"])
+        self.assertTrue(offer["owner_constructor_changed"])
+        self.assertFalse(offer["safe_to_install"])
+        self.assertNotIn("OWNER PRIVATE VALUE", str(risks))
+
+    def test_false_equivalence_of_no_missing_fields_is_not_install_approval(self):
+        installed = b"""class WebbieCognitiveDialog:
+    def __init__(self):
+        self.callback = 1
+    def old_workflow(self):
+        return self.callback
+"""
+        candidate = b"""class WebbieCognitiveDialog:
+    def __init__(self):
+        self.callback = 2
+"""
+        risks = tool.preservation_dependencies(installed, candidate)
+        self.assertEqual(risks[0]["locally_initialized_fields_missing_from_candidate"], [])
+        self.assertFalse(risks[0]["safe_to_install"])
+
     def test_separates_method_arguments_from_body_changes(self):
         first = b"class Webbie:\n    def listen(self, name):\n        return 1\n"
         second = b"class Webbie:\n    def listen(self, name, verified=False):\n        return 2\n"
