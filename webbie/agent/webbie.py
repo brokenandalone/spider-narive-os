@@ -40,6 +40,7 @@ from owner_authorization_store import read_policy,update_policy
 # Only replace the blocking model call with the owner-tested subprocess boundary.
 from webbie_ai_isolation import respond
 from model_resilience import MODEL_GOVERNOR, model_health_message
+from heretic_lab import inspect_heretic
 from jarvis_context import read_context, context_summary, advisory_context
 from focus_tasks import focus_answer, advisory_focus, WORKSPACES
 from privacy_controls import private_session_active, privacy_explanation
@@ -342,6 +343,10 @@ def handle_builtin(command):
             return None
     stripped = re.sub(
         r"^(?:hey )?(?:webbie|webby|web)[\s,.:]+", "", lower).strip(" ?.!")
+    if stripped in ("heretic status", "heretic lab status", "check heretic"):
+        # Read-only local environment status; NEVER invoke model training
+        # from wake words, model output or unsolicited background checks.
+        return inspect_heretic().explanation
     if stripped in ("ai model health", "brain health",
                     "is your ai stuck", "how is your brain doing"):
         return model_health_message(MODEL_GOVERNOR.status())
