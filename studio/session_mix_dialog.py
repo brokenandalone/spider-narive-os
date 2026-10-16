@@ -23,6 +23,7 @@ if __package__:
     from .session_clip_dialog import TrackClipDialog
     from .session_regions import normalize_regions
     from .session_regions_dialog import TrackRegionsDialog
+    from .session_mix_player import MixPlaybackBar
 else:
     from session_project import inspect_session
     from session_mix import render_session
@@ -36,6 +37,7 @@ else:
     from session_clip_dialog import TrackClipDialog
     from session_regions import normalize_regions
     from session_regions_dialog import TrackRegionsDialog
+    from session_mix_player import MixPlaybackBar
 
 
 class SessionAudioQcWorker(QThread):
@@ -221,6 +223,8 @@ class SessionMixDialog(QDialog):
                        self.open_button, self.master_button):
             actions.addWidget(button)
         layout.addLayout(actions)
+        self.internal_player=MixPlaybackBar(self)
+        layout.addWidget(self.internal_player)
         if session_folder:
             self.load_session()
 
@@ -253,6 +257,7 @@ class SessionMixDialog(QDialog):
         self.open_button.setEnabled(False)
         self.master_button.setEnabled(False)
         self.rendered = None
+        self.internal_player.clear()
         self.status.setText("Checking track metadata and original SHA-256 checksums...")
         self.checker = SessionAuditWorker(self.folder.text().strip())
         self.checker.result.connect(self.audit_done)
@@ -581,6 +586,7 @@ class SessionMixDialog(QDialog):
         if (self.worker is not None or self.checker is not None
                 or self.quality_worker is not None or self.session is None):
             return
+        self.internal_player.stop()
         self.mix_button.setEnabled(False)
         self.quality_button.setEnabled(False)
         self.track_fx_button.setEnabled(False)
@@ -602,6 +608,7 @@ class SessionMixDialog(QDialog):
         self.status.setText(message)
         if path:
             self.rendered = Path(path)
+            self.internal_player.load(self.rendered)
             self.play_button.setEnabled(True)
             self.open_button.setEnabled(True)
             self.master_button.setEnabled(True)
@@ -645,6 +652,7 @@ class SessionMixDialog(QDialog):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.rendered.parent)))
 
     def closeEvent(self, event):
+        self.internal_player.shutdown()
         if self.checker is not None:
             self.checker.shutdown()
         if self.quality_worker is not None:
