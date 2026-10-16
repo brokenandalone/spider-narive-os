@@ -95,6 +95,23 @@ class PrivateStageTests(unittest.TestCase):
                       focus="desktop", home=self.home,
                       scope=("the-web/shell/main.py",))
 
+    def test_native_bays_only_stages_existing_native_components(self):
+        expected = {
+            "the-web/shell/home_dashboard.py",
+            "the-web/shell/bay_missions.py",
+            "the-web/shell/bay_mission_panel.py",
+            "the-web/shell/native_utility_bays.py",
+            "the-web/shell/art_workbench.py",
+            "the-web/shell/webbie_research_panel.py",
+            "the-web/shell/immersive_bays.py",
+        }
+        self.assertEqual(set(mod.FOCI["native-bays"]), expected)
+        self.assertFalse(any(path.startswith("studio/") for path in expected))
+        release = (ROOT / "system/release_batch.py").read_text()
+        for path in expected:
+            self.assertIn(repr(path), release)
+        self.assertFalse(any("webbie_panel.py" in path for path in expected))
+
     def test_noninstalling_staging_does_not_execute_or_upload_code(self):
         content = (ROOT / "tools/stage_native_merge.py").read_text()
         for forbidden in ("os.system(", "subprocess.Popen(", "urllib",
