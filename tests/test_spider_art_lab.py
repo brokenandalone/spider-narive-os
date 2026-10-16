@@ -136,6 +136,45 @@ class NativeArtLabTests(unittest.TestCase):
         finally:
             editor.close()
 
+    def test_photo_to_ink_outline_is_an_actual_transparent_separate_layer(self):
+        from PyQt5.QtCore import QByteArray,QBuffer,QIODevice,Qt
+        from PyQt5.QtGui import QImage,QPainter,QColor
+        import base64
+        from art_lab.outline import photo_outline
+        from art_lab.main import SpiderArtLab
+        photo=QImage(80,80,QImage.Format_ARGB32)
+        photo.fill(QColor("white"))
+        brush=QPainter(photo)
+        brush.fillRect(20,20,40,40,QColor("black"))
+        brush.end()
+        data=QByteArray()
+        buffer=QBuffer(data)
+        self.assertTrue(buffer.open(QIODevice.WriteOnly))
+        self.assertTrue(photo.save(buffer,"PNG"))
+        buffer.close()
+        original=bytes(data)
+        output=photo_outline(original)
+        self.assertNotEqual(output,original)
+        outlined=QImage.fromData(output,"PNG")
+        self.assertFalse(outlined.isNull())
+        alphas=[outlined.pixelColor(x,y).alpha()
+                for y in range(1,79) for x in range(1,79)]
+        self.assertTrue(any(alpha>0 for alpha in alphas))
+        self.assertTrue(any(alpha==0 for alpha in alphas))
+        self.assertEqual(outlined.pixelColor(35,35).alpha(),0)
+        editor=SpiderArtLab()
+        try:
+            candidate=add_layer(editor.document,"Reference",
+                image_png=base64.b64encode(original).decode("ascii"))
+            editor._update(candidate,"Loaded photo")
+            editor.trace_reference()
+            self.assertEqual(len(editor.document["layers"]),3)
+            self.assertTrue(editor.document["layers"][-1]["name"].startswith("Outline:"))
+            editor.undo()
+            self.assertEqual(len(editor.document["layers"]),2)
+        finally:
+            editor.close()
+
     def test_existing_web_native_bay_loads_real_editor(self):
         import importlib.util
         from pathlib import Path
