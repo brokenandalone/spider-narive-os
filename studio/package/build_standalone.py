@@ -19,7 +19,7 @@ import tarfile
 import tempfile
 
 SOURCE=Path(__file__).resolve().parents[2]
-VERSION="0.14.0-beta"
+VERSION="0.15.0-beta"
 PACKAGE="Spider-Audio-Studio-"+VERSION
 ROOTS=(
     "studio",
@@ -71,6 +71,9 @@ sys.path.insert(0,str(app))
 if "--doctor" in sys.argv[1:]:
     from studio.package.doctor import main as studio_doctor
     raise SystemExit(studio_doctor())
+if "--self-test" in sys.argv[1:]:
+    from studio.package.audio_self_test import main as studio_self_test
+    raise SystemExit(studio_self_test())
 try:
     from studio.main import main
 except ImportError as error:
