@@ -1,0 +1,44 @@
+name: Spider Audio Studio private source preview
+
+on:
+  push:
+    branches:
+      - feature/spider-audio-instruments-20261015
+    paths:
+      - 'studio/**'
+      - 'system/apps.py'
+      - 'the-web/shell/workspace_max_native.py'
+      - 'spider_max_source/**'
+      - '.github/workflows/spider-audio-studio-preview.yml'
+  pull_request:
+    paths:
+      - 'studio/**'
+      - 'system/apps.py'
+      - 'the-web/shell/workspace_max_native.py'
+      - 'spider_max_source/**'
+      - '.github/workflows/spider-audio-studio-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-owner-preview:
+    name: Package native Audio Studio
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact GitHub source revision
+        uses: actions/checkout@v4
+      - name: Build isolated Audio Studio source package
+        run: python3 studio/package/build_standalone.py --output-dir "$RUNNER_TEMP"
+      - name: Verify extracted runtime and manifest
+        run: |
+          mkdir -p "$RUNNER_TEMP/verified"
+          tar -xzf "$RUNNER_TEMP/Spider-Audio-Studio-0.13.0-dev.tar.gz" -C "$RUNNER_TEMP/verified"
+          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.13.0-dev/run_spider_audio_studio.py" --verify-only
+      - name: Publish private developer preview archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spider-Audio-Studio-0.13.0-dev
+          path: ${{ runner.temp }}/Spider-Audio-Studio-0.13.0-dev.tar.gz
+          if-no-files-found: error
+          retention-days: 14

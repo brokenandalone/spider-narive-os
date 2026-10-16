@@ -148,6 +148,102 @@ class SpiderStudio(QMainWindow):
         ai_scroll.setWidgetResizable(True)
         ai_scroll.setWidget(self.ai_panel)
         self.tool_tabs.addTab(ai_scroll, 'Studio AI')
+        # All new identity/instrument logic stays within the tab section. This
+        # keeps legacy Studio reconciliation strict and structurally comparable.
+        if __package__:
+            from .instrument_workbench import InstrumentWorkbench
+        else:
+            from instrument_workbench import InstrumentWorkbench
+        from PyQt5.QtGui import QIcon
+        self.setWindowTitle('Spider Audio Studio | Spider OS')
+        app_icon = SPIDER_ROOT / 'branding/spider-apps/icons/spider-audio-studio.svg'
+        if app_icon.is_file():
+            self.setWindowIcon(QIcon(str(app_icon)))
+        # Native Spider instrument machine: no external launcher, no replacement DAW.
+        self.instrument_workbench = InstrumentWorkbench(self)
+        instrument_scroll = QScrollArea()
+        instrument_scroll.setWidgetResizable(True)
+        instrument_scroll.setWidget(self.instrument_workbench)
+        self.tool_tabs.addTab(instrument_scroll, 'Play Instruments')
+        self.instrument_page = instrument_scroll
+        if __package__:
+            from .song_production_panel import SongProductionPanel
+        else:
+            from song_production_panel import SongProductionPanel
+        self.song_production_panel = SongProductionPanel(self.instrument_workbench, self)
+        song_scroll = QScrollArea()
+        song_scroll.setWidgetResizable(True)
+        song_scroll.setWidget(self.song_production_panel)
+        self.tool_tabs.addTab(song_scroll, 'Song Arranger & Mixer')
+        if __package__:
+            from .waveform_edit_panel import WaveformEditPanel
+        else:
+            from waveform_edit_panel import WaveformEditPanel
+        self.waveform_edit_panel = WaveformEditPanel(self)
+        waveform_scroll = QScrollArea()
+        waveform_scroll.setWidgetResizable(True)
+        waveform_scroll.setWidget(self.waveform_edit_panel)
+        self.tool_tabs.addTab(waveform_scroll, 'Waveform Editor')
+        if __package__:
+            from .dj_deck_panel import DJDeckPanel
+        else:
+            from dj_deck_panel import DJDeckPanel
+        self.dj_deck_panel = DJDeckPanel(self)
+        dj_scroll = QScrollArea()
+        dj_scroll.setWidgetResizable(True)
+        dj_scroll.setWidget(self.dj_deck_panel)
+        self.tool_tabs.addTab(dj_scroll, 'DJ Decks')
+        if __package__:
+            from .auto_performer_panel import AutoPerformerPanel
+        else:
+            from auto_performer_panel import AutoPerformerPanel
+        self.auto_performer_panel = AutoPerformerPanel(self)
+        auto_scroll = QScrollArea()
+        auto_scroll.setWidgetResizable(True)
+        auto_scroll.setWidget(self.auto_performer_panel)
+        self.tool_tabs.addTab(auto_scroll, 'Auto Performer · Scores & TAB')
+        self.auto_performer_page = auto_scroll
+        if __package__:
+            from .score_timeline_panel import ScoreTimelinePanel
+        else:
+            from score_timeline_panel import ScoreTimelinePanel
+        self.score_timeline_panel = ScoreTimelinePanel(self.auto_performer_panel.apply_edited_score, self)
+        self.tool_tabs.addTab(self.score_timeline_panel, 'Performance Note Editor')
+        self.auto_performer_panel.attach_editor(
+            self.score_timeline_panel,
+            lambda: self.tool_tabs.setCurrentWidget(self.score_timeline_panel))
+        # Explicit hardware-only recording stays inside the original Studio,
+        # never as a separate launcher or automatic background microphone.
+        if __package__:
+            from .audio_capture_panel import AudioCapturePanel
+        else:
+            from audio_capture_panel import AudioCapturePanel
+        self.audio_capture_panel = AudioCapturePanel(self)
+        capture_scroll = QScrollArea()
+        capture_scroll.setWidgetResizable(True)
+        capture_scroll.setWidget(self.audio_capture_panel)
+        self.tool_tabs.addTab(capture_scroll, 'Record Audio · Multitrack')
+        self.audio_capture_page = capture_scroll
+        # Owner-selected audio stems can enter the real native mixer directly.
+        # No terminal, outside DAW, or automatic microphone access.
+        if __package__:
+            from .stem_import_panel import StemImportPanel
+        else:
+            from stem_import_panel import StemImportPanel
+        self.stem_import_panel = StemImportPanel(self)
+        self.tool_tabs.addTab(self.stem_import_panel, 'Import WAVs · Create Song')
+        # Read-only recording inventory inside native Studio; no hardware access.
+        if __package__:
+            from .recording_audit_panel import RecordingAuditPanel
+        else:
+            from recording_audit_panel import RecordingAuditPanel
+        self.recording_audit_panel = RecordingAuditPanel(self)
+        self.tool_tabs.addTab(self.recording_audit_panel, 'Recording Library Audit')
+        # Handoff selects a private cue only; never opens a mic or starts sound.
+        self.auto_performer_panel.backing_cue_ready.connect(self._handoff_virtual_band)
+        self.song_production_panel.backing_cue_ready.connect(self._handoff_virtual_band)
+
+
         self.native_max_tools = NativeWorkspaceTools('studio', self)
         self.tool_tabs.addTab(self.native_max_tools, 'Production analysis & tasks')
         # Preserve the owner-reviewed Studio layout while activating the
@@ -248,12 +344,11 @@ class SpiderStudio(QMainWindow):
             self.status.setText(f'Opened {tool[0]}.')
 
     def launch_music(self):
-        for tool in TOOLS['Recording & mixing']:
-            command = resolve_tool(tool)
-            if command:
-                self.launch(command)
-                return
-        self.status.setText('No supported DAW or audio editor was detected. Refresh installed tools after checking the Ubuntu Studio menu.')
+        # The music sidebar button must open Spider's REAL native tools, not
+        # launch another DAW as a substitute. Ubuntu Studio apps remain
+        # available in the preserved installed-tool tabs when needed.
+        self.tool_tabs.setCurrentWidget(self.instrument_page)
+        self.status.setText('Spider Audio Studio instruments are ready in this window.')
 
     def media_command(self):
         try:
@@ -302,11 +397,40 @@ class SpiderStudio(QMainWindow):
         )
 
 
+    def _handoff_virtual_band(self, path, rate):
+        """Connect both real native virtual-band bays to the recording console."""
+        if self.audio_capture_panel.load_generated_cue(path,rate):
+            self.tool_tabs.setCurrentWidget(self.audio_capture_page)
+
     def closeEvent(self, event):
-        worker = getattr(self.native_max_tools, 'worker', None)
-        if worker is not None and worker.isRunning():
+        # Do not destroy a QThread while it is exporting the owner's song or
+        # WAV. Preserve the existing MAX worker closure protection as well.
+        for panel in (self.native_max_tools, self.song_production_panel,
+                      self.waveform_edit_panel, self.dj_deck_panel,
+                      self.auto_performer_panel, self.audio_capture_panel,
+                      self.stem_import_panel):
+            worker = getattr(panel, 'worker', None)
+            if worker is not None and worker.isRunning():
+                if panel is self.stem_import_panel:
+                    self.stem_import_panel.cancel_import()
+                if panel is self.audio_capture_panel:
+                    self.audio_capture_panel.stop()
+                self.status.setText('Finish or safely stop the current recording/export before closing Spider Studio.')
+                event.ignore()
+                return
+        midi = self.instrument_workbench.midi_input
+        midi.disconnect()
+        if midi.worker is not None and midi.worker.isRunning():
+            self.status.setText('MIDI connection is still closing.')
             event.ignore()
             return
+        self.instrument_workbench.timer.stop()
+        self.waveform_edit_panel.stop_preview()
+        self.dj_deck_panel.stop()
+        self.auto_performer_panel.stop()
+        for audio, _data in list(self.instrument_workbench._voices):
+            audio.stop()
+        self.instrument_workbench._voices.clear()
         super().closeEvent(event)
 
 

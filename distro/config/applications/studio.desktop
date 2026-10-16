@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Spider Studio
-Comment=Spider OS studio workspace
+Name=Spider Audio Studio
+Comment=Playable drums, guitar, bass, piano and music production in Spider OS
 Exec=/usr/local/lib/spider-os/studio/bin/studio
-Icon=spider-os-logo
+Icon=/usr/local/lib/spider-os/branding/spider-apps/icons/spider-audio-studio.svg
 Terminal=false
 Categories=AudioVideo;
 StartupNotify=true

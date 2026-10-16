@@ -1,0 +1,778 @@
+"""Native Spider Audio Studio recording console: real owner-approved input only.
+
+No device enumerated or opened on app startup. The Refresh and Record actions
+are explicit. Captures independent vocal/guitar/bass/drum takes on separate
+passes, and hands owner WAVs to existing non-destructive multitrack packaging.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+import threading
+from PyQt5.QtCore import Qt,QThread,pyqtSignal
+from PyQt5.QtWidgets import (
+    QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QSpinBox,
+    QLineEdit,QListWidget,QFileDialog,QMessageBox,QProgressBar,QCheckBox,QDoubleSpinBox,
+)
+try:
+    from .audio_capture_engine import (
+        available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
+    from .multitrack import export_session,SessionError
+    from .audio_overdub_engine import available_outputs,capture_overdub
+    from .backing_cue import validate_recordable_cue
+    from .overdub_transport import transport_plan
+    from .session_qc import analyze_wav
+    from .multitrack import SessionError
+    from .audio_latency_calibration import measure_loopback
+    from .take_comp_dialog import TakeCompDialog,CompWorker
+    from .take_effects_dialog import TakeEffectsDialog,EffectsWorker
+except ImportError:
+    from audio_capture_engine import (
+        available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
+    from multitrack import export_session,SessionError
+    from audio_overdub_engine import available_outputs,capture_overdub
+    from backing_cue import validate_recordable_cue
+    from overdub_transport import transport_plan
+    from session_qc import analyze_wav
+    from multitrack import SessionError
+    from audio_latency_calibration import measure_loopback
+    from take_comp_dialog import TakeCompDialog,CompWorker
+    from take_effects_dialog import TakeEffectsDialog,EffectsWorker
+
+TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
+
+def _inspect_finished_take(result):
+    """Read-only bounded QC preview after the recording device closes.
+
+    QC failure cannot delete or modify a successfully recorded owner WAV.
+    This checks only first/last two seconds: it is NOT a master/loudness test.
+    """
+    try:
+        result["sampled_qc"] = analyze_wav(result["path"],edge_seconds=2)
+    except (OSError,SessionError,ValueError):
+        result["quality_note"] = "WAV saved; sampled quality analysis unavailable"
+    return result
+
+
+class CaptureWorker(QThread):
+    recorded=pyqtSignal(object,str)
+    levels=pyqtSignal(float,float,float)
+    def __init__(self,filename,device,role,channels,rate,seconds,depth,parent=None):
+        super().__init__(parent)
+        self.filename,self.device,self.role=filename,device,role
+        self.channels,self.rate,self.seconds,self.depth=channels,rate,seconds,depth
+        self.stop_event=threading.Event()
+
+    def run(self):
+        try:
+            result=capture_take(
+                self.filename,device=self.device,role=self.role,
+                channels=self.channels,rate=self.rate,max_seconds=self.seconds,
+                bit_depth=self.depth,
+                stop=self.stop_event,
+                on_level=lambda peak,rms,seconds:self.levels.emit(peak,rms,seconds))
+            self.recorded.emit(_inspect_finished_take(result),"")
+        except (OSError,ValueError,RuntimeError,FileExistsError) as exc:
+            self.recorded.emit(None,str(exc)[:340])
+
+class OverdubWorker(QThread):
+    recorded=pyqtSignal(object,str)
+    levels=pyqtSignal(float,float,float)
+    def __init__(self,filename,cue,input_device,output_device,role,channels,rate,
+                 latency,seconds,tempo,beats_per_bar,count_in_bars,
+                 punch_start_ms,punch_end_ms,parent=None):
+        super().__init__(parent)
+        self.filename=filename
+        self.cue=cue
+        self.input_device=input_device
+        self.output_device=output_device
+        self.role=role
+        self.channels=channels
+        self.rate=rate
+        self.latency=latency
+        self.seconds=seconds
+        self.tempo,self.beats_per_bar=tempo,beats_per_bar
+        self.count_in_bars=count_in_bars
+        self.punch_start_ms,self.punch_end_ms=punch_start_ms,punch_end_ms
+        self.stop_event=threading.Event()
+    def run(self):
+        try:
+            result=capture_overdub(
+                self.filename,cue=self.cue,input_device=self.input_device,
+                output_device=self.output_device,role=self.role,
+                channels=self.channels,rate=self.rate,
+                latency_ms=self.latency,max_seconds=self.seconds,
+                tempo=self.tempo,beats_per_bar=self.beats_per_bar,
+                count_in_bars=self.count_in_bars,
+                punch_start_ms=self.punch_start_ms,punch_end_ms=self.punch_end_ms,
+                stop=self.stop_event,
+                on_level=lambda peak,rms,seconds:self.levels.emit(peak,rms,seconds))
+            self.recorded.emit(_inspect_finished_take(result),"")
+        except (OSError,ValueError,RuntimeError,FileExistsError) as exc:
+            self.recorded.emit(None,str(exc)[:350])
+
+
+class CalibrationWorker(QThread):
+    measured=pyqtSignal(object,str)
+    def __init__(self,input_device,output_device,rate,parent=None):
+        super().__init__(parent)
+        self.input_device=input_device
+        self.output_device=output_device
+        self.rate=rate
+        self.stop_event=threading.Event()
+    def run(self):
+        try:
+            result=measure_loopback(
+                input_device=self.input_device,output_device=self.output_device,
+                rate=self.rate,stop=self.stop_event)
+            self.measured.emit(result,"")
+        except (OSError,ValueError,RuntimeError) as error:
+            self.measured.emit(None,str(error)[:330])
+
+
+class SessionWorker(QThread):
+    recorded=pyqtSignal(object,str)
+    def __init__(self,tracks,title,bpm,parent=None):
+        super().__init__(parent)
+        self.tracks=list(tracks)
+        self.title=title
+        self.bpm=bpm
+        self.stop_event=threading.Event()
+    def run(self):
+        try:
+            project=export_session(self.tracks,title=self.title,tempo_bpm=self.bpm,
+                                   stop=self.stop_event)
+            self.recorded.emit(str(project),"")
+        except (OSError,ValueError,RuntimeError,SessionError) as exc:
+            self.recorded.emit(None,str(exc)[:340])
+
+class AudioCapturePanel(QWidget):
+    def __init__(self,parent=None):
+        super().__init__(parent)
+        self.worker=None
+        self.takes=[]
+        self.last_session=None
+        self.setObjectName("spiderAudioCaptureConsole")
+        self.setStyleSheet("""QWidget#spiderAudioCaptureConsole{background:#110d20}
+            QLabel{color:#f1e6ff} QPushButton{color:#fff;background:#35234c;
+            border:1px solid #8968bc;border-radius:7px;padding:8px}
+            QSpinBox,QComboBox,QLineEdit,QListWidget{background:#231931;color:#fff;
+            border:1px solid #72558e;padding:6px}""")
+        layout=QVBoxLayout(self)
+        heading=QLabel("SPIDER RECORDING CONSOLE / REAL INSTRUMENT AND VOCAL TAKES")
+        heading.setStyleSheet("font-size:20px;font-weight:bold;color:#cba6fa")
+        layout.addWidget(heading)
+        desc=QLabel(
+            "Record real WAV takes using a manually selected input. Choose one "
+            "vocal, bass, guitar, keyboard or drum source at a time, or stereo "
+            "inputs if your interface supports them. Mic access is never automatic. "
+            "No changes are made to PipeWire, JACK, Nova, Webbie or default routing.")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+        device_row=QHBoxLayout()
+        device_row.addWidget(QLabel("Audio input"))
+        self.input=QComboBox()
+        self.input.setAccessibleName("User selected recording audio input device")
+        device_row.addWidget(self.input,1)
+        self.refresh_btn=self._button("Refresh Inputs",self.refresh_inputs)
+        device_row.addWidget(self.refresh_btn)
+        layout.addLayout(device_row)
+        settings=QHBoxLayout()
+        settings.addWidget(QLabel("Take role"))
+        self.role=QComboBox()
+        for role in ROLES:
+            self.role.addItem(role.replace("_"," ").title(),role)
+        self.role.setCurrentIndex(0)
+        settings.addWidget(self.role)
+        settings.addWidget(QLabel("Channels"))
+        self.channels=QComboBox()
+        self.channels.addItem("Mono (one input)",1)
+        self.channels.addItem("Stereo (two inputs)",2)
+        settings.addWidget(self.channels)
+        settings.addWidget(QLabel("Rate"))
+        self.rate=QComboBox()
+        self.rate.addItem("48 kHz",48000)
+        self.rate.addItem("44.1 kHz",44100)
+        settings.addWidget(self.rate)
+        settings.addWidget(QLabel("Bit depth"))
+        self.depth=QComboBox()
+        self.depth.addItem("16-bit PCM",16)
+        self.depth.addItem("24-bit PCM (device must support)",24)
+        self.depth.setCurrentIndex(1)
+        self.depth.setAccessibleName("Native hardware capture bit depth")
+        settings.addWidget(self.depth)
+        settings.addWidget(QLabel("Maximum"))
+        self.seconds=QSpinBox()
+        self.seconds.setRange(1,300)
+        self.seconds.setValue(180)
+        self.seconds.setSuffix(" s")
+        settings.addWidget(self.seconds)
+        layout.addLayout(settings)
+        overdub_heading=QLabel("BACKING TRACK / FULL-DUPLEX OVERDUB")
+        overdub_heading.setStyleSheet("font-weight:bold;color:#c8a8ee")
+        layout.addWidget(overdub_heading)
+        overdub_row=QHBoxLayout()
+        overdub_row.addWidget(QLabel("Cue WAV"))
+        self.cue_file=QLineEdit()
+        self.cue_file.setReadOnly(True)
+        self.cue_file.setPlaceholderText("Select a 16-bit 44.1/48 kHz backing WAV")
+        self.cue_file.setAccessibleName("Selected backing cue WAV for full-duplex recording")
+        overdub_row.addWidget(self.cue_file,3)
+        overdub_row.addWidget(self._button("Choose Backing WAV",self.select_cue))
+        layout.addLayout(overdub_row)
+        output_row=QHBoxLayout()
+        output_row.addWidget(QLabel("Playback device"))
+        self.output_device=QComboBox()
+        self.output_device.setAccessibleName("Explicit stereo headphone or monitor output for cue")
+        output_row.addWidget(self.output_device,2)
+        output_row.addWidget(QLabel("Input timing correction"))
+        self.latency=QSpinBox()
+        self.latency.setRange(-250,250)
+        self.latency.setValue(0)
+        self.latency.setSuffix(" ms")
+        self.latency.setAccessibleName("Manual latency compensation; positive moves recorded take earlier")
+        output_row.addWidget(self.latency)
+        layout.addLayout(output_row)
+        caveat=QLabel(
+            "Use headphones to prevent cue spill. This is one shared duplex "
+            "stream clock, not measured physical interface latency. "
+            "+ms moves recorded audio EARLIER; -ms moves it later. "
+            "Overdub input is 16-bit PCM; separate takes can record at 24-bit.")
+        caveat.setWordWrap(True)
+        layout.addWidget(caveat)
+        transport_row=QHBoxLayout()
+        transport_row.addWidget(QLabel("Count-in"))
+        self.count_in_bars=QSpinBox()
+        self.count_in_bars.setRange(0,4)
+        self.count_in_bars.setSuffix(" bars")
+        self.count_in_bars.setAccessibleName("Headphone count-in bars before cue")
+        transport_row.addWidget(self.count_in_bars)
+        transport_row.addWidget(QLabel("Meter"))
+        self.beats_per_bar=QComboBox()
+        self.beats_per_bar.addItem("4/4",4)
+        self.beats_per_bar.addItem("3/4",3)
+        transport_row.addWidget(self.beats_per_bar)
+        self.punch_enable=QCheckBox("Punch-in / punch-out only")
+        self.punch_enable.setAccessibleName("Record only inside a bounded score-time window")
+        transport_row.addWidget(self.punch_enable)
+        layout.addLayout(transport_row)
+        punch_row=QHBoxLayout()
+        punch_row.addWidget(QLabel("Punch starts at"))
+        self.punch_start=QDoubleSpinBox()
+        self.punch_start.setRange(0,300)
+        self.punch_start.setDecimals(2)
+        self.punch_start.setSuffix(" s")
+        self.punch_start.setAccessibleName("Punch-in time relative to beginning of backing")
+        punch_row.addWidget(self.punch_start)
+        punch_row.addWidget(QLabel("Punch ends at"))
+        self.punch_end=QDoubleSpinBox()
+        self.punch_end.setRange(0,300)
+        self.punch_end.setDecimals(2)
+        self.punch_end.setSuffix(" s")
+        self.punch_end.setAccessibleName("Punch-out time relative to beginning of backing")
+        punch_row.addWidget(self.punch_end)
+        layout.addLayout(punch_row)
+        self.include_cue=QCheckBox(
+            "Include backing WAV as an instrumental-bed track in exported sessions")
+        self.include_cue.setChecked(False)
+        self.include_cue.setAccessibleName("Explicitly add backing cue to multitrack recording exports")
+        layout.addWidget(self.include_cue)
+        tracks=QHBoxLayout()
+        tracks.addWidget(QLabel("Project"))
+        self.project_title=QLineEdit("Spider Recording Session")
+        self.project_title.setAccessibleName("Recorded multitrack session project title")
+        tracks.addWidget(self.project_title,2)
+        tracks.addWidget(QLabel("Tempo"))
+        self.tempo=QSpinBox()
+        self.tempo.setRange(30,300)
+        self.tempo.setValue(120)
+        tracks.addWidget(self.tempo)
+        layout.addLayout(tracks)
+        action=QHBoxLayout()
+        self.record_btn=self._button("● Record New WAV Take",self.record)
+        self.record_btn.setEnabled(False)
+        self.stop_btn=self._button("■ Stop and Save Take",self.stop)
+        self.stop_btn.setEnabled(False)
+        self.export_btn=self._button("Create Multitrack Session",self.export_multitrack)
+        action.addWidget(self.record_btn)
+        action.addWidget(self.stop_btn)
+        action.addWidget(self.export_btn)
+        layout.addLayout(action)
+        overdub_action=QHBoxLayout()
+        self.overdub_btn=self._button("▶ Record Along With Backing",self.record_overdub)
+        self.overdub_btn.setEnabled(False)
+        overdub_action.addWidget(self.overdub_btn)
+        layout.addLayout(overdub_action)
+        session_action=QHBoxLayout()
+        self.arrange_btn=self._button(
+            "Open Recorded Takes in Studio Multitrack Editor",self.open_multitrack)
+        self.mix_btn=self._button(
+            "Mix Last Recorded Session",self.open_session_mix)
+        self.mix_btn.setEnabled(False)
+        self.comp_btn=self._button("Comp Two Recorded Takes",self.comp_two_takes)
+        self.comp_btn.setEnabled(False)
+        self.effects_btn=self._button("Shape Selected Take · EQ / Compression / Room",
+                                      self.shape_selected_take)
+        self.effects_btn.setEnabled(False)
+        session_action.addWidget(self.arrange_btn)
+        session_action.addWidget(self.comp_btn)
+        session_action.addWidget(self.effects_btn)
+        session_action.addWidget(self.mix_btn)
+        layout.addLayout(session_action)
+        calibration_row=QHBoxLayout()
+        self.calibration_btn=self._button(
+            "Measure Physical Cable Loopback (Experimental)",
+            self.measure_latency)
+        self.calibration_btn.setEnabled(False)
+        calibration_row.addWidget(self.calibration_btn)
+        self.calibration_info=QLabel(
+            "Connect LINE output to safe LINE input with a suitable cable, "
+            "at low level. Never connect amplified speaker outputs, and disable "
+            "phantom power. Round-trip measurement is NOT input-only delay.")
+        self.calibration_info.setWordWrap(True)
+        calibration_row.addWidget(self.calibration_info,1)
+        layout.addLayout(calibration_row)
+        level_row=QHBoxLayout()
+        level_row.addWidget(QLabel("INPUT PEAK"))
+        self.peak=QProgressBar()
+        self.peak.setRange(0,100)
+        self.peak.setValue(0)
+        self.peak.setAccessibleName("Real-time audio input peak meter")
+        level_row.addWidget(self.peak,1)
+        self.meter_info=QLabel("No input capture active")
+        level_row.addWidget(self.meter_info)
+        layout.addLayout(level_row)
+        layout.addWidget(QLabel("RECORDED TAKES (independent WAVs; no overwriting existing files)"))
+        self.take_list=QListWidget()
+        self.take_list.setMinimumHeight(175)
+        layout.addWidget(self.take_list,1)
+        self.status=QLabel(
+            "No microphone has been opened. Click Refresh Inputs to list audio devices, "
+            "then choose a device and press Record to start a take.")
+        self.status.setTextFormat(Qt.PlainText)
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        # No refresh or capture call here: startup must remain device-private.
+
+    def _button(self,title,fn):
+        b=QPushButton(title)
+        b.clicked.connect(fn)
+        return b
+
+    def load_generated_cue(self, path, rate):
+        """Arm a finished virtual-band cue; NEVER start input or output devices."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText(
+                "Backing rendered, but a recording or export is active. "
+                "It was NOT switched mid-take. Stop first and choose the saved cue.")
+            return False
+        try:
+            info=validate_recordable_cue(path,expected_rate=rate)
+            self.cue_file.setText(str(Path(path)))
+            self.rate.setCurrentIndex(0 if info["rate"]==48000 else 1)
+            # Cue + possible reverb tail must fit within the safe recording bound.
+            import math
+            seconds=math.ceil(info["seconds"])
+            self.seconds.setValue(max(self.seconds.value(),seconds))
+            self.punch_end.setValue(min(300,math.floor(info["seconds"]*100)/100))
+            self.project_title.setText(Path(path).stem[:100])
+            self.status.setText(
+                f"Virtual band backing is ready ({info['seconds']:.1f}s, "
+                f"{rate}Hz, 16-bit). Now click Refresh Inputs, choose "
+                "a microphone/interface and headphone output, then manually "
+                "press Record Along With Backing. Nothing is recording yet.")
+            return True
+        except (CaptureError,OSError,ValueError) as error:
+            self.status.setText("Cannot select the rendered backing: "+str(error)[:280])
+            return False
+
+    def select_cue(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current recording before changing the backing track.")
+            return
+        filename,_=QFileDialog.getOpenFileName(
+            self,"Select a licensed WAV backing track",str(Path.home()/"Music"),
+            "PCM WAV (*.wav)")
+        if filename:
+            self.cue_file.setText(filename)
+            try:
+                info=validate_recordable_cue(filename)
+                self.rate.setCurrentIndex(0 if info["rate"]==48000 else 1)
+                import math
+                self.seconds.setValue(max(self.seconds.value(),math.ceil(info["seconds"])))
+                self.punch_end.setValue(min(300,math.floor(info["seconds"]*100)/100))
+            except (CaptureError,OSError,ValueError):
+                pass  # Explicit Record runs strict file validation before device opens.
+            self.status.setText(
+                "Backing selected. Choose an input, stereo playback device, "
+                "matching sample rate and headphones before starting overdub.")
+
+    def refresh_inputs(self):
+        if self.worker is not None and self.worker.isRunning():
+            return
+        try:
+            results=available_inputs()
+            outputs=available_outputs()
+            self.input.clear()
+            for index,name,channels in results:
+                self.input.addItem(f"{name} ({channels} inputs)",(index,channels))
+            self.output_device.clear()
+            for index,name,channels in outputs:
+                self.output_device.addItem(f"{name} ({channels} outputs)",(index,channels))
+            self.status.setText(
+                f"Found {len(results)} input(s) and {len(outputs)} stereo output(s). "
+                "None are open. Choose an input and click Record."
+                if results else "No input devices found. Check your audio interface/permissions.")
+        except CaptureError as exc:
+            self.status.setText(str(exc))
+        self.record_btn.setEnabled(self.input.count()>0)
+        self.overdub_btn.setEnabled(self.input.count()>0 and self.output_device.count()>0)
+        self.calibration_btn.setEnabled(
+            self.input.count()>0 and self.output_device.count()>0)
+
+    def measure_latency(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current recording/export before calibration.")
+            return
+        inp=self.input.currentData()
+        out=self.output_device.currentData()
+        if inp is None or out is None:
+            self.status.setText("Refresh devices and choose an input and stereo output first.")
+            return
+        message=(
+            "This sends a low-level test signal to the SELECTED OUTPUT and "
+            "measures it at the SELECTED INPUT. Use a safe LINE-level "
+            "output-to-LINE-input cable at low volume, with phantom power OFF. "
+            "NEVER connect power-amplified speaker outputs. This measures "
+            "combined output+input delay, not input-only latency, and never "
+            "adjusts your recording settings automatically. Proceed?")
+        approved=QMessageBox.question(
+            self,"Confirm electrical loopback safety",message,
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No)
+        if approved!=QMessageBox.Yes:
+            return
+        self.worker=CalibrationWorker(inp[0],out[0],self.rate.currentData(),self)
+        self.worker.measured.connect(self._calibrated)
+        for button in (self.record_btn,self.overdub_btn,self.calibration_btn,
+                       self.refresh_btn,self.export_btn,self.comp_btn):
+            button.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.worker.start()
+        self.status.setText("Testing selected electrical loopback; no recordings will be saved.")
+
+    def _calibrated(self,result,error):
+        self.stop_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(True)
+        self.export_btn.setEnabled(True)
+        self.comp_btn.setEnabled(len(self.takes)>=2)
+        self.record_btn.setEnabled(self.input.count()>0)
+        connected=self.input.count()>0 and self.output_device.count()>0
+        self.overdub_btn.setEnabled(connected)
+        self.calibration_btn.setEnabled(connected)
+        if error:
+            self.status.setText("Loopback calibration unsuccessful: "+error)
+            return
+        self.calibration_info.setText(
+            f"Electrical round-trip: {result['round_trip_ms']:.3f} ms "
+            f"({result['round_trip_samples']} frames), "
+            f"confidence {result['confidence']:.2f}. Includes ADC AND DAC "
+            "delays, so it was not automatically applied to input compensation.")
+        self.status.setText(
+            "Round-trip measured. Recording input latency remains manually "
+            "adjustable until the ADC and DAC delays can be distinguished.")
+
+    def shape_selected_take(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current job before applying effects.")
+            return
+        index=self.take_list.currentRow()
+        if not 0<=index<len(self.takes):
+            self.status.setText("Select a recorded take to shape in the take list.")
+            return
+        chosen=self.takes[index]
+        dialog=TakeEffectsDialog(chosen["path"],self)
+        if dialog.exec_()!=dialog.Accepted:
+            return
+        try:
+            TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+            if TAKE_ROOT.is_symlink():
+                raise CaptureError("The take folder cannot be a symlink")
+            dest=new_take_filename(TAKE_ROOT,chosen["role"])
+            self.worker=EffectsWorker(
+                chosen["path"],str(dest),chosen["role"],dialog.settings(),self)
+            self.worker.recorded.connect(self._recorded)
+            for button in (self.record_btn,self.overdub_btn,self.calibration_btn,
+                           self.export_btn,self.refresh_btn,self.comp_btn,
+                           self.effects_btn):
+                button.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.worker.start()
+            self.status.setText(
+                "Rendering offline effects on a new WAV. Original take stays untouched.")
+        except (OSError,ValueError) as error:
+            self.status.setText("Cannot shape recording: "+str(error)[:260])
+
+    def comp_two_takes(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current audio job before comping.")
+            return
+        if len(self.takes)<2:
+            self.status.setText("Record at least two takes to composite.")
+            return
+        dialog=TakeCompDialog(self.takes,self)
+        if dialog.exec_()!=dialog.Accepted:
+            return
+        before=self.takes[dialog.before.currentData()]
+        after=self.takes[dialog.after.currentData()]
+        try:
+            TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+            if TAKE_ROOT.is_symlink():
+                raise CaptureError("Take directory must not be a symlink")
+            dest=new_take_filename(TAKE_ROOT,before["role"])
+            self.worker=CompWorker(
+                before["path"],after["path"],round(dialog.split.value()*1000),
+                dialog.fade.value(),str(dest),before["role"],self)
+            self.worker.recorded.connect(self._recorded)
+            for button in (self.record_btn,self.overdub_btn,self.calibration_btn,
+                           self.export_btn,self.refresh_btn,self.comp_btn):
+                button.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.worker.start()
+            self.status.setText(
+                "Creating NEW composite take with a crossfade. "
+                "All source recordings are untouched.")
+        except (OSError,ValueError) as error:
+            self.status.setText("Cannot start take comping: "+str(error)[:280])
+
+    def record_overdub(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the other recording or export first.")
+            return
+        selected=self.input.currentData()
+        output=self.output_device.currentData()
+        if selected is None or output is None:
+            self.status.setText("Refresh and explicitly choose an input and stereo output.")
+            return
+        if not self.cue_file.text().strip():
+            self.status.setText("Select a local WAV backing track before recording along.")
+            return
+        input_id,max_channels=selected
+        if self.channels.currentData()>max_channels:
+            self.status.setText("The selected input has too few channels.")
+            return
+        try:
+            cue=validate_recordable_cue(
+                self.cue_file.text(),expected_rate=self.rate.currentData())
+            start_ms=round(self.punch_start.value()*1000) if self.punch_enable.isChecked() else None
+            end_ms=round(self.punch_end.value()*1000) if self.punch_enable.isChecked() else None
+            transport_plan(
+                rate=self.rate.currentData(),cue_frames=cue["frames"],
+                tempo=self.tempo.value(),beats_per_bar=self.beats_per_bar.currentData(),
+                count_in_bars=self.count_in_bars.value(),
+                punch_start_ms=start_ms,punch_end_ms=end_ms)
+            TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+            if TAKE_ROOT.is_symlink():
+                raise CaptureError("The recorded-take directory cannot be a symlink")
+            filename=new_take_filename(TAKE_ROOT,self.role.currentData())
+            self.worker=OverdubWorker(
+                str(filename),self.cue_file.text(),input_id,output[0],
+                self.role.currentData(),self.channels.currentData(),
+                self.rate.currentData(),self.latency.value(),self.seconds.value(),
+                self.tempo.value(),self.beats_per_bar.currentData(),
+                self.count_in_bars.value(),start_ms,end_ms,self)
+            self.worker.recorded.connect(self._recorded)
+            self.worker.levels.connect(self._levels)
+            self.record_btn.setEnabled(False)
+            self.overdub_btn.setEnabled(False)
+            self.refresh_btn.setEnabled(False)
+            self.export_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.worker.start()
+            self.status.setText(
+                "Full-duplex transport armed. Headphone count-in plays BEFORE "
+                "cue time zero, then selected backing plays while the input is captured. "
+                "Any punch window is enforced on the final take, with silence outside "
+                "it. No live microphone signal is sent to the speakers.")
+        except (CaptureError,OSError,ValueError) as exc:
+            self.status.setText("Could not begin overdub: "+str(exc)[:280])
+
+    def record(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Stop the current job before starting another recording.")
+            return
+        selected=self.input.currentData()
+        if not selected:
+            self.status.setText("Click Refresh Inputs, then choose a recording device.")
+            return
+        device,max_channels=selected
+        channels=self.channels.currentData()
+        if channels>max_channels:
+            self.status.setText("The selected recording device cannot provide that many channels.")
+            return
+        try:
+            TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+            if TAKE_ROOT.is_symlink():
+                raise CaptureError("Recording directory cannot be a symlink")
+            filename=new_take_filename(TAKE_ROOT,self.role.currentData())
+        except (OSError,CaptureError) as exc:
+            self.status.setText("Could not prepare recording: "+str(exc)[:230])
+            return
+        self.worker=CaptureWorker(str(filename),device,self.role.currentData(),
+                                  channels,self.rate.currentData(),self.seconds.value(),
+                                  self.depth.currentData(),self)
+        self.worker.recorded.connect(self._recorded)
+        self.worker.levels.connect(self._levels)
+        self.stop_btn.setEnabled(True)
+        self.record_btn.setEnabled(False)
+        self.overdub_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(False)
+        self.export_btn.setEnabled(False)
+        self.worker.start()
+        self.status.setText(
+            "Recording is active on the selected device only. "
+            "Click Stop and Save Take to end capture. Audio stays private on this computer.")
+
+    def _levels(self,peak,rms,seconds):
+        # Map -60..0 dBFS to a bounded visible meter.
+        self.peak.setValue(max(0,min(100,round((peak+60)*100/60))))
+        self.meter_info.setText(
+            f"{peak:.1f} dBFS peak · {rms:.1f} dBFS RMS · {seconds:.1f} s")
+
+    def stop(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.worker.stop_event.set()
+            self.status.setText("Stopping capture and validating the WAV. Do not close yet.")
+
+    def _recorded(self,result,error):
+        worker=self.worker
+        if worker is not None and worker.isRunning():
+            worker.wait(1500)
+        self.record_btn.setEnabled(self.input.count()>0)
+        connected=self.input.count()>0 and self.output_device.count()>0
+        self.overdub_btn.setEnabled(connected)
+        self.calibration_btn.setEnabled(connected)
+        self.comp_btn.setEnabled(len(self.takes)>=2)
+        self.effects_btn.setEnabled(bool(self.takes))
+        self.stop_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(True)
+        self.export_btn.setEnabled(True)
+        if error:
+            self.status.setText(
+                "Capture rejected or cancelled: "+error+
+                ". No incomplete take was published.")
+            return
+        if isinstance(result,dict):
+            path=Path(result["path"])
+            self.takes.append({
+                "path":str(path),"role":result["role"],
+                "label":path.stem[:100],
+            })
+            self.comp_btn.setEnabled(len(self.takes)>=2)
+            self.effects_btn.setEnabled(True)
+            self.take_list.addItem(
+                f"{len(self.takes):02d} · {result['role']} · "
+                f"{result['duration_seconds']:.1f}s · {result['sample_rate']} Hz · "
+                f"{result['channels']}ch · {result['sample_width_bits']}-bit · {path.name}")
+            self.take_list.setCurrentRow(self.take_list.count()-1)
+            message=(
+                "Captured real WAV: "+path.name+
+                ". You can record another take or create a multitrack DAW session.")
+            sampled=result.get("sampled_qc")
+            if isinstance(sampled,dict):
+                message+=(
+                    f" Sampled input peak {sampled.get('peak_dbfs')} dBFS "
+                    "(first/last 2 seconds only, not whole-song QC).")
+                warnings=sampled.get("warnings",[])
+                if warnings:
+                    message+=" Sampling warnings: "+"; ".join(warnings[:2])
+            elif result.get("quality_note"):
+                message+=" "+result["quality_note"]
+            self.status.setText(message)
+        elif isinstance(result,str):
+            self.last_session=Path(result)
+            self.mix_btn.setEnabled(True)
+            self.status.setText(
+                "Created a private multitrack session: "+result+
+                ". Open its copied WAV tracks in your preferred DAW.")
+
+    def _selected_session_tracks(self):
+        tracks=list(self.takes)
+        if self.include_cue.isChecked():
+            cue=Path(self.cue_file.text().strip())
+            if (not self.cue_file.text().strip() or not cue.is_file()
+                    or cue.is_symlink() or cue.suffix.lower()!=".wav"):
+                raise CaptureError("Choose a regular WAV backing file or uncheck Include backing")
+            if all(Path(t["path"]).resolve()!=cue.resolve() for t in tracks):
+                tracks.insert(0,{"path":str(cue),"role":"instrumental_bed",
+                                 "label":"Backing reference cue"})
+        return tracks
+
+    def open_multitrack(self):
+        """Reuse the EXISTING native multitrack mixer/dialog, not a launcher."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current recording or export first.")
+            return
+        if not self.takes:
+            self.status.setText("Record a real WAV take before opening the multitrack editor.")
+            return
+        try:
+            if __package__:
+                from .multitrack_dialog import MultitrackDialog
+            else:
+                from multitrack_dialog import MultitrackDialog
+            editor=MultitrackDialog(
+                seed_tracks=self._selected_session_tracks(),
+                title=self.project_title.text().strip() or "Spider Recording",
+                parent=self)
+            editor.tempo.setValue(self.tempo.value())
+            editor.exec_()
+        except (OSError,ValueError,RuntimeError,SessionError,CaptureError) as exc:
+            self.status.setText("Cannot open the recorded multitrack editor: "+str(exc)[:250])
+
+    def open_session_mix(self):
+        """Open the existing native audited mixer for actual recorded WAVs."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish recording or export before opening the mixer.")
+            return
+        if self.last_session is None or not self.last_session.is_dir():
+            self.status.setText("Create a recorded multitrack session first.")
+            return
+        try:
+            if __package__:
+                from .session_mix_dialog import SessionMixDialog
+            else:
+                from session_mix_dialog import SessionMixDialog
+            editor=SessionMixDialog(str(self.last_session),self)
+            editor.exec_()
+        except (OSError,RuntimeError,ValueError) as exc:
+            self.status.setText("Cannot open recorded session mixer: "+str(exc)[:260])
+
+    def export_multitrack(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Stop recording before exporting a session.")
+            return
+        if not self.takes:
+            self.status.setText("Record at least one real WAV take first.")
+            return
+        try:
+            selected_tracks=self._selected_session_tracks()
+        except (CaptureError,OSError) as exc:
+            self.status.setText("Cannot add backing cue: "+str(exc)[:230])
+            return
+        self.worker=SessionWorker(
+            selected_tracks,self.project_title.text(),self.tempo.value(),self)
+        self.worker.recorded.connect(self._recorded)
+        self.stop_btn.setEnabled(False)
+        self.record_btn.setEnabled(False)
+        self.overdub_btn.setEnabled(False)
+        self.export_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(False)
+        self.worker.start()
+        self.status.setText("Copying your chosen recordings into a new private multitrack session.")
+
+    def closeEvent(self,event):
+        if self.worker is not None and self.worker.isRunning():
+            self.stop()
+            self.status.setText("Capture/session export is stopping; close after it finishes.")
+            event.ignore()
+            return
+        super().closeEvent(event)

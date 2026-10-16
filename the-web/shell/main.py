@@ -21,6 +21,7 @@ if not SPIDER_ROOT.exists():
 sys.path.insert(0, str(SPIDER_ROOT / 'system'))
 from apps import AppUnavailable, media_command
 from app_catalog import WORKSPACES, discover_apps, launch_command
+from app_visuals import app_art
 from desktop import list_tasks, wm_command, close_window, minimize_window, maximize_window, x11_properties
 from wallpapers import WallpaperCatalog
 from workspaces import create_native
@@ -158,7 +159,11 @@ class StartMenu(QDialog):
         query = self.search.text().casefold(); self.results.clear()
         for workspace, label in WORKSPACES.items():
             if workspace != 'default' and query in label.casefold():
-                item = QListWidgetItem('Workspace  /  ' + label); item.setData(Qt.UserRole, ('workspace', workspace)); self.results.addItem(item)
+                artwork = app_art(SPIDER_ROOT, workspace)
+                icon = QIcon(str(artwork)) if artwork is not None else QIcon.fromTheme("applications-other")
+                item = QListWidgetItem(icon, 'Workspace  /  ' + label)
+                item.setData(Qt.UserRole, ('workspace', workspace))
+                self.results.addItem(item)
         for app in self.shell.installed_apps:
             if query in (app.name + ' ' + app.comment + ' ' + WORKSPACES[app.workspace]).casefold():
                 item = QListWidgetItem(QIcon.fromTheme(app.icon), app.name + '  /  ' + WORKSPACES[app.workspace])
