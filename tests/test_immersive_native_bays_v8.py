@@ -45,7 +45,14 @@ class NativeImmersiveBays(unittest.TestCase):
         self.assertIn("workspace_tabs.addTab(area, 'Native workspace')", self.shell)
         self.assertIn("workspace_tabs.addTab(surface, 'Native workspace')", self.shell)
         self.assertIn("else: native = create_native(name, SPIDER_ROOT)", self.shell)
-        self.assertIn("if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)", self.shell)
+        # Webbie has one resident panel and reuses it in the native bay.
+        resident = [call for call in ast.walk(self.shell_ast)
+                    if isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id == "WebbiePanel"]
+        self.assertEqual(len(resident), 1)
+        self.assertIn("workspace_tabs.addTab(operations, 'Webbie controls')", self.shell)
+        self.assertIn("native.setObjectName('webbieResidentBayOverview')", self.shell)
 
     def test_actual_devices_productivity_and_communications_bays(self):
         self.assertIn("elif name == 'devices': native = DevicesPanel()", self.shell)
