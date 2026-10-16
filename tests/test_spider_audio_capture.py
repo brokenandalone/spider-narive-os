@@ -42,7 +42,8 @@ class FakeBackend:
                         sample_width=3 if kwargs["dtype"]=="int24" else 2
                         positive=(1000).to_bytes(sample_width,"little",signed=True)
                         negative=(-1000).to_bytes(sample_width,"little",signed=True)
-                        cb((positive+negative)*32,32,None,None)
+                        frame=positive if kwargs["channels"]==1 else positive+negative
+                        cb(frame*32,32,None,None)
                         if owner.stop.is_set():
                             break
                 owner.stop.set()
