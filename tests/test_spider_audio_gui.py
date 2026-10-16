@@ -135,6 +135,27 @@ class StudioProductionGUITests(unittest.TestCase):
         finally:
             panel.close()
 
+    def test_recording_console_never_opens_input_automatically(self):
+        from unittest.mock import patch
+        with patch("studio.audio_capture_panel.available_inputs",
+                   side_effect=AssertionError("startup enumerated an audio input")):
+            from studio.audio_capture_panel import AudioCapturePanel
+            panel=AudioCapturePanel()
+            try:
+                self.assertEqual(panel.input.count(),0)
+                self.assertFalse(panel.record_btn.isEnabled())
+                self.assertFalse(panel.stop_btn.isEnabled())
+                self.assertEqual(panel.takes,[])
+                self.assertIsNone(panel.worker)
+                self.assertEqual(panel.peak.value(),0)
+                self.assertIn("No microphone has been opened",panel.status.text())
+                panel.record()
+                self.assertIsNone(panel.worker)
+                panel._levels(-6.,-13.,2.5)
+                self.assertGreater(panel.peak.value(),85)
+            finally:
+                panel.close()
+
     def test_note_editor_actually_changes_auto_performer_with_undo(self):
         from studio.score_timeline_panel import ScoreTimelinePanel
         from studio.auto_performer_panel import AutoPerformerPanel
