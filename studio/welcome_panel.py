@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
 
 class StudioWelcome(QWidget):
     def __init__(self,*,open_import,open_record,open_instruments,open_session,
-                 parent=None):
+                 open_recent=None,parent=None):
         super().__init__(parent)
         self.setObjectName("studioWelcome")
         layout=QVBoxLayout(self)
@@ -48,6 +48,13 @@ class StudioWelcome(QWidget):
              "Reopen a verified session, adjust its channel strips, arrange "
              "regions and render a new finished stereo mix.",open_session),
         ]
+        if open_recent is not None:
+            items.append((
+                "Recent saved songs",
+                "Find your latest multitrack recordings by title and tempo, "
+                "then verify each track before opening the original mixer.",
+                open_recent))
+
         self.actions={}
         for idx,(title,description,callback) in enumerate(items):
             card=QFrame()
