@@ -111,6 +111,7 @@ APP_FILES = (
     # Oct 11 full Spider OS wave: additive modules from daily release inventory.
     # Existing PC customizations are NOT made into recognized overwrite baselines.
 
+    'system/daily_install_policy.py',
     'system/onedrive.py',
     'branding/webbie/webbie-face-v1.png',
     'branding/webbie/webbie-face-speaking-v1.png',
@@ -659,7 +660,12 @@ def main(argv=None):
         if args.action == 'check':
             return 0 if report(inspect(items)) else 3
         if args.action == 'apply':
-            apply(items, backup_root)
+            # Owner-requested single daily release. Rollback remains unguarded.
+            # Load only on apply, so standalone source tests and dry-run checks
+            # do not need any installed policy or writable state directory.
+            from daily_install_policy import daily_install_guard
+            with daily_install_guard(backup_root):
+                apply(items, backup_root)
             return 0
         if not args.backup:
             parser.error('Rollback requires the exact backup path from the installation receipt.')
