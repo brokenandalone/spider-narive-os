@@ -77,6 +77,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_webbie_kali_doctor.py' -v
       - name: Verify private offline speaker enrollment cannot bypass voice trust
         run: python3 -m unittest discover -s tests -p 'test_webbie_speaker_provider.py' -v
+      - name: Verify guarded daily release policy imports and compiles
+        run: python3 -m py_compile system/daily_install_policy.py system/release_batch.py
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
