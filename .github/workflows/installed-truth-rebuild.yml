@@ -27,6 +27,7 @@ on:
       - 'webbie/agent/workspace_launchers.py'
       - 'webbie/actions/owner_safe_access.py'
       - 'webbie/actions/action_receipts.py'
+      - 'webbie/actions/action_journal.py'
       - 'the-web/shell/webbie_operator_bridge.py'
       - 'the-web/shell/webbie_computer_panel.py'
       - 'webbie/agent/webbie.py'
