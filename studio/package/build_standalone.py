@@ -19,7 +19,7 @@ import tarfile
 import tempfile
 
 SOURCE=Path(__file__).resolve().parents[2]
-VERSION="0.15.0-beta"
+VERSION="0.16.0-beta"
 PACKAGE="Spider-Audio-Studio-"+VERSION
 ROOTS=(
     "studio",
@@ -153,6 +153,7 @@ def build(output_dir, *, source=SOURCE):
         # run automatically. Preserve owner MIT notice and legal caveats.
         extras={
             "install_for_user.py":"studio/package/install_for_user.py",
+            "remove_beta.py":"studio/package/remove_beta.py",
             "installer_gui.py":"studio/package/installer_gui.py",
             "START_HERE.sh":"studio/package/START_HERE.sh",
             "LICENSE":"LICENSE",
