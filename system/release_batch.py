@@ -275,6 +275,8 @@ APP_FILES = (
     'studio/audio_latency_calibration.py',
     'studio/take_comp_engine.py',
     'studio/take_comp_dialog.py',
+    'studio/take_effects.py',
+    'studio/take_effects_dialog.py',
     'studio/backing_cue.py',
     'studio/band_backing_worker.py',
     'the-web/shell/app_visuals.py',
