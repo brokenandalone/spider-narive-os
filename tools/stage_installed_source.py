@@ -115,6 +115,14 @@ def validate_source(rel: str, contents: bytes) -> None:
             compile(value, rel, "exec")
         except SyntaxError as error:
             raise ValueError(f"Python syntax failed for {rel}: {error}") from error
+    elif p.suffix == ".sh" or p.name == "kali-bay":
+        try:
+            checked = subprocess.run(["bash", "-n"], input=contents,
+                                     capture_output=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise ValueError(f"Shell syntax check could not finish for {rel}: {error}") from error
+        if checked.returncode:
+            raise ValueError(f"Shell syntax failed for {rel}")
     elif p.suffix == ".json":
         try:
             json.loads(value)
