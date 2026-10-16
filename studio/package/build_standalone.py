@@ -138,6 +138,8 @@ def build(output_dir, *, source=SOURCE):
         # run automatically. Preserve owner MIT notice and legal caveats.
         extras={
             "install_for_user.py":"studio/package/install_for_user.py",
+            "installer_gui.py":"studio/package/installer_gui.py",
+            "START_HERE.sh":"studio/package/START_HERE.sh",
             "LICENSE":"LICENSE",
             "BETA_README.md":"studio/product/BETA_README.md",
             "THIRD_PARTY_NOTICE.md":"studio/product/THIRD_PARTY_NOTICE.md",
@@ -149,7 +151,7 @@ def build(output_dir, *, source=SOURCE):
                 raise RuntimeError("Missing product beta disclosure or installer source")
             with source_file.open("rb") as inp,dest.open("xb") as out:
                 shutil.copyfileobj(inp,out)
-            dest.chmod(0o755 if dest_name.endswith(".py") else 0o600)
+            dest.chmod(0o755 if dest_name.endswith((".py",".sh")) else 0o600)
         revision="unknown"
         try:
             record=subprocess.run(
