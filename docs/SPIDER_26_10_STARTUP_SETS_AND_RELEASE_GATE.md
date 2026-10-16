@@ -285,6 +285,52 @@ sequence, do not presume a boot partition synchronization
 strategy or attempt an upgrade. Independent backup and normal
 release availability remain required.
 
+## Confirmed boot chain and release-upgrade synchronization blocker
+
+The October 15 complete `debugfs -R 'cat /grub/grub.cfg'` output settles
+the outstanding command path. The active EFI stub loads
+`/dev/sda1:/grub/grub.cfg`, whose default Spider OS menu sets
+`root='hd0,gpt1'` and searches `/dev/sda1` UUID
+`b8b48e84-c748-4741-9b94-a2f5bab50ca6` before executing:
+
+    linux  /vmlinuz-7.0.0-38-generic root=/dev/mapper/kali--vg-root ro quiet splash ...
+    initrd /initrd.img-7.0.0-38-generic
+
+The recovery and advanced entries also reference those `/dev/sda1`-root
+paths. There is no `/boot` directory on sda1. This means the current
+EFI GRUB menu does **not** read the main encrypted root's
+`/boot/vmlinuz-7.0.0-38-generic` and
+`/boot/initrd.img-7.0.0-38-generic`; it attempts to load files
+from the root of the separate sda1 ext4 filesystem. The exact presence
+and consistency of these two sda1 files must still be verified using
+read-only `debugfs stat`.
+
+This is an upgrade **BLOCKER**. The conventional Ubuntu kernel/postinst
+and `update-grub` path updates the installed root's
+`/boot` and `/boot/grub/grub.cfg`, whereas the current active
+`/dev/sda1` is not mounted and therefore may be skipped. A new kernel
+and removed old `/lib/modules` can make the old sda1 boot menu fail.
+Do **not** start `do-release-upgrade` until a backup, boot partition
+synchronization, free-space and rollback plan are tested.
+
+The preflight script now marks an EFI stub targeting an unmounted
+filesystem as BLOCK, regardless of a clean package manager, free space,
+or disabled Secure Boot. No installer USB is necessary, but a usable
+independent backup and realistic rescue method are required.
+
+Safe current-machine validation without mounting/writing:
+
+    sudo debugfs -R 'stat /vmlinuz-7.0.0-38-generic' /dev/sda1
+    sudo debugfs -R 'stat /initrd.img-7.0.0-38-generic' /dev/sda1
+    sudo debugfs -R 'stats' /dev/sda1
+    stat -c '%n %s bytes' /boot/vmlinuz-7.0.0-38-generic /boot/initrd.img-7.0.0-38-generic
+
+Compare expected sizes and available blocks. It is **not yet safe**
+to mount sda1 read/write, copy files, `grub-install`,
+`update-grub`, edit fstab, install automated kernel hooks or
+start the upgrade. Those tasks require staged/tested backup and
+manual review first.
+
 ## Plymouth / LUKS boundary
 The existing Spider Plymouth theme now draws the disk-password prompt and masked bullet count. This code is NOT yet verified with a real encrypted-root boot. Do not activate or rebuild the daily-use machine's initramfs from this candidate until a test confirms that the LUKS2 unlock prompt is displayed and responds normally.
 
