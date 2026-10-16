@@ -21,6 +21,13 @@ on:
       - 'tests/test_webbie_kali_doctor.py'
       - 'tests/test_webbie_speaker_provider.py'
       - 'tests/test_webbie_heretic_lab.py'
+      - 'tests/test_author_native_voice_navigation.py'
+      - 'tests/test_studio_reconciled_band_workbench.py'
+      - 'tests/test_webbie_natural_speech.py'
+      - 'author/commands.py'
+      - 'author/control_socket.py'
+      - 'studio/ai_panel.py'
+      - 'webbie/voice/interruptible_speech.py'
       - 'webbie/brain/heretic_lab.py'
       - 'the-web/shell/webbie_cognitive_center.py'
       - 'tools/setup_heretic_lab.sh'
@@ -88,6 +95,12 @@ jobs:
         run: bash -n tools/setup_heretic_lab.sh
       - name: Verify owner-approved Heretic lab never replaces resident Webbie
         run: python3 -m unittest discover -s tests -p 'test_webbie_heretic_lab.py' -v
+      - name: Verify native Author voice controls
+        run: python3 -m unittest discover -s tests -p 'test_author_native_voice_navigation.py' -v
+      - name: Verify Studio band stem and DAW session recovery
+        run: python3 -m unittest discover -s tests -p 'test_studio_reconciled_band_workbench.py' -v
+      - name: Verify owner-quality Natasha narration cleanup
+        run: python3 -m unittest discover -s tests -p 'test_webbie_natural_speech.py' -v
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
