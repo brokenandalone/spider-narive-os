@@ -277,6 +277,8 @@ APP_FILES = (
     'studio/take_comp_dialog.py',
     'studio/take_effects.py',
     'studio/take_effects_dialog.py',
+    'studio/session_track_fx.py',
+    'studio/session_channel_strip.py',
     'studio/backing_cue.py',
     'studio/band_backing_worker.py',
     'the-web/shell/app_visuals.py',
