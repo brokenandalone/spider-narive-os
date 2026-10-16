@@ -85,6 +85,12 @@ def parse_request(message: str):
     if not phrase or len(phrase) > 180:
         return None
     direct = phrase.casefold().strip()
+    if direct in (
+        "check kali diagnostics", "show kali diagnostics",
+        "check kali bay diagnostics", "show kali bay diagnostics",
+        "run kali doctor", "check kali doctor",
+    ):
+        return ("doctor", None)
     if direct in ("open kali terminal", "open kali linux terminal",
                   "launch kali terminal", "open kali shell"):
         return ("shell", None)
@@ -180,6 +186,22 @@ def handle_kali_request(message: str, manager=None, *,
             "The Kali Bay manager isn't available here. "
             "I haven't started or changed anything."
         )
+    if operation == "doctor":
+        # The audited manager already implements this exact read-only
+        # operation. No command arguments come from model text.
+        try:
+            checked = subprocess.run(
+                [str(command), "doctor"], capture_output=True,
+                text=True, timeout=22, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return "Kali Bay's read-only diagnostics were unavailable."
+        if checked.returncode:
+            return "Kali Bay doctor could not complete: " + _excerpt(
+                checked.stderr or checked.stdout, 600)
+        return ("Kali Bay diagnostics (read only):\\n" +
+                _excerpt(checked.stdout, 1500) +
+                "\\nI did not start a container, change packages or run scans.")
     if operation in ("apps", "search_apps"):
         # Fixed read-only query against real Kali package .desktop inventory.
         # Application metadata is untrusted and never executable input.
