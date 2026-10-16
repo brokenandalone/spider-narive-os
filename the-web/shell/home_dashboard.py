@@ -169,7 +169,7 @@ class SpiderHomeDashboard(QWidget):
         for index, button in enumerate(self.focus_buttons):
             try:
                 button.clicked.disconnect()
-            except TypeError:
+            except (TypeError, RuntimeError):
                 pass
             if index >= len(focus):
                 button.hide()
