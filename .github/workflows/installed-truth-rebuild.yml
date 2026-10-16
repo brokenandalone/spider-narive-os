@@ -8,8 +8,10 @@ on:
     paths:
       - 'tools/spider_installed_truth.py'
       - 'tools/installed_truth_triage.py'
+      - 'tools/stage_installed_source.py'
       - 'tests/test_installed_truth_rebuild.py'
       - 'tests/test_installed_truth_triage.py'
+      - 'tests/test_stage_installed_source.py'
       - 'docs/INSTALLED_TRUTH_REBUILD_20261016.md'
       - '.github/workflows/installed-truth-rebuild.yml'
   workflow_dispatch:
@@ -24,11 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Verify read-only installed-source audit syntax
-        run: python3 -m py_compile tools/spider_installed_truth.py tests/test_installed_truth_rebuild.py tools/installed_truth_triage.py tests/test_installed_truth_triage.py
+        run: python3 -m py_compile tools/spider_installed_truth.py tests/test_installed_truth_rebuild.py tools/installed_truth_triage.py tests/test_installed_truth_triage.py tools/stage_installed_source.py tests/test_stage_installed_source.py
       - name: Verify safe local provenance and comparison
         run: python3 -m unittest discover -s tests -p 'test_installed_truth_rebuild.py' -v
       - name: Test triage against synthetic owner backup layout
         run: python3 -m unittest discover -s tests -p 'test_installed_truth_triage.py' -v
+      - name: Test checkout-only installed source staging
+        run: python3 -m unittest discover -s tests -p 'test_stage_installed_source.py' -v
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
