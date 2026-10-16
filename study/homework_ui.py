@@ -43,12 +43,15 @@ class DraftWorker(QThread):
 
 
 class HomeworkDialog(QDialog):
-    def __init__(self, parent=None, *, course="", assignment="", notes="", folder=None):
+    def __init__(self, parent=None, *, course="", assignment="", notes="", folder=None,
+                 store=None, course_id=None):
         super().__init__(parent)
         self.setWindowTitle("Webbie | Homework Assistant")
         self.resize(850, 830)
         self.course_folder = Path(folder) if folder else Path.home() / "Documents"
         self.notes = str(notes)
+        self.store = store
+        self.course_id = course_id
         self.worker = None
         self.last_mode = "draft"
         self.last_exported_path = None
@@ -107,6 +110,7 @@ class HomeworkDialog(QDialog):
         for label, handler in [
             ("Import local course document", self.import_local_material),
             ("Use school OneDrive document", self.import_school_material),
+            ("Select a saved course reading", self.import_course_reading),
         ]:
             button = QPushButton(label)
             button.clicked.connect(handler)
@@ -296,6 +300,23 @@ class HomeworkDialog(QDialog):
         self.add_selected_material("materials",
             "LOCAL COURSE FILE: " + Path(path).name +
             "\nUser-selected text, not a verified bibliographic citation:\n" + body)
+
+    def import_course_reading(self):
+        """Preview a saved course excerpt before making it draft material."""
+        if self.store is None or self.course_id is None:
+            QMessageBox.information(self, "Course readings",
+                                    "Choose an existing course in Study first.")
+            return
+        try:
+            if __package__:
+                from .reading_library_ui import ReadingLibraryDialog
+            else:
+                from reading_library_ui import ReadingLibraryDialog
+            picker = ReadingLibraryDialog(self.store, self.course_id, self, pick=True)
+            if picker.exec_() == QDialog.Accepted and picker.selected_excerpt:
+                self.add_selected_material("materials", picker.selected_excerpt)
+        except (OSError, ValueError, TypeError) as error:
+            QMessageBox.warning(self, "Course readings", str(error))
 
     def import_school_material(self):
         try:
