@@ -12,12 +12,14 @@ from PyQt5.QtCore import Qt, QProcess
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QApplication,QCheckBox,QDialog,QHBoxLayout,QLabel,QPushButton,QTextEdit,
-    QVBoxLayout,QWidget)
+    QVBoxLayout,QWidget,QMessageBox)
 
 try:
     from .install_for_user import verify,install
+    from .remove_beta import remove_version
 except ImportError:
     from install_for_user import verify,install
+    from remove_beta import remove_version
 
 BUNDLE=Path(__file__).resolve().parent
 
@@ -44,7 +46,7 @@ class SpiderAudioSetup(QDialog):
         title=QLabel("SPIDER AUDIO STUDIO")
         title.setStyleSheet("font-size:26px;font-weight:800;color:#c6a4ff")
         root.addWidget(title)
-        tag=QLabel("0.15 PRIVATE BETA • Native music recording and production")
+        tag=QLabel("0.16 PRIVATE BETA • Native music recording and production")
         tag.setStyleSheet("color:#d0b7f5")
         root.addWidget(tag)
         paragraph=QLabel(
@@ -82,6 +84,10 @@ class SpiderAudioSetup(QDialog):
         self.launch_button.clicked.connect(self.launch)
         buttons.addWidget(self.launch_button)
         root.addLayout(buttons)
+        self.remove_button=QPushButton("Remove this installed beta")
+        self.remove_button.setEnabled(False)
+        self.remove_button.clicked.connect(self.remove_installed_beta)
+        root.addWidget(self.remove_button)
         self.result=QLabel("Nothing has been installed.")
         self.result.setWordWrap(True)
         root.addWidget(self.result)
@@ -120,6 +126,7 @@ class SpiderAudioSetup(QDialog):
         try:
             location,desktop=install(self.bundle)
             self.installed=location
+            self.remove_button.setEnabled(True)
             self.result.setText(
                 "Installed. Open 'Spider Audio Studio (Beta)' from your "
                 "application menu, or click Run Studio.")
@@ -131,6 +138,28 @@ class SpiderAudioSetup(QDialog):
         except (OSError,ValueError,subprocess.SubprocessError) as error:
             self.result.setText("Install was not completed; source music was not altered.")
             self.log.setPlainText("Install blocked:\n"+str(error)[:2000])
+
+    def remove_installed_beta(self):
+        """Remove only this exact verified version after explicit confirmation."""
+        if self.installed is None:
+            return
+        answer=QMessageBox.question(
+            self,"Remove Spider Audio Studio Beta",
+            "Remove only this installed beta version and its menu shortcut? "
+            "Your songs, mixes, other versions and Spider OS will remain. "
+            "Modified installations will be protected instead of deleted.",
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No)
+        if answer!=QMessageBox.Yes:
+            return
+        try:
+            info=verify(self.installed)
+            remove_version(info["version"])
+            self.installed=None
+            self.remove_button.setEnabled(False)
+            self._update_install_permission()
+            self.result.setText("This beta version was removed. Your songs remain untouched.")
+        except (OSError,ValueError,subprocess.SubprocessError) as error:
+            self.result.setText("Removal safely blocked: "+str(error)[:240])
 
     def test_audio_engine(self):
         """Background offline FFmpeg test; never activates audio input/output."""
