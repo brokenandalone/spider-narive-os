@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 SPIDER_UUID = "b8b48e84-c748-4741-9b94-a2f5bab50ca6"
 ROOT_DEVICE = "/dev/mapper/kali--vg-root"
@@ -118,6 +119,27 @@ def inspect(device: str, stub: Path, root_boot: Path) -> tuple[str, str, str, in
     return cfg, old, args, free
 
 
+def verify_bytes(device: str, old: str, root_boot: Path) -> None:
+    """Compare complete SHA256 hashes without mounting or writing to sda1.
+
+    debugfs 'dump' writes temporary copies to /var/tmp on the *root* disk.
+    Temporary files are removed after the comparison; sda1 remains read-only.
+    """
+    with tempfile.TemporaryDirectory(prefix="spider-boot-verify-", dir="/var/tmp") as stage:
+        for basename in (f"vmlinuz-{old}", f"initrd.img-{old}"):
+            dest = Path(stage) / basename
+            source = root_boot / basename
+            debugfs(device, f"dump /{basename} {dest}")
+            if not dest.is_file() or dest.stat().st_size != source.stat().st_size:
+                raise ValueError(f"Copied file size mismatch for {basename}")
+            first, second = sha256(dest), sha256(source)
+            if first != second:
+                raise ValueError(f"SHA256 MISMATCH: {basename} differs between sda1 and root /boot")
+            print(f"SHA256 MATCH: {basename} ({first})")
+    print("Both boot files are byte-for-byte identical to the main /boot copies.")
+    print("No file on /dev/sda1 or in /boot was modified.")
+
+
 def make_candidate(cfg: str, new_version: str, new_kernel_bytes: int,
                    new_initrd_bytes: int, free_bytes: int) -> str:
     if not VERSION.fullmatch(new_version):
@@ -155,7 +177,7 @@ def make_candidate(cfg: str, new_version: str, new_kernel_bytes: int,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=["audit", "prepare"])
+    parser.add_argument("mode", choices=["audit", "verify", "prepare"])
     parser.add_argument("--device", default="/dev/sda1")
     parser.add_argument("--efi-stub", type=Path, default=EFI_STUB)
     parser.add_argument("--root-boot", type=Path, default=Path("/boot"))
@@ -167,6 +189,9 @@ def main() -> int:
     try:
         cfg, old, old_args, free = inspect(args.device, args.efi_stub, args.root_boot)
         if args.mode == "audit":
+            return 0
+        if args.mode == "verify":
+            verify_bytes(args.device, old, args.root_boot)
             return 0
         new_kernel = args.root_boot / f"vmlinuz-{args.version}"
         new_initrd = args.root_boot / f"initrd.img-{args.version}"
