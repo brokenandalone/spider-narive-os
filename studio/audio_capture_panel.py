@@ -127,6 +127,7 @@ class AudioCapturePanel(QWidget):
         layout.addLayout(tracks)
         action=QHBoxLayout()
         self.record_btn=self._button("● Record New WAV Take",self.record)
+        self.record_btn.setEnabled(False)
         self.stop_btn=self._button("■ Stop and Save Take",self.stop)
         self.stop_btn.setEnabled(False)
         self.export_btn=self._button("Create Multitrack Session",self.export_multitrack)
@@ -134,6 +135,11 @@ class AudioCapturePanel(QWidget):
         action.addWidget(self.stop_btn)
         action.addWidget(self.export_btn)
         layout.addLayout(action)
+        session_action=QHBoxLayout()
+        self.arrange_btn=self._button(
+            "Open Recorded Takes in Studio Multitrack Editor",self.open_multitrack)
+        session_action.addWidget(self.arrange_btn)
+        layout.addLayout(session_action)
         level_row=QHBoxLayout()
         level_row.addWidget(QLabel("INPUT PEAK"))
         self.peak=QProgressBar()
@@ -252,6 +258,28 @@ class AudioCapturePanel(QWidget):
             self.status.setText(
                 "Created a private multitrack session: "+result+
                 ". Open its copied WAV tracks in your preferred DAW.")
+
+    def open_multitrack(self):
+        """Reuse the EXISTING native multitrack mixer/dialog, not a launcher."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current recording or export first.")
+            return
+        if not self.takes:
+            self.status.setText("Record a real WAV take before opening the multitrack editor.")
+            return
+        try:
+            if __package__:
+                from .multitrack_dialog import MultitrackDialog
+            else:
+                from multitrack_dialog import MultitrackDialog
+            editor=MultitrackDialog(
+                seed_tracks=list(self.takes),
+                title=self.project_title.text().strip() or "Spider Recording",
+                parent=self)
+            editor.tempo.setValue(self.tempo.value())
+            editor.exec_()
+        except (OSError,ValueError,RuntimeError,SessionError) as exc:
+            self.status.setText("Cannot open the recorded multitrack editor: "+str(exc)[:250])
 
     def export_multitrack(self):
         if self.worker is not None and self.worker.isRunning():
