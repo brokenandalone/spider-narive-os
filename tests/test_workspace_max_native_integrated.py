@@ -15,7 +15,9 @@ class NativeMaxIntegrationTests(unittest.TestCase):
 
     def test_native_original_app_kept(self):
         self.assertIn("create_native(name, SPIDER_ROOT)", SHELL)
-        self.assertIn("native = WebbiePanel(SPIDER_ROOT)", SHELL)
+        self.assertIn("WebbieNativeOperations(", SHELL)
+        self.assertIn("self.webbie_assistant,", SHELL)
+        self.assertIn("native.setObjectName('webbieResidentBayOverview')", SHELL)
         self.assertIn("native = MediaPanel(self.launch_media)", SHELL)
         self.assertIn("workspace_tabs.addTab(area, 'Native workspace')", SHELL)
         self.assertIn("workspace_tabs.addTab(surface, 'Native workspace')", SHELL)
