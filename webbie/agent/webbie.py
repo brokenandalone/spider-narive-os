@@ -669,12 +669,21 @@ def handle_command(command, voice=False, expected_turn=None,
         allowed=(grant.get('authorized') is True and
                  grant.get('paused') is False)
         console_reply=perform_console_request(command,authorized=allowed)
+    # A literal, read-only Kali diagnostic uses the already-installed manager.
+    # Other Kali tools remain on their existing verified/authorized routes.
+    from kali_assistant import parse_request as parse_kali_request, handle_kali_request
+    kali_doctor_reply = (
+        handle_kali_request(command)
+        if parse_kali_request(command) == ("doctor", None) else None
+    )
     native_bay = native_bay_request(command)
     if native_bay is not None:
         # This is the ORIGINAL user utterance, after speaker verification.
         # The model cannot produce commands here, and the GUI must also
         # have a pre-existing owner-approved desktop authorization.
         reply = request_native_bay(native_bay)
+    elif kali_doctor_reply is not None:
+        reply = kali_doctor_reply
     elif console_reply is not None:
         reply=console_reply
     elif navigation_reply is not None:
