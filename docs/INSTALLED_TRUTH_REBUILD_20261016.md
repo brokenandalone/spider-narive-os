@@ -128,3 +128,60 @@ extra work in `webbie/actions/task_grants.py`,
 Do **not** merge the PC overlay wholesale. Review changed symbols,
 interfaces, tests, and live runtime behavior, then integrate differences in
 component-specific commits after code review.
+
+## Actual owner-source integration round 1: Webbie AI V2 (2026-10-16)
+
+A source-review archive matching SHA-256
+`0b10f3dec0d1ed69445550093a61c7c50dfdc600fcbe14fbb59ef888e5e0cb7c`
+was supplied privately in conversation. It contains 39 Git patch targets and eight
+additional owner source modules, totalling 10 ZIP entries. The **private review
+archive itself has not been committed to this public repository**.
+
+**Merged into this development branch:**
+
+- `webbie/agent/webbie_ai_isolation.py`: existing owner-tested bounded process IPC,
+  refined to forward the newer source tree's `advisory_context` argument and
+  reject a symlink at the log destination.
+- `webbie/agent/webbie_ai_worker.py`: existing V2 full-brain-first model worker,
+  bounded local Qwen3 8B fallback; passes workspace advisory context into primary.
+- `webbie/agent/webbie_brain_primary.py`: original full-memory brain worker,
+  preserving its original `respond(..., advisory_context=...)` contract.
+- `webbie/agent/webbie.py`: **only** switches the AI reply import. Keeps GitHub's
+  owner speaker verification, interrupted speech/STOP semantics, browser permission
+  checks, guarded desktop actions, model status handling and atomic privacy-aware
+  runtime state.
+- `webbie/config/default.json`, `webbie/brain/brain.py`: select the owner's
+  verified `qwen3:8b` model, preserving Natasha, the Author/Study/Studio address
+  settings, privacy, proactive monitor and speaker-verification configuration.
+- `system/release_batch.py`: explicitly includes all three new worker modules
+  in the guarded release inventory. There is **no installer execution**.
+- `tests/test_webbie_ai_v2_reconciliation.py` and the dedicated GitHub source
+  workflow provide regression checks for these preserved interfaces.
+
+**Explicitly rejected wholesale replacement** from the installed patch:
+
+- Installed `webbie/agent/webbie.py` removes the newer GitHub voice trust,
+  cancellation, privacy-aware state and additional authorization flows.
+- Installed `webbie/config/default.json` omits GitHub's explicit speaker
+  verification and proactive settings. Only the owner's local 8B model selection
+  is ported.
+- Installed `webbie/voice/speaker_gate.py` treats incomplete enrollment as
+  `"bypass"`; that is **not evidence of an authorized speaker**. This module
+  was NOT merged or enabled. Existing GitHub fail-closed trust remains.
+- Installed `the-web/shell/main.py` drops newer immersive bays and native
+  advanced tabs. Installed `studio/main.py` removes audio-panel and MIDI
+  lifecycle protections. Both newer GitHub implementations are retained.
+- Other 37 installed changed-source files and five additional owner-source
+  modules are still under review. The three worker files are the **only**
+  additional installed-source modules merged in this round.
+
+**Validation status:** source and regression test code committed; the newly
+merged GitHub code has **not** been live-tested on the owner's PC or verified
+to pass hosted CI. A previous installed Webbie V2 full-brain AI text/voice
+exchange worked with Natasha in ~6.73 seconds; the merged source has additional
+compatibility and safety behavior, so that result must NOT be represented as a
+live test of this GitHub build.
+
+This branch is **not ready to install or flash**. Do not replace the
+working resident Webbie, destroy newer bay source, automatically merge
+the entire owner patch, or push a private archive into a public repo.
