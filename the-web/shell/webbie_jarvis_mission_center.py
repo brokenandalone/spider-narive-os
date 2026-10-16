@@ -20,6 +20,7 @@ sys.path.insert(0,str(ROOT/"webbie/actions"))
 from jarvis_orchestrator import JarvisCore
 
 CHOICES=(
+    ("Review whole project: files, TODOs and site assets","project.review"),
     ("Search selected folder","local.evidence"),
     ("Audit a website project","site.audit"),
     ("Host local website preview (127.0.0.1)","site.preview"),
@@ -136,10 +137,10 @@ class JarvisMissionCenter(QDialog):
     def refresh(self):
         action=self.action.currentData()
         needs_folder=action in ("local.evidence","site.audit",
-                                "site.preview","project.overview")
+                                "site.preview","project.overview","project.review")
         self.choose.setEnabled(needs_folder)
         self.query.setEnabled(action in (
-            "local.evidence","project.overview","forage.web"))
+            "local.evidence","project.overview","project.review","forage.web"))
         running=self.worker is not None and self.worker.isRunning()
         self.run_button.setEnabled(not running and
                                    (not needs_folder or bool(self.folder)))
@@ -153,7 +154,7 @@ class JarvisMissionCenter(QDialog):
             return
         selected=self.action.currentData()
         if selected in ("local.evidence","site.audit",
-                        "site.preview","project.overview") and not self.folder:
+                        "site.preview","project.overview","project.review") and not self.folder:
             self.report.setPlainText("Select a project folder first.")
             return
         self.worker=JarvisMissionWorker(
