@@ -46,6 +46,18 @@ class WaveformThumbnail(QWidget):
             x1=left+round(cut_in*w/length)
             x2=left+round(cut_out*w/length)
             p.fillRect(x1,top,max(0,x2-x1),h,QColor("#352451"))
+            retained=max(1,x2-x1)
+            keep_seconds=max(.001,(cut_out-cut_in)/1000)
+            fade_start=round(retained*min(1,self.owner.fade_in.value()/1000/keep_seconds))
+            fade_end=round(retained*min(1,self.owner.fade_out.value()/1000/keep_seconds))
+            if fade_start:
+                p.fillRect(x1,top,fade_start,h,QColor(19,15,33,120))
+                p.setPen(QPen(QColor("#f1bd96"),1))
+                p.drawLine(x1,top+h,x1+fade_start,top)
+            if fade_end:
+                p.fillRect(x2-fade_end,top,fade_end,h,QColor(19,15,33,120))
+                p.setPen(QPen(QColor("#f1bd96"),1))
+                p.drawLine(x2-fade_end,top,x2,top+h)
             p.setPen(QPen(QColor("#b7a0e0"),1))
             n=len(self.owner.peaks)
             for i,peak in enumerate(self.owner.peaks):
@@ -60,7 +72,7 @@ class WaveformThumbnail(QWidget):
             p.setFont(QFont("Sans Serif",9))
             p.drawText(left,self.height()-5,"Source 0:00")
             label=f"Source {self.owner.source_duration_ms/1000:.3f} s"
-            p.drawText(left+w-145,self.height()-5,145,18,Qt.AlignRight,label)
+            p.drawText(left+w-145,self.height()-22,145,20,Qt.AlignRight,label)
         finally:
             p.end()
 
@@ -125,7 +137,8 @@ class TrackClipDialog(QDialog):
         layout.addLayout(fields)
         self.preview=WaveformThumbnail(self)
         layout.addWidget(self.preview)
-        for knob in (self.start,self.end,self.position):
+        for knob in (self.start,self.end,self.position,
+                     self.fade_in,self.fade_out):
             knob.valueChanged.connect(self.preview.update)
         self.status=QLabel("The highlighted section will be kept in the offline mix.")
         self.status.setWordWrap(True)
