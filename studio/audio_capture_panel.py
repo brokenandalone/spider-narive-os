@@ -20,6 +20,8 @@ try:
     from .audio_overdub_engine import available_outputs,capture_overdub
     from .backing_cue import validate_recordable_cue
     from .overdub_transport import transport_plan
+    from .session_qc import analyze_wav
+    from .multitrack import SessionError
 except ImportError:
     from audio_capture_engine import (
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
@@ -27,8 +29,23 @@ except ImportError:
     from audio_overdub_engine import available_outputs,capture_overdub
     from backing_cue import validate_recordable_cue
     from overdub_transport import transport_plan
+    from session_qc import analyze_wav
+    from multitrack import SessionError
 
 TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
+
+def _inspect_finished_take(result):
+    """Read-only bounded QC preview after the recording device closes.
+
+    QC failure cannot delete or modify a successfully recorded owner WAV.
+    This checks only first/last two seconds: it is NOT a master/loudness test.
+    """
+    try:
+        result["sampled_qc"] = analyze_wav(result["path"],edge_seconds=2)
+    except (OSError,SessionError,ValueError):
+        result["quality_note"] = "WAV saved; sampled quality analysis unavailable"
+    return result
+
 
 class CaptureWorker(QThread):
     recorded=pyqtSignal(object,str)
@@ -47,7 +64,7 @@ class CaptureWorker(QThread):
                 bit_depth=self.depth,
                 stop=self.stop_event,
                 on_level=lambda peak,rms,seconds:self.levels.emit(peak,rms,seconds))
-            self.recorded.emit(result,"")
+            self.recorded.emit(_inspect_finished_take(result),"")
         except (OSError,ValueError,RuntimeError,FileExistsError) as exc:
             self.recorded.emit(None,str(exc)[:340])
 
@@ -83,7 +100,7 @@ class OverdubWorker(QThread):
                 punch_start_ms=self.punch_start_ms,punch_end_ms=self.punch_end_ms,
                 stop=self.stop_event,
                 on_level=lambda peak,rms,seconds:self.levels.emit(peak,rms,seconds))
-            self.recorded.emit(result,"")
+            self.recorded.emit(_inspect_finished_take(result),"")
         except (OSError,ValueError,RuntimeError,FileExistsError) as exc:
             self.recorded.emit(None,str(exc)[:350])
 
@@ -488,9 +505,20 @@ class AudioCapturePanel(QWidget):
                 f"{len(self.takes):02d} · {result['role']} · "
                 f"{result['duration_seconds']:.1f}s · {result['sample_rate']} Hz · "
                 f"{result['channels']}ch · {result['sample_width_bits']}-bit · {path.name}")
-            self.status.setText(
+            message=(
                 "Captured real WAV: "+path.name+
                 ". You can record another take or create a multitrack DAW session.")
+            sampled=result.get("sampled_qc")
+            if isinstance(sampled,dict):
+                message+=(
+                    f" Sampled input peak {sampled.get('peak_dbfs')} dBFS "
+                    "(first/last 2 seconds only, not whole-song QC).")
+                warnings=sampled.get("warnings",[])
+                if warnings:
+                    message+=" Sampling warnings: "+"; ".join(warnings[:2])
+            elif result.get("quality_note"):
+                message+=" "+result["quality_note"]
+            self.status.setText(message)
         elif isinstance(result,str):
             self.last_session=Path(result)
             self.mix_btn.setEnabled(True)
