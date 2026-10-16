@@ -199,9 +199,9 @@ def handle_kali_request(message: str, manager=None, *,
         if checked.returncode:
             return "Kali Bay doctor could not complete: " + _excerpt(
                 checked.stderr or checked.stdout, 600)
-        return ("Kali Bay diagnostics (read only):\\n" +
+        return ("Kali Bay diagnostics (read only):\n" +
                 _excerpt(checked.stdout, 1500) +
-                "\\nI did not start a container, change packages or run scans.")
+                "\nI did not start a container, change packages or run scans.")
     if operation in ("apps", "search_apps"):
         # Fixed read-only query against real Kali package .desktop inventory.
         # Application metadata is untrusted and never executable input.
