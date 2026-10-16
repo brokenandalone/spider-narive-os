@@ -23,7 +23,7 @@ from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_
 from webbie_reminders_dialog import WebbieRemindersDialog
 from webbie_cognitive_center import WebbieCognitiveDialog
 from webbie_unified_workflow import WebbieUnifiedWorkflowDialog
-from webbie_jarvis_mission_center import JarvisMissionCenter
+from webbie_jarvis_mission_center import JarvisMissionCenter, JarvisCore
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
@@ -278,6 +278,8 @@ class WebbiePanel(QWidget):
         self.cognitive_dialog = None
         self.workflow_dialog = None
         self.jarvis_mission_dialog = None
+        # One mission controller shared by dock and embedded native bay.
+        self.jarvis_core = JarvisCore()
         self.unified_workflow = UnifiedWorkflow()
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
@@ -850,8 +852,14 @@ class WebbiePanel(QWidget):
         steps = [
             ("guided workflow", self.unified_workflow.stop),
         ]
+        # One shared JARVIS core is stopped whether either view has opened.
+        shared_core = getattr(self, 'jarvis_core', None)
+        if shared_core is not None:
+            steps.append(("shared JARVIS core", shared_core.stop))
         if self.jarvis_mission_dialog is not None:
-            steps.append(("JARVIS mission", self.jarvis_mission_dialog.core.stop))
+            mission_core = self.jarvis_mission_dialog.core
+            if mission_core is not shared_core:
+                steps.append(("JARVIS mission", mission_core.stop))
         if self.computer_dialog is not None:
             steps.append(("computer control", self.computer_dialog.stop))
         steps.extend((
@@ -909,7 +917,8 @@ class WebbiePanel(QWidget):
         """Single entrypoint to owner-scoped local research/diagnostics."""
         if self.jarvis_mission_dialog is None:
             self.jarvis_mission_dialog=JarvisMissionCenter(
-                self,stop_callback=self.stop_sensitive_actions)
+                self,core=self.jarvis_core,
+                stop_callback=self.stop_sensitive_actions)
         self.jarvis_mission_dialog.show()
         self.jarvis_mission_dialog.raise_()
         self.jarvis_mission_dialog.activateWindow()
