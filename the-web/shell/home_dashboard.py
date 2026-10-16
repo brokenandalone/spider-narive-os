@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import Counter
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QFrame, QGridLayout, QLabel, QPushButton,
+from PyQt5.QtWidgets import (QApplication, QFrame, QGridLayout, QLabel, QPushButton,
                               QScrollArea, QVBoxLayout, QWidget)
 
 from app_catalog import VISIBLE_WORKSPACES
@@ -77,6 +77,19 @@ def focus_queue(missions, limit=6):
     selected.sort(key=lambda entry: (entry[0], entry[1]))
     return [row for _priority, _index, row in selected[:limit]]
 
+def mission_brief(missions, *, limit=20):
+    """Owner-requested plaintext handoff; never includes paths or IDs."""
+    if type(limit) is not int or not 1 <= limit <= 20:
+        raise ValueError("Brief limit must be 1..20")
+    lines = ["SPIDER OS / MISSION BRIEF", "Blocked work first; private paths excluded."]
+    items = focus_queue(missions, limit=limit)
+    if not items:
+        lines.append("No unfinished missions.")
+    for item in items:
+        title = " ".join(item["title"].split())
+        lines.append(f'[{item["status"].upper()}] {item["bay_name"]}: {title}')
+    return "\\n".join(lines)
+
 
 class SpiderHomeDashboard(QWidget):
     def __init__(self, workspace_opener, installed_supplier, parent=None, store=None):
@@ -109,6 +122,10 @@ class SpiderHomeDashboard(QWidget):
         self.focus_status = QLabel("No pending missions.")
         self.focus_status.setWordWrap(True)
         root.addWidget(self.focus_status)
+        brief_button = QPushButton("Copy Mission Brief (no project paths)")
+        brief_button.setToolTip("Copies unfinished mission titles only, on your command.")
+        brief_button.clicked.connect(self.copy_mission_brief)
+        root.addWidget(brief_button)
         self.focus_buttons = []
         for _ in range(6):
             focus_button = QPushButton("")
@@ -149,6 +166,19 @@ class SpiderHomeDashboard(QWidget):
         scroll.setWidget(contents)
         root.addWidget(scroll, 1)
         self.refresh()
+
+    def copy_mission_brief(self):
+        try:
+            contents = mission_brief(self.store.read())
+        except (ValueError, OSError):
+            self.status.setText("Could not read missions. Clipboard unchanged.")
+            return
+        clipboard = QApplication.clipboard()
+        if clipboard is None:
+            self.status.setText("Clipboard is unavailable.")
+            return
+        clipboard.setText(contents)
+        self.status.setText("Mission brief copied. No linked folder paths or IDs included.")
 
     def refresh(self):
         try:
