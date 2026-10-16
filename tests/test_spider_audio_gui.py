@@ -74,6 +74,8 @@ class StudioProductionGUITests(unittest.TestCase):
         self.assertIn("midi.disconnect()", source)
         self.assertIn("self.tool_tabs.addTab(auto_scroll, 'Auto Performer · Scores & TAB')", source)
         self.assertIn("self.tool_tabs.addTab(capture_scroll, 'Record Audio · Multitrack')", source)
+        self.assertIn("self.auto_performer_panel.backing_cue_ready.connect(self._handoff_virtual_band)", source)
+        self.assertIn("self.song_production_panel.backing_cue_ready.connect(self._handoff_virtual_band)", source)
         self.assertIn("self.tool_tabs.addTab(self.score_timeline_panel", source)
         self.assertNotIn("self.tool_tabs.addTab(auto_scroll, 'Sheet Music & TAB Autoplay')", source)
         self.assertIn("from .song_production_panel import SongProductionPanel", source)
@@ -180,6 +182,54 @@ class StudioProductionGUITests(unittest.TestCase):
                     self.assertIsNotNone(panel.last_session)
             finally:
                 panel.close()
+
+    def test_virtual_band_backing_is_selected_without_opening_devices(self):
+        from tempfile import TemporaryDirectory
+        from fractions import Fraction
+        import wave
+        from studio.audio_capture_panel import AudioCapturePanel
+        from studio.auto_performer_panel import AutoPerformerPanel
+        from studio.score_performer import Performance,Note,Part
+        from studio.instruments_engine import Pattern
+        from studio.song_production_panel import SongProductionPanel
+        from studio.instrument_workbench import InstrumentWorkbench
+        with TemporaryDirectory() as directory:
+            cue=Path(directory)/"Spider-Band-Test.wav"
+            with wave.open(str(cue),"wb") as output:
+                output.setnchannels(2)
+                output.setsampwidth(2)
+                output.setframerate(44100)
+                output.writeframes(b"\\x20\\x00\\x20\\x00"*44100)
+            recorder=AudioCapturePanel()
+            score_panel=AutoPerformerPanel()
+            workbench=InstrumentWorkbench()
+            song_panel=SongProductionPanel(workbench)
+            try:
+                score_panel.backing_cue_ready.connect(recorder.load_generated_cue)
+                score_panel._backing_rendered(True,str(cue),44100,"")
+                self.assertEqual(recorder.cue_file.text(),str(cue))
+                self.assertEqual(recorder.rate.currentData(),44100)
+                self.assertIsNone(recorder.worker)
+                self.assertEqual(recorder.input.count(),0)
+                self.assertEqual(recorder.output_device.count(),0)
+                self.assertFalse(recorder.overdub_btn.isEnabled())
+                song_panel.backing_cue_ready.connect(recorder.load_generated_cue)
+                song_panel._finished_backing(True,str(cue),44100,"")
+                self.assertEqual(recorder.cue_file.text(),str(cue))
+                self.assertEqual(recorder.input.count(),0)
+                # Never replace the backing while another take is active.
+                class Busy:
+                    def isRunning(self): return True
+                recorder.worker=Busy()
+                recorder.cue_file.clear()
+                self.assertFalse(recorder.load_generated_cue(str(cue),44100))
+                self.assertFalse(recorder.cue_file.text())
+                recorder.worker=None
+            finally:
+                song_panel.close()
+                workbench.close()
+                score_panel.close()
+                recorder.close()
 
     def test_note_editor_actually_changes_auto_performer_with_undo(self):
         from studio.score_timeline_panel import ScoreTimelinePanel
