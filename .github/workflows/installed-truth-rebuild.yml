@@ -23,6 +23,9 @@ on:
       - 'tests/test_webbie_heretic_lab.py'
       - 'tests/test_author_native_voice_navigation.py'
       - 'tests/test_studio_reconciled_band_workbench.py'
+      - 'tests/test_study_saved_reading_handoff.py'
+      - 'study/homework_ui.py'
+      - 'study/study.py'
       - 'tests/test_webbie_natural_speech.py'
       - 'author/commands.py'
       - 'author/control_socket.py'
@@ -101,6 +104,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_studio_reconciled_band_workbench.py' -v
       - name: Verify owner-quality Natasha narration cleanup
         run: python3 -m unittest discover -s tests -p 'test_webbie_natural_speech.py' -v
+      - name: Verify saved Study course-reading integration
+        run: python3 -m unittest discover -s tests -p 'test_study_saved_reading_handoff.py' -v
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
