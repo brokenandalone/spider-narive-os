@@ -27,10 +27,12 @@ try:
     from .audio_capture_engine import (
         _backend, _levels, _validate, CaptureError, MAX_SECONDS, QUEUE_LIMIT,
         BLOCK_FRAMES, RATES)
+    from .overdub_transport import transport_plan, write_aligned_punch
 except ImportError:
     from audio_capture_engine import (
         _backend, _levels, _validate, CaptureError, MAX_SECONDS, QUEUE_LIMIT,
         BLOCK_FRAMES, RATES)
+    from overdub_transport import transport_plan, write_aligned_punch
 
 MAX_CUE_BYTES = MAX_SECONDS * 48000 * 2 * 2
 CHUNK = 32768
@@ -79,50 +81,18 @@ def _read_cue(path, rate, destination):
         data = bytes(stereo)
     return data, frames
 
-def _aligned_copy(raw_path, wav, captured_frames, total_frames, shift):
-    """Write exactly total_frames samples with zero-padding and integer shift.
-
-    Positive shift moves captured input earlier: drop leading captured frames
-    and append silence. Negative shift moves input later: prepend silence.
-    The source cue is never mixed or re-encoded into the recorded track.
-    """
-    if abs(shift) > total_frames:
-        raise CaptureError("Latency adjustment exceeds backing track duration")
-    channels = wav.getnchannels()
-    unit = channels * 2
-    wav.setnchannels(channels)
-    with Path(raw_path).open("rb") as stream:
-        if shift >= 0:
-            stream.seek(min(shift, captured_frames) * unit)
-            copied = max(0, captured_frames - shift)
-            prepend = 0
-        else:
-            copied = min(captured_frames, total_frames + shift)
-            prepend = -shift
-        prepend = min(total_frames, prepend)
-        remaining = total_frames
-        while prepend > 0:
-            count = min(CHUNK, prepend)
-            wav.writeframesraw(bytes(count * unit))
-            prepend -= count
-            remaining -= count
-        to_copy = min(max(0,copied), remaining)
-        while to_copy > 0:
-            count = min(CHUNK, to_copy)
-            data = stream.read(count*unit)
-            if len(data) != count*unit:
-                raise CaptureError("Captured PCM was truncated during alignment")
-            wav.writeframesraw(data)
-            to_copy -= count
-            remaining -= count
-        while remaining > 0:
-            count = min(CHUNK, remaining)
-            wav.writeframesraw(bytes(count * unit))
-            remaining -= count
+def _aligned_copy(raw_path, wav, captured_frames, total_frames, shift,
+                  *, punch_start=0, punch_end=None):
+    # Compatibility wrapper for earlier exported recording sessions.
+    return write_aligned_punch(
+        raw_path,wav,captured_frames,total_frames,shift,
+        punch_start=punch_start,punch_end=punch_end)
 
 def capture_overdub(destination, *, cue, input_device, output_device,
                     role, channels=1, rate=48000, latency_ms=0, max_seconds=300,
-                    stop=None, on_level=None, backend=None):
+                    stop=None, on_level=None, backend=None,
+                    tempo=120, beats_per_bar=4, count_in_bars=0,
+                    punch_start_ms=None, punch_end_ms=None):
     """Full-duplex 16-bit capture, sample-indexed to a chosen cue WAV.
 
     Playback and capture share one PortAudio callback. The returned WAV
@@ -140,6 +110,10 @@ def capture_overdub(destination, *, cue, input_device, output_device,
         raise CaptureError("Selected maximum recording time must cover the entire cue")
     if cue_frames > 48000 * MAX_SECONDS:
         raise CaptureError("Backing cue is too long")
+    transport=transport_plan(
+        rate=rate,cue_frames=cue_frames,tempo=tempo,
+        beats_per_bar=beats_per_bar,count_in_bars=count_in_bars,
+        punch_start_ms=punch_start_ms,punch_end_ms=punch_end_ms)
     stopped = stop if stop is not None else threading.Event()
     if stopped.is_set():
         raise CaptureError("Overdub was cancelled before opening devices")
@@ -147,15 +121,10 @@ def capture_overdub(destination, *, cue, input_device, output_device,
     raw_queue = queue.Queue(maxsize=QUEUE_LIMIT)
     cue_view = memoryview(cue_data)
     state = {"sent": 0, "fault": None}
-    # The callback must never block on disk writes.
+    # The callback must never block on disk writes or synthesize metronome.
+    # Intro frames have NO recorded content and do not shift song timeline.
     def callback(indata, outdata, frames, stream_time, status):
-        remaining = max(0, cue_frames - state["sent"])
-        wanted = min(frames, remaining) if not stopped.is_set() else 0
-        # Always initialize the whole output buffer to avoid leaking old data.
         outdata[:] = bytes(len(outdata))
-        if wanted:
-            start = state["sent"] * 4
-            outdata[:wanted*4] = cue_view[start:start+wanted*4]
         if status:
             state["fault"] = "Full-duplex input/output underflow or overflow; discard take"
             stopped.set()
@@ -165,16 +134,30 @@ def capture_overdub(destination, *, cue, input_device, output_device,
             state["fault"] = "Invalid full-duplex audio callback frame layout"
             stopped.set()
             return
-        if wanted:
+        remaining=max(0,transport.total_frames-state["sent"])
+        wanted=min(frames,remaining) if not stopped.is_set() else 0
+        if not wanted:
+            return
+        begin=state["sent"]
+        # Pre-count is audible only in headphone cue, never recorded.
+        intro=min(wanted,max(0,transport.intro_frames-begin))
+        if intro:
+            outdata[:intro*4]=transport.intro_pcm[begin*4:(begin+intro)*4]
+        active=wanted-intro
+        if active:
+            cue_offset=begin+intro-transport.intro_frames
+            outdata[intro*4:wanted*4]=cue_view[
+                cue_offset*4:(cue_offset+active)*4]
             try:
-                # Preserve input and output frame alignment; no wall-clock drift.
-                raw_queue.put_nowait((state["sent"], bytes(indata[:wanted*channels*2]), wanted))
-            except (queue.Full, MemoryError, BufferError, ValueError):
-                state["fault"] = "Recording input queue overflow; discard take"
+                offset=intro*channels*2
+                block=bytes(indata[offset:offset+active*channels*2])
+                raw_queue.put_nowait((cue_offset,block,active))
+            except (queue.Full,MemoryError,BufferError,ValueError):
+                state["fault"]="Recording input queue overflow; discard take"
                 stopped.set()
                 return
-            state["sent"] += wanted
-        if state["sent"] >= cue_frames:
+        state["sent"]+=wanted
+        if state["sent"]>=transport.total_frames:
             stopped.set()
 
     raw_tmp = None
@@ -225,7 +208,9 @@ def capture_overdub(destination, *, cue, input_device, output_device,
                 wav.setnchannels(channels)
                 wav.setsampwidth(2)
                 wav.setframerate(rate)
-                _aligned_copy(raw_tmp, wav, frames_written, cue_frames, shift)
+                _aligned_copy(raw_tmp, wav, frames_written, cue_frames, shift,
+                              punch_start=transport.punch_start,
+                              punch_end=transport.punch_end)
                 wav.writeframes(b"")
             final.flush()
             os.fsync(final.fileno())
@@ -241,6 +226,11 @@ def capture_overdub(destination, *, cue, input_device, output_device,
             "timing":"single_duplex_callback_stream_clock",
             "compensation_ms":latency_ms,
             "cue_name":Path(cue).name,
+            "count_in_bars":count_in_bars,
+            "count_in_tempo":tempo,
+            "punch_start_ms":round(transport.punch_start*1000/rate),
+            "punch_end_ms":round(transport.punch_end*1000/rate),
+            "preroll_seconds":round(transport.intro_frames/rate,3),
         }
     finally:
         for path in (raw_tmp,wav_tmp):
