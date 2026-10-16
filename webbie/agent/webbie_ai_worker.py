@@ -19,7 +19,6 @@ HERE = Path(__file__).resolve().parent
 PRIMARY_PATH = HERE / "webbie_brain_primary.py"
 _PRIMARY = None
 _BUFFER = b""
-_HISTORY = []
 
 
 def _log(label, **fields):
@@ -123,19 +122,15 @@ def _fallback_reply(message, context_name):
     parsed = urllib.parse.urlsplit(url)
     if (parsed.scheme, parsed.hostname, parsed.path) != ("http", "127.0.0.1", "/api/chat"):
         raise ValueError("Ollama fallback must use loopback /api/chat")
-    if parsed.username or parsed.password or parsed.query or parsed.fragment:
-        raise ValueError("Unexpected Ollama URL components")
-    recent = [
-        {"role": role, "content": content[:900]}
-        for role, content in _HISTORY[-6:]
-    ]
+    if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.port != 11434:
+        raise ValueError("Unexpected Ollama URL components or port")
     messages = [{"role": "system", "content": (
         "You are Webbie, the resident assistant for Spider OS. "
         f"Address the user in the {context_name} workspace naturally. "
         "Answer accurately and concisely. Do not claim to have run tools, "
         "changed files, controlled devices or obtained root access. "
         "You are responding using local Ollama while the full brain recovers."
-    )}] + recent + [{"role": "user", "content": message[:6000]}]
+    )}] + [{"role": "user", "content": message[:6000]}]
     payload = {
         "model": "qwen3:8b", "stream": False, "think": False,
         "keep_alive": "30m",
@@ -150,7 +145,10 @@ def _fallback_reply(message, context_name):
     )
     start = time.monotonic()
     with urllib.request.urlopen(request, timeout=10) as response:
-        result_data = json.load(response)
+        raw = response.read(2_000_001)
+    if len(raw) > 2_000_000:
+        raise ValueError("Oversized local fallback response")
+    result_data = json.loads(raw.decode("utf-8"))
     result = str(result_data.get("message", {}).get("content") or "").strip()
     _log("FALLBACK_RETURNED", seconds=round(time.monotonic() - start, 2), chars=len(result))
     if not result:
@@ -185,10 +183,6 @@ def _answer(data):
             answer = ("My local AI reply is temporarily unavailable. "
                       "My desktop and built-in system commands are still available.")
             mode = "degraded"
-    if mode != "degraded":
-        _HISTORY.extend([("user", message[:900]), ("assistant", answer[:900])])
-        if len(_HISTORY) > 8:
-            del _HISTORY[:-8]
     _log("REQUEST_COMPLETE", mode=mode,
          seconds=round(time.monotonic() - start, 2))
     return {"id": request_id, "ok": True, "reply": answer}
