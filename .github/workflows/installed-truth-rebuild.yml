@@ -1,0 +1,33 @@
+name: Installed-truth rebuild source checks
+
+on:
+  push:
+    branches:
+      - rebuild/spider-os-installed-truth-20261016
+  pull_request:
+    paths:
+      - 'tools/spider_installed_truth.py'
+      - 'tests/test_installed_truth_rebuild.py'
+      - 'docs/INSTALLED_TRUTH_REBUILD_20261016.md'
+      - '.github/workflows/installed-truth-rebuild.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provenance-audit-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify read-only installed-source audit syntax
+        run: python3 -m py_compile tools/spider_installed_truth.py tests/test_installed_truth_rebuild.py
+      - name: Verify safe local provenance and comparison
+        run: python3 -m unittest discover -s tests -p 'test_installed_truth_rebuild.py' -v
+      - name: Enforce no invented PC snapshot in Git history
+        run: |
+          test ! -e docs/installed-pc-manifest.json
+          test ! -e installed-snapshot.tar.gz
+          test ! -e installed-snapshot.zip
+          echo 'Source checks passed. Live PC remains NOT YET RECONCILED.'
