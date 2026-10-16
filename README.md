@@ -1,3 +1,16 @@
+# Spider OS installed-truth rebuild branch (2026-10-16)
+
+> **IMPORTANT: not yet installable and not yet an exact copy of the PC.**
+> The owner's running Spider OS is based on **Ubuntu Studio 26.04.1** with
+> a working Webbie AI V2 + Natasha voice, native bays, and a customized Kali Bay.
+> The older 24.04.5 ISO directions below are legacy history, **not** the
+> release specification for this rebuild. Do not run the historical ISO builder
+> or overwrite the PC based on this branch. See
+> [Installed-Truth Rebuild](docs/INSTALLED_TRUTH_REBUILD_20261016.md)
+> and run the local read-only source audit before source synchronization.
+
+---
+
 # Spider Narive OS
 
 Native Spider OS development build based on Ubuntu Studio 24.04.5 and KDE Plasma.
