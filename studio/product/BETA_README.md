@@ -32,6 +32,28 @@ The Studio beta setup screen offers Check computer, Install for this user
 (after explicit acknowledgement), and Run Studio. Nothing is installed,
 recorded, shared, or overwritten just by opening the setup screen.
 
+## Built-in audio engine qualification
+
+The first-run **Test music engine** button (or
+`python3 run_spider_audio_studio.py --self-test`) makes **temporary
+synthetic WAV tracks** and tests the actual Studio importer, integrity
+checks, multitrack effects, multi-region song editing and final
+48 kHz stereo 24-bit WAV rendering. No personal music is opened and
+no microphone/speaker is activated by the test.
+
+**PASS only means the offline engine passed on that machine.** The
+separate testing of live sound output, MIDI, recording devices, USB
+latency and professional acoustic quality is still required.
+
+## Reliability and safe installation
+
+The versioned user installer copies all files into a new private
+staging directory and verifies them before publishing the application
+shortcut. A failed copy or verification cleans up that staging area.
+The same version can then be retried. Older version directories and
+recordings are not modified. Before choosing Install, the graphical
+setup requires a successful computer check and explicit beta agreement.
+
 ## Linux desktop beta setup (no sudo, no Spider OS replacement)
 
 Requires Python 3, PyQt5 with Qt Widgets, SVG and Qt Multimedia modules.
@@ -45,6 +67,7 @@ extracted `Spider-Audio-Studio-0.15.0-beta` folder:
 ```bash
 python3 run_spider_audio_studio.py --verify-only
 python3 run_spider_audio_studio.py --doctor
+python3 run_spider_audio_studio.py --self-test
 python3 install_for_user.py --check
 python3 install_for_user.py --install
 ```
