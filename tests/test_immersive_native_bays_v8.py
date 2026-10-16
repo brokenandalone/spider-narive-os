@@ -28,6 +28,13 @@ class NativeImmersiveBays(unittest.TestCase):
         compile(self.scene, str(SCENE_FILE), "exec")
         compile(self.shell, str(SHELL_FILE), "exec")
 
+    def test_owner_svg_background_preserved_with_fallback(self):
+        self.assertIn("from PyQt5.QtSvg import QSvgRenderer", self.scene)
+        self.assertIn("from app_visuals import app_art", self.scene)
+        self.assertIn("self.svg_background.render(painter", self.scene)
+        self.assertIn("painter.fillRect(self.rect(), bg)", self.scene)
+        self.assertIn("QColor(10, 7, 19, 144)", self.scene)
+
     def test_exact_eight_existing_bays(self):
         assignment = next(
             n for n in self.scene_ast.body if isinstance(n, ast.Assign)
