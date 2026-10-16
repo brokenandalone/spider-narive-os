@@ -21,6 +21,7 @@ EVENTS = {
     "website_requested": "Approved website opening requested",
     "website_denied": "Website opening denied",
     "app_requested": "Approved application launch requested",
+    "native_workspace_requested": "Authorized native Spider OS tab switch requested",
     "app_denied": "Application launch denied",
     "window_bound": "Window selected for desktop task",
     "window_observed": "One consented window snapshot captured",
