@@ -32,6 +32,7 @@ try:
     from .soundfont_library import auto_soundfont, discover_soundfonts
     from .score_edit_session import save_project, load_project
     from .score_stem_export import render_score_stems
+    from .band_backing_worker import BandBackingWorker
 except ImportError:
     from score_performer import parse_musicxml, parse_ascii_tab, load_notation
     from chord_chart_performer import parse_chord_chart
@@ -42,6 +43,7 @@ except ImportError:
     from soundfont_library import auto_soundfont, discover_soundfonts
     from score_edit_session import save_project, load_project
     from score_stem_export import render_score_stems
+    from band_backing_worker import BandBackingWorker
 
 TAB_EXAMPLE = """e|--0---2---3---2-|
 B|--1---3---0---3-|
@@ -106,6 +108,8 @@ class StemRenderWorker(QThread):
 
 
 class AutoPerformerPanel(QWidget):
+    backing_cue_ready = pyqtSignal(str, int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.performance = None
@@ -287,6 +291,12 @@ class AutoPerformerPanel(QWidget):
         project_row.addWidget(self._button("Open Spider Score Session", self.open_score_session))
         project_row.addWidget(self._button("Export Separate Instrument Stems", self.export_stems))
         layout.addLayout(project_row)
+        self.backing_button = self._button(
+            "🎸 Render Virtual Band Backing → Record Along With Spider",
+            self.make_backing_for_recorder)
+        self.backing_button.setAccessibleName(
+            "Render edited score with selected instruments and open native recording console")
+        layout.addWidget(self.backing_button)
         self.status = QLabel(
             "Auto Performer is offline and does not monitor your mic, import private "
             "music or control Nova. Sound quality depends on your selected SoundFont.")
@@ -597,6 +607,45 @@ class AutoPerformerPanel(QWidget):
                     "Saved your expressive MIDI performance: " + Path(filename).name)
             except (OSError, ValueError) as error:
                 QMessageBox.warning(self, "Expressive MIDI export failed", str(error)[:300])
+
+    def make_backing_for_recorder(self):
+        """Render edited score as private 16-bit WAV, then offer it in Studio recorder."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current score render before creating a backing cue.")
+            return
+        if self.performance is None or not self.soundfont:
+            self.status.setText("Load a score and choose a licensed SoundFont first.")
+            return
+        if not quality_backend_available():
+            self.status.setText("Install FluidSynth CLI to render actual virtual musician samples.")
+            return
+        try:
+            performed = express(self.performance, Expression(
+                groove=self.groove.currentText(), energy=self.energy.value(),
+                strum_ms=self.strum_ms.value()))
+            if performed.duration_seconds > 300:
+                raise ValueError("The recording cue must be no longer than five minutes")
+            self.stop()
+            self.worker = BandBackingWorker(
+                score=performed, default_bank=str(self.soundfont),
+                part_banks=dict(self.part_banks), channels=list(self.mix_channels),
+                rate=self.rate_select.currentData(), parent=self)
+            self.worker.finished_cue.connect(self._backing_rendered)
+            self.worker.start()
+            self.status.setText(
+                "Rendering selected virtual band instruments to a private 16-bit cue. "
+                "The microphone and outputs remain off until you explicitly record.")
+        except (ValueError, TypeError, OSError) as error:
+            self.status.setText("Backing cue was not started: " + str(error)[:280])
+
+    def _backing_rendered(self, success, path, rate, error):
+        if not success:
+            self.status.setText("Virtual band backing failed: " + error)
+            return
+        self.status.setText(
+            "Virtual band backing is ready: " + Path(path).name +
+            ". Recording console selected; microphones are still off.")
+        self.backing_cue_ready.emit(path, rate)
 
     def export_stems(self):
         """Produce isolated dry tracks. Existing stem folders are never overwritten."""
