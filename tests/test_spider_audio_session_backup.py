@@ -102,7 +102,7 @@ class PortableSongBackupTests(unittest.TestCase):
         self.assertEqual(self.session["tracks"][0]["sha256"],self.original_hash)
 
     def test_backup_rejects_linked_presets_and_a_linked_output(self):
-        link=self.folder/"mix-presets"/"preset-"+"a"*32+".json"
+        link=self.folder/"mix-presets"/("preset-"+"a"*32+".json")
         link.symlink_to(self.preset)
         with self.assertRaises(SessionError):
             create_backup(self.folder,self.root/"a.zip")
