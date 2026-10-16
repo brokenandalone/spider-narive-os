@@ -925,6 +925,7 @@ class TheWeb(QMainWindow):
             if name == 'webbie':
                 operations = WebbieNativeOperations(
                     native, workspace_callback=lambda: self.current_workspace,
+                    workspace_opener=self.open_workspace,
                     parent=workspace_tabs)
                 page.webbie_operations = operations
                 workspace_tabs.addTab(operations, 'Webbie controls')
