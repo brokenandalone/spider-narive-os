@@ -13,6 +13,16 @@ from pathlib import Path
 
 from PyQt5.QtCore import Qt, QRectF, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
+try:
+    from PyQt5.QtSvg import QSvgRenderer
+except ImportError:
+    QSvgRenderer = None
+
+try:
+    from app_visuals import app_art
+except ImportError:
+    app_art = None
+
 from PyQt5.QtWidgets import (
     QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
 )
@@ -52,6 +62,8 @@ class BayCanvas(QWidget):
     def __init__(self, workspace, parent=None):
         super().__init__(parent)
         self.workspace = workspace
+        artwork = app_art(Path(__file__).resolve().parents[2], workspace, "backgrounds") if app_art is not None else None
+        self.svg_background = QSvgRenderer(str(artwork)) if (QSvgRenderer is not None and artwork) else None
         self.frame = 0
         self.selected_name = ""
         self.media_image = QPixmap()
@@ -102,7 +114,11 @@ class BayCanvas(QWidget):
         bg = QLinearGradient(0, 0, w, h)
         bg.setColorAt(0, QColor("#090c1b" if self.workspace != "author" else "#0e080c"))
         bg.setColorAt(1, QColor(accent).darker(440))
-        painter.fillRect(self.rect(), bg)
+        if self.svg_background is not None and self.svg_background.isValid():
+            self.svg_background.render(painter, QRectF(0, 0, w, h))
+            painter.fillRect(self.rect(), QColor(10, 7, 19, 144))
+        else:
+            painter.fillRect(self.rect(), bg)
         self._grid(painter, w, h, accent)
         if self.workspace == "studio":
             for row, name in enumerate(labels):
