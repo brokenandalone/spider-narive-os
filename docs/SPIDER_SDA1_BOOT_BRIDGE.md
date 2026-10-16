@@ -111,6 +111,51 @@ defaults, activate a GRUB entry, or change EFI.** It is a preparation
 artifact for a later owner-reviewed, backup-first procedure, NOT an
 automatically executable synchronization tool.
 
+## Independent OneDrive candidate confirmed October 16
+
+The owner's live `rclone about webbie_onedrive:` returned **100 GiB
+total, 5.600 GiB used, 94.400 GiB available**. The host previously
+reported approximately **209 GiB used on the root filesystem**,
+so OneDrive is **not** sufficient for a full system image. It can
+nevertheless serve as independent off-disk storage for carefully
+selected critical recovery files once properly encrypted, budgeted,
+uploaded and successfully restored in a test.
+
+**Use a client-side `rclone crypt` overlay**, configured separately
+from `webbie_onedrive:` and pointing inside a dedicated directory such
+as `webbie_onedrive:SpiderOS-Private-Recovery-2610`. Do not write
+unencrypted tar archives, EFI images, encrypted-disk headers or
+sensitive service configuration directly to the plain OneDrive remote.
+The crypt remote's password and optional salt must be recoverable from
+somewhere **other than the same PC or this OneDrive backup**, e.g.
+a secure password manager with independent access. Do not paste the
+password, any rclone configuration, OAuth tokens or encryption secrets
+into chat or public CI logs. The lightly obscured rclone config is
+**not** secure encryption of the config itself: see
+https://rclone.org/crypt/ .
+
+Before enabling backup uploads, collect a read-only size inventory:
+```bash
+sudo du -xsh /etc /opt /home/spider /usr/local /srv \
+  /var/lib/spider-os /var/lib/containers /var/lib/bcn-broadcast \
+  2>/dev/null || true
+rclone about webbie_onedrive:
+```
+Note these categories can contain overlapping data, omitted paths,
+large caches, symlinks or project files elsewhere: sizes are a
+starting point, not a full inventory or guaranteed upload estimate.
+Reserve space for file overhead and future backups. Never purge models,
+music or projects automatically to fit the quota.
+
+The new boot-only backup script targets a **mounted independent
+filesystem**, not a bare rclone remote. It must **not** be passed a
+local same-disk directory that will later be synced to OneDrive
+as if it were a verified independent destination. For cloud storage
+prepare a separate explicit upload/recovery workflow and confirm a
+small restore test before claiming protection. Offline recovery of a
+non-booting, LUKS-encrypted PC requires an independently usable rescue
+method; an online cloud copy alone does not solve this.
+
 ## Independent boot-backup helper
 
 The branch now includes `distro/backup-spider-boot-independent.sh`.
