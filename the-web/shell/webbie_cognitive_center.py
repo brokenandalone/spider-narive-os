@@ -304,10 +304,21 @@ class WebbieCognitiveDialog(QDialog):
                 QMessageBox.Yes|QMessageBox.No,
                 QMessageBox.No)!=QMessageBox.Yes:
             return
-        if self.emergency_callback is not None:
+        if not callable(self.emergency_callback):
+            self.report.setPlainText(
+                "STOP NOT VERIFIED: No emergency control handler is connected. "
+                "Camera and desktop-control access may still be active.")
+            return
+        try:
             self.emergency_callback()
+        except Exception:
+            self.report.setPlainText(
+                "STOP NOT VERIFIED: Emergency control handler failed. "
+                "Camera and desktop-control access may still be active.")
+            return
         self.report.setPlainText(
-            "Sensitive controls stop was requested in the parent Webbie panel.")
+            "Sensitive controls stop requested. Verify camera and desktop access "
+            "are off; this dialog cannot independently confirm revocation.")
 
     def closeEvent(self,event):
         if ((self.model_worker and self.model_worker.isRunning()) or
