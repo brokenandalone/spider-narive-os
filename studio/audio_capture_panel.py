@@ -22,6 +22,8 @@ try:
     from .overdub_transport import transport_plan
     from .session_qc import analyze_wav
     from .multitrack import SessionError
+    from .audio_latency_calibration import measure_loopback
+    from .take_comp_dialog import TakeCompDialog,CompWorker
 except ImportError:
     from audio_capture_engine import (
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
@@ -31,6 +33,8 @@ except ImportError:
     from overdub_transport import transport_plan
     from session_qc import analyze_wav
     from multitrack import SessionError
+    from audio_latency_calibration import measure_loopback
+    from take_comp_dialog import TakeCompDialog,CompWorker
 
 TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
 
@@ -103,6 +107,24 @@ class OverdubWorker(QThread):
             self.recorded.emit(_inspect_finished_take(result),"")
         except (OSError,ValueError,RuntimeError,FileExistsError) as exc:
             self.recorded.emit(None,str(exc)[:350])
+
+
+class CalibrationWorker(QThread):
+    measured=pyqtSignal(object,str)
+    def __init__(self,input_device,output_device,rate,parent=None):
+        super().__init__(parent)
+        self.input_device=input_device
+        self.output_device=output_device
+        self.rate=rate
+        self.stop_event=threading.Event()
+    def run(self):
+        try:
+            result=measure_loopback(
+                input_device=self.input_device,output_device=self.output_device,
+                rate=self.rate,stop=self.stop_event)
+            self.measured.emit(result,"")
+        except (OSError,ValueError,RuntimeError) as error:
+            self.measured.emit(None,str(error)[:330])
 
 
 class SessionWorker(QThread):
@@ -284,9 +306,25 @@ class AudioCapturePanel(QWidget):
         self.mix_btn=self._button(
             "Mix Last Recorded Session",self.open_session_mix)
         self.mix_btn.setEnabled(False)
+        self.comp_btn=self._button("Comp Two Recorded Takes",self.comp_two_takes)
+        self.comp_btn.setEnabled(False)
         session_action.addWidget(self.arrange_btn)
+        session_action.addWidget(self.comp_btn)
         session_action.addWidget(self.mix_btn)
         layout.addLayout(session_action)
+        calibration_row=QHBoxLayout()
+        self.calibration_btn=self._button(
+            "Measure Physical Cable Loopback (Experimental)",
+            self.measure_latency)
+        self.calibration_btn.setEnabled(False)
+        calibration_row.addWidget(self.calibration_btn)
+        self.calibration_info=QLabel(
+            "Connect LINE output to safe LINE input with a suitable cable, "
+            "at low level. Never connect amplified speaker outputs, and disable "
+            "phantom power. Round-trip measurement is NOT input-only delay.")
+        self.calibration_info.setWordWrap(True)
+        calibration_row.addWidget(self.calibration_info,1)
+        layout.addLayout(calibration_row)
         level_row=QHBoxLayout()
         level_row.addWidget(QLabel("INPUT PEAK"))
         self.peak=QProgressBar()
@@ -382,6 +420,90 @@ class AudioCapturePanel(QWidget):
             self.status.setText(str(exc))
         self.record_btn.setEnabled(self.input.count()>0)
         self.overdub_btn.setEnabled(self.input.count()>0 and self.output_device.count()>0)
+        self.calibration_btn.setEnabled(
+            self.input.count()>0 and self.output_device.count()>0)
+
+    def measure_latency(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current recording/export before calibration.")
+            return
+        inp=self.input.currentData()
+        out=self.output_device.currentData()
+        if inp is None or out is None:
+            self.status.setText("Refresh devices and choose an input and stereo output first.")
+            return
+        message=(
+            "This sends a low-level test signal to the SELECTED OUTPUT and "
+            "measures it at the SELECTED INPUT. Use a safe LINE-level "
+            "output-to-LINE-input cable at low volume, with phantom power OFF. "
+            "NEVER connect power-amplified speaker outputs. This measures "
+            "combined output+input delay, not input-only latency, and never "
+            "adjusts your recording settings automatically. Proceed?")
+        approved=QMessageBox.question(
+            self,"Confirm electrical loopback safety",message,
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No)
+        if approved!=QMessageBox.Yes:
+            return
+        self.worker=CalibrationWorker(inp[0],out[0],self.rate.currentData(),self)
+        self.worker.measured.connect(self._calibrated)
+        for button in (self.record_btn,self.overdub_btn,self.calibration_btn,
+                       self.refresh_btn,self.export_btn,self.comp_btn):
+            button.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.worker.start()
+        self.status.setText("Testing selected electrical loopback; no recordings will be saved.")
+
+    def _calibrated(self,result,error):
+        self.stop_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(True)
+        self.export_btn.setEnabled(True)
+        self.comp_btn.setEnabled(len(self.takes)>=2)
+        self.record_btn.setEnabled(self.input.count()>0)
+        connected=self.input.count()>0 and self.output_device.count()>0
+        self.overdub_btn.setEnabled(connected)
+        self.calibration_btn.setEnabled(connected)
+        if error:
+            self.status.setText("Loopback calibration unsuccessful: "+error)
+            return
+        self.calibration_info.setText(
+            f"Electrical round-trip: {result['round_trip_ms']:.3f} ms "
+            f"({result['round_trip_samples']} frames), "
+            f"confidence {result['confidence']:.2f}. Includes ADC AND DAC "
+            "delays, so it was not automatically applied to input compensation.")
+        self.status.setText(
+            "Round-trip measured. Recording input latency remains manually "
+            "adjustable until the ADC and DAC delays can be distinguished.")
+
+    def comp_two_takes(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current audio job before comping.")
+            return
+        if len(self.takes)<2:
+            self.status.setText("Record at least two takes to composite.")
+            return
+        dialog=TakeCompDialog(self.takes,self)
+        if dialog.exec_()!=dialog.Accepted:
+            return
+        before=self.takes[dialog.before.currentData()]
+        after=self.takes[dialog.after.currentData()]
+        try:
+            TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+            if TAKE_ROOT.is_symlink():
+                raise CaptureError("Take directory must not be a symlink")
+            dest=new_take_filename(TAKE_ROOT,before["role"])
+            self.worker=CompWorker(
+                before["path"],after["path"],round(dialog.split.value()*1000),
+                dialog.fade.value(),str(dest),before["role"],self)
+            self.worker.recorded.connect(self._recorded)
+            for button in (self.record_btn,self.overdub_btn,self.calibration_btn,
+                           self.export_btn,self.refresh_btn,self.comp_btn):
+                button.setEnabled(False)
+            self.worker.start()
+            self.status.setText(
+                "Creating NEW composite take with a crossfade. "
+                "All source recordings are untouched.")
+        except (OSError,ValueError) as error:
+            self.status.setText("Cannot start take comping: "+str(error)[:280])
 
     def record_overdub(self):
         if self.worker is not None and self.worker.isRunning():
@@ -487,6 +609,10 @@ class AudioCapturePanel(QWidget):
         if worker is not None and worker.isRunning():
             worker.wait(1500)
         self.record_btn.setEnabled(self.input.count()>0)
+        connected=self.input.count()>0 and self.output_device.count()>0
+        self.overdub_btn.setEnabled(connected)
+        self.calibration_btn.setEnabled(connected)
+        self.comp_btn.setEnabled(len(self.takes)>=2)
         self.stop_btn.setEnabled(False)
         self.refresh_btn.setEnabled(True)
         self.export_btn.setEnabled(True)
@@ -501,6 +627,7 @@ class AudioCapturePanel(QWidget):
                 "path":str(path),"role":result["role"],
                 "label":path.stem[:100],
             })
+            self.comp_btn.setEnabled(len(self.takes)>=2)
             self.take_list.addItem(
                 f"{len(self.takes):02d} · {result['role']} · "
                 f"{result['duration_seconds']:.1f}s · {result['sample_rate']} Hz · "
