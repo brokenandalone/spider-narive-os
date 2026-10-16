@@ -46,3 +46,54 @@ python3 tools/installed_truth_triage.py --limit 35
 ```
 
 The classification tool only reads `~/Downloads/Spider_OS_Installed_Truth/manifest.json`, prints candidate live code separated from likely backups and development assets, and makes **no filesystem or GitHub changes**. Do not upload the manifest or private owner source to this **public** GitHub repository. Reconcile reviewed, non-sensitive source only.
+
+## Owner's second local triage (2026-10-16)
+
+The installed-only subset was confirmed from the printed local report:
+- 408 modules beneath `webbie/vendor/numpy/` and nine beneath `webbie/vendor/sherpa_onnx/`, which are third-party dependencies, **not native Spider OS features to copy**.
+- 82 old backup paths.
+- One local install receipt.
+- **Eight candidate owner-installed source files**:
+  `branding/apply-spider-branding.sh`, `studio/studio.py`,
+  `system/daily_install_policy.py`,
+  `webbie/agent/webbie_ai_isolation.py`,
+  `webbie/agent/webbie_ai_worker.py`,
+  `webbie/agent/webbie_brain_primary.py`,
+  `webbie/agent/webbie_ops.py`,
+  `webbie/voice/speaker_gate.py`.
+
+The modified active code consists of **39 source files** distributed across The Web,
+Webbie, Author, Forage, Kali Bay, Nova, Studio, Study and the release system.
+These 39 + 8, not the entire 508, are the working-source reconciliation queue.
+
+### Stage exact installed source in the separate clone, NOT on the OS
+
+**This repository is PUBLIC**. Review any staged source carefully for secrets, personal
+paths, private media and license restrictions before committing or pushing.
+The automated credential scan is incomplete and does not make public publication safe.
+
+The existing local audit hashes remain valid for this step even though GitHub's
+reconciliation docs and tests have moved forward, because the source staging tool
+validates *each source file* against the original hashes individually.
+
+```bash
+cd ~/Downloads/Spider_OS_Installed_Truth_Rebuild
+git pull --ff-only
+python3 tools/stage_installed_source.py             # verification-only dry run
+python3 tools/stage_installed_source.py --apply     # ONLY if the dry run validates
+git diff --stat
+git status --short
+git diff --check
+```
+
+The `--apply` option copies only the 39 modified and eight explicitly permitted
+owner source paths to the **separate Git checkout**. It does not change
+`/usr/local/lib/spider-os`, restart a service, install packages, affect disks,
+or make any Git commits or pushes. Source files are not uploaded. If any original
+file hash differs from the audit, the checker fails *before writing any file*.
+The checkout must be clean and on this exact rebuild branch.
+
+Do not blindly `git add -A && git push`. This is a code review stage, not a
+release or public source approval. GitHub-only Art Lab and packaging files are
+left untouched. All source remains in the PC's installed form until a later,
+separately reviewed release is produced.
