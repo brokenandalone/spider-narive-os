@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 
-ACTIONS=frozenset({"website","application","window","navigation","observation","stop"})
+ACTIONS=frozenset({"website","application","window","workspace","navigation","observation","stop"})
 OUTCOMES=frozenset({"requested","denied","failed","observed","canceled"})
 MAX_AGE=90
 
