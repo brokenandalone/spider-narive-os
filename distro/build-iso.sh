@@ -248,6 +248,12 @@ mount --rbind /run "${ROOTFS}/run"
 mount --make-rslave "${ROOTFS}/run"
 
 # /run is bind-mounted, so the chroot already has resolver access.
+# Ubuntu Studio 26.10 ISO images can carry enabled installer-media APT
+# entries as either legacy *.list or deb822 *.sources. /cdrom is not
+# mounted inside the reconstructed install root. Sanitize only ROOTFS,
+# preserving remote mirrors and never touching the host's APT sources.
+python3 "${ROOT}/distro/disable-chroot-media-sources.py" --rootfs "${ROOTFS}" --apply
+python3 "${ROOT}/distro/disable-chroot-media-sources.py" --rootfs "${ROOTFS}" --check
 
 echo "Installing Spider OS dependencies..."
 
@@ -255,12 +261,6 @@ chroot "${ROOTFS}" /bin/bash <<'CHROOT'
 set -Eeuo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
-
-if [[ -f /etc/apt/sources.list.d/dvd.list ]]; then
-    mv \
-        /etc/apt/sources.list.d/dvd.list \
-        /etc/apt/sources.list.d/dvd.list.spider-disabled
-fi
 
 apt-get update
 
