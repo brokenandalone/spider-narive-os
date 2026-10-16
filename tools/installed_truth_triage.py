@@ -12,6 +12,7 @@ import json
 from pathlib import Path, PurePosixPath
 import sys
 
+VENDORED_DEPENDENCY_ROOTS = ("webbie/vendor/numpy/", "webbie/vendor/sherpa_onnx/")
 RECOVERY_PREFIXES = (
     "upgrade-backups", "backup-", "backups", "webbie.backup-",
     ".webbie-jarvis-recovery-backups", "previous-versions", "rollback-",
@@ -34,6 +35,8 @@ def category(path: str, group: str) -> str:
     if (not parts or path.startswith("/") or ".." in parts
             or "\x00" in path or "\\" in path):
         return "unsafe_name"
+    if any(path.startswith(root) for root in VENDORED_DEPENDENCY_ROOTS):
+        return "third_party_vendor"
     if any(
         part.startswith(RECOVERY_PREFIXES)
         or part.endswith((".bak", ".orig", ".old", ".backup"))
