@@ -94,7 +94,7 @@ def remove_version(version,home=None):
         if (len(desktop_text)>16_000 or
                 "X-SpiderStudio-PrivateBeta=true" not in desktop_text or
                 expected_launcher not in desktop_text or
-                ("Beta "+version+")" not in desktop_text):
+                f"Beta {version})" not in desktop_text):
             raise ValueError("The versioned desktop shortcut has been customized; refusing removal.")
         _only_known_files(location,info)
         # Every app source checksum and installed extra was already verified.
