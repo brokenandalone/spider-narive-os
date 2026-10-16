@@ -57,7 +57,7 @@ def save_preset(session, controls, *, name, include_reference=False):
     planned = mix_plan(session, controls, include_reference=include_reference)
     normalized = {
         t["filename"]: {key: t[key] for key in
-                        ("gain", "pan", "mute", "solo", "delay_ms", "effects", "clip")}
+                        ("gain", "pan", "mute", "solo", "delay_ms", "effects", "clip", "regions")}
         for t in planned["settings"]
     }
     entry = {
@@ -129,5 +129,5 @@ def load_preset(session, path):
     return {"name": data["name"],
             "include_reference": data["include_reference"],
             "controls": {t["filename"]: {key: t[key] for key in
-                         ("gain", "pan", "mute", "solo", "delay_ms", "effects", "clip")}
+                         ("gain", "pan", "mute", "solo", "delay_ms", "effects", "clip", "regions")}
                          for t in plan["settings"]}}
