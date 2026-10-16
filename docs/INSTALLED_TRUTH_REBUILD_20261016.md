@@ -213,3 +213,69 @@ a normal `git pull --ff-only` into that dirty checkout might fail because
 this branch now changes some of the same tracked paths. Preserve the dirty
 checkout for review. Testing the new GitHub head should use a separate clean
 worktree or a fresh checkout, without replacing installed files.
+
+## Integration round 2: real resident operations (source staged on GitHub)
+
+Rather than replacing any native bay or running another resident daemon, the
+existing Webbie and The Web are wired together more directly.
+
+**Native-bay navigation**: `webbie/agent/workspace_launchers.py` now strictly
+parses literal requests such as "switch to Studio", "take me to Kali Bay",
+"go to Author", and "open Art Lab". The existing resident `handle_command`
+routes those after its speaker-authorization gate into the already-existing
+`webbie-operator.sock`. The Web's existing `OperatorBridge` accepts only
+approved fixed `BAY:<workspace_id>` names while the **owner's pre-existing
+broad GUI grant** is active. The resident Computer Control panel invokes
+the original `workspace_navigator` callback, which leads to The Web's
+`open_workspace(name)` and actual native tabs, never a new standalone
+app launcher. Native tab navigation has a redacted action receipt, and STOP
+revokes permission to process further requests. An unauthorised request
+returns a denial or an instruction to authorize safe computer access.
+
+**Project review mission**: the existing JARVIS Mission Center gained
+`project.review`, an owner-clicked combination of existing local project
+evidence and website asset checks. It never edits files, scans unknown locations,
+deploys websites, executes shell commands, or launches new background workers.
+STOP or a revoked owner permission discards results before the next stage.
+
+**Kali diagnostics**: a literal "check Kali diagnostics" request invokes only
+the already-existing `kali-bay doctor` command with a bounded timeout.
+That manager's doctor branch inspects the existing Kali container/package state
+without running a scan or changing packages. Other unapproved commands are
+never forwarded to the Kali shell.
+
+**Voice trust**: an optional `webbie/voice/speaker_voice_provider.py`
+can reuse the actual installed TitaNet ONNX speaker model and owner-local
+Cory/Shayna enrollment profiles through the **existing hash-pinned**
+`speaker_provider_loader`. Enrollment is never guessed or bypassed, unknown
+and ambiguous voices are rejected, and speaker evidence is tied to the exact
+recorded segment. The provisional 0.88 threshold requires offline mic/voice
+calibration and live false-accept/false-reject testing. No model downloads,
+biometric profile material or raw speech are in GitHub. This feature remains
+DISABLED in the committed default config; enabling it without a validated
+model, individual enrollment, exact SHA pin and on-PC tests would silence
+regular voice responses.
+
+**Once-daily release safety**: recovered the owner's installed
+`system/daily_install_policy.py` behavior into the existing
+`system/release_batch.py` **apply** branch. A second same-day batch is denied
+even if a partial prior backup was created. **Rollback stays available**.
+No installer was executed as part of this source work.
+
+**New regression coverage**: `test_webbie_native_bay_navigation.py`,
+`test_webbie_project_review.py`, `test_webbie_kali_doctor.py` and
+`test_webbie_speaker_provider.py` were committed. The GitHub workflow
+installs PyQt5 so the native Qt socket scenario does not merely skip. The daily
+policy module is included in CI's Python compilation check. A separate daily
+policy test-file write was blocked by the tool and therefore is **not**
+represented as a passing test.
+
+### Release gate, unchanged
+
+The installed Webbie V2 + Natasha setup is still the known-good PC reference.
+The complete rebuild is **NOT installed, merged to main or ready to flash**.
+The actual desktop microphone, identity enrollment, signed local model and
+project workflows have not been live-validated on owner hardware. More source
+conflicts remain, especially in Studio, The Web, Nova, Author and other installed
+customizations. The owner's original dirty source-review clone must not be
+overwritten with this branch.
