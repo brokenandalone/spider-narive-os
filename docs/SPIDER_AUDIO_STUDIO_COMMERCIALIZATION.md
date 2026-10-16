@@ -1,6 +1,6 @@
 # Spider Audio Studio | Commercialization and beta release plan
 
-**Status: owner-testing beta 0.14, NOT CLEARED FOR PUBLIC SALE.**
+**Status: owner-testing beta 0.15, NOT CLEARED FOR PUBLIC SALE.**
 The program is to turn a proven native Linux music-making workflow into a
 credible product without risking users' recordings or violating third-party
 licenses. The app already runs on the owner's Ubuntu Studio workstation; that
@@ -94,9 +94,9 @@ business model and price. We can test willingness to pay only after software
 and compliance are ready. Do not advertise specific prices, dates, performance
 figures, supported OS versions or commercial plugin compatibility prematurely.
 
-## Engineering changes in 0.14 beta
+## Engineering changes in 0.15 beta
 
-- Original native Studio packaged with a distinct 0.14 beta identifier.
+- Original native Studio packaged with a distinct 0.15 beta identifier.
 - `install_for_user.py --check` / `--install`: no-sudo versioned local
   desktop installation, refusing existing installation or desktop entry.
 - `run_spider_audio_studio.py --doctor`: readonly dependency report.
@@ -119,3 +119,25 @@ explicit owner sign-off are all documented.
 
 The software is moving toward marketability; current status is a useful
 beta candidate rather than a certified commercial product.
+
+## Wave 15 reliability improvements (October 16, 2026)
+
+- New actionable first-run **Start a Song** screen inside the original Studio.
+- Installer now stages an entire version under a private temporary folder,
+  verifies the copied runtime, then publishes the versioned desktop entry.
+  On a copy failure, its own staging folder and shortcut are cleaned so the
+  same beta can be retried without touching existing versions or songs.
+- Beta archive cryptographically verifies top-level setup scripts and its
+  third-party licensing notices alongside actual Studio source modules.
+- Offline **Test music engine** runs in a nonblocking GUI process and is
+  available as `run_spider_audio_studio.py --self-test`. It generates temporary
+  guitars and bass, uses the real importer, per-track EQ and compression,
+  two-region timeline, actual installed FFmpeg renderer, PCM WAV output and
+  original-file hash checks. No live audio device is opened.
+- Previously, unverified FFmpeg graph syntax could pass unit tests because
+  the runner had no FFmpeg. The real test exposed and corrected a leading
+  comma after source-pad labels. The beta workflow now installs FFmpeg on
+  its disposable runner and **requires** a successful real stereo render.
+- Wave 15 is still a private beta, not a sealed public commercial product.
+  PyQt/Qt/FFmpeg licensing, instrument rights, live hardware acceptance,
+  business terms, support and explicit owner approval remain pending.
