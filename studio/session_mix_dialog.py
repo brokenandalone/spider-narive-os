@@ -21,6 +21,8 @@ if __package__:
     from .session_track_fx import normalize_track_effects
     from .session_clip_edit import normalize_clip_edit
     from .session_clip_dialog import TrackClipDialog
+    from .session_regions import normalize_regions
+    from .session_regions_dialog import TrackRegionsDialog
 else:
     from session_project import inspect_session
     from session_mix import render_session
@@ -32,6 +34,8 @@ else:
     from session_track_fx import normalize_track_effects
     from session_clip_edit import normalize_clip_edit
     from session_clip_dialog import TrackClipDialog
+    from session_regions import normalize_regions
+    from session_regions_dialog import TrackRegionsDialog
 
 
 class SessionAudioQcWorker(QThread):
@@ -112,6 +116,7 @@ class SessionMixDialog(QDialog):
         self.rendered = None
         self.channel_effects = {}
         self.clip_edits = {}
+        self.region_edits = {}
         layout = QVBoxLayout(self)
         note = QLabel(
             "Reopen a Spider Studio multitrack session, inspect real independent WAVs, "
@@ -170,6 +175,11 @@ class SessionMixDialog(QDialog):
         self.clip_button.setEnabled(False)
         self.clip_button.clicked.connect(self.edit_recorded_clip)
         layout.addWidget(self.clip_button)
+        self.region_button=QPushButton(
+            "Arrange Multiple Regions · Performance Timeline")
+        self.region_button.setEnabled(False)
+        self.region_button.clicked.connect(self.edit_multi_regions)
+        layout.addWidget(self.region_button)
         self.include_reference = QCheckBox(
             "Explicitly include a full-song reference mix (may double recorded instruments)"
         )
@@ -228,8 +238,10 @@ class SessionMixDialog(QDialog):
         self.session = None
         self.channel_effects.clear()
         self.clip_edits.clear()
+        self.region_edits.clear()
         self.track_fx_button.setEnabled(False)
         self.clip_button.setEnabled(False)
+        self.region_button.setEnabled(False)
         self.quality_button.setEnabled(False)
         self.quality_report.clear()
         self.table.setRowCount(0)
@@ -261,6 +273,7 @@ class SessionMixDialog(QDialog):
             self.table.setItem(index, 7, QTableWidgetItem(track["label"]))
             self.channel_effects[track["filename"]]=normalize_track_effects()
             self.clip_edits[track["filename"]]=normalize_clip_edit(track)[0]
+            self.region_edits[track["filename"]]=[]
             self.table.setItem(index, 8, QTableWidgetItem("Dry / unprocessed"))
             self.table.setItem(index, 9, QTableWidgetItem("Full source · No fades"))
             gain = QDoubleSpinBox()
@@ -299,6 +312,7 @@ class SessionMixDialog(QDialog):
         self.mix_button.setEnabled(True)
         self.track_fx_button.setEnabled(True)
         self.clip_button.setEnabled(True)
+        self.region_button.setEnabled(True)
         self.table.setCurrentCell(0,0)
         self.quality_button.setEnabled(True)
         self.save_preset_button.setEnabled(True)
@@ -383,6 +397,10 @@ class SessionMixDialog(QDialog):
             "Track processing updated for the next offline mix. No source WAV was touched.")
 
     def _describe_clip(self,track):
+        multi=self.region_edits.get(track["filename"],[])
+        if multi:
+            normalized,final_end=normalize_regions(track,multi)
+            return f"{len(normalized)} regions · song to {final_end:.2f}s"
         saved=self.clip_edits.get(track["filename"])
         offset=self.table.cellWidget(
             next(i for i,src in enumerate(self.session["tracks"])
@@ -401,6 +419,39 @@ class SessionMixDialog(QDialog):
             changes.append(f"At +{offset/1000:.3f}s")
         return " · ".join(changes) if changes else "Full source · No fades"
 
+    def edit_multi_regions(self):
+        if (self.session is None or self.worker is not None or
+                self.checker is not None or self.quality_worker is not None):
+            return
+        row=self.table.currentRow()
+        if not 0<=row<len(self.session["tracks"]):
+            self.status.setText("Select a verified recording before arranging regions.")
+            return
+        track=self.session["tracks"][row]
+        if track["role"]=="click_guide":
+            self.status.setText("Tracking click guides are excluded from the mix.")
+            return
+        name=track["filename"]
+        offset=self.table.cellWidget(row,6).value()
+        try:
+            editor=TrackRegionsDialog(
+                track,self.region_edits.get(name,[]),
+                clip=self.clip_edits.get(name),offset_ms=offset,parent=self)
+            if editor.exec_()!=editor.Accepted:
+                return
+            regions=editor.values()
+            self.region_edits[name]=regions
+            # Explicit switch into region mode; old one-clip settings do not
+            # silently combine with a distinct multi-region timeline.
+            self.clip_edits[name]=normalize_clip_edit(track)[0]
+            self.table.cellWidget(row,6).setValue(0)
+            self.table.setItem(row,9,QTableWidgetItem(self._describe_clip(track)))
+            self.status.setText(
+                f"{len(regions)} source regions arranged in the mix. "
+                "The original WAV is unchanged.")
+        except (OSError,SessionError,ValueError) as error:
+            self.status.setText("Multi-region edits rejected: "+str(error)[:250])
+
     def edit_recorded_clip(self):
         if (self.session is None or self.worker is not None or
                 self.checker is not None or self.quality_worker is not None):
@@ -415,12 +466,24 @@ class SessionMixDialog(QDialog):
             return
         filename=track["filename"]
         offset=self.table.cellWidget(row,6).value()
+        if self.region_edits.get(filename):
+            from PyQt5.QtWidgets import QMessageBox
+            response=QMessageBox.question(
+                self,"Switch to single-clip editing?",
+                "This recording has a multi-region arrangement. Opening the "
+                "single-clip editor will replace that arrangement only if "
+                "you confirm an edit. Your source WAV and saved mix presets "
+                "remain unchanged. Continue?",
+                QMessageBox.Yes|QMessageBox.No,QMessageBox.No)
+            if response!=QMessageBox.Yes:
+                return
         try:
             dialog=TrackClipDialog(track,self.clip_edits.get(filename),offset,self)
             if dialog.exec_()!=dialog.Accepted:
                 return
             new_edit,new_offset,region=dialog.values()
             self.clip_edits[filename]=new_edit
+            self.region_edits[filename]=[]
             self.table.cellWidget(row,6).setValue(new_offset)
             self.table.setItem(row,9,QTableWidgetItem(self._describe_clip(track)))
             self.status.setText(
@@ -446,6 +509,8 @@ class SessionMixDialog(QDialog):
                 "clip": normalize_clip_edit(
                     track,self.clip_edits.get(track["filename"]),
                     delay_ms=self.table.cellWidget(index,6).value())[0],
+                "regions": normalize_regions(
+                    track,self.region_edits.get(track["filename"]))[0],
             }
         return result
 
@@ -503,6 +568,8 @@ class SessionMixDialog(QDialog):
                 self.clip_edits[track["filename"]]=normalize_clip_edit(
                     track,settings.get("clip"),
                     delay_ms=settings["delay_ms"])[0]
+                self.region_edits[track["filename"]]=normalize_regions(
+                    track,settings.get("regions"))[0]
                 self.table.setItem(index,9,
                                    QTableWidgetItem(self._describe_clip(track)))
             self.include_reference.setChecked(preset["include_reference"])
@@ -518,6 +585,7 @@ class SessionMixDialog(QDialog):
         self.quality_button.setEnabled(False)
         self.track_fx_button.setEnabled(False)
         self.clip_button.setEnabled(False)
+        self.region_button.setEnabled(False)
         self.check_button.setEnabled(False)
         self.choose_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -544,6 +612,7 @@ class SessionMixDialog(QDialog):
         self.mix_button.setEnabled(self.session is not None)
         self.track_fx_button.setEnabled(self.session is not None)
         self.clip_button.setEnabled(self.session is not None)
+        self.region_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
         self.choose_button.setEnabled(True)
         self.stop_button.setEnabled(False)
