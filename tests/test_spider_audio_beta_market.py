@@ -1,6 +1,7 @@
 """Commercial private beta: real package, installed desktop launcher and release blocker."""
 import json
 import os
+os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
 from pathlib import Path
 import subprocess
 import sys
@@ -28,7 +29,8 @@ class BetaPackageTests(unittest.TestCase):
             with tarfile.open(artifact,"r:gz") as tar:
                 members=tar.getnames()
                 for wanted in ("run_spider_audio_studio.py",
-                               "manifest.json","install_for_user.py","LICENSE",
+                               "manifest.json","install_for_user.py",
+                               "installer_gui.py","START_HERE.sh","LICENSE",
                                "BETA_README.md","THIRD_PARTY_NOTICE.md"):
                     self.assertIn(PACKAGE+"/"+wanted,members)
                 tar.extractall(unpack,filter="data")
@@ -92,6 +94,34 @@ class BetaPackageTests(unittest.TestCase):
                             for s in info["notes"]))
         self.assertTrue(any("does not guarantee" in s
                             for s in info["notes"]))
+
+class BetaSetupGuiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        try:
+            from PyQt5.QtWidgets import QApplication
+        except ImportError:
+            raise unittest.SkipTest("PyQt5 is unavailable")
+        cls.application=QApplication.instance() or QApplication([])
+
+    def test_gui_requires_explicit_acknowledgment_and_never_auto_installs(self):
+        from studio.package.installer_gui import SpiderAudioSetup
+        gui=SpiderAudioSetup()
+        try:
+            self.assertFalse(gui.install_button.isEnabled())
+            self.assertIsNone(gui.installed)
+            self.assertIn("Nothing has been installed",gui.result.text())
+            gui.ack.setChecked(True)
+            self.assertTrue(gui.install_button.isEnabled())
+            with patch("studio.package.installer_gui.install") as save:
+                save.return_value=(Path("/tmp/spider-studio-app"),
+                                   Path("/tmp/spider-studio.desktop"))
+                gui.install_beta()
+            save.assert_called_once()
+            self.assertEqual(gui.installed,Path("/tmp/spider-studio-app"))
+            self.assertFalse(gui.install_button.isEnabled())
+        finally:
+            gui.close()
 
 class CommercialReleaseGuard(unittest.TestCase):
     def test_missing_license_and_qa_approvals_block_sale(self):
