@@ -149,6 +149,9 @@ class StudioProductionGUITests(unittest.TestCase):
                 self.assertEqual(panel.output_device.count(),0)
                 self.assertFalse(panel.record_btn.isEnabled())
                 self.assertFalse(panel.overdub_btn.isEnabled())
+                self.assertFalse(panel.calibration_btn.isEnabled())
+                self.assertFalse(panel.comp_btn.isEnabled())
+                self.assertFalse(panel.effects_btn.isEnabled())
                 self.assertFalse(panel.include_cue.isChecked())
                 self.assertEqual(panel.count_in_bars.value(),0)
                 self.assertEqual(panel.beats_per_bar.currentData(),4)
@@ -171,6 +174,9 @@ class StudioProductionGUITests(unittest.TestCase):
                         "channels":1,"sample_width_bits":24}, "")
                     self.assertEqual(len(panel.takes),1)
                     self.assertEqual(panel.take_list.count(),1)
+                    self.assertTrue(panel.effects_btn.isEnabled())
+                    self.assertFalse(panel.comp_btn.isEnabled())
+                    self.assertEqual(panel.take_list.currentRow(),0)
                     cue=Path(root)/"Backing.wav"
                     cue.write_bytes(b"cue list fixture; backend validation not run")
                     panel.cue_file.setText(str(cue))
@@ -261,6 +267,34 @@ class StudioProductionGUITests(unittest.TestCase):
                 workbench.close()
                 score_panel.close()
                 recorder.close()
+
+    def test_comp_and_effect_controls_are_native_not_auto_device_access(self):
+        from studio.take_comp_dialog import TakeCompDialog
+        from studio.take_effects_dialog import TakeEffectsDialog
+        from studio.audio_capture_panel import AudioCapturePanel
+        with self.subTest("Dialog is non-destructive until owner confirms"):
+            dialog=TakeEffectsDialog("/tmp/not-opened.wav")
+            try:
+                self.assertEqual(dialog.settings().room,0)
+                dialog.controls["bass_db"].setValue(8)
+                dialog.compression.setChecked(True)
+                self.assertEqual(dialog.settings().bass_db,8)
+                self.assertTrue(dialog.settings().compression)
+            finally:
+                dialog.close()
+        panel=AudioCapturePanel()
+        try:
+            panel.measure_latency()
+            self.assertIsNone(panel.worker)
+            self.assertIn("choose an input",panel.status.text())
+            panel.comp_two_takes()
+            self.assertIsNone(panel.worker)
+            panel.shape_selected_take()
+            self.assertIsNone(panel.worker)
+            self.assertEqual(panel.input.count(),0)
+            self.assertEqual(panel.output_device.count(),0)
+        finally:
+            panel.close()
 
     def test_note_editor_actually_changes_auto_performer_with_undo(self):
         from studio.score_timeline_panel import ScoreTimelinePanel
