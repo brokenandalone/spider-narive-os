@@ -1,0 +1,26 @@
+name: Webbie hearing and speech tests
+on:
+  push:
+    paths:
+      - 'webbie/**'
+      - 'tests/test_webbie_*'
+      - '.github/workflows/test-webbie-speaker.yml'
+  pull_request:
+    paths:
+      - 'webbie/**'
+      - 'tests/test_webbie_*'
+      - '.github/workflows/test-webbie-speaker.yml'
+jobs:
+  speaker-and-speech:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Webbie modules
+        run: python -m py_compile webbie/voice/speaker_guard.py webbie/voice/audio_gate.py webbie/voice/tts.py webbie/agent/webbie.py webbie/voice/whisper_listener.py webbie/brain/brain.py
+      - name: Speaker verification tests
+        run: python -m unittest discover -s tests -p test_webbie_speaker_guard.py -v
+      - name: Hearing and speech tests
+        run: python -m unittest discover -s tests -p test_webbie_hearing_speech_v3.py -v

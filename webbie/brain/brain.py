@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
 import json
+from collections import deque
+from threading import RLock
 import urllib.error
 import urllib.request
 
 
 DEFAULT_MODEL = "qwen3:1.7b"
+_HISTORY = {}
+_HISTORY_LOCK = RLock()
+_MAX_SESSIONS = 12
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
 
 
@@ -29,10 +34,13 @@ Deep Forage, launch workspaces, support study and creative work, and
 assist with normal computer tasks.
 
 Never claim an action succeeded unless Spider OS actually performed it.
+If speech sounds ambiguous, ask one short clarifying question.
+Use natural direct language, without introductory filler.
+Do not invent personal memories or actions.
 """.strip()
 
 
-def ask_ollama(message, context_name="Cory", model=DEFAULT_MODEL):
+def ask_ollama(message, context_name="Cory", model=DEFAULT_MODEL, history=None):
     prompt = (
         SYSTEM_PROMPT
         + "\n\nCurrent user name: "
@@ -43,14 +51,9 @@ def ask_ollama(message, context_name="Cory", model=DEFAULT_MODEL):
         "model": model,
         "stream": False,
         "messages": [
-            {
-                "role": "system",
-                "content": prompt,
-            },
-            {
-                "role": "user",
-                "content": message,
-            },
+            {"role": "system", "content": prompt},
+            *(history or []),
+            {"role": "user", "content": message},
         ],
     }
 
@@ -114,16 +117,25 @@ def built_in_response(message, context_name="Cory"):
     )
 
 
-def respond(message, context_name="Cory"):
-    answer = ask_ollama(
-        message,
-        context_name=context_name,
-    )
+def _get_history(session_key):
+    with _HISTORY_LOCK:
+        return list(_HISTORY.get(session_key, ()))
 
-    if answer:
-        return answer
+def remember_exchange(session_key, user_message, assistant_message):
+    """Short in-memory context separated by voice speaker and typed session."""
+    if not user_message or not assistant_message:
+        return
+    with _HISTORY_LOCK:
+        if session_key not in _HISTORY and len(_HISTORY) >= _MAX_SESSIONS:
+            _HISTORY.pop(next(iter(_HISTORY)), None)
+        history=_HISTORY.setdefault(session_key,deque(maxlen=8))
+        history.append({"role":"user","content":str(user_message)[:900]})
+        history.append({"role":"assistant","content":str(assistant_message)[:1400]})
 
-    return built_in_response(
-        message,
-        context_name=context_name,
-    )
+def respond(message, context_name="Cory", session_key="typed"):
+    answer=ask_ollama(message,context_name=context_name,
+                      history=_get_history(session_key))
+    if not answer:
+        answer=built_in_response(message,context_name=context_name)
+    remember_exchange(session_key,message,answer)
+    return answer
