@@ -223,6 +223,10 @@ class SpiderStudio(QMainWindow):
         capture_scroll.setWidgetResizable(True)
         capture_scroll.setWidget(self.audio_capture_panel)
         self.tool_tabs.addTab(capture_scroll, 'Record Audio · Multitrack')
+        self.audio_capture_page = capture_scroll
+        # Handoff selects a private cue only; never opens a mic or starts sound.
+        self.auto_performer_panel.backing_cue_ready.connect(self._handoff_virtual_band)
+        self.song_production_panel.backing_cue_ready.connect(self._handoff_virtual_band)
 
 
         self.native_max_tools = NativeWorkspaceTools('studio', self)
@@ -377,6 +381,11 @@ class SpiderStudio(QMainWindow):
             '● Ollama: INSTALLED' if shutil.which('ollama') else '○ Ollama: NOT FOUND'
         )
 
+
+    def _handoff_virtual_band(self, path, rate):
+        """Connect both real native virtual-band bays to the recording console."""
+        if self.audio_capture_panel.load_generated_cue(path,rate):
+            self.tool_tabs.setCurrentWidget(self.audio_capture_page)
 
     def closeEvent(self, event):
         # Do not destroy a QThread while it is exporting the owner's song or
