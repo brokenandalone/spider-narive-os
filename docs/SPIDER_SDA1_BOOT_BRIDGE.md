@@ -64,6 +64,29 @@ verification and must be investigated; never overwrite either boot
 copy to force a match. A match establishes identical bytes, not
 whether a future 26.10 boot or restoration will succeed.
 
+## Owner's October 16 live SHA256 verification: PASS
+
+The owner ran the `verify` mode on the actual Ubuntu Studio 26.04.1
+Spider OS installation. The audit reported the known default
+`7.0.0-38-generic` and **253 MiB** available on `/dev/sda1`.
+
+Both exact-byte comparisons **passed**:
+
+| File on unmounted /dev/sda1 | SHA256, matches root's /boot file |
+| --- | --- |
+| `/vmlinuz-7.0.0-38-generic` | `9f55ef7253055a9cf68f8a04323c93dead2fca617386d842fbde9ca7b178b27e` |
+| `/initrd.img-7.0.0-38-generic` | `9a3d628f34802d68f996db3b1614b82b647242834b50d9c1aea49e6debe94c9e` |
+
+This resolves the previous **kernel/initrd content-equality verification gate**.
+The `verify` command reported no changes to sda1 or main /boot.
+
+**Important:** SHA equality is *not* confirmation of an independent
+backup, a tested restore route, an upgrade-ready boot synchronization
+process, or a 26.10 kernel that fits sda1. Do not remove the
+known-good 7.0.0-38 kernel, repartition the disk, change UEFI boot
+entries or run the release upgrader. Independent backup and boot
+rollback remain required first.
+
 ## Offline candidate generator (after a new kernel is available)
 
 Once the new Ubuntu kernel and corresponding initramfs exist in the
