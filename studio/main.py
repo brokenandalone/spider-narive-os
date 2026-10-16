@@ -224,6 +224,13 @@ class SpiderStudio(QMainWindow):
         capture_scroll.setWidget(self.audio_capture_panel)
         self.tool_tabs.addTab(capture_scroll, 'Record Audio · Multitrack')
         self.audio_capture_page = capture_scroll
+        # Read-only recording inventory inside native Studio; no hardware access.
+        if __package__:
+            from .recording_audit_panel import RecordingAuditPanel
+        else:
+            from recording_audit_panel import RecordingAuditPanel
+        self.recording_audit_panel = RecordingAuditPanel(self)
+        self.tool_tabs.addTab(self.recording_audit_panel, 'Recording Library Audit')
         # Handoff selects a private cue only; never opens a mic or starts sound.
         self.auto_performer_panel.backing_cue_ready.connect(self._handoff_virtual_band)
         self.song_production_panel.backing_cue_ready.connect(self._handoff_virtual_band)
