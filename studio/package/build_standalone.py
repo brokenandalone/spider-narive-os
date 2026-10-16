@@ -19,7 +19,7 @@ import tarfile
 import tempfile
 
 SOURCE=Path(__file__).resolve().parents[2]
-VERSION="0.11.0-dev"
+VERSION="0.13.0-dev"
 PACKAGE="Spider-Audio-Studio-"+VERSION
 ROOTS=(
     "studio",
