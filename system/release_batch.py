@@ -125,6 +125,7 @@ APP_FILES = (
     'media/ai-dj/service.py',
     'art_lab/__init__.py',
     'art_lab/project.py',
+    'art_lab/outline.py',
     'art_lab/main.py',
     'the-web/shell/workspaces.py',
     'studio/__init__.py',
