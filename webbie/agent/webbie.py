@@ -36,7 +36,9 @@ sys.path.insert(
 sys.path.insert(0,str(WEBBIE_ROOT / "actions"))
 
 from owner_authorization_store import read_policy,update_policy
-from brain import respond
+# Keep GitHub's owner verification, voice turn cancellation, permissions and native bays.
+# Only replace the blocking model call with the owner-tested subprocess boundary.
+from webbie_ai_isolation import respond
 from model_resilience import MODEL_GOVERNOR, model_health_message
 from jarvis_context import read_context, context_summary, advisory_context
 from focus_tasks import focus_answer, advisory_focus, WORKSPACES
