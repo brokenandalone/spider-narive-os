@@ -141,6 +141,45 @@ class ChannelStripUiTests(unittest.TestCase):
             raise unittest.SkipTest("Qt not installed")
         cls.qt=QApplication.instance() or QApplication([])
 
+    def test_session_mixer_exposes_fx_and_restores_saved_track_parameters(self):
+        from studio.session_mix_dialog import SessionMixDialog
+        from unittest.mock import patch
+        harness=NativeMixerChannelFx("test_real_session_mixes_two_independent_track_fx_chains")
+        harness.setUp()
+        self.addCleanup(harness.tmp.cleanup)
+        dialog=SessionMixDialog()
+        try:
+            dialog.audit_done(harness.session,"")
+            self.assertEqual(dialog.table.columnCount(),9)
+            self.assertTrue(dialog.track_fx_button.isEnabled())
+            self.assertEqual(dialog.table.currentRow(),0)
+            class MockFxDialog:
+                Accepted=1
+                def __init__(self,*unused):
+                    pass
+                def exec_(self):return self.Accepted
+                def values(self):
+                    return normalize_track_effects(
+                        {"bass_db":-5,"compression":True,"room":15})
+            with patch("studio.session_mix_dialog.ChannelStripDialog",MockFxDialog):
+                dialog.edit_track_effects()
+            settings=dialog.mix_controls()
+            self.assertEqual(settings[harness.voice]["effects"]["bass_db"],-5)
+            self.assertTrue(settings[harness.voice]["effects"]["compression"])
+            self.assertIn("Comp",dialog.table.item(0,8).text())
+            saved=save_preset(harness.session,settings,name="Singer warm")
+            dialog.refresh_presets()
+            found=next(i for i in range(dialog.preset_list.count())
+                       if dialog.preset_list.itemData(i)==str(saved))
+            dialog.preset_list.setCurrentIndex(found)
+            dialog.channel_effects[harness.voice]=normalize_track_effects()
+            dialog.load_mix_preset()
+            self.assertEqual(
+                dialog.mix_controls()[harness.voice]["effects"]["room"],15)
+            self.assertIn("Room",dialog.table.item(0,8).text())
+        finally:
+            dialog.close()
+
     def test_real_channel_strip_is_bounded_without_opening_audio(self):
         from studio.session_channel_strip import ChannelStripDialog
         dialog=ChannelStripDialog("Lead Vocal",{"bass_db":5,"room":12})
