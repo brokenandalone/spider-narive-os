@@ -271,6 +271,8 @@ APP_FILES = (
     'studio/audio_capture_engine.py',
     'studio/audio_capture_panel.py',
     'studio/audio_overdub_engine.py',
+    'studio/backing_cue.py',
+    'studio/band_backing_worker.py',
     'the-web/shell/app_visuals.py',
     'branding/spider-apps/icons/spider-audio-studio.svg',
     'branding/spider-apps/icons/spider-art-lab.svg',
