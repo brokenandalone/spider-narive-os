@@ -91,9 +91,15 @@ def inspect(device: str, stub: Path, root_boot: Path) -> tuple[str, str, str, in
     text = stub.read_text()
     if "search.fs_uuid " + SPIDER_UUID not in text or "configfile $prefix/grub.cfg" not in text:
         raise ValueError("EFI SpiderOS stub does not point to the known sda1 config")
-    mounted = run("findmnt", "-rn", "--source", device, "-o", "TARGET")
-    if mounted.strip():
-        raise ValueError(f"Boot partition unexpectedly mounted at {mounted.strip()}")
+    # findmnt status 1 is expected when the active boot filesystem is unmounted.
+    mount_check = subprocess.run(
+        ["findmnt", "-rn", "--source", device, "-o", "TARGET"],
+        text=True, capture_output=True, check=False,
+    )
+    if mount_check.returncode not in (0, 1):
+        raise RuntimeError(f"Cannot inspect boot mount status: {mount_check.stderr[:200]}")
+    if mount_check.stdout.strip():
+        raise ValueError(f"Boot partition unexpectedly mounted at {mount_check.stdout.strip()}")
     cfg = debugfs(device, f"cat {GRUB_PATH}")
     old, args = original_entry(cfg)
     for basename in (f"vmlinuz-{old}", f"initrd.img-{old}"):
