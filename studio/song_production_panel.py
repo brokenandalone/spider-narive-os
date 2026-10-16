@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 try:
     from .instruments_engine import TRACKS, Pattern
     from .midi_song_export import write_song_midi
+    from .band_backing_worker import BandBackingWorker
     from .song_arranger_engine import (
         MAX_BARS, Bar, Channel, Song, export_stems, load_song, save_song,
         song_duration, write_song_wav,
@@ -23,6 +24,7 @@ try:
 except ImportError:
     from instruments_engine import TRACKS, Pattern
     from midi_song_export import write_song_midi
+    from band_backing_worker import BandBackingWorker
     from song_arranger_engine import (
         MAX_BARS, Bar, Channel, Song, export_stems, load_song, save_song,
         song_duration, write_song_wav,
@@ -51,6 +53,8 @@ class SongRenderWorker(QThread):
             self.completed.emit(False, str(error)[:350])
 
 class SongProductionPanel(QWidget):
+    backing_cue_ready = pyqtSignal(str, int)
+
     def __init__(self, workbench, parent=None):
         super().__init__(parent)
         self.workbench = workbench
@@ -155,6 +159,7 @@ class SongProductionPanel(QWidget):
             ("Export stereo WAV", self.export_mix),
             ("Export all 7 stems", self.export_stems),
             ("Export standard MIDI", self.export_midi),
+            ("🎸 Backing to Audio Recorder", self.make_backing_for_recorder),
         ]):
             button = QPushButton(label)
             button.clicked.connect(handler)
@@ -330,6 +335,34 @@ class SongProductionPanel(QWidget):
 
     def _finish_export(self, ok, message):
         self.status.setText(message if ok else "Export failed: " + message)
+
+    def make_backing_for_recorder(self):
+        """Render the actual arranged virtual instruments to a private overdub cue."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current export before making a recording cue.")
+            return
+        try:
+            song=self._song_validated()
+            if not song.bars:
+                raise ValueError("Capture and arrange at least one song bar first")
+            if song_duration(song) > 300:
+                raise ValueError("Backing for live overdubs is limited to five minutes")
+            self.worker=BandBackingWorker(song=song,rate=44100,parent=self)
+            self.worker.finished_cue.connect(self._finished_backing)
+            self.worker.start()
+            self.status.setText(
+                "Rendering arranged drums, guitar, bass and keys into a private "
+                "16-bit backing track. No audio hardware opened.")
+        except (OSError,ValueError,TypeError) as error:
+            self.status.setText("Cannot prepare virtual band: "+str(error)[:270])
+
+    def _finished_backing(self,ok,path,rate,error):
+        if not ok:
+            self.status.setText("Virtual band backing failed: "+error)
+            return
+        self.status.setText(
+            "Arrangement ready for recorded overdubs: "+Path(path).name)
+        self.backing_cue_ready.emit(path,rate)
 
     def export_mix(self):
         filename, _ = QFileDialog.getSaveFileName(self, "Export Spider song WAV",
