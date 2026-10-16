@@ -17,6 +17,8 @@ if __package__:
     from .session_presets import save_preset, load_preset, list_presets
     from .session_qc import audit_session_audio
     from .mastering_dialog import MasteringDialog
+    from .session_channel_strip import ChannelStripDialog
+    from .session_track_fx import normalize_track_effects
 else:
     from session_project import inspect_session
     from session_mix import render_session
@@ -24,6 +26,8 @@ else:
     from session_presets import save_preset, load_preset, list_presets
     from session_qc import audit_session_audio
     from mastering_dialog import MasteringDialog
+    from session_channel_strip import ChannelStripDialog
+    from session_track_fx import normalize_track_effects
 
 
 class SessionAudioQcWorker(QThread):
@@ -102,6 +106,7 @@ class SessionMixDialog(QDialog):
         self.worker = None
         self.quality_worker = None
         self.rendered = None
+        self.channel_effects = {}
         layout = QVBoxLayout(self)
         note = QLabel(
             "Reopen a Spider Studio multitrack session, inspect real independent WAVs, "
@@ -137,9 +142,9 @@ class SessionMixDialog(QDialog):
         self.quality_report.setReadOnly(True)
         self.quality_report.setMaximumHeight(110)
         layout.addWidget(self.quality_report)
-        self.table = QTableWidget(0, 8)
+        self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels(
-            ["File", "Role", "Gain", "Pan", "Mute", "Solo", "Start delay (ms)", "Label"]
+            ["File", "Role", "Gain", "Pan", "Mute", "Solo", "Start delay (ms)", "Label", "Channel FX"]
         )
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -152,6 +157,10 @@ class SessionMixDialog(QDialog):
         self.table.setColumnWidth(5, 55)
         self.table.setColumnWidth(6, 140)
         layout.addWidget(self.table)
+        self.track_fx_button=QPushButton("Edit Selected Track EQ / Compression / Room")
+        self.track_fx_button.setEnabled(False)
+        self.track_fx_button.clicked.connect(self.edit_track_effects)
+        layout.addWidget(self.track_fx_button)
         self.include_reference = QCheckBox(
             "Explicitly include a full-song reference mix (may double recorded instruments)"
         )
@@ -208,6 +217,8 @@ class SessionMixDialog(QDialog):
                 or self.quality_worker is not None):
             return
         self.session = None
+        self.channel_effects.clear()
+        self.track_fx_button.setEnabled(False)
         self.quality_button.setEnabled(False)
         self.quality_report.clear()
         self.table.setRowCount(0)
@@ -237,6 +248,8 @@ class SessionMixDialog(QDialog):
             self.table.setItem(index, 0, QTableWidgetItem(track["filename"]))
             self.table.setItem(index, 1, QTableWidgetItem(track["role"].replace("_", " ")))
             self.table.setItem(index, 7, QTableWidgetItem(track["label"]))
+            self.channel_effects[track["filename"]]=normalize_track_effects()
+            self.table.setItem(index, 8, QTableWidgetItem("Dry / unprocessed"))
             gain = QDoubleSpinBox()
             gain.setRange(0.0, 2.0)
             gain.setSingleStep(0.05)
@@ -271,6 +284,8 @@ class SessionMixDialog(QDialog):
             "All tracks begin at their saved zero offset, plus optional per-track delay."
         )
         self.mix_button.setEnabled(True)
+        self.track_fx_button.setEnabled(True)
+        self.table.setCurrentCell(0,0)
         self.quality_button.setEnabled(True)
         self.save_preset_button.setEnabled(True)
         self.refresh_presets()
@@ -321,6 +336,38 @@ class SessionMixDialog(QDialog):
         if worker is not None:
             worker.deleteLater()
 
+    def _describe_fx(self, filename):
+        fx=normalize_track_effects(self.channel_effects.get(filename))
+        parts=[]
+        for key,label in (("bass_db","Bass"),("mids_db","Mid"),("treble_db","Treble")):
+            if fx[key]:
+                parts.append(f"{label} {fx[key]:+d} dB")
+        if fx["compression"]:
+            parts.append("Comp")
+        if fx["room"]:
+            parts.append(f"Room {fx['room']}%")
+        return " · ".join(parts) if parts else "Dry / unprocessed"
+
+    def edit_track_effects(self):
+        if self.session is None or self.worker is not None or self.checker is not None:
+            return
+        row=self.table.currentRow()
+        if not 0<=row<len(self.session["tracks"]):
+            self.status.setText("Select a recorded session track before opening its channel strip.")
+            return
+        track=self.session["tracks"][row]
+        if track["role"]=="click_guide":
+            self.status.setText("Click guides are tracking only and cannot enter the final mix.")
+            return
+        key=track["filename"]
+        dialog=ChannelStripDialog(track["label"],self.channel_effects.get(key),self)
+        if dialog.exec_()!=dialog.Accepted:
+            return
+        self.channel_effects[key]=dialog.values()
+        self.table.setItem(row,8,QTableWidgetItem(self._describe_fx(key)))
+        self.status.setText(
+            "Track processing updated for the next offline mix. No source WAV was touched.")
+
     def mix_controls(self):
         if self.session is None:
             raise SessionError("Verify a saved session before mixing.")
@@ -332,6 +379,8 @@ class SessionMixDialog(QDialog):
                 "mute": self.table.cellWidget(index, 4).isChecked(),
                 "solo": self.table.cellWidget(index, 5).isChecked(),
                 "delay_ms": self.table.cellWidget(index, 6).value(),
+                "effects": normalize_track_effects(
+                    self.channel_effects.get(track["filename"])),
             }
         return result
 
@@ -382,6 +431,10 @@ class SessionMixDialog(QDialog):
                 self.table.cellWidget(index, 4).setChecked(settings["mute"])
                 self.table.cellWidget(index, 5).setChecked(settings["solo"])
                 self.table.cellWidget(index, 6).setValue(settings["delay_ms"])
+                self.channel_effects[track["filename"]]=normalize_track_effects(
+                    settings.get("effects"))
+                self.table.setItem(index,8,
+                                   QTableWidgetItem(self._describe_fx(track["filename"])))
             self.include_reference.setChecked(preset["include_reference"])
             self.status.setText(f"Restored preset: {preset['name']}. No render was started.")
         except (OSError, SessionError, ValueError) as error:
@@ -393,6 +446,7 @@ class SessionMixDialog(QDialog):
             return
         self.mix_button.setEnabled(False)
         self.quality_button.setEnabled(False)
+        self.track_fx_button.setEnabled(False)
         self.check_button.setEnabled(False)
         self.choose_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -417,6 +471,7 @@ class SessionMixDialog(QDialog):
         worker, self.worker = self.worker, None
         self.quality_button.setEnabled(self.session is not None)
         self.mix_button.setEnabled(self.session is not None)
+        self.track_fx_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
         self.choose_button.setEnabled(True)
         self.stop_button.setEnabled(False)
