@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 import sys
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QProcess
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QApplication,QCheckBox,QDialog,QHBoxLayout,QLabel,QPushButton,QTextEdit,
@@ -27,6 +27,8 @@ class SpiderAudioSetup(QDialog):
         super().__init__(parent)
         self.bundle=Path(bundle)
         self.installed=None
+        self.computer_ready=False
+        self.self_test_process=None
         self.setObjectName("spiderAudioBetaSetup")
         self.setWindowTitle("Spider Audio Studio · Beta Setup")
         self.setMinimumSize(610,450)
@@ -71,8 +73,11 @@ class SpiderAudioSetup(QDialog):
         self.install_button=QPushButton("Install for this user")
         self.install_button.setEnabled(False)
         self.install_button.clicked.connect(self.install_beta)
-        self.ack.toggled.connect(self.install_button.setEnabled)
+        self.ack.toggled.connect(self._update_install_permission)
         buttons.addWidget(self.install_button)
+        self.audio_button=QPushButton("Test music engine")
+        self.audio_button.clicked.connect(self.test_audio_engine)
+        buttons.addWidget(self.audio_button)
         self.launch_button=QPushButton("Run Studio")
         self.launch_button.clicked.connect(self.launch)
         buttons.addWidget(self.launch_button)
@@ -81,7 +86,14 @@ class SpiderAudioSetup(QDialog):
         self.result.setWordWrap(True)
         root.addWidget(self.result)
 
+    def _update_install_permission(self):
+        self.install_button.setEnabled(
+            self.installed is None and self.computer_ready and
+            self.ack.isChecked())
+
     def check_computer(self):
+        self.computer_ready=False
+        self._update_install_permission()
         try:
             data=verify(self.bundle)
             result=subprocess.run(
@@ -91,15 +103,19 @@ class SpiderAudioSetup(QDialog):
             self.log.setPlainText(
                 "PACKAGE VERIFIED: "+data["version"]+"\n\n"+
                 (result.stdout or result.stderr)[:6000])
+            self.computer_ready=result.returncode==0
+            self._update_install_permission()
             self.result.setText(
-                "Required runtime available." if result.returncode==0 else
-                "Some dependencies are missing. See the report; you may need to install them.")
+                "Required runtime available. You may now install this beta." 
+                if self.computer_ready else
+                "A required dependency is missing. Installation stays blocked; see the report.")
         except (OSError,ValueError,subprocess.SubprocessError) as error:
             self.log.setPlainText("Computer check failed:\n"+str(error)[:2000])
             self.result.setText("The beta cannot be verified here.")
 
     def install_beta(self):
-        if not self.ack.isChecked():
+        if not self.ack.isChecked() or not self.computer_ready:
+            self.result.setText("Check the computer and acknowledge the beta before installing.")
             return
         try:
             location,desktop=install(self.bundle)
@@ -111,10 +127,54 @@ class SpiderAudioSetup(QDialog):
                 "New versioned application location:\n"+str(location)+
                 "\n\nNew user desktop shortcut:\n"+str(desktop)+
                 "\n\nYour recordings, previous Studio and OS are unchanged.")
-            self.install_button.setEnabled(False)
+            self._update_install_permission()
         except (OSError,ValueError,subprocess.SubprocessError) as error:
             self.result.setText("Install was not completed; source music was not altered.")
             self.log.setPlainText("Install blocked:\n"+str(error)[:2000])
+
+    def test_audio_engine(self):
+        """Background offline FFmpeg test; never activates audio input/output."""
+        if self.self_test_process is not None:
+            return
+        try:
+            verify(self.bundle)
+        except (OSError,ValueError,subprocess.SubprocessError) as error:
+            self.result.setText("Cannot test an unverified package: "+str(error)[:170])
+            return
+        process=QProcess(self)
+        self.self_test_process=process
+        self.audio_button.setEnabled(False)
+        self.result.setText("Testing the actual Studio multitrack renderer with temporary tones...")
+        process.setProgram(sys.executable)
+        process.setArguments([
+            str(self.bundle/"run_spider_audio_studio.py"),"--self-test"])
+        process.finished.connect(self._engine_test_finished)
+        process.start()
+
+    def _engine_test_finished(self,*args):
+        process=self.self_test_process
+        self.self_test_process=None
+        self.audio_button.setEnabled(True)
+        if process is None:
+            return
+        report=bytes(process.readAllStandardOutput()).decode("utf-8","replace")
+        error=bytes(process.readAllStandardError()).decode("utf-8","replace")
+        passed=process.exitCode()==0 and '"result": "PASS"' in report
+        self.log.setPlainText(
+            (report or error or "No music-engine test results")[:6000])
+        self.result.setText(
+            "Offline music engine PASSED. Live device latency is not tested."
+            if passed else "Offline music-engine test failed. See the report.")
+        process.deleteLater()
+
+    def closeEvent(self,event):
+        process=self.self_test_process
+        if process is not None and process.state()!=QProcess.NotRunning:
+            process.terminate()
+            if not process.waitForFinished(2000):
+                process.kill()
+                process.waitForFinished(2000)
+        super().closeEvent(event)
 
     def launch(self):
         folder=self.installed or self.bundle
