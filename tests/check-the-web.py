@@ -98,6 +98,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert isinstance(webbie_operations, main.WebbieNativeOperations)
     assert webbie_operations.assistant is window.webbie_assistant
     assert webbie_operations.workflow.session is window.webbie_assistant.unified_workflow
+    assert webbie_operations.missions.core is window.webbie_assistant.jarvis_core
     assert window.workspace_widgets['webbie'].native.objectName() == 'webbieResidentBayOverview'
     assert len(window.findChildren(main.WebbiePanel)) == 1
     assert webbie_operations.tabs.count() == 3
