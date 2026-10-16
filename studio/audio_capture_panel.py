@@ -66,6 +66,7 @@ class AudioCapturePanel(QWidget):
         super().__init__(parent)
         self.worker=None
         self.takes=[]
+        self.last_session=None
         self.setObjectName("spiderAudioCaptureConsole")
         self.setStyleSheet("""QWidget#spiderAudioCaptureConsole{background:#110d20}
             QLabel{color:#f1e6ff} QPushButton{color:#fff;background:#35234c;
@@ -146,7 +147,11 @@ class AudioCapturePanel(QWidget):
         session_action=QHBoxLayout()
         self.arrange_btn=self._button(
             "Open Recorded Takes in Studio Multitrack Editor",self.open_multitrack)
+        self.mix_btn=self._button(
+            "Mix Last Recorded Session",self.open_session_mix)
+        self.mix_btn.setEnabled(False)
         session_action.addWidget(self.arrange_btn)
+        session_action.addWidget(self.mix_btn)
         layout.addLayout(session_action)
         level_row=QHBoxLayout()
         level_row.addWidget(QLabel("INPUT PEAK"))
@@ -264,6 +269,8 @@ class AudioCapturePanel(QWidget):
                 "Captured real WAV: "+path.name+
                 ". You can record another take or create a multitrack DAW session.")
         elif isinstance(result,str):
+            self.last_session=Path(result)
+            self.mix_btn.setEnabled(True)
             self.status.setText(
                 "Created a private multitrack session: "+result+
                 ". Open its copied WAV tracks in your preferred DAW.")
@@ -289,6 +296,24 @@ class AudioCapturePanel(QWidget):
             editor.exec_()
         except (OSError,ValueError,RuntimeError,SessionError) as exc:
             self.status.setText("Cannot open the recorded multitrack editor: "+str(exc)[:250])
+
+    def open_session_mix(self):
+        """Open the existing native audited mixer for actual recorded WAVs."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish recording or export before opening the mixer.")
+            return
+        if self.last_session is None or not self.last_session.is_dir():
+            self.status.setText("Create a recorded multitrack session first.")
+            return
+        try:
+            if __package__:
+                from .session_mix_dialog import SessionMixDialog
+            else:
+                from session_mix_dialog import SessionMixDialog
+            editor=SessionMixDialog(str(self.last_session),self)
+            editor.exec_()
+        except (OSError,RuntimeError,ValueError) as exc:
+            self.status.setText("Cannot open recorded session mixer: "+str(exc)[:260])
 
     def export_multitrack(self):
         if self.worker is not None and self.worker.isRunning():
