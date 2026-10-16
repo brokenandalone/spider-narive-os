@@ -100,6 +100,48 @@ class HereticLabTests(unittest.TestCase):
                                       approved=True,status=status,workdir=out,
                                       popen=mock.Mock())
 
+    def test_setup_only_opens_after_gui_approval_and_resources(self):
+        ready=lab.LabStatus(False,"/nonexistent",32,90,True,"")
+        commands=[]
+        def runner(argv,**kwargs):
+            commands.append((argv,kwargs))
+            return object()
+        with self.assertRaises(PermissionError):
+            lab.launch_lab_setup(approved=False,status=ready,popen=runner)
+        self.assertFalse(commands)
+        self.assertTrue(lab.SETUP_SCRIPT.is_file())
+        self.assertTrue(lab.launch_lab_setup(
+            approved=True,status=ready,popen=runner))
+        self.assertEqual(len(commands),1)
+        argv,kwargs=commands[0]
+        self.assertEqual(argv,[
+            "konsole","--hold","-e","bash",str(lab.SETUP_SCRIPT),"--install"])
+        self.assertFalse(kwargs.get("shell",False))
+        self.assertNotIn("sudo",argv)
+        self.assertNotIn("ollama",argv)
+
+    def test_setup_fails_closed_when_already_installed_or_disk_limited(self):
+        installed=lab.LabStatus(True,"/home/user/venv/bin/heretic",64,80,True,"")
+        missing_disk=lab.LabStatus(False,"/nonexistent",64,24,True,"")
+        missing_console=lab.LabStatus(False,"/nonexistent",64,80,False,"")
+        with mock.patch.object(lab.subprocess,"Popen") as caller:
+            for status in (installed,missing_disk,missing_console):
+                with self.assertRaises(RuntimeError):
+                    lab.launch_lab_setup(approved=True,status=status)
+            caller.assert_not_called()
+
+    def test_release_includes_optional_heretic_setup_and_lab(self):
+        release=(ROOT/"system"/"release_batch.py").read_text()
+        self.assertIn("'tools/setup_heretic_lab.sh'",release)
+        self.assertIn("'webbie/brain/heretic_lab.py'",release)
+        self.assertIn("launch_lab_setup",SOURCE.read_text())
+        ui=(ROOT/"the-web"/"shell"/"webbie_cognitive_center.py").read_text()
+        self.assertIn("webbieHereticSetupButton",ui)
+        self.assertIn("launch_lab_setup(approved=True",ui)
+        script=(ROOT/"tools"/"setup_heretic_lab.sh").read_text()
+        self.assertIn("INSTALL HERETIC",script)
+        self.assertIn("python\" -m pip install",script)
+
     def test_prod_brain_is_never_changed_by_model_lab(self):
         code=SOURCE.read_text()
         self.assertNotIn("ollama create",code)
