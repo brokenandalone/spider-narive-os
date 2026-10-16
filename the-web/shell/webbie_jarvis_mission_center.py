@@ -20,8 +20,8 @@ sys.path.insert(0,str(ROOT/"webbie/actions"))
 from jarvis_orchestrator import JarvisCore
 
 CHOICES=(
-    ("Review whole project: files, TODOs and site assets","project.review"),
     ("Search selected folder","local.evidence"),
+    ("Review whole project: files, TODOs and site assets","project.review"),
     ("Audit a website project","site.audit"),
     ("Host local website preview (127.0.0.1)","site.preview"),
     ("Check Spider OS health","system.health"),
