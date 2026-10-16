@@ -77,6 +77,14 @@ class InstalledTruthTests(unittest.TestCase):
         self.assertNotIn("sensitive token string",
                          (self.report / "manifest.json").read_text())
 
+    def test_rejects_reports_inside_git_checkout(self):
+        self._add(self.repo, "studio/audio.py", "original")
+        self._add(self.installed, "studio/audio.py", "original")
+        self._git_add()
+        with self.assertRaisesRegex(RuntimeError, "inside the Git checkout"):
+            audit.make_report(self.installed, self.repo, self.repo / "PC-REPORT")
+        self.assertFalse((self.repo / "PC-REPORT").exists())
+
     def test_ignores_untracked_git_file_and_never_modifies_installed(self):
         p = self._add(self.repo, "studio/audio.py", "version one")
         q = self._add(self.installed, "studio/audio.py", "version one")
