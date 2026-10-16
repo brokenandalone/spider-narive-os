@@ -232,6 +232,21 @@ class SpiderStudio(QMainWindow):
             from stem_import_panel import StemImportPanel
         self.stem_import_panel = StemImportPanel(self)
         self.tool_tabs.addTab(self.stem_import_panel, 'Import WAVs · Create Song')
+        if __package__:
+            from .welcome_panel import StudioWelcome
+        else:
+            from welcome_panel import StudioWelcome
+        self.welcome_panel=StudioWelcome(
+            open_import=lambda:self.tool_tabs.setCurrentWidget(
+                self.stem_import_panel),
+            open_record=lambda:self.tool_tabs.setCurrentWidget(
+                self.audio_capture_page),
+            open_instruments=lambda:self.tool_tabs.setCurrentWidget(
+                self.instrument_page),
+            open_session=self.open_existing_session,
+            open_recent=self.open_recent_songs,
+            parent=self)
+        self.tool_tabs.insertTab(0,self.welcome_panel,'Start a Song')
         # Read-only recording inventory inside native Studio; no hardware access.
         if __package__:
             from .recording_audit_panel import RecordingAuditPanel
@@ -311,6 +326,7 @@ class SpiderStudio(QMainWindow):
 
         outer.addWidget(center, 1)
 
+        self.tool_tabs.setCurrentWidget(self.welcome_panel)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_status)
         self.timer.start(5000)
@@ -342,6 +358,24 @@ class SpiderStudio(QMainWindow):
             return
         if self.launch(command):
             self.status.setText(f'Opened {tool[0]}.')
+
+    def open_recent_songs(self):
+        """Open local saved session inventory; verifying still occurs on open."""
+        if __package__:
+            from .saved_songs_dialog import SavedSongsDialog
+        else:
+            from saved_songs_dialog import SavedSongsDialog
+        chooser=SavedSongsDialog(parent=self)
+        chooser.exec_()
+
+    def open_existing_session(self):
+        """Open the exact existing native verified session mixing dialog."""
+        if __package__:
+            from .session_mix_dialog import SessionMixDialog
+        else:
+            from session_mix_dialog import SessionMixDialog
+        editor=SessionMixDialog(parent=self)
+        editor.exec_()
 
     def launch_music(self):
         # The music sidebar button must open Spider's REAL native tools, not
