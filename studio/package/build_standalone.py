@@ -19,7 +19,7 @@ import tarfile
 import tempfile
 
 SOURCE=Path(__file__).resolve().parents[2]
-VERSION="0.13.0-dev"
+VERSION="0.14.0-beta"
 PACKAGE="Spider-Audio-Studio-"+VERSION
 ROOTS=(
     "studio",
@@ -68,6 +68,9 @@ if "--verify-only" in sys.argv[1:]:
     raise SystemExit(0)
 
 sys.path.insert(0,str(app))
+if "--doctor" in sys.argv[1:]:
+    from studio.package.doctor import main as studio_doctor
+    raise SystemExit(studio_doctor())
 try:
     from studio.main import main
 except ImportError as error:
@@ -131,6 +134,22 @@ def build(output_dir, *, source=SOURCE):
             hashes[rel]=hashlib.sha256(dest.read_bytes()).hexdigest()
         (bundle/"run_spider_audio_studio.py").write_text(LAUNCHER,encoding="utf-8")
         (bundle/"run_spider_audio_studio.py").chmod(0o755)
+        # Explicit per-user install is separate from app launch and is never
+        # run automatically. Preserve owner MIT notice and legal caveats.
+        extras={
+            "install_for_user.py":"studio/package/install_for_user.py",
+            "LICENSE":"LICENSE",
+            "BETA_README.md":"studio/product/BETA_README.md",
+            "THIRD_PARTY_NOTICE.md":"studio/product/THIRD_PARTY_NOTICE.md",
+        }
+        for dest_name,source_rel in extras.items():
+            dest=bundle/dest_name
+            source_file=source/source_rel
+            if source_file.is_symlink() or not source_file.is_file():
+                raise RuntimeError("Missing product beta disclosure or installer source")
+            with source_file.open("rb") as inp,dest.open("xb") as out:
+                shutil.copyfileobj(inp,out)
+            dest.chmod(0o755 if dest_name.endswith(".py") else 0o600)
         revision="unknown"
         try:
             record=subprocess.run(
@@ -174,7 +193,7 @@ def main(argv=None):
     except (OSError,RuntimeError,ValueError) as exc:
         cli.exit(2,"Spider Audio Studio bundling rejected: "+str(exc)+"\n")
     print("SPIDER AUDIO STUDIO STANDALONE SOURCE PACKAGE:",result)
-    print("This is a separate developer preview, NOT installed OS software.")
+    print("This is a private beta archive, NOT an installed or publicly approved product.")
     print("Review licenses and hardware dependencies before public redistribution.")
 
 if __name__=="__main__":
