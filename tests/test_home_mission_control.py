@@ -36,6 +36,8 @@ class FocusQueueTests(unittest.TestCase):
                "folder":"/private/family/songs","id":"secret-id"}]
         brief=mission_brief(data)
         self.assertIn("Studio: Record new song",brief)
+        self.assertIn("\\n[ACTIVE]",brief)
+        self.assertNotIn("\\\\n",brief)
         self.assertNotIn("/private",brief)
         self.assertNotIn("secret-id",brief)
         self.assertNotIn("folder",brief)
