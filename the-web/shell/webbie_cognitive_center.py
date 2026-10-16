@@ -21,7 +21,7 @@ from privacy_controls import private_session_active, set_private_session, privac
 from local_models import configured_choice
 from local_model_inventory import inspect_local_models, report_lines
 from heretic_lab import (inspect_heretic, plan_experiment, launch_experiment,
-                         EXPERIMENT_MODELS)
+                         launch_lab_setup, EXPERIMENT_MODELS)
 from proactive_checks import status_message
 from runtime_readiness import inspect_readiness, render_report
 from voice_trust import trust_status
@@ -361,6 +361,10 @@ class HereticExperimentDialog(QDialog):
         self.check_button = QPushButton("Check local readiness")
         self.check_button.clicked.connect(self.refresh)
         actions.addWidget(self.check_button)
+        self.setup_button = QPushButton("Install isolated Heretic lab")
+        self.setup_button.setObjectName("webbieHereticSetupButton")
+        self.setup_button.clicked.connect(self.install_setup)
+        actions.addWidget(self.setup_button)
         self.run_button = QPushButton("Start supervised experiment in Konsole")
         self.run_button.setObjectName("webbieHereticStartButton")
         self.run_button.clicked.connect(self.start)
@@ -375,6 +379,9 @@ class HereticExperimentDialog(QDialog):
         status = inspect_heretic()
         ready, explanation = plan_experiment(self.model.currentText(), status)
         self.run_button.setEnabled(ready)
+        self.setup_button.setEnabled(
+            (not status.installed) and status.console_available
+            and status.free_disk_gib >= 25)
         self.report.setPlainText(
             status.explanation + "\n\n" + explanation + "\n\n"
             "Upstream: https://github.com/p-e-w/heretic (AGPL-3.0-or-later). "
@@ -383,6 +390,37 @@ class HereticExperimentDialog(QDialog):
             "and offer optional online publishing inside its CLI. "
             "The interactive Konsole run is managed there; press Ctrl+C in "
             "that Konsole to stop it.")
+
+
+    def install_setup(self):
+        """Only a deliberate GUI button plus in-terminal consent installs."""
+        status = inspect_heretic()
+        if status.installed:
+            self.report.setPlainText("Heretic is already present in the private lab.")
+            return
+        question = (
+            "Open the optional Heretic setup in Konsole?\n\n"
+            "This installs heavyweight Python/PyTorch research dependencies in "
+            "your home directory, not in the Spider OS system environment. "
+            "It may download several gigabytes. Webbie's running qwen3:8b, "
+            "Natasha voice, memory and permissions are not changed.\n\n"
+            "The installer also requires you to type INSTALL HERETIC in Konsole. "
+            "Nothing is downloaded until you do. Continue?")
+        if QMessageBox.question(
+            self, "Install Heretic research environment?", question,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        ) != QMessageBox.Yes:
+            return
+        try:
+            launch_lab_setup(approved=True, status=status)
+            self.report.setPlainText(
+                "Heretic setup Konsole requested. Review the optional installation "
+                "details and type INSTALL HERETIC only if you approve. "
+                "Refresh readiness after it completes. No Webbie service changed.")
+        except (OSError, RuntimeError, ValueError, PermissionError) as error:
+            self.report.setPlainText(
+                "No Heretic installation started: " + str(error)[:500])
+        self.refresh()
 
     def start(self):
         status = inspect_heretic()
