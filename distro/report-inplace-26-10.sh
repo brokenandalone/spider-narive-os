@@ -31,6 +31,19 @@ elif [[ "${VERSION_ID:-unknown}" == "26.10" ]]; then
 else
   mark BLOCK "OS base" "Unexpected version ${VERSION_ID:-unknown}; stop and investigate"
 fi
+# A Spider OS upgrade must retain the Ubuntu Studio product, not silently
+# become a generic Ubuntu desktop. These are checks, not install actions.
+if command -v dpkg-query >/dev/null 2>&1; then
+  studio_core="$(dpkg-query -W -f='${db:Status-Abbrev}' ubuntustudio-desktop-core 2>/dev/null || true)"
+  studio_full="$(dpkg-query -W -f='${db:Status-Abbrev}' ubuntustudio-desktop 2>/dev/null || true)"
+  if [[ "$studio_core" == ii* || "$studio_full" == ii* ]]; then
+    mark PASS "Ubuntu Studio base" "Ubuntu Studio desktop package installed; target must remain Ubuntu Studio 26.10"
+  else
+    mark BLOCK "Ubuntu Studio base" "Neither Ubuntu Studio desktop-core nor desktop is installed; do not treat generic Ubuntu as verified Studio"
+  fi
+else
+  mark BLOCK "Ubuntu Studio base" "dpkg-query unavailable; cannot verify Studio installation"
+fi
 if [[ -d /sys/firmware/efi ]]; then
   mark INFO "Boot" "UEFI detected; leave existing EFI entries unchanged"
 else
