@@ -244,6 +244,7 @@ class SpiderStudio(QMainWindow):
             open_instruments=lambda:self.tool_tabs.setCurrentWidget(
                 self.instrument_page),
             open_session=self.open_existing_session,
+            open_recent=self.open_recent_songs,
             parent=self)
         self.tool_tabs.insertTab(0,self.welcome_panel,'Start a Song')
         # Read-only recording inventory inside native Studio; no hardware access.
@@ -357,6 +358,15 @@ class SpiderStudio(QMainWindow):
             return
         if self.launch(command):
             self.status.setText(f'Opened {tool[0]}.')
+
+    def open_recent_songs(self):
+        """Open local saved session inventory; verifying still occurs on open."""
+        if __package__:
+            from .saved_songs_dialog import SavedSongsDialog
+        else:
+            from saved_songs_dialog import SavedSongsDialog
+        chooser=SavedSongsDialog(parent=self)
+        chooser.exec_()
 
     def open_existing_session(self):
         """Open the exact existing native verified session mixing dialog."""
