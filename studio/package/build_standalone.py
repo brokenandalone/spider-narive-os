@@ -61,6 +61,18 @@ try:
             raise ValueError("Missing or linked app source: "+name)
         if hashlib.sha256(source.read_bytes()).hexdigest()!=digest:
             raise ValueError("Studio package file changed: "+name)
+    extras=data.get("extras")
+    if not isinstance(extras,dict) or not 4<=len(extras)<=12:
+        raise ValueError("Incomplete beta installer and legal notices")
+    for name,digest in extras.items():
+        if (not isinstance(name,str) or "/" in name or ".." in name or
+                not isinstance(digest,str) or len(digest)!=64):
+            raise ValueError("Unsafe beta archive extra")
+        source=home/name
+        if source.is_symlink() or not source.is_file():
+            raise ValueError("Beta disclosure missing or linked: "+name)
+        if hashlib.sha256(source.read_bytes()).hexdigest()!=digest:
+            raise ValueError("Beta disclosure/installer changed: "+name)
 except (OSError,ValueError,UnicodeError) as error:
     raise SystemExit("Spider Audio Studio package verification failed: "+str(error))
 if "--verify-only" in sys.argv[1:]:
@@ -166,7 +178,9 @@ def build(output_dir, *, source=SOURCE):
             pass
         manifest={"schema":1,"app":"Spider Audio Studio",
                   "version":VERSION,"source_revision":revision,
-                  "private_developer_preview":True,"files":hashes}
+                  "private_developer_preview":True,"files":hashes,
+                  "extras":{name:hashlib.sha256((bundle/name).read_bytes()).hexdigest()
+                            for name in sorted(extras)}}
         (bundle/"manifest.json").write_text(
             json.dumps(manifest,sort_keys=True,indent=2)+"\n",encoding="utf-8")
         (bundle/"manifest.json").chmod(0o600)
