@@ -44,7 +44,7 @@ class SpiderAudioSetup(QDialog):
         title=QLabel("SPIDER AUDIO STUDIO")
         title.setStyleSheet("font-size:26px;font-weight:800;color:#c6a4ff")
         root.addWidget(title)
-        tag=QLabel("0.14 PRIVATE BETA • Native music recording and production")
+        tag=QLabel("0.15 PRIVATE BETA • Native music recording and production")
         tag.setStyleSheet("color:#d0b7f5")
         root.addWidget(tag)
         paragraph=QLabel(
