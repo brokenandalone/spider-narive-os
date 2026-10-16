@@ -504,6 +504,7 @@ class AudioCapturePanel(QWidget):
                            self.export_btn,self.refresh_btn,self.comp_btn,
                            self.effects_btn):
                 button.setEnabled(False)
+            self.stop_btn.setEnabled(True)
             self.worker.start()
             self.status.setText(
                 "Rendering offline effects on a new WAV. Original take stays untouched.")
@@ -534,6 +535,7 @@ class AudioCapturePanel(QWidget):
             for button in (self.record_btn,self.overdub_btn,self.calibration_btn,
                            self.export_btn,self.refresh_btn,self.comp_btn):
                 button.setEnabled(False)
+            self.stop_btn.setEnabled(True)
             self.worker.start()
             self.status.setText(
                 "Creating NEW composite take with a crossfade. "
