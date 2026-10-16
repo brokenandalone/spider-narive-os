@@ -56,7 +56,8 @@ class WebbieNativeOperations(QWidget):
         self._add_scroll_tab(cognitive, "Model · Voice · Privacy")
 
         missions = JarvisMissionCenter(
-            self, stop_callback=assistant.stop_sensitive_actions)
+            self, core=assistant.jarvis_core,
+            stop_callback=assistant.stop_sensitive_actions)
         missions.setWindowFlags(Qt.Widget)
         missions.setObjectName("webbieEmbeddedJarvisMissions")
         self.missions = missions
