@@ -90,6 +90,7 @@ APP_FILES = (
     'webbie/agent/workspace_launchers.py', 'webbie/agent/jarvis_commands.py',
     'webbie/agent/voice_trust.py', 'webbie/agent/runtime_readiness.py',
     'webbie/agent/segment_speaker_gate.py',
+    'webbie/voice/speaker_voice_provider.py',
     'webbie/agent/speaker_provider_loader.py', 'webbie/agent/voice_lab.py',
     'webbie/agent/launch_intents.py',
     'webbie/agent/voice_metrics.py',
