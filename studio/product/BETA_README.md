@@ -8,6 +8,32 @@ of Spider OS, with virtual instruments, MIDI and score tools, real WAV import,
 multitrack sessions, non-destructive clip regions, EQ/compression/room controls,
 mix rendering and a rendered-WAV player.
 
+## Your songs, available when you need them
+
+The native **Start a Song** screen has a **Recent saved songs** action.
+Browse previously exported private sessions by title, tempo and track count;
+the actual recordings are still SHA-256 verified before the mixer opens.
+
+The Saved Songs window also has **Back Up Selected Song** and
+**Restore Song from Backup**. Backups include the project's independent WAVs,
+session manifest and saved mix presets. Restores create an entirely NEW
+verified private session. Both actions are initiated by the owner and do not
+publish to any service or overwrite the original.
+
+To remove ONLY the current installed beta, use the setup window's confirmed
+**Remove this installed beta** action or inspect versions from the extracted
+folder using:
+
+```bash
+python3 remove_beta.py --list-versions
+```
+
+An explicit `python3 remove_beta.py --remove 0.16.0-beta` removes
+only that verified version and matching menu shortcut; it refuses
+modified installations or unknown files. Original songs, finished WAVs,
+and older beta versions remain. Keep a separate copy of precious recordings
+outside the same disk.
+
 ## What this beta can do today
 
 - Import independent mono or stereo PCM WAV files into a new private session.
