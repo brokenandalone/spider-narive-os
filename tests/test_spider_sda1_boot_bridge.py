@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 FILE = Path(__file__).resolve().parents[1] / "distro/spider-sda1-boot-bridge.py"
 spec = importlib.util.spec_from_file_location("spider_boot_bridge", FILE)
@@ -48,6 +49,32 @@ class BootBridgeTests(unittest.TestCase):
         self.assertNotIn("$vt_handoff", candidate.split("# SPIDER_OS_TEST_ENTRY:")[1])
         self.assertEqual(EXAMPLE.count("menuentry 'Spider OS GNU/Linux'"),
                          candidate.count("menuentry 'Spider OS GNU/Linux'"))
+
+    def test_verified_byte_for_byte_matches_boot_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "vmlinuz-7.0.0-38-generic").write_bytes(b"kernel bytes")
+            (root / "initrd.img-7.0.0-38-generic").write_bytes(b"initrd bytes")
+            def fake_debugfs(device, command):
+                _, source_name, dest_name = command.split(" ", 2)
+                Path(dest_name).write_bytes((root / source_name.lstrip("/")).read_bytes())
+                return ""
+            with mock.patch.object(bridge, "debugfs", side_effect=fake_debugfs) as calls:
+                bridge.verify_bytes("/dev/fake", "7.0.0-38-generic", root)
+                self.assertEqual(calls.call_count, 2)
+
+    def test_verified_bytes_rejects_difference_even_if_sizes_match(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "vmlinuz-7.0.0-38-generic").write_bytes(b"ABCD")
+            (root / "initrd.img-7.0.0-38-generic").write_bytes(b"EFGH")
+            def wrong_debugfs(device, command):
+                _, source_name, dest_name = command.split(" ", 2)
+                Path(dest_name).write_bytes(b"WXYZ")
+                return ""
+            with mock.patch.object(bridge, "debugfs", side_effect=wrong_debugfs):
+                with self.assertRaisesRegex(ValueError, "SHA256 MISMATCH"):
+                    bridge.verify_bytes("/dev/fake", "7.0.0-38-generic", root)
 
     def test_refuses_candidate_that_uses_working_kernel(self):
         with self.assertRaisesRegex(ValueError, "different kernel"):
