@@ -96,7 +96,17 @@ if [[ -r "$stub" ]]; then
   cp -- "$stub" "$OUT/spider-efi-boot-stub.txt"
   stub_uuid="$(awk '$1=="search.fs_uuid" {print $2; exit}' "$stub")"
   if [[ -n "$stub_uuid" ]]; then
-    mark REVIEW "SpiderOS EFI stub" "References filesystem UUID $stub_uuid; inspect its effective grub.cfg before 26.10"
+    mark INFO "SpiderOS EFI stub" "References filesystem UUID $stub_uuid"
+    # The active SpiderOS EFI GRUB can point to a second, unmounted
+    # ext4 /boot partition. update-grub writes the mounted system's
+    # /boot/grub/grub.cfg instead, so a new kernel can become unbootable.
+    # Block the release upgrade until a tested synchronization plan exists.
+    target_mount="$(findmnt -rn -S "UUID=$stub_uuid" -o TARGET 2>/dev/null | head -n 1 || true)"
+    if [[ -z "$target_mount" ]]; then
+      mark BLOCK "Separate unmounted SpiderOS boot filesystem" "EFI stub points to unmounted UUID $stub_uuid; kernel and initramfs may be loaded from it. Require external backup and tested sync/rollback before do-release-upgrade"
+    else
+      mark REVIEW "SpiderOS boot filesystem" "EFI stub target mounted at $target_mount; verify active GRUB kernel and initramfs match installed files"
+    fi
   else
     mark REVIEW "SpiderOS EFI stub" "Cannot identify GRUB filesystem target; inspect spider-efi-boot-stub.txt"
   fi
