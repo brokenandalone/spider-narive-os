@@ -11,7 +11,7 @@ import threading
 from PyQt5.QtCore import Qt,QThread,pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QSpinBox,
-    QLineEdit,QListWidget,QFileDialog,QMessageBox,QProgressBar,QCheckBox,
+    QLineEdit,QListWidget,QFileDialog,QMessageBox,QProgressBar,QCheckBox,QDoubleSpinBox,
 )
 try:
     from .audio_capture_engine import (
@@ -19,12 +19,14 @@ try:
     from .multitrack import export_session,SessionError
     from .audio_overdub_engine import available_outputs,capture_overdub
     from .backing_cue import validate_recordable_cue
+    from .overdub_transport import transport_plan
 except ImportError:
     from audio_capture_engine import (
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
     from multitrack import export_session,SessionError
     from audio_overdub_engine import available_outputs,capture_overdub
     from backing_cue import validate_recordable_cue
+    from overdub_transport import transport_plan
 
 TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
 
@@ -53,7 +55,8 @@ class OverdubWorker(QThread):
     recorded=pyqtSignal(object,str)
     levels=pyqtSignal(float,float,float)
     def __init__(self,filename,cue,input_device,output_device,role,channels,rate,
-                 latency,seconds,parent=None):
+                 latency,seconds,tempo,beats_per_bar,count_in_bars,
+                 punch_start_ms,punch_end_ms,parent=None):
         super().__init__(parent)
         self.filename=filename
         self.cue=cue
@@ -64,6 +67,9 @@ class OverdubWorker(QThread):
         self.rate=rate
         self.latency=latency
         self.seconds=seconds
+        self.tempo,self.beats_per_bar=tempo,beats_per_bar
+        self.count_in_bars=count_in_bars
+        self.punch_start_ms,self.punch_end_ms=punch_start_ms,punch_end_ms
         self.stop_event=threading.Event()
     def run(self):
         try:
@@ -72,6 +78,9 @@ class OverdubWorker(QThread):
                 output_device=self.output_device,role=self.role,
                 channels=self.channels,rate=self.rate,
                 latency_ms=self.latency,max_seconds=self.seconds,
+                tempo=self.tempo,beats_per_bar=self.beats_per_bar,
+                count_in_bars=self.count_in_bars,
+                punch_start_ms=self.punch_start_ms,punch_end_ms=self.punch_end_ms,
                 stop=self.stop_event,
                 on_level=lambda peak,rms,seconds:self.levels.emit(peak,rms,seconds))
             self.recorded.emit(result,"")
@@ -189,6 +198,38 @@ class AudioCapturePanel(QWidget):
             "Overdub input is 16-bit PCM; separate takes can record at 24-bit.")
         caveat.setWordWrap(True)
         layout.addWidget(caveat)
+        transport_row=QHBoxLayout()
+        transport_row.addWidget(QLabel("Count-in"))
+        self.count_in_bars=QSpinBox()
+        self.count_in_bars.setRange(0,4)
+        self.count_in_bars.setSuffix(" bars")
+        self.count_in_bars.setAccessibleName("Headphone count-in bars before cue")
+        transport_row.addWidget(self.count_in_bars)
+        transport_row.addWidget(QLabel("Meter"))
+        self.beats_per_bar=QComboBox()
+        self.beats_per_bar.addItem("4/4",4)
+        self.beats_per_bar.addItem("3/4",3)
+        transport_row.addWidget(self.beats_per_bar)
+        self.punch_enable=QCheckBox("Punch-in / punch-out only")
+        self.punch_enable.setAccessibleName("Record only inside a bounded score-time window")
+        transport_row.addWidget(self.punch_enable)
+        layout.addLayout(transport_row)
+        punch_row=QHBoxLayout()
+        punch_row.addWidget(QLabel("Punch starts at"))
+        self.punch_start=QDoubleSpinBox()
+        self.punch_start.setRange(0,300)
+        self.punch_start.setDecimals(2)
+        self.punch_start.setSuffix(" s")
+        self.punch_start.setAccessibleName("Punch-in time relative to beginning of backing")
+        punch_row.addWidget(self.punch_start)
+        punch_row.addWidget(QLabel("Punch ends at"))
+        self.punch_end=QDoubleSpinBox()
+        self.punch_end.setRange(0,300)
+        self.punch_end.setDecimals(2)
+        self.punch_end.setSuffix(" s")
+        self.punch_end.setAccessibleName("Punch-out time relative to beginning of backing")
+        punch_row.addWidget(self.punch_end)
+        layout.addLayout(punch_row)
         self.include_cue=QCheckBox(
             "Include backing WAV as an instrumental-bed track in exported sessions")
         self.include_cue.setChecked(False)
@@ -271,6 +312,7 @@ class AudioCapturePanel(QWidget):
             import math
             seconds=math.ceil(info["seconds"])
             self.seconds.setValue(max(self.seconds.value(),seconds))
+            self.punch_end.setValue(min(300,info["seconds"]))
             self.project_title.setText(Path(path).stem[:100])
             self.status.setText(
                 f"Virtual band backing is ready ({info['seconds']:.1f}s, "
@@ -291,6 +333,14 @@ class AudioCapturePanel(QWidget):
             "PCM WAV (*.wav)")
         if filename:
             self.cue_file.setText(filename)
+            try:
+                info=validate_recordable_cue(filename)
+                self.rate.setCurrentIndex(0 if info["rate"]==48000 else 1)
+                import math
+                self.seconds.setValue(max(self.seconds.value(),math.ceil(info["seconds"])))
+                self.punch_end.setValue(min(300,info["seconds"]))
+            except (CaptureError,OSError,ValueError):
+                pass  # Explicit Record runs strict file validation before device opens.
             self.status.setText(
                 "Backing selected. Choose an input, stereo playback device, "
                 "matching sample rate and headphones before starting overdub.")
@@ -333,6 +383,15 @@ class AudioCapturePanel(QWidget):
             self.status.setText("The selected input has too few channels.")
             return
         try:
+            cue=validate_recordable_cue(
+                self.cue_file.text(),expected_rate=self.rate.currentData())
+            start_ms=round(self.punch_start.value()*1000) if self.punch_enable.isChecked() else None
+            end_ms=round(self.punch_end.value()*1000) if self.punch_enable.isChecked() else None
+            transport_plan(
+                rate=self.rate.currentData(),cue_frames=cue["frames"],
+                tempo=self.tempo.value(),beats_per_bar=self.beats_per_bar.currentData(),
+                count_in_bars=self.count_in_bars.value(),
+                punch_start_ms=start_ms,punch_end_ms=end_ms)
             TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
             if TAKE_ROOT.is_symlink():
                 raise CaptureError("The recorded-take directory cannot be a symlink")
@@ -340,7 +399,9 @@ class AudioCapturePanel(QWidget):
             self.worker=OverdubWorker(
                 str(filename),self.cue_file.text(),input_id,output[0],
                 self.role.currentData(),self.channels.currentData(),
-                self.rate.currentData(),self.latency.value(),self.seconds.value(),self)
+                self.rate.currentData(),self.latency.value(),self.seconds.value(),
+                self.tempo.value(),self.beats_per_bar.currentData(),
+                self.count_in_bars.value(),start_ms,end_ms,self)
             self.worker.recorded.connect(self._recorded)
             self.worker.levels.connect(self._levels)
             self.record_btn.setEnabled(False)
@@ -350,9 +411,10 @@ class AudioCapturePanel(QWidget):
             self.stop_btn.setEnabled(True)
             self.worker.start()
             self.status.setText(
-                "Full-duplex recording started. Backing plays through selected stereo "
-                "output while input records into its own WAV. No live microphone "
-                "signal is sent to the speakers.")
+                "Full-duplex transport armed. Headphone count-in plays BEFORE "
+                "cue time zero, then selected backing plays while the input is captured. "
+                "Any punch window is enforced on the final take, with silence outside "
+                "it. No live microphone signal is sent to the speakers.")
         except (CaptureError,OSError,ValueError) as exc:
             self.status.setText("Could not begin overdub: "+str(exc)[:280])
 
