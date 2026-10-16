@@ -89,6 +89,17 @@ class WebbieAIV2SourceTests(TestCase):
                 worker._fallback_reply("hello", "Spider")
             remote.assert_not_called()
 
+    def test_fallback_rejects_other_loopback_ports_and_forgets_past_messages(self):
+        worker = load_module("webbie_test_worker_port", "webbie/agent/webbie_ai_worker.py")
+        self.assertFalse(hasattr(worker, "_HISTORY"),
+                         "the emergency model must not retain prior private conversations")
+        with (mock.patch.dict("os.environ",
+                              {"WEBBIE_LOCAL_OLLAMA_CHAT_URL": "http://127.0.0.1:9999/api/chat"}),
+              mock.patch.object(worker.urllib.request, "urlopen") as unauthorized):
+            with self.assertRaises(ValueError):
+                worker._fallback_reply("private question", "Spider")
+            unauthorized.assert_not_called()
+
     def test_primary_child_preserves_full_brain_import(self):
         source = (ROOT / "webbie/agent/webbie_brain_primary.py").read_text()
         self.assertIn("from brain import respond", source)
