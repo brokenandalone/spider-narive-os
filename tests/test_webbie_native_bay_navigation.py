@@ -67,6 +67,16 @@ class NativeBayParsingTests(unittest.TestCase):
         permission.revoke()
         self.assertFalse(permission.authorize("workspace.switch", "workspace_id=studio"))
 
+    def test_native_tab_receipt_and_journal_are_content_free(self):
+        from action_journal import ActionJournal
+        from action_receipts import ActionReceipts
+        journal=ActionJournal()
+        journal.record("native_workspace_requested")
+        self.assertIn("native Spider OS tab",journal.display())
+        receipt=ActionReceipts()
+        receipt.record("workspace","requested")
+        self.assertIn("request sent",receipt.summary())
+
     def test_native_request_without_owner_gui_is_not_a_fallback_launcher(self):
         with tempfile.TemporaryDirectory() as directory:
             answer = request_native_bay("studio", runtime=directory)
