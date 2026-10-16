@@ -111,6 +111,58 @@ class NativeOwnerComposeTests(unittest.TestCase):
             self.assertEqual((stage/"installed"/mod.RESOLVED[0]).read_bytes(),
                              code(mod.RESOLVED[0]))
 
+    def test_old_snapshot_with_valid_manifest_refused_even_if_hashes_match(self):
+        # An OLD Bridge stage can be individually valid yet omit the newly
+        # committed Webbie STOP, one-resident and shared mission repairs.
+        with tempfile.TemporaryDirectory() as root:
+            home = Path(root)
+            stage = home / "OldBridge"
+            stage.mkdir(mode=0o700)
+            files = []
+            for name in mod.DESKTOP:
+                current = code(name)
+                # Stage is self-consistent but stale for one sensitive file.
+                proposed = current + (b"\n# earlier candidate\n"
+                                      if name.endswith("webbie_panel.py") else b"")
+                for location, data in (("installed", current),
+                                       ("candidate", proposed)):
+                    item = stage / location / name
+                    item.parent.mkdir(parents=True,exist_ok=True)
+                    item.write_bytes(data)
+                    item.chmod(0o600)
+                files.append({
+                    "component": name,
+                    "installed_sha256": hashlib.sha256(current).hexdigest(),
+                    "candidate_sha256": hashlib.sha256(proposed).hexdigest(),
+                })
+            manifest = stage / "manifest.json"
+            manifest.write_text(json.dumps({
+                "format": "spider-native-private-merge-stage-v1",
+                "focus": "desktop", "release_installable": False,
+                "files": files,
+            }))
+            manifest.chmod(0o600)
+            dest = home / "ShouldNeverExist"
+            with self.assertRaisesRegex(ValueError, "OLD STAGE") as problem:
+                mod.generate(stage,dest,home=home)
+            self.assertIn("webbie_panel.py",str(problem.exception))
+            self.assertFalse(dest.exists())
+
+    def test_snapshot_rejects_linked_source(self):
+        with tempfile.TemporaryDirectory() as root:
+            home = Path(root)
+            original = home / "original.py"
+            original.write_bytes(b"print('safe')\n")
+            source = home / "git-source"
+            source.mkdir()
+            staged = home / "private-stage"
+            staged.mkdir()
+            item = source / mod.DESKTOP[0]
+            item.parent.mkdir(parents=True)
+            item.symlink_to(original)
+            with self.assertRaisesRegex(ValueError, "Symlink"):
+                mod._check_live_candidate_snapshot(staged,source)
+
     def test_corrupt_stage_refused_before_output_created(self):
         with tempfile.TemporaryDirectory() as root:
             home=Path(root)
