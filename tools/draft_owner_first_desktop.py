@@ -88,11 +88,6 @@ def _stitch(local: bytes, incoming: bytes, relative: str):
     added = []
     deferred = []
 
-    for name, cls in candidate_classes.items():
-        if name not in owner_classes:
-            edits.setdefault(len(owner_lines), []).append(
-                _snippet(candidate_lines, cls))
-            added.append(name)
     for name, method in candidate_methods.items():
         if name in owner_methods:
             continue
@@ -107,6 +102,14 @@ def _stitch(local: bytes, incoming: bytes, relative: str):
         edits.setdefault(owner.end_lineno, []).append(
             _snippet(candidate_lines, method))
         added.append(name)
+    # A new class can land at exactly the last line of an existing owner
+    # class. Put its new methods FIRST, otherwise Python would attach
+    # those methods to the newly appended class at EOF.
+    for name, cls in candidate_classes.items():
+        if name not in owner_classes:
+            edits.setdefault(len(owner_lines), []).append(
+                _snippet(candidate_lines, cls))
+            added.append(name)
     for name, method in candidate_functions.items():
         if name not in owner_functions:
             edits.setdefault(len(owner_lines), []).append(
