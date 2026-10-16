@@ -24,6 +24,13 @@ class InPlace2610ReadinessTests(unittest.TestCase):
         self.assertIn("apt-get -s full-upgrade", source)
         self.assertIn("26.04 only, NOT the 26.10 plan", source)
 
+    def test_custom_unmounted_efi_boot_is_an_explicit_stop_gate(self):
+        source = SCRIPT.read_text()
+        self.assertIn('stub="/boot/efi/EFI/SpiderOS/grub.cfg"', source)
+        self.assertIn('findmnt -rn -S "UUID=$stub_uuid"', source)
+        self.assertIn('mark BLOCK "Separate unmounted SpiderOS boot filesystem"', source)
+        self.assertIn("kernel and initramfs may be loaded from it", source)
+
     def test_report_on_wrong_host_blocks_without_changing_it(self):
         # The Ubuntu 24.04 GitHub runner intentionally is NOT an eligible host.
         with tempfile.TemporaryDirectory(prefix="spider-readiness-") as home:
