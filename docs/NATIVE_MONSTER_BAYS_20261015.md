@@ -721,16 +721,15 @@ Webbie panel and cognitive control file:
 Use NEW private output folders. These files never leave the PC:
 
 ```bash
-set -e
-git -C "$HOME/spider-os-native-wave" pull --ff-only
+git -C "$HOME/spider-os-native-wave" pull --ff-only &&
 python3 -B "$HOME/spider-os-native-wave/tools/stage_native_merge.py" \
   --source "$HOME/spider-os-native-wave" \
   --installed-root /usr/local/lib/spider-os \
   --focus desktop \
-  --output "$HOME/SpiderOS-Private-Desktop-Current-20261016"
+  --output "$HOME/SpiderOS-Private-Desktop-Current-20261016" &&
 python3 -B "$HOME/spider-os-native-wave/tools/compose_owner_native_desktop.py" \
   --stage "$HOME/SpiderOS-Private-Desktop-Current-20261016" \
-  --output "$HOME/SpiderOS-Private-Desktop-Current-Integration-20261016"
+  --output "$HOME/SpiderOS-Private-Desktop-Current-Integration-20261016" &&
 python3 -B "$HOME/spider-os-native-wave/tools/compose_owner_webbie_safety.py" \
   --stage "$HOME/SpiderOS-Private-Desktop-Current-20261016" \
   --output "$HOME/SpiderOS-Private-Webbie-Safety-20261016"
