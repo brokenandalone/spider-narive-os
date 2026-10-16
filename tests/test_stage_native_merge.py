@@ -75,6 +75,8 @@ class PrivateStageTests(unittest.TestCase):
             focus="desktop", home=self.home, scope=mod.FOCI["desktop"])
         row = next(item for item in report["files"] if item["component"] == relative)
         self.assertEqual(row["state"], "new_candidate_only")
+        self.assertEqual(len(row.get("integration_gaps", [])), 0)
+        self.assertFalse(row.get("integration_gaps", []))
         self.assertIsNone(row["installed_sha256"])
         self.assertTrue(row["requires_owner_review"])
         self.assertFalse((output / "installed" / relative).exists())
