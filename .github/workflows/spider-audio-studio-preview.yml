@@ -34,11 +34,11 @@ jobs:
       - name: Verify extracted runtime and manifest
         run: |
           mkdir -p "$RUNNER_TEMP/verified"
-          tar -xzf "$RUNNER_TEMP/Spider-Audio-Studio-0.15.0-beta.tar.gz" -C "$RUNNER_TEMP/verified"
-          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.15.0-beta/run_spider_audio_studio.py" --verify-only
+          tar -xzf "$RUNNER_TEMP/Spider-Audio-Studio-0.16.0-beta.tar.gz" -C "$RUNNER_TEMP/verified"
+          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.16.0-beta/run_spider_audio_studio.py" --verify-only
       - name: Validate no-overwrite user installer and commercial release gate
         run: |
-          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.15.0-beta/install_for_user.py" --check
+          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.16.0-beta/install_for_user.py" --check
           python3 studio/package/commercial_release_gate.py --assert-blocked
       - name: Install real FFmpeg in disposable CI runner
         run: |
@@ -47,11 +47,11 @@ jobs:
           ffmpeg -version | head -1
       - name: Run real offline music-engine self-test in packaged app
         run: |
-          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.15.0-beta/run_spider_audio_studio.py" --self-test
+          python3 "$RUNNER_TEMP/verified/Spider-Audio-Studio-0.16.0-beta/run_spider_audio_studio.py" --self-test
       - name: Publish private developer preview archive
         uses: actions/upload-artifact@v4
         with:
-          name: Spider-Audio-Studio-0.15.0-beta
-          path: ${{ runner.temp }}/Spider-Audio-Studio-0.15.0-beta.tar.gz
+          name: Spider-Audio-Studio-0.16.0-beta
+          path: ${{ runner.temp }}/Spider-Audio-Studio-0.16.0-beta.tar.gz
           if-no-files-found: error
           retention-days: 14
