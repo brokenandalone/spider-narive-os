@@ -21,7 +21,7 @@ class StudioFirstProjectExperience(unittest.TestCase):
             self.assertIs(
                 window.tool_tabs.currentWidget(),window.welcome_panel)
             buttons=window.welcome_panel.actions
-            self.assertEqual(len(buttons),4)
+            self.assertEqual(len(buttons),5)
             buttons["Import tracks · Start a song"].click()
             self.assertIs(
                 window.tool_tabs.currentWidget(),window.stem_import_panel)
@@ -43,6 +43,16 @@ class StudioFirstProjectExperience(unittest.TestCase):
             with patch("studio.session_mix_dialog.SessionMixDialog",FakeMixer):
                 buttons["Open an existing song"].click()
             self.assertEqual((FakeMixer.created,FakeMixer.opened),(1,1))
+            class FakeSongs:
+                shown=0
+                def __init__(self,parent=None):
+                    pass
+                def exec_(self):
+                    FakeSongs.shown+=1
+                    return 0
+            with patch("studio.saved_songs_dialog.SavedSongsDialog",FakeSongs):
+                buttons["Recent saved songs"].click()
+            self.assertEqual(FakeSongs.shown,1)
             self.assertFalse(window.stem_import_panel.items)
         finally:
             window.close()
