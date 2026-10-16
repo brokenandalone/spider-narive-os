@@ -11,7 +11,7 @@ import threading
 from PyQt5.QtCore import Qt,QThread,pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QSpinBox,
-    QLineEdit,QListWidget,QFileDialog,QMessageBox,QProgressBar,
+    QLineEdit,QListWidget,QFileDialog,QMessageBox,QProgressBar,QCheckBox,
 )
 try:
     from .audio_capture_engine import (
@@ -187,6 +187,11 @@ class AudioCapturePanel(QWidget):
             "Overdub input is 16-bit PCM; separate takes can record at 24-bit.")
         caveat.setWordWrap(True)
         layout.addWidget(caveat)
+        self.include_cue=QCheckBox(
+            "Include backing WAV as an instrumental-bed track in exported sessions")
+        self.include_cue.setChecked(False)
+        self.include_cue.setAccessibleName("Explicitly add backing cue to multitrack recording exports")
+        layout.addWidget(self.include_cue)
         tracks=QHBoxLayout()
         tracks.addWidget(QLabel("Project"))
         self.project_title=QLineEdit("Spider Recording Session")
@@ -403,6 +408,18 @@ class AudioCapturePanel(QWidget):
                 "Created a private multitrack session: "+result+
                 ". Open its copied WAV tracks in your preferred DAW.")
 
+    def _selected_session_tracks(self):
+        tracks=list(self.takes)
+        if self.include_cue.isChecked():
+            cue=Path(self.cue_file.text().strip())
+            if (not self.cue_file.text().strip() or not cue.is_file()
+                    or cue.is_symlink() or cue.suffix.lower()!=".wav"):
+                raise CaptureError("Choose a regular WAV backing file or uncheck Include backing")
+            if all(Path(t["path"]).resolve()!=cue.resolve() for t in tracks):
+                tracks.insert(0,{"path":str(cue),"role":"instrumental_bed",
+                                 "label":"Backing reference cue"})
+        return tracks
+
     def open_multitrack(self):
         """Reuse the EXISTING native multitrack mixer/dialog, not a launcher."""
         if self.worker is not None and self.worker.isRunning():
@@ -417,12 +434,12 @@ class AudioCapturePanel(QWidget):
             else:
                 from multitrack_dialog import MultitrackDialog
             editor=MultitrackDialog(
-                seed_tracks=list(self.takes),
+                seed_tracks=self._selected_session_tracks(),
                 title=self.project_title.text().strip() or "Spider Recording",
                 parent=self)
             editor.tempo.setValue(self.tempo.value())
             editor.exec_()
-        except (OSError,ValueError,RuntimeError,SessionError) as exc:
+        except (OSError,ValueError,RuntimeError,SessionError,CaptureError) as exc:
             self.status.setText("Cannot open the recorded multitrack editor: "+str(exc)[:250])
 
     def open_session_mix(self):
@@ -450,8 +467,13 @@ class AudioCapturePanel(QWidget):
         if not self.takes:
             self.status.setText("Record at least one real WAV take first.")
             return
+        try:
+            selected_tracks=self._selected_session_tracks()
+        except (CaptureError,OSError) as exc:
+            self.status.setText("Cannot add backing cue: "+str(exc)[:230])
+            return
         self.worker=SessionWorker(
-            self.takes,self.project_title.text(),self.tempo.value(),self)
+            selected_tracks,self.project_title.text(),self.tempo.value(),self)
         self.worker.recorded.connect(self._recorded)
         self.stop_btn.setEnabled(False)
         self.record_btn.setEnabled(False)
