@@ -97,6 +97,83 @@ def _top_level(tree):
     return imports, bindings, executable_calls
 
 
+def _method_nodes(tree):
+    """Qualified method nodes for dependency review. Never executes code."""
+    classes = {}
+    methods = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        classes[node.name] = node
+        for member in node.body:
+            if isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                methods[node.name + "." + member.name] = member
+    return classes, methods
+
+
+def _self_fields_written(node):
+    if node is None:
+        return set()
+    result = set()
+    for item in ast.walk(node):
+        if isinstance(item, ast.Attribute) and isinstance(item.ctx, ast.Store):
+            if isinstance(item.value, ast.Name) and item.value.id == "self":
+                result.add(item.attr)
+    return result
+
+
+def preservation_dependencies(installed_bytes: bytes, candidate_bytes: bytes):
+    """Local-only methods referencing removed constructor state or changed calls.
+
+    Only inspect current AST owner/candidate data. Output symbols and counts,
+    never values, literals, source text, credentials or runtime state.
+    An empty warning list still does NOT mean a merge is safe.
+    """
+    try:
+        old = ast.parse(installed_bytes.decode("utf-8"))
+        incoming = ast.parse(candidate_bytes.decode("utf-8"))
+    except (SyntaxError, UnicodeError) as error:
+        raise ValueError("Cannot analyze private source syntax") from error
+    _, old_methods = _method_nodes(old)
+    _, new_methods = _method_nodes(incoming)
+    shared_changed = {
+        name for name in old_methods.keys() & new_methods.keys()
+        if _fingerprint(old_methods[name]) != _fingerprint(new_methods[name])
+    }
+    results = []
+    for name in sorted(old_methods.keys() - new_methods.keys()):
+        if "." not in name:
+            continue
+        owner = name.split(".", 1)[0]
+        old_init = old_methods.get(owner + ".__init__")
+        new_init = new_methods.get(owner + ".__init__")
+        old_fields = _self_fields_written(old_init)
+        new_fields = _self_fields_written(new_init)
+        reads = {
+            item.attr for item in ast.walk(old_methods[name])
+            if isinstance(item, ast.Attribute)
+            and isinstance(item.ctx, ast.Load)
+            and isinstance(item.value, ast.Name)
+            and item.value.id == "self"
+        }
+        calls = {
+            owner + "." + item.func.attr for item in ast.walk(old_methods[name])
+            if isinstance(item, ast.Call)
+            and isinstance(item.func, ast.Attribute)
+            and isinstance(item.func.value, ast.Name)
+            and item.func.value.id == "self"
+        }
+        results.append({
+            "owner_only_method": name,
+            "locally_initialized_fields_missing_from_candidate": sorted(
+                (old_fields - new_fields) & reads),
+            "calls_to_changed_shared_methods": sorted(calls & shared_changed),
+            "owner_constructor_changed": owner + ".__init__" in shared_changed,
+            "safe_to_install": False,
+        })
+    return results
+
+
 def structural_diff(installed_bytes: bytes, candidate_bytes: bytes, path: str):
     try:
         old = ast.parse(installed_bytes.decode("utf-8"))
@@ -173,7 +250,10 @@ def inspect_stage(stage: Path):
         if (hashlib.sha256(original).hexdigest() != item.get("installed_sha256") or
                 hashlib.sha256(incoming).hexdigest() != item.get("candidate_sha256")):
             raise ValueError("Staged file hash mismatch; regenerate a private stage")
-        results.append(structural_diff(original, incoming, name))
+        result = structural_diff(original, incoming, name)
+        result["owner_only_dependencies"] = preservation_dependencies(
+            original, incoming)
+        results.append(result)
     return results
 
 
@@ -209,6 +289,16 @@ def main(argv=None):
         print("  New import count:", result["candidate_only_import_count"])
         print("  Local-only import count:", result["local_only_import_count"])
         print("  Class base changes:", result["existing_class_base_changes"])
+        for risk in result["owner_only_dependencies"]:
+            print("  PRESERVE OWNER METHOD:", risk["owner_only_method"])
+            print("    Candidate constructor missing owner-initialized fields:",
+                  ", ".join(risk["locally_initialized_fields_missing_from_candidate"])
+                  or "none detected")
+            print("    Calls a changed shared method:",
+                  ", ".join(risk["calls_to_changed_shared_methods"])
+                  or "none detected")
+            if risk["owner_constructor_changed"]:
+                print("    Constructor changed; verify callback/state compatibility")
         print("  CANDIDATE IS NOT AN AUTHORIZED REPLACEMENT.")
     print("\nAll five files still require reviewed semantic merging.")
     print("Nothing installed, copied, committed, executed or modified.")
