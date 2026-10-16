@@ -150,7 +150,7 @@ class ChannelStripUiTests(unittest.TestCase):
         dialog=SessionMixDialog()
         try:
             dialog.audit_done(harness.session,"")
-            self.assertEqual(dialog.table.columnCount(),9)
+            self.assertEqual(dialog.table.columnCount(),10)
             self.assertTrue(dialog.track_fx_button.isEnabled())
             self.assertEqual(dialog.table.currentRow(),0)
             class MockFxDialog:
