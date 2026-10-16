@@ -578,6 +578,49 @@ and clear the guarded **33-file** owner-customization blocker. This
 workflow specifically avoids replacing any original Ubuntu Studio menu
 program and does not build new duplicate desktop launchers.
 
+## Native merge workbench: review **actual method bodies** privately
+
+The owner ran the revised owner-first desktop preview against the
+private "Bridge" stage and verified that the tool staged 24 candidate-only
+definitions/literals and 20 candidate imports, while preserving owner
+methods in all five files. The report shows unresolved per-file counts
+11 + 6 + 1 + 13 + 2 = **33 method/setting issues**, a distinct count
+from the **33 protected local release files**. No files have been
+installed or the guard lifted.
+
+To move beyond abstract identifier reports, a new
+`tools/private_method_workbench.py` prepares a static, offline-only
+**15-conflict side-by-side HTML view** of the most consequential
+overlapping definitions in the actual installed-vs-GitHub private stage:
+
+- desktop startup, `build_ui`, `open_workspace`, original-app
+  registry and `open_installed`
+- `app_catalog.workspace_for` / `discover_apps`
+- `workspace_files.workspace_folders`
+- Webbie's `__init__`, computer authorization, STOP revocation,
+  `send`, sleep/camera control, and cognitive workflow callbacks
+
+All inputs are revalidated against the local stage manifest and source
+SHA256 hashes. Original owner code is never executed. The output
+`index.html` embeds fragments of real private source for local viewing.
+The tool has no network functionality, uses a restrictive HTML content
+security policy, and writes its only files into a **new owner-private**
+0700 directory (files 0600), never into the installed program tree.
+
+```bash
+git -C "$HOME/spider-os-native-wave" pull --ff-only
+python3 -B "$HOME/spider-os-native-wave/tools/private_method_workbench.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Merge-Bridge-20261015" \
+  --output "$HOME/SpiderOS-Private-Method-Workbench-20261015"
+xdg-open "$HOME/SpiderOS-Private-Method-Workbench-20261015/index.html"
+```
+
+Keep the HTML **on the owner's PC**. It contains private code; never
+upload it, its screenshots, or its source bodies unreviewed. It is a
+comparison viewer, **not** a merged runtime and cannot make a candidate
+method safe by displaying it. The 33 customized files still require
+semantic reconciliation and a validated rollback-aware release.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
