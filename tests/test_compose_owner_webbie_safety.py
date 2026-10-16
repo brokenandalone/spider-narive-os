@@ -82,6 +82,51 @@ class PrivateWebbieSafetyTests(unittest.TestCase):
         self.assertFalse(record["install_allowed"])
         compile(merged,"webbie_cognitive_center.py","exec")
 
+    def test_cognitive_workflow_callback_precedes_owner_fallback(self):
+        public = sample("the-web/shell/webbie_cognitive_center.py")
+        original = public.replace(
+            b"    def open_workflow(self):",
+            b"    def offer_workflow(self, key):\\n"
+            b"        return 'legacy fallback'\\n"
+            b"    def open_workflows(self):\\n"
+            b"        return self.offer_workflow(None)\\n"
+            b"    def open_workflow(self):")
+        merged, _ = mod.combine_pair(
+            "the-web/shell/webbie_cognitive_center.py", original, public)
+        node = mod._definitions(merged)["WebbieCognitiveDialog.open_workflow"]
+        module = ast.fix_missing_locations(
+            ast.Module(body=[node], type_ignores=[]))
+        namespace = {}
+        exec(compile(module, "<isolated-workflow>", "exec"), namespace)
+        open_workflow = namespace["open_workflow"]
+
+        class FakeReport:
+            message = None
+            def setPlainText(self, message):
+                self.message = message
+
+        class FakeDialog:
+            workflow_callback = None
+            report = FakeReport()
+            calls = []
+            def offer_workflow(self, key):
+                self.calls.append(("legacy", key))
+                return "legacy"
+
+        obj = FakeDialog()
+        obj.workflow_callback = lambda: obj.calls.append(("native", None)) or "native"
+        self.assertEqual(open_workflow(obj), "native")
+        self.assertEqual(obj.calls, [("native", None)])
+
+        obj.calls.clear()
+        obj.workflow_callback = None
+        self.assertEqual(open_workflow(obj), "legacy")
+        self.assertEqual(obj.calls, [("legacy", None)])
+
+        obj.offer_workflow = None
+        open_workflow(obj)
+        self.assertIn("resident Webbie panel", obj.report.message)
+
     def test_full_private_stage_compiles_both_without_touching_installed(self):
         with tempfile.TemporaryDirectory() as home_dir:
             home=Path(home_dir)
