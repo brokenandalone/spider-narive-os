@@ -21,6 +21,17 @@ A real instrument/audio interface or compatible sound libraries might be
 needed for particular capabilities. This is **not** yet a zero-latency live
 DAW, a reliable commercial plugin host or a commercial instrument library.
 
+## Easiest setup: graphical private beta installer
+
+After extracting the downloaded ZIP and inner tar.gz, open the versioned
+folder and double-click **START_HERE.sh**, choosing Run if your file manager
+asks. Some desktops open scripts in an editor. In that case right-click the
+script and select Run in Konsole, or run python3 installer_gui.py.
+
+The Studio beta setup screen offers Check computer, Install for this user
+(after explicit acknowledgement), and Run Studio. Nothing is installed,
+recorded, shared, or overwritten just by opening the setup screen.
+
 ## Linux desktop beta setup (no sudo, no Spider OS replacement)
 
 Requires Python 3, PyQt5 with Qt Widgets, SVG and Qt Multimedia modules.
