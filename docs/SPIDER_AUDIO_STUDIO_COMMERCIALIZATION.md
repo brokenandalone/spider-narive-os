@@ -1,6 +1,6 @@
 # Spider Audio Studio | Commercialization and beta release plan
 
-**Status: owner-testing beta 0.15, NOT CLEARED FOR PUBLIC SALE.**
+**Status: owner-testing beta 0.16, NOT CLEARED FOR PUBLIC SALE.**
 The program is to turn a proven native Linux music-making workflow into a
 credible product without risking users' recordings or violating third-party
 licenses. The app already runs on the owner's Ubuntu Studio workstation; that
@@ -94,9 +94,9 @@ business model and price. We can test willingness to pay only after software
 and compliance are ready. Do not advertise specific prices, dates, performance
 figures, supported OS versions or commercial plugin compatibility prematurely.
 
-## Engineering changes in 0.15 beta
+## Engineering changes in 0.16 beta
 
-- Original native Studio packaged with a distinct 0.15 beta identifier.
+- Original native Studio packaged with a distinct 0.16 beta identifier.
 - `install_for_user.py --check` / `--install`: no-sudo versioned local
   desktop installation, refusing existing installation or desktop entry.
 - `run_spider_audio_studio.py --doctor`: readonly dependency report.
