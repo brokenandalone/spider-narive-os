@@ -96,6 +96,10 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert studio_rack.wav('E').startswith(b'RIFF')
     webbie_operations = window.workspace_widgets['webbie'].webbie_operations
     assert isinstance(webbie_operations, main.WebbieNativeOperations)
+    assert webbie_operations.assistant is window.webbie_assistant
+    assert webbie_operations.workflow.session is window.webbie_assistant.unified_workflow
+    assert window.workspace_widgets['webbie'].native.objectName() == 'webbieResidentBayOverview'
+    assert len(window.findChildren(main.WebbiePanel)) == 1
     assert webbie_operations.tabs.count() == 3
     assert webbie_operations.cognitive is not None
     assert webbie_operations.missions is not None
