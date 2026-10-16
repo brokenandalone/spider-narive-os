@@ -840,25 +840,58 @@ class WebbiePanel(QWidget):
                 'Could not request local checks: ' + str(error))
 
     def stop_sensitive_actions(self):
-        """One owner GUI action to drop camera and all desktop grants."""
-        self.unified_workflow.stop()
+        """Attempt every STOP surface; never claim revocation without verifying it.
+
+        The STOP button is an owner GUI action, not an instruction from a
+        model, page, microphone, or screenshot. A write failure must never be
+        presented as successfully revoked desktop authorization.
+        """
+        failures = []
+        steps = [
+            ("guided workflow", self.unified_workflow.stop),
+        ]
         if self.jarvis_mission_dialog is not None:
-            self.jarvis_mission_dialog.core.stop()
+            steps.append(("JARVIS mission", self.jarvis_mission_dialog.core.stop))
         if self.computer_dialog is not None:
-            self.computer_dialog.stop()
+            steps.append(("computer control", self.computer_dialog.stop))
+        steps.extend((
+            ("camera", self.stop_camera),
+            ("screen awareness",
+             lambda: self.awareness.revoke_observation('screen')),
+            ("advisory context", self.publish_jarvis_context),
+        ))
+        # Keep attempting the remaining stops even when one control fails.
+        for label, action in steps:
+            try:
+                action()
+            except Exception:
+                failures.append(label)
+
+        # Check persistent authorization AFTER closing active control surfaces.
+        # The Computer Control STOP path may itself update the saved grant.
+        paused = False
+        try:
+            policy = read_policy()
+            if policy.get('authorized') and not policy.get('paused'):
+                update_policy('pause')
+            verified = read_policy()
+            paused = (not verified.get('authorized')
+                      or bool(verified.get('paused')))
+        except (OSError, ValueError, PermissionError, TypeError, KeyError):
+            failures.append('saved desktop permission')
+
+        if paused and not failures:
+            self.append_message(
+                'Webbie',
+                'STOP confirmed. Sensitive controls stopped; saved desktop '
+                'authorization is paused or disabled. Background checks remain active.')
         else:
-            # Persist STOP even when the control dialog has not been opened.
-            if read_policy().get('authorized'):
-                try:
-                    update_policy('pause')
-                except (OSError,ValueError,PermissionError):
-                    pass
-        self.stop_camera()
-        self.awareness.revoke_observation('screen')
-        self.publish_jarvis_context()
-        self.append_message(
-            'Webbie',
-            'Camera off and desktop approvals revoked. Background checks remain active.')
+            detail = ', '.join(failures) if failures else 'permission pause not verified'
+            self.append_message(
+                'Security',
+                'STOP was attempted, but complete revocation was NOT verified '
+                '(' + detail + '). Avoid additional desktop control until '
+                'the grant and service states are checked.')
 
     def open_cognitive_center(self):
         if self.cognitive_dialog is None:
