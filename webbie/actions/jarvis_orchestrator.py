@@ -18,7 +18,7 @@ from jarvis_local_site_preview import LocalSitePreview
 
 OPERATIONS=frozenset((
     "local.evidence","site.audit","system.health","project.overview",
-    "forage.web","site.preview",
+    "forage.web","site.preview","project.review",
 ))
 MAX_RESULT_LENGTH=8000
 
@@ -102,6 +102,27 @@ class JarvisCore:
                     raise ValueError("Enter a specific public research topic")
                 data=self.forage(query)
                 report=render_public_research(data)
+            elif action=="project.review":
+                # One approved GUI mission that uses EXISTING evidence and
+                # site-audit tools, not a new crawler or autonomous shell.
+                if folder is None:
+                    raise ValueError("Choose a local project folder")
+                data=self.evidence(folder,query or "TODO",home=home,
+                                   max_results=12)
+                first="PROJECT FILES AND OPEN ITEMS\n"+render_evidence(data)
+                if self.stop_flag.is_set() or not self._permitted():
+                    return MissionResult(action,"canceled",
+                        "STOP/pause revoked this operation. Results discarded.",False)
+                try:
+                    checked=self.site(folder,home=home)
+                    second="WEBSITE ASSET REVIEW\n"+render_site_report(checked)
+                except (OSError,ValueError,PermissionError,TypeError):
+                    # A Studio or manuscript project need not be a website.
+                    second=("WEBSITE ASSET REVIEW\n"
+                            "Not applicable or unavailable for this folder.")
+                report=("WEBBIE · PROJECT REVIEW · READ ONLY\n\n"
+                        + first[:3500]+"\n\n"+second[:3500]+
+                        "\n\nNo project files, websites or permissions were changed.")
             elif action=="project.overview":
                 if folder is None:
                     raise ValueError("Choose a project folder")
