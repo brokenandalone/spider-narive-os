@@ -12,8 +12,12 @@ The modal native QWidget dialog shows a read-only, bounded waveform thumbnail
 from actual WAV PCM, a separate editor row for each region, actions to add,
 duplicate, remove or reorder regions and a highlighted selected source
 interval. Each row has source start/end, destination song position and
-fade-in/out values. Nothing is committed until the user accepts the validated
-edit.
+fade-in/out values. The lower visual SONG TIMELINE draws a separate lane for
+each region. Drag a region along its lane to change the song position with
+25ms snapping; the numerical position remains available for precise changes.
+The drag does not move the source in/out points, and the timeline scales
+to the current arrangement. Nothing is committed until the user accepts
+the validated edit.
 
 The same original WAV provides all passages. FFmpeg loads each source only
 once and uses `asplit` for up to 12 branches, with sample-exact source
@@ -53,7 +57,8 @@ guitar/bass/drum sound assets remain outside this wave.
 graphs, input safety, bounded max 12 regions, overlapping regions,
 full sample-generated FFmpeg exported WAV with expected silence and two
 passages, unchanged original recordings, backward-compatible mix presets,
-and native Qt controls. These run with the normal Spider OS / Studio CI
+and native Qt controls including a simulated true left-button timeline drag.
+These run with the normal Spider OS / Studio CI
 together with the independent developer archive packaging workflow.
 
 See existing Studio Waves 1–11 documents for instrument, score/MIDI, real
