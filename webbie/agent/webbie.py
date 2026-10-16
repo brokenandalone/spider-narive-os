@@ -36,6 +36,7 @@ sys.path.insert(
 
 from brain import respond
 from tts import speak
+from speaker_guard import SpeakerGuard
 
 
 CONFIG_FILE = (
@@ -85,6 +86,7 @@ STATE_FILE = (
 running = True
 speech_lock = threading.Lock()
 awaiting_command_until = 0.0
+awaiting_command_speaker = None
 
 
 def load_config():
@@ -116,6 +118,7 @@ def load_config():
 
 
 CONFIG = load_config()
+VOICE_GUARD = SpeakerGuard(CONFIG.get("voice_access", {}))
 
 
 def ensure_directories():
@@ -557,34 +560,19 @@ def clean_phrase(text):
 
 
 def remove_wake_word(phrase):
+    """Recognize only complete wake words at the beginning of speech."""
     phrase = clean_phrase(phrase)
-
-    wake_words = sorted(
-        CONFIG.get(
-            "wake_words",
-            [],
-        ),
-        key=len,
-        reverse=True,
-    )
-
-    for wake in wake_words:
+    wakes = sorted(CONFIG.get("wake_words", []), key=len, reverse=True)
+    for wake in wakes:
         wake = clean_phrase(wake)
-
-        index = phrase.find(wake)
-
-        if index >= 0:
-            remainder = (
-                phrase[
-                    index + len(wake):
-                ]
-                .strip()
-            )
-
-            return True, remainder
-
+        # "web" alone is too ambiguous for hands-free activation.
+        if not wake or wake == "web":
+            continue
+        if phrase == wake:
+            return True, ""
+        if phrase.startswith(wake + " "):
+            return True, phrase[len(wake):].strip()
     return False, phrase
-
 
 def voice_listener():
     global awaiting_command_until
@@ -620,56 +608,39 @@ def voice_listener():
         voice_error=None,
     )
 
-    def on_text(phrase):
-        global awaiting_command_until
+    def on_text(phrase, audio_path=None):
+        global awaiting_command_until, awaiting_command_speaker
+        # Text alone cannot tell us who spoke. Deny absent audio or identity.
+        speaker = VOICE_GUARD.identify(audio_path) if audio_path else None
+        if speaker is None:
+            return
 
-        phrase = clean_phrase(
-            phrase
-        )
-
+        phrase = clean_phrase(phrase)
         if not phrase:
             return
 
         now = time.time()
-
-        if (
-            now
-            < awaiting_command_until
-        ):
-            awaiting_command_until = 0
-
-            handle_command(
-                phrase,
-                voice=True,
-            )
-
+        if now < awaiting_command_until:
+            # The same verified speaker must give the follow-up command.
+            if awaiting_command_speaker != speaker:
+                return
+            awaiting_command_until = 0.0
+            awaiting_command_speaker = None
+            handle_command(phrase, voice=True)
             return
 
-        woke, command = (
-            remove_wake_word(
-                phrase
-            )
-        )
-
+        awaiting_command_until = 0.0
+        awaiting_command_speaker = None
+        woke, command = remove_wake_word(phrase)
         if not woke:
             return
-
         if command:
-            handle_command(
-                command,
-                voice=True,
-            )
-
+            handle_command(command, voice=True)
             return
 
-        awaiting_command_until = (
-            time.time() + 10
-        )
-
-        say(
-            f"I'm here, "
-            f"{current_name()}."
-        )
+        awaiting_command_speaker = speaker
+        awaiting_command_until = time.time() + 10
+        say(f"I'm here, {current_name()}.")
 
     try:
         listen_forever(
