@@ -6,11 +6,31 @@ owner's existing configured edge-tts provider is already enabled.
 """
 from __future__ import annotations
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import threading
+
+
+def clean_spoken_text(text):
+    """Strip visual Markdown without changing the user's underlying words.
+
+    This is the recovered owner-installed speech cleanup adapted to the
+    existing STOP-aware resident player, not a competing TTS process.
+    """
+    value = str(text or "")
+    value = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", value)
+    value = value.replace("\x60\x60\x60", "").replace("\x60", "")
+    value = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", value)
+    value = re.sub(r"(?m)^\s*>\s?", "", value)
+    value = re.sub(r"(?m)^\s*[-+•]\s+", "", value)
+    for marker in ("***", "**", "__", "*"):
+        value = value.replace(marker, "")
+    value = re.sub(r"[ \t]+", " ", value)
+    value = re.sub(r"\n{3,}", "\n\n", value)
+    return value.strip()
 
 
 class InterruptibleSpeech:
@@ -66,7 +86,7 @@ class InterruptibleSpeech:
                     self._active = None
 
     def speak(self, message, *, may_start=None):
-        text = str(message or '').strip()
+        text = clean_spoken_text(message)
         if not text:
             return False
         # Revalidate the originating voice generation while holding the
