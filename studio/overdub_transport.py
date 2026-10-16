@@ -39,8 +39,8 @@ def transport_plan(*,rate,cue_frames,tempo=120,beats_per_bar=4,
         raise CaptureError("Overdub transport requires 44.1 or 48 kHz")
     if type(cue_frames) is not int or not 1 <= cue_frames <= rate*300:
         raise CaptureError("Backing WAV duration is outside the five-minute limit")
-    if type(tempo) is not int or not 30 <= tempo <= 280:
-        raise CaptureError("Count-in tempo must be 30–280 BPM")
+    if type(tempo) is not int or not 30 <= tempo <= 300:
+        raise CaptureError("Count-in tempo must be 30–300 BPM")
     if type(beats_per_bar) is not int or beats_per_bar not in (3,4):
         raise CaptureError("Count-in supports 3/4 or 4/4")
     if type(count_in_bars) is not int or not 0 <= count_in_bars <= 4:
