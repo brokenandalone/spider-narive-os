@@ -24,6 +24,7 @@ try:
     from .multitrack import SessionError
     from .audio_latency_calibration import measure_loopback
     from .take_comp_dialog import TakeCompDialog,CompWorker
+    from .take_effects_dialog import TakeEffectsDialog,EffectsWorker
 except ImportError:
     from audio_capture_engine import (
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
@@ -35,6 +36,7 @@ except ImportError:
     from multitrack import SessionError
     from audio_latency_calibration import measure_loopback
     from take_comp_dialog import TakeCompDialog,CompWorker
+    from take_effects_dialog import TakeEffectsDialog,EffectsWorker
 
 TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
 
@@ -308,8 +310,12 @@ class AudioCapturePanel(QWidget):
         self.mix_btn.setEnabled(False)
         self.comp_btn=self._button("Comp Two Recorded Takes",self.comp_two_takes)
         self.comp_btn.setEnabled(False)
+        self.effects_btn=self._button("Shape Selected Take · EQ / Compression / Room",
+                                      self.shape_selected_take)
+        self.effects_btn.setEnabled(False)
         session_action.addWidget(self.arrange_btn)
         session_action.addWidget(self.comp_btn)
+        session_action.addWidget(self.effects_btn)
         session_action.addWidget(self.mix_btn)
         layout.addLayout(session_action)
         calibration_row=QHBoxLayout()
@@ -474,6 +480,36 @@ class AudioCapturePanel(QWidget):
             "Round-trip measured. Recording input latency remains manually "
             "adjustable until the ADC and DAC delays can be distinguished.")
 
+    def shape_selected_take(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current job before applying effects.")
+            return
+        index=self.take_list.currentRow()
+        if not 0<=index<len(self.takes):
+            self.status.setText("Select a recorded take to shape in the take list.")
+            return
+        chosen=self.takes[index]
+        dialog=TakeEffectsDialog(chosen["path"],self)
+        if dialog.exec_()!=dialog.Accepted:
+            return
+        try:
+            TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+            if TAKE_ROOT.is_symlink():
+                raise CaptureError("The take folder cannot be a symlink")
+            dest=new_take_filename(TAKE_ROOT,chosen["role"])
+            self.worker=EffectsWorker(
+                chosen["path"],str(dest),chosen["role"],dialog.settings(),self)
+            self.worker.recorded.connect(self._recorded)
+            for button in (self.record_btn,self.overdub_btn,self.calibration_btn,
+                           self.export_btn,self.refresh_btn,self.comp_btn,
+                           self.effects_btn):
+                button.setEnabled(False)
+            self.worker.start()
+            self.status.setText(
+                "Rendering offline effects on a new WAV. Original take stays untouched.")
+        except (OSError,ValueError) as error:
+            self.status.setText("Cannot shape recording: "+str(error)[:260])
+
     def comp_two_takes(self):
         if self.worker is not None and self.worker.isRunning():
             self.status.setText("Finish the current audio job before comping.")
@@ -613,6 +649,7 @@ class AudioCapturePanel(QWidget):
         self.overdub_btn.setEnabled(connected)
         self.calibration_btn.setEnabled(connected)
         self.comp_btn.setEnabled(len(self.takes)>=2)
+        self.effects_btn.setEnabled(bool(self.takes))
         self.stop_btn.setEnabled(False)
         self.refresh_btn.setEnabled(True)
         self.export_btn.setEnabled(True)
@@ -628,10 +665,12 @@ class AudioCapturePanel(QWidget):
                 "label":path.stem[:100],
             })
             self.comp_btn.setEnabled(len(self.takes)>=2)
+            self.effects_btn.setEnabled(True)
             self.take_list.addItem(
                 f"{len(self.takes):02d} · {result['role']} · "
                 f"{result['duration_seconds']:.1f}s · {result['sample_rate']} Hz · "
                 f"{result['channels']}ch · {result['sample_width_bits']}-bit · {path.name}")
+            self.take_list.setCurrentRow(self.take_list.count()-1)
             message=(
                 "Captured real WAV: "+path.name+
                 ". You can record another take or create a multitrack DAW session.")
