@@ -66,6 +66,42 @@ defaults, activate a GRUB entry, or change EFI.** It is a preparation
 artifact for a later owner-reviewed, backup-first procedure, NOT an
 automatically executable synchronization tool.
 
+## Independent boot-backup helper
+
+The branch now includes `distro/backup-spider-boot-independent.sh`.
+It requires a **separately mounted physical drive or approved network
+filesystem** and refuses destinations on the SpiderOS `/dev/sda`
+disk. With no backup volume mounted, it stops without changes.
+
+After a proper off-disk destination is mounted and its privacy/encryption
+is considered, inspect the target before writing anything:
+
+```bash
+sudo bash distro/backup-spider-boot-independent.sh --check /path/to/independent/mounted/backup-directory
+```
+
+Only with an independently mounted destination, run the explicit backup
+operation:
+
+```bash
+sudo bash distro/backup-spider-boot-independent.sh --backup /path/to/independent/mounted/backup-directory
+```
+
+The script reads and stores full raw images of `/dev/sda1` and
+`/dev/sda2` (never writes to them), root's `/boot` tree,
+`/var/lib/spider-os/webbie-brain`, partition table and drive mapping
+on that destination. It confirms full image lengths, SHA256 checksums
+and archive integrity, and renames the verified backup folder from
+`.partial` to final only on success. File copies can contain
+sensitive data, so store the result privately on encrypted storage.
+
+This **only protects the boot chain and one Webbie brain directory**.
+It does not back up the full encrypted root, all programs, studio,
+Nova, users' media, services, Git changes or the LUKS header; those
+need a separate full-system backup and recovery plan. There is
+currently **no confirmed independent backup destination** on the
+owner's PC.
+
 ## Hard gates before 26.10
 
 - **Independent backup:** preserve an image of /dev/sda1, the EFI
