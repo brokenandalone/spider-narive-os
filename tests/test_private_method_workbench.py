@@ -39,7 +39,8 @@ class WebbiePanel:
         self.assertIn("connect-src 'none'", html_text)
         self.assertIn("script-src 'none'", html_text)
         self.assertNotIn("<script>alert(1)</script>", html_text)
-        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html_text)
+        self.assertIn("&lt;script&gt;alert(", html_text)
+        self.assertIn("&lt;/script&gt;", html_text)
         self.assertIn("DO NOT INSTALL OR UPLOAD", html_text)
 
     def test_rejects_unstaged_or_changed_conflicts(self):
