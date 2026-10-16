@@ -676,6 +676,70 @@ in `summary.json`. **Never copy these partial candidates into
 `/usr/local/lib/spider-os` or run the release install** until
 comprehensive host-specific integration and rollback QA is complete.
 
+## Fresh-source and Webbie safety review checkpoint, October 16
+
+An important post-staging defect was found: the owner's successful
+October 16 **three-file** desktop composition still referenced the
+previous private `Bridge` snapshot, prepared **before** the source branch
+received the revised Webbie STOP, single resident panel, and shared JARVIS
+core. The older stage was valid and hash-verified in isolation, but
+not current. **Do not use that output as a release candidate.**
+
+The three-file composer now compares the five staged candidate bytes
+against the **current checked-out source tree**. A mismatch is rejected
+with `OLD STAGE` before producing any new output. Regression tests cover
+a fully hash-consistent but stale private stage.
+
+The new `tools/compose_owner_webbie_safety.py` provides a **second
+non-installable owner-private source composition** for the protected
+Webbie panel and cognitive control file:
+
+- Uses the SAME freshly staged, SHA256-verified source snapshot as the
+  desktop composer.
+- Begins from the newer GitHub native UI so the resident single-panel,
+  one shared JARVIS mission core and all candidate-only UI additions
+  remain present.
+- Restores the owner's original method bodies for message delivery,
+  consented screen observation, Computer Control entry, quiet sleep,
+  proactive checks, shutdown, resident portrait painting, and other
+  specifically named privacy-sensitive routines.
+- Verifies current global STOP includes the shared mission core,
+  independently stops camera/screen controls, re-reads saved policy
+  after STOP and never claims permission revocation without confirmation.
+- Copies the owner's two local-only cognitive methods and adds a
+  bounded, direct-GUI fallback: use native workflow callback when
+  present; otherwise call the installed `offer_workflow(None)`.
+- Refuses changed constructor signatures or missing original
+  initialized attributes. Compiles staged results in memory and leaves
+  all full-release protections engaged.
+- **Does not claim semantic completeness:** added/new methods may rely
+  on behavior in unmerged original methods. The preview cannot be
+  installed, executed as Webbie, committed publicly, or used to lift the
+  33-file release guard. Owner runtime, webcam, voice trust, Nova and
+  Kali need separate guarded smoke tests.
+
+Use NEW private output folders. These files never leave the PC:
+
+```bash
+set -e
+git -C "$HOME/spider-os-native-wave" pull --ff-only
+python3 -B "$HOME/spider-os-native-wave/tools/stage_native_merge.py" \
+  --source "$HOME/spider-os-native-wave" \
+  --installed-root /usr/local/lib/spider-os \
+  --focus desktop \
+  --output "$HOME/SpiderOS-Private-Desktop-Current-20261016"
+python3 -B "$HOME/spider-os-native-wave/tools/compose_owner_native_desktop.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Current-20261016" \
+  --output "$HOME/SpiderOS-Private-Desktop-Current-Integration-20261016"
+python3 -B "$HOME/spider-os-native-wave/tools/compose_owner_webbie_safety.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Current-20261016" \
+  --output "$HOME/SpiderOS-Private-Webbie-Safety-20261016"
+```
+
+These three commands create a **private five-file review suite**, not an
+installed release. Read the short terminal reports only. Original
+source and private candidate bodies should not be posted publicly.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
