@@ -285,6 +285,47 @@ sequence, do not presume a boot partition synchronization
 strategy or attempt an upgrade. Independent backup and normal
 release availability remain required.
 
+## Previous boot relocation history and current fallback (October 5–6)
+
+Historical Spider OS repair sessions matter for this upgrade:
+
+- On **October 5**, `/boot` had been moved or staged off the legacy
+  `/dev/sda1` ext4 boot partition into the encrypted
+  `/dev/mapper/kali--vg-root`; `/dev/sda1` was intentionally kept
+  as a fallback and had been inspected under `/mnt/spider-real-boot`.
+- A separate `SpiderRoot` UEFI loader was prepared, with an attempted
+  one-shot firmware selection (`BootNext 0007`). The resulting test
+  did **not** establish a healthy boot into SpiderRoot; the machine
+  reached GRUB command-line recovery and subsequently an emergency
+  system state. Never assume that this experimental alternate boot
+  option is validated, or automatically select it for the 26.10 upgrade.
+- The **currently proven** firmware entry is `BootCurrent 0002`,
+  `SpiderOS`, which loads its boot menu, kernel and initramfs from
+  `/dev/sda1`. The on-disk root's `/boot` is a second location,
+  not the tested firmware's immediate kernel source.
+- On October 15, read-only `debugfs` confirmed
+  `sda1:/vmlinuz-7.0.0-38-generic` is **17,320,328 bytes** and
+  `sda1:/initrd.img-7.0.0-38-generic` is **84,340,560 bytes**,
+  exactly matching sizes of their counterparts under root's `/boot`.
+  Sizes do not guarantee identical contents. The sda1 ext4 filesystem
+  reports **64,941 free 4,096-byte blocks**, about **254 MiB free**.
+  The free-space estimate must account for bigger future initramfs
+  files, staged fallbacks and other GRUB files. Never purge the known
+  working kernel merely to make space.
+- Preserve the working `SpiderOS` EFI entry and the small ext4
+  `sda1` layout. Do **not** redo the previous relocation, activate
+  SpiderRoot, update boot entries, or install kernels/hooks on the host
+  as part of preparation.
+- Develop/test a *separate* kernel/initramfs/config synchronization
+  procedure and independent recovery strategy first. Keep the
+  current custom kernel and initrd until the new boot path has been
+  proven after the eventual in-place 26.10 upgrade.
+
+This historical finding does not remove the **HOLD**: official
+upgrader availability, an independently accessible data/boot backup,
+the 26.10 actual proposed package removals and tested startup recovery
+must still be established before starting a release upgrade.
+
 ## Confirmed boot chain and release-upgrade synchronization blocker
 
 The October 15 complete `debugfs -R 'cat /grub/grub.cfg'` output settles
