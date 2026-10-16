@@ -15,7 +15,7 @@ from model_resilience import (
 )
 
 
-DEFAULT_MODEL = "qwen3:1.7b"
+DEFAULT_MODEL = "qwen3:8b"
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
 
 
