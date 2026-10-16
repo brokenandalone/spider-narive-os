@@ -102,7 +102,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     assert webbie_operations.workflow is not None
     assert webbie_operations.cognitive.workflow_dialog is webbie_operations.workflow
     assert webbie_operations.cognitive.workspace_opener.__self__ is window
-    assert webbie_operations.cognitive.workspace_callback() == 'webbie'
+    assert webbie_operations.cognitive.workspace_callback() == window.current_workspace
     assert webbie_operations.can_close()
     # Legacy control-center launchers route into existing native bays;
     # no subprocess is ever spawned and Ubuntu Studio entries stay intact.
