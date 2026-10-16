@@ -56,7 +56,7 @@ from voice_supervisor import VoiceSupervisor
 from voice_metrics import VOICE_INTAKE
 from launch_intents import direct_launch_intent
 from console_bridge import parse_console_request,perform_console_request
-from workspace_launchers import workspace_command
+from workspace_launchers import workspace_command, native_bay_request, request_native_bay
 from jarvis_commands import is_capability_question, voice_guide
 from voice_trust import voice_permission, trust_status
 from speaker_provider_loader import speaker_gate_from_config
@@ -669,7 +669,13 @@ def handle_command(command, voice=False, expected_turn=None,
         allowed=(grant.get('authorized') is True and
                  grant.get('paused') is False)
         console_reply=perform_console_request(command,authorized=allowed)
-    if console_reply is not None:
+    native_bay = native_bay_request(command)
+    if native_bay is not None:
+        # This is the ORIGINAL user utterance, after speaker verification.
+        # The model cannot produce commands here, and the GUI must also
+        # have a pre-existing owner-approved desktop authorization.
+        reply = request_native_bay(native_bay)
+    elif console_reply is not None:
         reply=console_reply
     elif navigation_reply is not None:
         reply = navigation_reply
