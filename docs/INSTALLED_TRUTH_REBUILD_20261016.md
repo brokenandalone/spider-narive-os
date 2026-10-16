@@ -6,7 +6,7 @@ This is a **new source-integration branch**, not a new installation of Spider OS
 **Do not merge, install, flash, update boot partitions, overwrite the resident Webbie, push private files, or run a release installer from this branch before the installed-source audit and owner review.** Never publish microphone samples, authentication material, token files, local Ollama memories, private case files, manuscripts, artwork, music, OneDrive data, or operational station data.
 
 ## Known working state supplied by the owner
-- Ubuntu Studio 26.04.1 with UEFI, separate `SPIDER_EFI` EFI partition, LUKS-on-LVM `kali-vg-root`. Do not alter disk or boot configuration.
+- Ubuntu Studio 26.04.1 with LUKS-on-LVM `kali-vg-root`. The current PC boot mode, partitions and bootloader configuration are **not established by this source audit**. Preserve them exactly; do not touch disks, boot entries, or encryption.
 - Webbie runs as a **user** service under `spider`, not root. Previous root system service is inactive.
 - Webbie AI worker V2 successful end-to-end text/IPC test: `qwen3:8b`, 18 messages, 7,743 prompt characters, 256 generation-token setting, 6.73 seconds; voice heard and spoken reply was **Natasha**. Treat that installed state as protected.
 - Webbie's installed agent is larger/different from the GitHub versions. GitHub **must not** clobber owner customizations.
@@ -29,3 +29,20 @@ The comparison inventories source-like files under `/usr/local/lib/spider-os` an
 
 ## Current status
 GitHub branch **created**. GitHub source is **not yet reconciled** with the PC. No install, PR merge, or ISO release is authorized by this branch.
+
+## First live source inventory (owner-reported, 2026-10-16)
+The initial local read-only audit at Git commit `c87786e163be27f1a26890b854b8859abcbe1df3` reported: **313 identical, 39 different, 508 installed-only, 249 GitHub-only**.
+
+This is **not** proof of 508 missing programs. The installed-only set includes at least 74 `upgrade-backups/` paths and eight `webbie.backup-20261003-040101/` paths; the 422 `webbie/` paths need closer triage. GitHub-only includes 199 tests and 28 `distro` paths (expected build-side files rather than necessarily missing PC programs).
+
+The changed-file subsystem counts were: the-web=13, webbie=9, author=4, forage=3, kali-bay=3, media=2, studio=2, study=2, system=1. These represent **owner-installed code that must be reviewed**, not something to overwrite with existing Git source.
+
+To inspect the *existing* local report without rescanning or transferring files:
+
+```bash
+cd ~/Downloads/Spider_OS_Installed_Truth_Rebuild
+git pull --ff-only
+python3 tools/installed_truth_triage.py --limit 35
+```
+
+The classification tool only reads `~/Downloads/Spider_OS_Installed_Truth/manifest.json`, prints candidate live code separated from likely backups and development assets, and makes **no filesystem or GitHub changes**. Do not upload the manifest or private owner source to this **public** GitHub repository. Reconcile reviewed, non-sensitive source only.
