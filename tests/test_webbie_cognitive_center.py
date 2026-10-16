@@ -143,6 +143,28 @@ class CognitiveCenterTests(unittest.TestCase):
         change.assert_not_called()
         self.assertEqual(fake.append_message.call_args.args[0], "Security")
 
+    def test_stop_reaches_shared_jarvis_core_without_any_dialog(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        shared = SimpleNamespace(stop=Mock())
+        fake = SimpleNamespace(
+            unified_workflow=SimpleNamespace(stop=Mock()),
+            jarvis_core=shared,
+            jarvis_mission_dialog=None,
+            computer_dialog=None,
+            stop_camera=Mock(),
+            awareness=SimpleNamespace(revoke_observation=Mock()),
+            publish_jarvis_context=Mock(),
+            append_message=Mock(),
+        )
+        with patch("webbie_panel.read_policy",
+                   return_value={"authorized": False, "paused": True}):
+            WebbiePanel.stop_sensitive_actions(fake)
+        shared.stop.assert_called_once_with()
+        fake.stop_camera.assert_called_once_with()
+        fake.awareness.revoke_observation.assert_called_once_with("screen")
+        self.assertIn("STOP confirmed", fake.append_message.call_args.args[1])
+
     def test_sleep_revokes_desktop_grant_and_turns_camera_off(self):
         mock=SimpleNamespace(
             awareness=SimpleNamespace(sleep=Mock()),
