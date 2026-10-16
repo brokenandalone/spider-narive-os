@@ -138,6 +138,7 @@ class WebbieComputerDialog(QDialog):
         self.pending_step_target = None
         self.bridge = OperatorBridge(grant=self.grant, parent=self)
         self.bridge.openRequested.connect(self.handle_voice_open)
+        self.bridge.bayRequested.connect(self.handle_voice_bay)
         self.bridge.webRequested.connect(self.handle_voice_web)
         self.bridge.navigationProposed.connect(self.handle_voice_navigation)
 
@@ -608,6 +609,32 @@ class WebbieComputerDialog(QDialog):
             self.bridge.finish(
                 peer, f'Launch requested for {app.name}.' if result and app else
                 'App launch denied or unsuccessful. Check the desktop panel.')
+
+    def handle_voice_bay(self, name):
+        """Use the existing The Web tab navigator, not another launcher.
+
+        The operator bridge already checked the saved GUI grant and allowlist.
+        Recheck the grant before invoking the native Qt navigation callback.
+        """
+        peer = self.bridge.pending
+        reply = 'Native workspace request denied or unavailable.'
+        allowed = self.grant.status()
+        panel = self.parent()
+        navigator = getattr(panel, 'workspace_navigator', None)
+        if (allowed.get('active') is True and allowed.get('wide') is True
+                and callable(navigator)):
+            try:
+                navigator(name)
+                reply = 'The Web navigation requested: ' + name + '.'
+                self.record_activity('native_workspace_requested')
+                self.receipt('workspace', 'requested')
+            except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+                reply = 'The Web could not open that native workspace.'
+                self.receipt('workspace', 'failed')
+        else:
+            self.receipt('workspace', 'denied')
+        if peer is not None:
+            self.bridge.finish(peer, reply)
 
     def offer_site(self, url):
         """Fill a proposal visibly; only the user can grant browser control."""
