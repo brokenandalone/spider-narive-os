@@ -19,7 +19,7 @@ import tarfile
 import tempfile
 
 SOURCE=Path(__file__).resolve().parents[2]
-VERSION="0.13.0-dev"
+VERSION="0.16.0-beta"
 PACKAGE="Spider-Audio-Studio-"+VERSION
 ROOTS=(
     "studio",
@@ -61,6 +61,18 @@ try:
             raise ValueError("Missing or linked app source: "+name)
         if hashlib.sha256(source.read_bytes()).hexdigest()!=digest:
             raise ValueError("Studio package file changed: "+name)
+    extras=data.get("extras")
+    if not isinstance(extras,dict) or not 4<=len(extras)<=12:
+        raise ValueError("Incomplete beta installer and legal notices")
+    for name,digest in extras.items():
+        if (not isinstance(name,str) or "/" in name or ".." in name or
+                not isinstance(digest,str) or len(digest)!=64):
+            raise ValueError("Unsafe beta archive extra")
+        source=home/name
+        if source.is_symlink() or not source.is_file():
+            raise ValueError("Beta disclosure missing or linked: "+name)
+        if hashlib.sha256(source.read_bytes()).hexdigest()!=digest:
+            raise ValueError("Beta disclosure/installer changed: "+name)
 except (OSError,ValueError,UnicodeError) as error:
     raise SystemExit("Spider Audio Studio package verification failed: "+str(error))
 if "--verify-only" in sys.argv[1:]:
@@ -68,6 +80,12 @@ if "--verify-only" in sys.argv[1:]:
     raise SystemExit(0)
 
 sys.path.insert(0,str(app))
+if "--doctor" in sys.argv[1:]:
+    from studio.package.doctor import main as studio_doctor
+    raise SystemExit(studio_doctor())
+if "--self-test" in sys.argv[1:]:
+    from studio.package.audio_self_test import main as studio_self_test
+    raise SystemExit(studio_self_test())
 try:
     from studio.main import main
 except ImportError as error:
@@ -131,6 +149,25 @@ def build(output_dir, *, source=SOURCE):
             hashes[rel]=hashlib.sha256(dest.read_bytes()).hexdigest()
         (bundle/"run_spider_audio_studio.py").write_text(LAUNCHER,encoding="utf-8")
         (bundle/"run_spider_audio_studio.py").chmod(0o755)
+        # Explicit per-user install is separate from app launch and is never
+        # run automatically. Preserve owner MIT notice and legal caveats.
+        extras={
+            "install_for_user.py":"studio/package/install_for_user.py",
+            "remove_beta.py":"studio/package/remove_beta.py",
+            "installer_gui.py":"studio/package/installer_gui.py",
+            "START_HERE.sh":"studio/package/START_HERE.sh",
+            "LICENSE":"LICENSE",
+            "BETA_README.md":"studio/product/BETA_README.md",
+            "THIRD_PARTY_NOTICE.md":"studio/product/THIRD_PARTY_NOTICE.md",
+        }
+        for dest_name,source_rel in extras.items():
+            dest=bundle/dest_name
+            source_file=source/source_rel
+            if source_file.is_symlink() or not source_file.is_file():
+                raise RuntimeError("Missing product beta disclosure or installer source")
+            with source_file.open("rb") as inp,dest.open("xb") as out:
+                shutil.copyfileobj(inp,out)
+            dest.chmod(0o755 if dest_name.endswith((".py",".sh")) else 0o600)
         revision="unknown"
         try:
             record=subprocess.run(
@@ -142,7 +179,9 @@ def build(output_dir, *, source=SOURCE):
             pass
         manifest={"schema":1,"app":"Spider Audio Studio",
                   "version":VERSION,"source_revision":revision,
-                  "private_developer_preview":True,"files":hashes}
+                  "private_developer_preview":True,"files":hashes,
+                  "extras":{name:hashlib.sha256((bundle/name).read_bytes()).hexdigest()
+                            for name in sorted(extras)}}
         (bundle/"manifest.json").write_text(
             json.dumps(manifest,sort_keys=True,indent=2)+"\n",encoding="utf-8")
         (bundle/"manifest.json").chmod(0o600)
@@ -174,7 +213,7 @@ def main(argv=None):
     except (OSError,RuntimeError,ValueError) as exc:
         cli.exit(2,"Spider Audio Studio bundling rejected: "+str(exc)+"\n")
     print("SPIDER AUDIO STUDIO STANDALONE SOURCE PACKAGE:",result)
-    print("This is a separate developer preview, NOT installed OS software.")
+    print("This is a private beta archive, NOT an installed or publicly approved product.")
     print("Review licenses and hardware dependencies before public redistribution.")
 
 if __name__=="__main__":
