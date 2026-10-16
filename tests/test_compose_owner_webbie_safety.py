@@ -86,10 +86,10 @@ class PrivateWebbieSafetyTests(unittest.TestCase):
         public = sample("the-web/shell/webbie_cognitive_center.py")
         original = public.replace(
             b"    def open_workflow(self):",
-            b"    def offer_workflow(self, key):\\n"
-            b"        return 'legacy fallback'\\n"
-            b"    def open_workflows(self):\\n"
-            b"        return self.offer_workflow(None)\\n"
+            b"    def offer_workflow(self, key):\n"
+            b"        return 'legacy fallback'\n"
+            b"    def open_workflows(self):\n"
+            b"        return self.offer_workflow(None)\n"
             b"    def open_workflow(self):")
         merged, _ = mod.combine_pair(
             "the-web/shell/webbie_cognitive_center.py", original, public)
