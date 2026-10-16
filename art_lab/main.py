@@ -24,10 +24,12 @@ try:
     from .project import (
         ArtError,new_project,validate_project,add_layer,append_stroke,
         create_stroke,open_project,save_project,MAX_IMAGE_BYTES)
+    from .outline import photo_outline
 except ImportError:
     from project import (
         ArtError,new_project,validate_project,add_layer,append_stroke,
         create_stroke,open_project,save_project,MAX_IMAGE_BYTES)
+    from outline import photo_outline
 
 ART_HOME=Path.home()/"Documents/Spider Art Lab"
 PURPLE="#a78bfa"
@@ -212,6 +214,7 @@ class SpiderArtLab(QWidget):
             ("New Canvas",self.new_canvas),("Open Project",self.open_art),
             ("Save New Project",self.save_art),("Export PNG",self.export_png),
             ("Import PNG Reference",self.import_reference),
+            ("Photo → Outline",self.trace_reference),
             ("Undo",self.undo),("Redo",self.redo)):
             button=QPushButton(name)
             button.clicked.connect(fn)
@@ -450,6 +453,28 @@ class SpiderArtLab(QWidget):
                 self.status.setText(f"New lossless PNG rendered: {saved.name}")
         except (ArtError,OSError) as error:
             self.status.setText("PNG export rejected: "+str(error))
+
+    def trace_reference(self):
+        source=None
+        for layer in reversed(self.document["layers"]):
+            if layer["image_png"] and not layer["name"].startswith("Outline:"):
+                source=layer
+                break
+        if source is None:
+            self.status.setText(
+                "Import a PNG photo reference before creating an outline.")
+            return
+        try:
+            raw=base64.b64decode(source["image_png"])
+            traced=photo_outline(raw)
+            new=add_layer(self.document,
+                          "Outline: "+source["name"][:60],
+                          image_png=base64.b64encode(traced).decode("ascii"))
+            self._update(new,
+                "Generated offline edge-outline as its own transparent layer. "
+                "Hide the photo layer to paint or trace over the outline.")
+        except (ArtError,OSError) as error:
+            self.status.setText("Outline generation was rejected: "+str(error))
 
     def import_reference(self):
         name,_=QFileDialog.getOpenFileName(
