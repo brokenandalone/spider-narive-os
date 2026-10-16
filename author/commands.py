@@ -16,6 +16,24 @@ def parse_author_command(value):
     text = text.rstrip("!.?")
     if not text:
         return None
+    # Literal read-only navigation of the already-open native Author Bay.
+    # These never select another manuscript or edit a chapter.
+    project_views = (
+        (r"(?:(?:author|the author)\s+)?"
+         r"(?:project map|chapter outline|manuscript outline)",
+         "open_project_map"),
+        (r"(?:story atlas|character network|story timeline|timeline map)",
+         "open_story_atlas"),
+        (r"(?:master canon|canon ledger|character dossiers|canon dashboard)",
+         "open_master_canon"),
+        (r"(?:canon intelligence|canon insights|canon review dashboard)",
+         "open_canon_intelligence"),
+    )
+    for phrase, action in project_views:
+        if re.fullmatch(
+                r"(?:please\s+)?(?:show|open)(?:\s+(?:me|the|my))?\s+"
+                + phrase, text):
+            return {"action": action}
     # Commands target only the active selection. No guessed book/chapter.
     if re.fullmatch(r"(?:please\s+)?(?:stop|cancel)(?:\s+(?:the|my))?\s+(?:review|reviewing)", text):
         return {"action": "cancel_review"}
