@@ -23,6 +23,17 @@ import subprocess
 import sys
 
 FOCI = {
+    # Existing native-bay integration files only. No standalone Studio project
+    # source; this compares owner-installed files without installing anything.
+    "native-bays": (
+        "the-web/shell/home_dashboard.py",
+        "the-web/shell/bay_missions.py",
+        "the-web/shell/bay_mission_panel.py",
+        "the-web/shell/native_utility_bays.py",
+        "the-web/shell/art_workbench.py",
+        "the-web/shell/webbie_research_panel.py",
+        "the-web/shell/immersive_bays.py",
+    ),
     "desktop": (
         "the-web/shell/main.py",
         "the-web/shell/app_catalog.py",
