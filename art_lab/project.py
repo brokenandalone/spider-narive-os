@@ -10,6 +10,7 @@ import copy
 import json
 import math
 import os
+import struct
 from pathlib import Path
 import tempfile
 
@@ -104,8 +105,12 @@ def validate_project(value):
                 data=base64.b64decode(image,validate=True)
             except (ValueError,base64.binascii.Error) as error:
                 raise ArtError("Invalid base64 raster reference") from error
-            if not data.startswith(b"\x89PNG\r\n\x1a\n") or len(data)>MAX_IMAGE_BYTES:
+            if (not data.startswith(b"\x89PNG\r\n\x1a\n")
+                    or len(data)<24 or len(data)>MAX_IMAGE_BYTES):
                 raise ArtError("Raster layers must contain bounded PNG data")
+            raster_width,raster_height=struct.unpack(">II",data[16:24])
+            if not (1<=raster_width<=MAX_SIDE and 1<=raster_height<=MAX_SIDE):
+                raise ArtError("Embedded raster dimensions are unsafe")
             image_bytes+=len(data)
             if image_bytes>MAX_IMAGE_BYTES:
                 raise ArtError("Combined embedded PNGs exceed 8 MiB")
