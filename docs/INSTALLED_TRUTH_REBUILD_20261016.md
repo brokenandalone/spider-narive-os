@@ -171,7 +171,7 @@ archive itself has not been committed to this public repository**.
 - Installed `the-web/shell/main.py` drops newer immersive bays and native
   advanced tabs. Installed `studio/main.py` removes audio-panel and MIDI
   lifecycle protections. Both newer GitHub implementations are retained.
-- Other 37 installed changed-source files and five additional owner-source
+- The remaining 36 not-yet-integrated changed-source files and five additional owner-source
   modules are still under review. The three worker files are the **only**
   additional installed-source modules merged in this round.
 
