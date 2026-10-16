@@ -66,6 +66,29 @@ class PrivateStageTests(unittest.TestCase):
         self.assertNotIn("PRIVATE LOCAL DATA", manifest)
         self.assertIn("local_owner_method", manifest)
 
+    def test_missing_installed_native_module_is_staged_as_addition(self):
+        relative = mod.FOCI["desktop"][0]
+        (self.installed / relative).unlink()
+        output = self.home / "stage-new-module"
+        report = mod.stage(
+            self.source, self.installed, output,
+            focus="desktop", home=self.home, scope=mod.FOCI["desktop"])
+        row = next(item for item in report["files"] if item["component"] == relative)
+        self.assertEqual(row["state"], "new_candidate_only")
+        self.assertIsNone(row["installed_sha256"])
+        self.assertTrue(row["requires_owner_review"])
+        self.assertFalse((output / "installed" / relative).exists())
+        self.assertTrue((output / "candidate" / relative).is_file())
+        self.assertFalse(report["release_installable"])
+
+    def test_unsafe_existing_directory_still_blocks_staging(self):
+        relative = mod.FOCI["desktop"][0]
+        (self.installed / relative).unlink()
+        (self.installed / relative).mkdir()
+        with self.assertRaises(ValueError):
+            mod.stage(self.source, self.installed, self.home / "stage-unsafe",
+                      focus="desktop", home=self.home, scope=mod.FOCI["desktop"])
+
     def test_cannot_overwrite_existing_stage_or_stage_in_candidate(self):
         output = self.home / "private-review"
         output.mkdir()
