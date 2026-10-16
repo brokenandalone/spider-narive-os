@@ -42,6 +42,28 @@ run. It exits nonzero on missing/mismatched boot assets.
 It **does not** prove a successful future boot, compare byte-for-byte
 hashes, or certify a backup.
 
+## Byte-for-byte verification of the proven kernel (safe next action)
+
+The additional `verify` subcommand builds on the already-passing
+read-only `audit`. It uses `debugfs` to copy the currently selected
+sda1 kernel and initramfs to a temporary private directory in
+`/var/tmp` **on the main root filesystem**, calculates SHA256 hashes
+for these temporary copies and the original root's `/boot` copies,
+reports MATCH or MISMATCH, and removes the temporary files. The
+sda1 partition is opened **read-only and never mounted**.
+
+From the branch source:
+
+```bash
+sudo python3 distro/spider-sda1-boot-bridge.py verify
+```
+
+This requires at least approximately 100 MiB of temporary free space
+and does not back up any files independently. A mismatch stops
+verification and must be investigated; never overwrite either boot
+copy to force a match. A match establishes identical bytes, not
+whether a future 26.10 boot or restoration will succeed.
+
 ## Offline candidate generator (after a new kernel is available)
 
 Once the new Ubuntu kernel and corresponding initramfs exist in the
