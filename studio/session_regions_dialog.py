@@ -9,16 +9,19 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter,QColor,QPen
 from PyQt5.QtWidgets import (
     QDialog,QVBoxLayout,QLabel,QHBoxLayout,QPushButton,QSpinBox,QDoubleSpinBox,
-    QTableWidget,QTableWidgetItem,QAbstractItemView,QDialogButtonBox,QWidget)
+    QTableWidget,QTableWidgetItem,QAbstractItemView,QDialogButtonBox,QWidget,
+    QScrollArea)
 try:
     from .session_regions import MAX_REGIONS,normalize_regions,REGION_FIELDS
     from .session_clip_edit import normalize_clip_edit
     from .session_waveform import waveform_peaks
+    from .session_regions_timeline import RegionArrangement
     from .multitrack import SessionError
 except ImportError:
     from session_regions import MAX_REGIONS,normalize_regions,REGION_FIELDS
     from session_clip_edit import normalize_clip_edit
     from session_waveform import waveform_peaks
+    from session_regions_timeline import RegionArrangement
     from multitrack import SessionError
 
 COLUMNS=("Source in (s)","Source out (s)","Song at (s)",
@@ -116,6 +119,15 @@ class TrackRegionsDialog(QDialog):
         root.addLayout(command)
         self.wave=RegionsWaveform(self)
         root.addWidget(self.wave)
+        root.addWidget(QLabel(
+            "Drag a region in its song lane to move it; source in/out stay unchanged. "
+            "Song placement also remains precisely editable in the table."))
+        self.arrangement=RegionArrangement(self)
+        self.arrange_scroll=QScrollArea(self)
+        self.arrange_scroll.setWidgetResizable(True)
+        self.arrange_scroll.setMaximumHeight(240)
+        self.arrange_scroll.setWidget(self.arrangement)
+        root.addWidget(self.arrange_scroll)
         self.status=QLabel(
             "Regions refer to the original recording; no source or previous mix is overwritten.")
         self.status.setWordWrap(True)
@@ -140,6 +152,8 @@ class TrackRegionsDialog(QDialog):
     def _redraw(self,*args):
         if hasattr(self,"wave"):
             self.wave.update()
+        if hasattr(self,"arrangement"):
+            self.arrangement.refresh()
 
     def _insert(self,region):
         if self.table.rowCount()>=MAX_REGIONS:
@@ -162,6 +176,7 @@ class TrackRegionsDialog(QDialog):
                 knob.setValue(region[key])
             knob.valueChanged.connect(self._redraw)
             self.table.setCellWidget(row,col,knob)
+        self._redraw()
 
     def rows(self):
         values=[]
@@ -187,7 +202,7 @@ class TrackRegionsDialog(QDialog):
                           fade_in_ms=0,fade_out_ms=0)
         self._insert(proposed)
         self.table.setCurrentCell(self.table.rowCount()-1,0)
-        self.wave.update()
+        self._redraw()
 
     def duplicate_region(self):
         current=self.table.currentRow()
@@ -199,6 +214,7 @@ class TrackRegionsDialog(QDialog):
         original=self.rows()[current]
         self._insert(original)
         self.table.setCurrentCell(self.table.rowCount()-1,0)
+        self._redraw()
 
     def remove_region(self):
         current=self.table.currentRow()
@@ -207,7 +223,7 @@ class TrackRegionsDialog(QDialog):
             return
         self.table.removeRow(current)
         self.table.setCurrentCell(min(current,self.table.rowCount()-1),0)
-        self.wave.update()
+        self._redraw()
 
     def move_region(self,delta):
         row=self.table.currentRow()
@@ -221,7 +237,7 @@ class TrackRegionsDialog(QDialog):
         for region in current:
             self._insert(region)
         self.table.setCurrentCell(dest,0)
-        self.wave.update()
+        self._redraw()
 
     def values(self):
         return normalize_regions(self.track,self.rows())[0]
