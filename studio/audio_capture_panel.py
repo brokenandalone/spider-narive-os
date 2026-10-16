@@ -17,10 +17,12 @@ try:
     from .audio_capture_engine import (
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
     from .multitrack import export_session,SessionError
+    from .audio_overdub_engine import available_outputs,capture_overdub
 except ImportError:
     from audio_capture_engine import (
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
     from multitrack import export_session,SessionError
+    from audio_overdub_engine import available_outputs,capture_overdub
 
 TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
 
@@ -44,6 +46,36 @@ class CaptureWorker(QThread):
             self.recorded.emit(result,"")
         except (OSError,ValueError,RuntimeError,FileExistsError) as exc:
             self.recorded.emit(None,str(exc)[:340])
+
+class OverdubWorker(QThread):
+    recorded=pyqtSignal(object,str)
+    levels=pyqtSignal(float,float,float)
+    def __init__(self,filename,cue,input_device,output_device,role,channels,rate,
+                 latency,seconds,parent=None):
+        super().__init__(parent)
+        self.filename=filename
+        self.cue=cue
+        self.input_device=input_device
+        self.output_device=output_device
+        self.role=role
+        self.channels=channels
+        self.rate=rate
+        self.latency=latency
+        self.seconds=seconds
+        self.stop_event=threading.Event()
+    def run(self):
+        try:
+            result=capture_overdub(
+                self.filename,cue=self.cue,input_device=self.input_device,
+                output_device=self.output_device,role=self.role,
+                channels=self.channels,rate=self.rate,
+                latency_ms=self.latency,max_seconds=self.seconds,
+                stop=self.stop_event,
+                on_level=lambda peak,rms,seconds:self.levels.emit(peak,rms,seconds))
+            self.recorded.emit(result,"")
+        except (OSError,ValueError,RuntimeError,FileExistsError) as exc:
+            self.recorded.emit(None,str(exc)[:350])
+
 
 class SessionWorker(QThread):
     recorded=pyqtSignal(object,str)
@@ -123,6 +155,38 @@ class AudioCapturePanel(QWidget):
         self.seconds.setSuffix(" s")
         settings.addWidget(self.seconds)
         layout.addLayout(settings)
+        overdub_heading=QLabel("BACKING TRACK / FULL-DUPLEX OVERDUB")
+        overdub_heading.setStyleSheet("font-weight:bold;color:#c8a8ee")
+        layout.addWidget(overdub_heading)
+        overdub_row=QHBoxLayout()
+        overdub_row.addWidget(QLabel("Cue WAV"))
+        self.cue_file=QLineEdit()
+        self.cue_file.setReadOnly(True)
+        self.cue_file.setPlaceholderText("Select a 16-bit 44.1/48 kHz backing WAV")
+        self.cue_file.setAccessibleName("Selected backing cue WAV for full-duplex recording")
+        overdub_row.addWidget(self.cue_file,3)
+        overdub_row.addWidget(self._button("Choose Backing WAV",self.select_cue))
+        layout.addLayout(overdub_row)
+        output_row=QHBoxLayout()
+        output_row.addWidget(QLabel("Playback device"))
+        self.output_device=QComboBox()
+        self.output_device.setAccessibleName("Explicit stereo headphone or monitor output for cue")
+        output_row.addWidget(self.output_device,2)
+        output_row.addWidget(QLabel("Input timing correction"))
+        self.latency=QSpinBox()
+        self.latency.setRange(-250,250)
+        self.latency.setValue(0)
+        self.latency.setSuffix(" ms")
+        self.latency.setAccessibleName("Manual latency compensation; positive moves recorded take earlier")
+        output_row.addWidget(self.latency)
+        layout.addLayout(output_row)
+        caveat=QLabel(
+            "Use headphones to prevent cue spill. This is one shared duplex "
+            "stream clock, not measured physical interface latency. "
+            "+ms moves recorded audio EARLIER; -ms moves it later. "
+            "Overdub input is 16-bit PCM; separate takes can record at 24-bit.")
+        caveat.setWordWrap(True)
+        layout.addWidget(caveat)
         tracks=QHBoxLayout()
         tracks.addWidget(QLabel("Project"))
         self.project_title=QLineEdit("Spider Recording Session")
@@ -144,6 +208,11 @@ class AudioCapturePanel(QWidget):
         action.addWidget(self.stop_btn)
         action.addWidget(self.export_btn)
         layout.addLayout(action)
+        overdub_action=QHBoxLayout()
+        self.overdub_btn=self._button("▶ Record Along With Backing",self.record_overdub)
+        self.overdub_btn.setEnabled(False)
+        overdub_action.addWidget(self.overdub_btn)
+        layout.addLayout(overdub_action)
         session_action=QHBoxLayout()
         self.arrange_btn=self._button(
             "Open Recorded Takes in Studio Multitrack Editor",self.open_multitrack)
@@ -180,21 +249,79 @@ class AudioCapturePanel(QWidget):
         b.clicked.connect(fn)
         return b
 
+    def select_cue(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the current recording before changing the backing track.")
+            return
+        filename,_=QFileDialog.getOpenFileName(
+            self,"Select a licensed WAV backing track",str(Path.home()/"Music"),
+            "PCM WAV (*.wav)")
+        if filename:
+            self.cue_file.setText(filename)
+            self.status.setText(
+                "Backing selected. Choose an input, stereo playback device, "
+                "matching sample rate and headphones before starting overdub.")
+
     def refresh_inputs(self):
         if self.worker is not None and self.worker.isRunning():
             return
         try:
             results=available_inputs()
+            outputs=available_outputs()
             self.input.clear()
             for index,name,channels in results:
                 self.input.addItem(f"{name} ({channels} inputs)",(index,channels))
+            self.output_device.clear()
+            for index,name,channels in outputs:
+                self.output_device.addItem(f"{name} ({channels} outputs)",(index,channels))
             self.status.setText(
-                f"Found {len(results)} audio-capable device(s). "
+                f"Found {len(results)} input(s) and {len(outputs)} stereo output(s). "
                 "None are open. Choose an input and click Record."
                 if results else "No input devices found. Check your audio interface/permissions.")
         except CaptureError as exc:
             self.status.setText(str(exc))
         self.record_btn.setEnabled(self.input.count()>0)
+        self.overdub_btn.setEnabled(self.input.count()>0 and self.output_device.count()>0)
+
+    def record_overdub(self):
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText("Finish the other recording or export first.")
+            return
+        selected=self.input.currentData()
+        output=self.output_device.currentData()
+        if selected is None or output is None:
+            self.status.setText("Refresh and explicitly choose an input and stereo output.")
+            return
+        if not self.cue_file.text().strip():
+            self.status.setText("Select a local WAV backing track before recording along.")
+            return
+        input_id,max_channels=selected
+        if self.channels.currentData()>max_channels:
+            self.status.setText("The selected input has too few channels.")
+            return
+        try:
+            TAKE_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+            if TAKE_ROOT.is_symlink():
+                raise CaptureError("The recorded-take directory cannot be a symlink")
+            filename=new_take_filename(TAKE_ROOT,self.role.currentData())
+            self.worker=OverdubWorker(
+                str(filename),self.cue_file.text(),input_id,output[0],
+                self.role.currentData(),self.channels.currentData(),
+                self.rate.currentData(),self.latency.value(),self.seconds.value(),self)
+            self.worker.recorded.connect(self._recorded)
+            self.worker.levels.connect(self._levels)
+            self.record_btn.setEnabled(False)
+            self.overdub_btn.setEnabled(False)
+            self.refresh_btn.setEnabled(False)
+            self.export_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.worker.start()
+            self.status.setText(
+                "Full-duplex recording started. Backing plays through selected stereo "
+                "output while input records into its own WAV. No live microphone "
+                "signal is sent to the speakers.")
+        except (CaptureError,OSError,ValueError) as exc:
+            self.status.setText("Could not begin overdub: "+str(exc)[:280])
 
     def record(self):
         if self.worker is not None and self.worker.isRunning():
@@ -224,6 +351,7 @@ class AudioCapturePanel(QWidget):
         self.worker.levels.connect(self._levels)
         self.stop_btn.setEnabled(True)
         self.record_btn.setEnabled(False)
+        self.overdub_btn.setEnabled(False)
         self.refresh_btn.setEnabled(False)
         self.export_btn.setEnabled(False)
         self.worker.start()
@@ -327,6 +455,7 @@ class AudioCapturePanel(QWidget):
         self.worker.recorded.connect(self._recorded)
         self.stop_btn.setEnabled(False)
         self.record_btn.setEnabled(False)
+        self.overdub_btn.setEnabled(False)
         self.export_btn.setEnabled(False)
         self.refresh_btn.setEnabled(False)
         self.worker.start()
