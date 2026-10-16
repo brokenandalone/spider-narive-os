@@ -157,3 +157,42 @@ def launch_experiment(model: str, *, approved: bool, status=None,
         start_new_session=True,
     )
     return True
+
+# A pinned in-tree setup entrypoint, never a model-generated command.
+SETUP_SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "setup_heretic_lab.sh"
+
+
+def launch_lab_setup(*, approved: bool, script=SETUP_SCRIPT, status=None,
+                     popen=None) -> bool:
+    """Start the reviewed, interactive, optional install from Webbie's UI.
+
+    This does NOT grant permission to install: the shell script also asks
+    the owner to type INSTALL HERETIC before downloads begin.
+    """
+    if approved is not True:
+        raise PermissionError("Heretic setup requires direct owner GUI approval")
+    status = status or inspect_heretic()
+    if not status.console_available:
+        raise RuntimeError("Konsole is required for the interactive setup")
+    if status.installed:
+        raise RuntimeError("Heretic is already present; inspect the model lab")
+    # The venv/setup can consume more space than a single model.
+    if status.free_disk_gib < 25:
+        raise RuntimeError("At least 25 GiB free disk is needed for Heretic setup")
+    script = Path(script)
+    if script.is_symlink() or not script.is_file() or script.name != "setup_heretic_lab.sh":
+        raise PermissionError("Approved Spider OS setup script is unavailable")
+    if script.resolve() != SETUP_SCRIPT.resolve():
+        raise PermissionError("Only the packaged Spider OS setup script is permitted")
+    info = script.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o022:
+        raise PermissionError("Heretic setup script is writable by untrusted users")
+    runner = popen or subprocess.Popen
+    runner(
+        ["konsole", "--hold", "-e", "bash", str(script), "--install"],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return True
