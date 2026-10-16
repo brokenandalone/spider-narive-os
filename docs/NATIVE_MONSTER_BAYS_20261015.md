@@ -524,6 +524,60 @@ absent from candidate `__init__` **if** the current candidate is checked
 out. It can still report constructor differences and must not be interpreted
 as authorization to merge or install.
 
+## Owner-first additive desktop integration preview (not installable)
+
+The owner reran the desktop staging and verified the repaired candidate
+`WebbieCognitiveDialog.__init__` now retains both previously missing
+owner-initialized attributes, `workflow_dialog` and
+`workspace_opener`. There are no constructor signature differences,
+but `__init__` and `open_workflow` still differ semantically. The
+candidate-only bay imports are **still missing from the installed shell**
+because an installation has not occurred.
+
+To make genuine progress beyond comparing names, the new
+`tools/draft_owner_first_desktop.py` creates a **SECOND, owner-first**
+review copy from the private staged pairs:
+
+- Takes the owner's existing `installed/` files as the base.
+- Preserves owner method/function bodies and existing module settings
+  (AST fingerprints must match or staging fails).
+- Adds candidate-only class/function definitions, unique methods,
+  candidate-only imports and simple literal new settings where safe to
+  append at source level.
+- Keeps every shared changed method and setting explicitly
+  **UNRESOLVED**. It never overrides the owner's working
+  `TheWeb.open_workspace`, `TheWeb.build_ui`,
+  `WebbiePanel.stop_sensitive_actions`, message/voice paths,
+  or local-only Webbie workflow methods.
+- Fails closed on parse errors, symlinks or altered private stage
+  hashes; writes into a newly created private 0700 directory with
+  0600 files. It neither executes modules nor modifies installed files.
+
+Run as the normal desktop user after pulling the checked development
+branch (use the **existing refreshed** Bridge stage):
+
+```bash
+git -C "$HOME/spider-os-native-wave" pull --ff-only
+python3 -B "$HOME/spider-os-native-wave/tools/draft_owner_first_desktop.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Merge-Bridge-20261015" \
+  --output "$HOME/SpiderOS-Private-Owner-First-20261015"
+```
+
+The tool prints **counts only** and stores `summary.json` plus
+`review-only/` source files locally. Those source files and diffs
+contain owner code; **keep private**. The additive preview is NOT an
+executable or deployable release because the 29 shared differences
+have not been semantically resolved, and candidate-only functions can
+rely on different existing constructor/callback behavior. Do not
+copy these preview files into system locations or publicly push them.
+
+Before any deployment, compare both the candidate-first and owner-first
+previews with the two originals in Meld, resolve shared method bodies,
+test in a separate application sandbox, inventory installed packages,
+and clear the guarded **33-file** owner-customization blocker. This
+workflow specifically avoids replacing any original Ubuntu Studio menu
+program and does not build new duplicate desktop launchers.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
