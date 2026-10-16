@@ -185,3 +185,31 @@ live test of this GitHub build.
 This branch is **not ready to install or flash**. Do not replace the
 working resident Webbie, destroy newer bay source, automatically merge
 the entire owner patch, or push a private archive into a public repo.
+
+### Additional integration safeguards in this round
+
+- Existing `webbie/agent/webbie.py:socket_server()` now serves up to eight
+  simultaneous non-root text clients; a slow model call can no longer
+  monopolize text IPC for simple built-in replies. Clients have bounded socket
+  I/O, and the UNIX socket remains 0600.
+- `tests/test_webbie_ipc_concurrent_reconciliation.py` exercises the
+  actual socket-server function through AST extraction and a disposable
+  local UNIX socket, checking that a quick command succeeds before a slow
+  request is released. This is source regression testing, **not a live PC test**.
+- Emergency Ollama fallback sends **only the current question**, not excerpts
+  of potentially private prior conversations. It rejects all non-loopback
+  endpoints and all ports except 11434, and bounds response size.
+  The healthy primary brain keeps its existing memory functionality.
+- No new systemd service, desktop launcher, root authorization grant,
+  vendor-copy tree, art/media archive or installer was introduced.
+
+### Gate before installation
+
+All of the above are **GitHub development commits only**, and neither hosted CI
+nor installed-device regression results have been independently verified.
+Do not run `system/release_batch.py --apply` while source drift remains.
+The owner's separate clone contains 47 uncommitted installed-source changes;
+a normal `git pull --ff-only` into that dirty checkout might fail because
+this branch now changes some of the same tracked paths. Preserve the dirty
+checkout for review. Testing the new GitHub head should use a separate clean
+worktree or a fresh checkout, without replacing installed files.
