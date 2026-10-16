@@ -17,9 +17,11 @@ import wave
 try:
     from .session_project import inspect_session
     from .multitrack import SessionError
+    from .session_track_fx import normalize_track_effects,track_effects_filter
 except ImportError:
     from session_project import inspect_session
     from multitrack import SessionError
+    from session_track_fx import normalize_track_effects,track_effects_filter
 
 DEFAULT_OUTPUT = Path.home() / "Documents/Spider Studio/Music/Session Mixes"
 MAX_RENDER_SECONDS = 2 * 3600
@@ -41,7 +43,7 @@ def mix_plan(session, controls=None, *, include_reference=False):
     for track in session["tracks"]:
         choices = controls.get(track["filename"], {})
         if not isinstance(choices, dict) or not set(choices).issubset(
-                {"gain", "pan", "mute", "solo", "delay_ms"}):
+                {"gain", "pan", "mute", "solo", "delay_ms", "effects"}):
             raise SessionError("Unknown per-track mixing control.")
         gain, pan = choices.get("gain", 1.0), choices.get("pan", 0.0)
         delay = choices.get("delay_ms", 0)
@@ -56,8 +58,10 @@ def mix_plan(session, controls=None, *, include_reference=False):
             raise SessionError("Track delay must be between 0 and 20000 ms.")
         if type(mute) is not bool or type(solo) is not bool:
             raise SessionError("Mute and solo must be yes or no.")
+        effects=normalize_track_effects(choices.get("effects"))
         planned.append({**track, "gain": float(gain), "pan": float(pan),
-                        "delay_ms": delay, "mute": mute, "solo": solo})
+                        "delay_ms": delay, "mute": mute, "solo": solo,
+                        "effects":effects})
     # Reference mixes risk doubling tracks; click guides must never enter a release mix.
     eligible = [t for t in planned if not t["mute"] and t["role"] != "click_guide"
                 and (include_reference or t["role"] != "reference_mix")]
@@ -94,10 +98,12 @@ def ffmpeg_command(ffmpeg, plan, output):
         left = min(1.0, 1.0 - entry["pan"])
         right = min(1.0, 1.0 + entry["pan"])
         delay = f",adelay={entry['delay_ms']}:all=1" if entry["delay_ms"] else ""
+        channel_fx=track_effects_filter(entry.get("effects"))
+        effect_section=channel_fx+"," if channel_fx else ""
         filters.append(
             f"[{index}:a:0]aresample=48000,"
             "aformat=sample_fmts=fltp:channel_layouts=stereo,"
-            f"volume={entry['gain']:.4f},"
+            f"{effect_section}volume={entry['gain']:.4f},"
             f"pan=stereo|c0={left:.4f}*c0|c1={right:.4f}*c1"
             f"{delay}[track{index}]"
         )
@@ -168,7 +174,7 @@ def render_session(folder, *, controls=None, include_reference=False,
             "verified_before_render": True,
             "tracks": [{key: item[key] for key in
                         ("filename", "role", "sha256", "gain", "pan",
-                         "delay_ms", "mute", "solo")} for item in plan["settings"]],
+                         "delay_ms", "mute", "solo", "effects")} for item in plan["settings"]],
             "active_filenames": [track["filename"] for track in plan["active"]],
         }
         with (destination / "mix-receipt.json").open("x", encoding="utf-8") as file:
