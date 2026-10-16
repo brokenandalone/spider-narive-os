@@ -26,8 +26,7 @@ class StudioInstalledToolsTests(unittest.TestCase):
         self.assertIn("MultitrackDialog",source)
         self.assertIn("SessionMixDialog",source)
         self.assertIn("MasteringDialog",source)
-        self.assertIn("Individual",source.replace("independent","Individual")
-                      if False else "Individual") if False else None
+        self.assertIn("Independent band stems mixed",source)
 
     def test_mixer_rejects_duplicate_stems(self):
         with tempfile.TemporaryDirectory() as directory:
