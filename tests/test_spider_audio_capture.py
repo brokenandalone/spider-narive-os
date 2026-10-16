@@ -38,8 +38,11 @@ class FakeBackend:
                 else:
                     count=(QUEUE_LIMIT+5) if owner.overflow else owner.chunks
                     for index in range(count):
-                        # 32 frames of two channels at 16 bits = 128 bytes.
-                        cb(b"\xe8\x03\x18\xfc"*32,32,None,None)
+                        # Test real 16- and 24-bit signed stereo device buffers.
+                        sample_width=3 if kwargs["dtype"]=="int24" else 2
+                        positive=(1000).to_bytes(sample_width,"little",signed=True)
+                        negative=(-1000).to_bytes(sample_width,"little",signed=True)
+                        cb((positive+negative)*32,32,None,None)
                         if owner.stop.is_set():
                             break
                 owner.stop.set()
@@ -77,6 +80,24 @@ class AudioCaptureEngineTests(unittest.TestCase):
                 self.assertEqual(wav.readframes(1),b"\xe8\x03\x18\xfc")
             self.assertEqual(dest.stat().st_mode & 0o777,0o600)
             self.assertFalse(list(root.glob("*.part")))
+
+    def test_native_24_bit_capture_preserves_device_samples(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            stop=threading.Event()
+            fake=FakeBackend(stop,chunks=2)
+            target=root/"device-24.wav"
+            result=capture_take(target,device=1,role="rhythm_guitar",channels=2,
+                                bit_depth=24,rate=48000,max_seconds=2,
+                                backend=fake,stop=stop)
+            self.assertEqual(fake.kwargs["dtype"],"int24")
+            self.assertEqual(result["sample_width_bits"],24)
+            with wave.open(str(target),"rb") as reader:
+                self.assertEqual(reader.getnframes(),64)
+                self.assertEqual(reader.getsampwidth(),3)
+                samples=reader.readframes(1)
+                self.assertEqual(int.from_bytes(samples[:3],"little",signed=True),1000)
+                self.assertEqual(int.from_bytes(samples[3:6],"little",signed=True),-1000)
 
     def test_mono_format_and_no_existing_takes_replaced(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -136,7 +157,7 @@ class AudioCaptureEngineTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 capture_take(dest,device=1,role="piano_keys",stop=stop,backend=backend)
             self.assertEqual(dest.read_bytes(),b"preexisting")
-            for values in ({"device":-1},{"channels":4},{"rate":96000},
+            for values in ({"device":-1},{"channels":4},{"rate":96000},{"bit_depth":32},
                            {"max_seconds":301},{"role":"unknown"}):
                 params=dict(device=1,role="bass",channels=1,rate=48000,max_seconds=3)
                 params.update(values)
