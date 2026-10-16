@@ -25,7 +25,7 @@ SOURCE_EXACT = frozenset({"kali-bay", "spider-core", "webbie", "spider-guardian"
 SKIP_DIRS = frozenset({
     ".git", "__pycache__", ".venv", "venv", "node_modules", "build",
     "dist", "backups", ".webbie-jarvis-recovery-backups",
-    "models", "music", "artwork", "audio", "recordings", "secrets",
+    "music", "artwork", "recordings", "secrets",
     "credentials", "private", ".ollama", ".cache",
 })
 EXTRA_LOCAL_FILES = (
