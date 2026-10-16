@@ -24,7 +24,7 @@ RATES=(44100,48000)
 BLOCK_FRAMES=1024
 QUEUE_LIMIT=96
 MAX_SECONDS=300
-MAX_CAPTURE_BYTES=MAX_SECONDS*48000*2*2
+MAX_CAPTURE_BYTES=MAX_SECONDS*48000*2*3
 ROLES=("lead_vocal","backing_vocal","rhythm_guitar","lead_guitar",
        "bass","drums","piano_keys","other_instrument")
 _SAFE_LABEL=re.compile(r"[^A-Za-z0-9_-]+")
@@ -51,7 +51,7 @@ def available_inputs(backend=None):
     except (OSError,RuntimeError,KeyError,TypeError,ValueError) as exc:
         raise CaptureError("Unable to list available audio recording devices") from exc
 
-def _validate(target,device,channels,rate,max_seconds,role):
+def _validate(target,device,channels,rate,max_seconds,role,bit_depth):
     dest=Path(target)
     if dest.suffix.lower()!=".wav" or dest.exists() or dest.is_symlink():
         raise CaptureError("Choose a NEW .wav recording path; existing takes are protected")
@@ -63,34 +63,45 @@ def _validate(target,device,channels,rate,max_seconds,role):
         raise CaptureError("Audio recording must be mono or stereo")
     if type(rate) is not int or rate not in RATES:
         raise CaptureError("Only 44.1/48 kHz recording is supported")
+    if type(bit_depth) is not int or bit_depth not in (16,24):
+        raise CaptureError("Only native 16-bit or 24-bit PCM input capture is supported")
     if type(max_seconds) not in (int,float) or isinstance(max_seconds,bool) or not 0<max_seconds<=MAX_SECONDS:
         raise CaptureError("Recording time limit must be between 0 and 300 seconds")
     if role not in ROLES:
         raise CaptureError("Choose a supported instrument/vocal recording role")
     return dest
 
-def _levels(pcm):
-    samples=array("h")
-    samples.frombytes(pcm)
-    if sys.byteorder!="little":
-        samples.byteswap()
+def _levels(pcm,bit_depth):
+    if bit_depth==16:
+        samples=array("h")
+        samples.frombytes(pcm)
+        if sys.byteorder!="little":
+            samples.byteswap()
+        scale=32768.0
+    elif bit_depth==24:
+        samples=(int.from_bytes(pcm[i:i+3],"little",signed=True)
+                 for i in range(0,len(pcm),3))
+        samples=list(samples)
+        scale=8388608.0
+    else:
+        raise CaptureError("Unsupported capture meter format")
     if not samples:
         return -120.0, -120.0
-    peak=max(abs(v) for v in samples)/32768.0
-    power=sum(v*v for v in samples)/(len(samples)*32768.0**2)
+    peak=max(abs(v) for v in samples)/scale
+    power=sum(v*v for v in samples)/(len(samples)*scale**2)
     peak_db=max(-120.0,20*math.log10(peak)) if peak else -120.0
     rms_db=max(-120.0,10*math.log10(power)) if power else -120.0
     return round(peak_db,1),round(rms_db,1)
 
 def capture_take(destination,*,device,role,channels=1,rate=48000,max_seconds=180,
-                 stop=None,on_level=None,backend=None):
+                 bit_depth=16,stop=None,on_level=None,backend=None):
     """Record one raw input stream into an atomic private 16-bit PCM WAV.
 
     The loop drains callback events after a requested Stop. If PortAudio ever
     drops an input block, or the queue overflows, the recording is rejected,
     not silently represented as an uninterrupted professional take.
     """
-    dest=_validate(destination,device,channels,rate,max_seconds,role)
+    dest=_validate(destination,device,channels,rate,max_seconds,role,bit_depth)
     stop=stop if stop is not None else threading.Event()
     if stop.is_set():
         raise CaptureError("Recording cancelled before opening the microphone")
@@ -99,7 +110,8 @@ def capture_take(destination,*,device,role,channels=1,rate=48000,max_seconds=180
     fault=[]
     frames_written=0
     tmp=None
-    limit_frames=min(int(rate*max_seconds),MAX_CAPTURE_BYTES//(channels*2))
+    sample_width=bit_depth//8
+    limit_frames=min(int(rate*max_seconds),MAX_CAPTURE_BYTES//(channels*sample_width))
     if limit_frames<1:
         raise CaptureError("Recording time limit too short")
     def callback(indata,frames,timing,status):
@@ -115,7 +127,7 @@ def capture_take(destination,*,device,role,channels=1,rate=48000,max_seconds=180
             return
         try:
             block=bytes(indata)
-            if len(block)!=frames*channels*2:
+            if len(block)!=frames*channels*sample_width:
                 raise ValueError("Capture data size does not match input frames")
             raw_queue.put_nowait((block,frames))
         except (queue.Full,ValueError,BufferError):
@@ -128,12 +140,13 @@ def capture_take(destination,*,device,role,channels=1,rate=48000,max_seconds=180
         with os.fdopen(fd,"wb") as output:
             with wave.open(output,"wb") as wav:
                 wav.setnchannels(channels)
-                wav.setsampwidth(2)
+                wav.setsampwidth(sample_width)
                 wav.setframerate(rate)
                 try:
                     with api.RawInputStream(
                         samplerate=rate,blocksize=BLOCK_FRAMES,device=device,
-                        channels=channels,dtype="int16",callback=callback):
+                        channels=channels,dtype="int24" if bit_depth==24 else "int16",
+                        callback=callback):
                         start=time.monotonic()
                         updated=start
                         while True:
@@ -150,11 +163,12 @@ def capture_take(destination,*,device,role,channels=1,rate=48000,max_seconds=180
                                 stop.set()
                                 continue
                             wanted=min(count,remaining)
-                            wav.writeframesraw(raw[:wanted*channels*2])
+                            wav.writeframesraw(raw[:wanted*channels*sample_width])
                             frames_written+=wanted
                             now=time.monotonic()
                             if on_level is not None and now-updated>=.12:
-                                peak,rms=_levels(raw[:wanted*channels*2])
+                                peak,rms=_levels(raw[:wanted*channels*sample_width],
+                                                 bit_depth)
                                 on_level(peak,rms,frames_written/rate)
                                 updated=now
                             if frames_written>=limit_frames:
@@ -176,7 +190,7 @@ def capture_take(destination,*,device,role,channels=1,rate=48000,max_seconds=180
         return {
             "path":str(dest),"role":role,"channels":channels,"sample_rate":rate,
             "frames":frames_written,"duration_seconds":round(frames_written/rate,3),
-            "sample_width_bits":16,
+            "sample_width_bits":bit_depth,
         }
     finally:
         if tmp is not None:
