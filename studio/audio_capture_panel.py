@@ -27,10 +27,10 @@ TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
 class CaptureWorker(QThread):
     recorded=pyqtSignal(object,str)
     levels=pyqtSignal(float,float,float)
-    def __init__(self,filename,device,role,channels,rate,seconds,parent=None):
+    def __init__(self,filename,device,role,channels,rate,seconds,depth,parent=None):
         super().__init__(parent)
         self.filename,self.device,self.role=filename,device,role
-        self.channels,self.rate,self.seconds=channels,rate,seconds
+        self.channels,self.rate,self.seconds,self.depth=channels,rate,seconds,depth
         self.stop_event=threading.Event()
 
     def run(self):
@@ -38,6 +38,7 @@ class CaptureWorker(QThread):
             result=capture_take(
                 self.filename,device=self.device,role=self.role,
                 channels=self.channels,rate=self.rate,max_seconds=self.seconds,
+                bit_depth=self.depth,
                 stop=self.stop_event,
                 on_level=lambda peak,rms,seconds:self.levels.emit(peak,rms,seconds))
             self.recorded.emit(result,"")
@@ -107,6 +108,13 @@ class AudioCapturePanel(QWidget):
         self.rate.addItem("48 kHz",48000)
         self.rate.addItem("44.1 kHz",44100)
         settings.addWidget(self.rate)
+        settings.addWidget(QLabel("Bit depth"))
+        self.depth=QComboBox()
+        self.depth.addItem("16-bit PCM",16)
+        self.depth.addItem("24-bit PCM (device must support)",24)
+        self.depth.setCurrentIndex(1)
+        self.depth.setAccessibleName("Native hardware capture bit depth")
+        settings.addWidget(self.depth)
         settings.addWidget(QLabel("Maximum"))
         self.seconds=QSpinBox()
         self.seconds.setRange(1,300)
@@ -205,7 +213,8 @@ class AudioCapturePanel(QWidget):
             self.status.setText("Could not prepare recording: "+str(exc)[:230])
             return
         self.worker=CaptureWorker(str(filename),device,self.role.currentData(),
-                                  channels,self.rate.currentData(),self.seconds.value(),self)
+                                  channels,self.rate.currentData(),self.seconds.value(),
+                                  self.depth.currentData(),self)
         self.worker.recorded.connect(self._recorded)
         self.worker.levels.connect(self._levels)
         self.stop_btn.setEnabled(True)
@@ -250,7 +259,7 @@ class AudioCapturePanel(QWidget):
             self.take_list.addItem(
                 f"{len(self.takes):02d} · {result['role']} · "
                 f"{result['duration_seconds']:.1f}s · {result['sample_rate']} Hz · "
-                f"{result['channels']}ch · {path.name}")
+                f"{result['channels']}ch · {result['sample_width_bits']}-bit · {path.name}")
             self.status.setText(
                 "Captured real WAV: "+path.name+
                 ". You can record another take or create a multitrack DAW session.")
