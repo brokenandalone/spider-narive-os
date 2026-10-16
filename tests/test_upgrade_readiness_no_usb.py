@@ -24,6 +24,13 @@ class InPlace2610ReadinessTests(unittest.TestCase):
         self.assertIn("apt-get -s full-upgrade", source)
         self.assertIn("26.04 only, NOT the 26.10 plan", source)
 
+    def test_requires_actual_ubuntu_studio_package(self):
+        source = SCRIPT.read_text()
+        self.assertIn("ubuntustudio-desktop-core", source)
+        self.assertIn("ubuntustudio-desktop", source)
+        self.assertIn('mark BLOCK "Ubuntu Studio base"', source)
+        self.assertIn("target must remain Ubuntu Studio 26.10", source)
+
     def test_custom_unmounted_efi_boot_is_an_explicit_stop_gate(self):
         source = SCRIPT.read_text()
         self.assertIn('stub="/boot/efi/EFI/SpiderOS/grub.cfg"', source)
