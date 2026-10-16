@@ -621,6 +621,61 @@ comparison viewer, **not** a merged runtime and cannot make a candidate
 method safe by displaying it. The 33 customized files still require
 semantic reconciliation and a validated rollback-aware release.
 
+## Owner-specific desktop build candidate, October 16
+
+The owner uploaded a **private, full 15-method side-by-side review**.
+It confirms that new immersive-bay GUI construction, native Studio/Art
+workbench tabs, installed-app global search and project-folder additions
+are intended enhancements to the existing desktop, while Webbie's
+consent, camera, voice, computer control and STOP paths must not be
+replaced blindly.
+
+`tools/compose_owner_native_desktop.py` is an owner-specific **partial
+semantic merge builder**, not another abstract report:
+
+- Reads the already-staged **Bridge** owner/candidate file pairs using
+  `inspect_stage` and original SHA256 checks. Does not read secrets
+  or unrequested user files.
+- Verifies that the candidate's `TheWeb.__init__` retains all owner
+  instance attributes, `open_workspace` retains owner lifecycle/
+  state calls and native instrument/Art/mission controls, and
+  application browsing still uses the optional installed-app shelf.
+- Verifies existing XDG `Hidden`, `NoDisplay`, `TryExec`,
+  `OnlyShowIn`, `NotShowIn` catalog semantics remain present, while
+  additions support reversible app placement.
+- Requires all original workspace folder entries remain AST-identical,
+  except for an additive recovery link; checks the new native
+  Productivity and Devices categories exist.
+- Composes real candidate **`main.py`, `app_catalog.py`, and
+  `workspace_files.py`** from the candidate plus any strictly
+  owner-only imports and methods. A syntax check occurs privately in
+  memory and the output is local-only under an owner 0700 folder.
+- Explicitly does **not** resolve, replace, or install either
+  `webbie_panel.py` or `webbie_cognitive_center.py`. Their
+  15 shared changes, especially STOP, on-device speaker trust, camera,
+  workflow callbacks and permission revocation, require stronger
+  semantic and runtime confirmation before use.
+- **No install authorization:** the remaining 33 owner-customized
+  release files keep the full guard engaged. Passing these source
+  checks does not validate active Webbie/Nova services, devices,
+  imported data, or the final GUI.
+
+The source composer uses a NEW private output directory; this owner
+command does not write to any OS installation path:
+
+```bash
+git -C "$HOME/spider-os-native-wave" pull --ff-only &&
+python3 -B "$HOME/spider-os-native-wave/tools/compose_owner_native_desktop.py" \
+  --stage "$HOME/SpiderOS-Private-Desktop-Merge-Bridge-20261015" \
+  --output "$HOME/SpiderOS-Private-Desktop-Integration-20261016"
+```
+
+Expected result: three `candidate/the-web/shell/*.py` source files
+in the private output and two explicitly blocked Webbie files recorded
+in `summary.json`. **Never copy these partial candidates into
+`/usr/local/lib/spider-os` or run the release install** until
+comprehensive host-specific integration and rollback QA is complete.
+
 ## First-class native desktop
 
 The user-facing navigation has **15 bays**, including The Web Home,
