@@ -17,6 +17,9 @@ on:
       - 'tests/test_webbie_ai_v2_reconciliation.py'
       - 'tests/test_webbie_ipc_concurrent_reconciliation.py'
       - 'tests/test_webbie_native_bay_navigation.py'
+      - 'tests/test_webbie_project_review.py'
+      - 'webbie/actions/jarvis_orchestrator.py'
+      - 'the-web/shell/webbie_jarvis_mission_center.py'
       - 'webbie/agent/workspace_launchers.py'
       - 'webbie/actions/owner_safe_access.py'
       - 'webbie/actions/action_receipts.py'
@@ -60,6 +63,8 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: python3 -m unittest discover -s tests -p 'test_webbie_native_bay_navigation.py' -v
+      - name: Verify owner project review and STOP cancellation
+        run: python3 -m unittest discover -s tests -p 'test_webbie_project_review.py' -v
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
