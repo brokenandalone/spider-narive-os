@@ -282,6 +282,7 @@ APP_FILES = (
     'studio/session_clip_edit.py',
     'studio/session_waveform.py',
     'studio/session_clip_dialog.py',
+    'studio/package/build_standalone.py',
     'studio/backing_cue.py',
     'studio/band_backing_worker.py',
     'the-web/shell/app_visuals.py',
