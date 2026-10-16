@@ -88,7 +88,7 @@ def mission_brief(missions, *, limit=20):
     for item in items:
         title = " ".join(item["title"].split())
         lines.append(f'[{item["status"].upper()}] {item["bay_name"]}: {title}')
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 class SpiderHomeDashboard(QWidget):
