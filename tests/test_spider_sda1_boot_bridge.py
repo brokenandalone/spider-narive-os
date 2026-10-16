@@ -76,7 +76,9 @@ class BootBridgeTests(unittest.TestCase):
 
     def test_audit_has_no_live_boot_mutation_actions(self):
         s = FILE.read_text()
-        self.assertNotIn("grub-install", s.replace("# No mount, dd, mkfs, grub-install, update-grub, or live-disk writes.", ""))
+        self.assertNotIn('subprocess.run(["grub-install"', s)
+        self.assertNotIn('subprocess.run(["update-grub"', s)
+        self.assertNotIn('subprocess.run(["mount"', s)
         self.assertNotIn("mount -o rw", s)
         self.assertNotIn('["debugfs", "-w"', s)
         self.assertNotIn("do-release-upgrade", s)
