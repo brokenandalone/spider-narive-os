@@ -9,7 +9,7 @@ import sys
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog, QLabel, QMessageBox, QPushButton, QTextEdit, QVBoxLayout,
-    QHBoxLayout,
+    QHBoxLayout, QComboBox,
 )
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -20,6 +20,8 @@ from focus_tasks import current_focus, focus_answer
 from privacy_controls import private_session_active, set_private_session, privacy_explanation
 from local_models import configured_choice
 from local_model_inventory import inspect_local_models, report_lines
+from heretic_lab import (inspect_heretic, plan_experiment, launch_experiment,
+                         EXPERIMENT_MODELS)
 from proactive_checks import status_message
 from runtime_readiness import inspect_readiness, render_report
 from voice_trust import trust_status
@@ -78,6 +80,7 @@ class WebbieCognitiveDialog(QDialog):
         self.focus_dialog=None
         self.model_worker=None
         self.hearing_worker=None
+        self.heretic_dialog=None
         root=QVBoxLayout(self)
         title=QLabel("WEBBIE · COGNITIVE CONTROL CENTER")
         title.setStyleSheet("font-size:19px; font-weight:bold; color:#c4b5fd")
@@ -118,6 +121,10 @@ class WebbieCognitiveDialog(QDialog):
         voice_lab.setObjectName("webbieVoiceLabButton")
         voice_lab.clicked.connect(self.inspect_voice_lab)
         lab_row.addWidget(voice_lab)
+        heretic=QPushButton("Heretic model lab")
+        heretic.setObjectName("webbieHereticResearchLabButton")
+        heretic.clicked.connect(self.open_heretic_lab)
+        lab_row.addWidget(heretic)
         hear=QPushButton("Test Webbie hearing (3 sec)")
         hear.setObjectName("webbieHearingTestButton")
         hear.clicked.connect(self.test_hearing)
@@ -217,6 +224,15 @@ class WebbieCognitiveDialog(QDialog):
         if done is not None:
             done.deleteLater()
 
+    def open_heretic_lab(self):
+        # Existing cognitive-center owner button only, never a voice/model command.
+        if self.heretic_dialog is None:
+            self.heretic_dialog=HereticExperimentDialog(self)
+        self.heretic_dialog.refresh()
+        self.heretic_dialog.show()
+        self.heretic_dialog.raise_()
+        self.heretic_dialog.activateWindow()
+
     def inspect_voice_lab(self):
         """Owner click: static local files only, no microphone access."""
         try:
@@ -309,3 +325,92 @@ class WebbieCognitiveDialog(QDialog):
             self.hide(); event.ignore()
         else:
             event.accept()
+
+
+class HereticExperimentDialog(QDialog):
+    """Native opt-in model workshop, not another daemon or Webbie persona."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Webbie AI Lab · Heretic experiments")
+        self.setObjectName("webbieHereticExperimentDialog")
+        self.resize(670, 460)
+        layout = QVBoxLayout(self)
+        heading = QLabel("HERETIC · MODEL RESEARCH")
+        heading.setStyleSheet("font-size:17px;font-weight:bold;color:#c4b5fd")
+        layout.addWidget(heading)
+        note = QLabel(
+            "Experiment with a separate Hugging Face language model using the "
+            "official Heretic CLI. Heretic changes refusal behavior; it is not "
+            "a memory, autonomy or intelligence upgrade. Nothing here swaps "
+            "Webbie's qwen3:8b brain, Natasha voice or authorization policy.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        self.model = QComboBox()
+        self.model.setObjectName("webbieHereticModelChoice")
+        for name in EXPERIMENT_MODELS:
+            self.model.addItem(name)
+        layout.addWidget(self.model)
+        self.model.currentIndexChanged.connect(self.refresh)
+        self.report = QTextEdit()
+        self.report.setReadOnly(True)
+        self.report.setObjectName("webbieHereticReadinessReport")
+        layout.addWidget(self.report)
+        actions = QHBoxLayout()
+        layout.addLayout(actions)
+        self.check_button = QPushButton("Check local readiness")
+        self.check_button.clicked.connect(self.refresh)
+        actions.addWidget(self.check_button)
+        self.run_button = QPushButton("Start supervised experiment in Konsole")
+        self.run_button.setObjectName("webbieHereticStartButton")
+        self.run_button.clicked.connect(self.start)
+        actions.addWidget(self.run_button)
+        done = QPushButton("Close")
+        done.clicked.connect(self.close)
+        actions.addWidget(done)
+        self.refresh()
+
+    def refresh(self):
+        # Read local readiness only, no model fetch/install or process execution.
+        status = inspect_heretic()
+        ready, explanation = plan_experiment(self.model.currentText(), status)
+        self.run_button.setEnabled(ready)
+        self.report.setPlainText(
+            status.explanation + "\n\n" + explanation + "\n\n"
+            "Upstream: https://github.com/p-e-w/heretic (AGPL-3.0-or-later). "
+            "Install separately into Webbie's isolated venv when you choose. "
+            "Heretic can download model weights, use substantial memory, "
+            "and offer optional online publishing inside its CLI. "
+            "The interactive Konsole run is managed there; press Ctrl+C in "
+            "that Konsole to stop it.")
+
+    def start(self):
+        status = inspect_heretic()
+        model = self.model.currentText()
+        ready, report = plan_experiment(model, status)
+        if not ready:
+            self.report.setPlainText(status.explanation + "\n\n" + report)
+            return
+        question = (
+            "Start the upstream Heretic research CLI for\n\n" + model + "\n\n"
+            "It can fetch large files and stress your CPU/RAM. Its prompts "
+            "may offer to upload an altered model to a public service; "
+            "do not select upload without reviewing it yourself. "
+            "It will NOT replace Webbie's active Ollama model.\n\n"
+            "An interactive Konsole window opens. Press Ctrl+C there "
+            "to stop the experiment.\n\nContinue?")
+        if QMessageBox.question(
+                self, "Start an isolated Heretic experiment?", question,
+                QMessageBox.Yes|QMessageBox.No, QMessageBox.No
+        ) != QMessageBox.Yes:
+            return
+        try:
+            launch_experiment(model, approved=True, status=status)
+            self.report.setPlainText(
+                "Interactive Heretic CLI launch requested in Konsole.\n"
+                "The model is NOT installed into Ollama or attached to Webbie.\n"
+                "Verify the new window; stop with Ctrl+C there.")
+        except (OSError, RuntimeError, ValueError, PermissionError) as error:
+            self.report.setPlainText(
+                "Heretic did not start: " + str(error)[:500] +
+                "\nNo Webbie production model was changed.")
