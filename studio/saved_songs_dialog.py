@@ -6,16 +6,37 @@ checksum-verified by the existing SessionMixDialog before they can play.
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
+from PyQt5.QtCore import QThread,pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QTableWidget,
     QTableWidgetItem,QAbstractItemView,QDialogButtonBox,QFileDialog)
 try:
     from .session_library import recent_sessions
     from .session_mix_dialog import SessionMixDialog
+    from .session_archive import create_backup,restore_backup
 except ImportError:
     from session_library import recent_sessions
     from session_mix_dialog import SessionMixDialog
+    from session_archive import create_backup,restore_backup
 
+
+class SongArchiveWorker(QThread):
+    complete=pyqtSignal(str,str)
+    def __init__(self,action,source,target,parent=None):
+        super().__init__(parent)
+        self.action,self.source,self.target=action,source,target
+
+    def run(self):
+        try:
+            if self.action=="backup":
+                output=create_backup(self.source,self.target)
+            elif self.action=="restore":
+                output=restore_backup(self.source,output_root=self.target)
+            else:
+                raise ValueError("Unknown Studio session archive operation.")
+            self.complete.emit(str(output),"")
+        except (OSError,ValueError,RuntimeError) as error:
+            self.complete.emit("",str(error)[:250])
 
 class SavedSongsDialog(QDialog):
     def __init__(self,parent=None,*,root=None):
@@ -23,6 +44,7 @@ class SavedSongsDialog(QDialog):
         self.root=root
         self.selected_path=None
         self.mixer=None
+        self.archive_worker=None
         self.setWindowTitle("Spider Audio Studio · Saved Songs")
         self.setObjectName("spiderSavedSongLibrary")
         self.resize(910,490)
@@ -63,6 +85,14 @@ class SavedSongsDialog(QDialog):
         browse.clicked.connect(self.browse)
         actions.addWidget(browse)
         box.addLayout(actions)
+        safety=QHBoxLayout()
+        self.backup_button=QPushButton("Back Up Selected Song")
+        self.backup_button.clicked.connect(self.backup_selected)
+        safety.addWidget(self.backup_button)
+        self.restore_button=QPushButton("Restore Song from Backup")
+        self.restore_button.clicked.connect(self.restore_selected)
+        safety.addWidget(self.restore_button)
+        box.addLayout(safety)
         self.message=QLabel("Open a saved song to continue editing in the native mixer.")
         self.message.setWordWrap(True)
         box.addWidget(self.message)
@@ -93,6 +123,91 @@ class SavedSongsDialog(QDialog):
                 "No saved sessions found in the default Studio session library. "
                 "Use Browse for Another Session if your song is stored elsewhere.")
         self.open_button.setEnabled(bool(self.candidates))
+        self.backup_button.setEnabled(
+            bool(self.candidates) and self.archive_worker is None)
+
+    def _run_archive(self,action,source,target):
+        if self.archive_worker is not None:
+            return
+        self.archive_worker=SongArchiveWorker(action,source,target,self)
+        self.archive_worker.complete.connect(self._archive_done)
+        self.archive_worker.finished.connect(self._archive_finished)
+        self.backup_button.setEnabled(False)
+        self.restore_button.setEnabled(False)
+        self.open_button.setEnabled(False)
+        self.message.setText("Verifying and "+(
+            "backing up" if action=="backup" else "restoring")+
+            " the saved song on a worker thread...")
+        self.archive_worker.start()
+
+    def backup_selected(self):
+        row=self.table.currentRow()
+        if self.archive_worker is not None or not 0<=row<len(self.candidates):
+            return
+        source=self.candidates[row]
+        title="".join(
+            ch if ch.isalnum() or ch in "-_ " else "_"
+            for ch in source["title"])[:70].strip().replace(" ","_")
+        suggested=Path.home()/"Documents"/(
+            (title or "Spider_Song")+".spiderstudio.zip")
+        dest,_=QFileDialog.getSaveFileName(
+            self,"Save a verified Spider Song Backup",
+            str(suggested),"Spider Song Backup (*.zip)")
+        if dest:
+            self._run_archive("backup",source["path"],dest)
+
+    def restore_selected(self):
+        if self.archive_worker is not None:
+            return
+        filename,_=QFileDialog.getOpenFileName(
+            self,"Choose a Spider Audio Studio Song Backup",
+            str(Path.home()/"Documents"),"Spider Song Backup (*.zip)")
+        if filename:
+            try:
+                from .multitrack import DEFAULT_OUTPUT
+            except ImportError:
+                from multitrack import DEFAULT_OUTPUT
+            root=self.root if self.root is not None else DEFAULT_OUTPUT
+            self._run_archive("restore",filename,str(root))
+
+    def _archive_done(self,output,error):
+        if output:
+            action=self.archive_worker.action if self.archive_worker else "backup"
+            if action=="restore":
+                self.message.setText(
+                    "Song restored as a NEW verified Studio session. "
+                    "The original session and backup remain untouched.")
+                self.refresh()
+            else:
+                self.message.setText(
+                    "Verified song backup created: "+Path(output).name+
+                    ". Keep another copy somewhere safe.")
+        else:
+            self.message.setText("Song archive was not completed: "+error)
+
+    def _archive_finished(self):
+        current=self.archive_worker
+        self.archive_worker=None
+        if current is not None:
+            current.deleteLater()
+        self.open_button.setEnabled(bool(self.candidates))
+        self.restore_button.setEnabled(True)
+        self.backup_button.setEnabled(bool(self.candidates))
+
+    def reject(self):
+        if self.archive_worker is not None:
+            self.message.setText(
+                "Finish the active backup/restore before closing this window.")
+            return
+        super().reject()
+
+    def closeEvent(self,event):
+        if self.archive_worker is not None:
+            self.message.setText(
+                "Finish the active backup/restore before closing this window.")
+            event.ignore()
+            return
+        super().closeEvent(event)
 
     def open_selected(self):
         row=self.table.currentRow()
