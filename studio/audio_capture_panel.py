@@ -18,11 +18,13 @@ try:
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
     from .multitrack import export_session,SessionError
     from .audio_overdub_engine import available_outputs,capture_overdub
+    from .backing_cue import validate_recordable_cue
 except ImportError:
     from audio_capture_engine import (
         available_inputs,capture_take,new_take_filename,CaptureError,ROLES)
     from multitrack import export_session,SessionError
     from audio_overdub_engine import available_outputs,capture_overdub
+    from backing_cue import validate_recordable_cue
 
 TAKE_ROOT=Path.home()/"Documents/Spider Studio/Music/Recorded Takes"
 
@@ -253,6 +255,32 @@ class AudioCapturePanel(QWidget):
         b=QPushButton(title)
         b.clicked.connect(fn)
         return b
+
+    def load_generated_cue(self, path, rate):
+        """Arm a finished virtual-band cue; NEVER start input or output devices."""
+        if self.worker is not None and self.worker.isRunning():
+            self.status.setText(
+                "Backing rendered, but a recording or export is active. "
+                "It was NOT switched mid-take. Stop first and choose the saved cue.")
+            return False
+        try:
+            info=validate_recordable_cue(path,expected_rate=rate)
+            self.cue_file.setText(str(Path(path)))
+            self.rate.setCurrentIndex(0 if info["rate"]==48000 else 1)
+            # Cue + possible reverb tail must fit within the safe recording bound.
+            import math
+            seconds=math.ceil(info["seconds"])
+            self.seconds.setValue(max(self.seconds.value(),seconds))
+            self.project_title.setText(Path(path).stem[:100])
+            self.status.setText(
+                f"Virtual band backing is ready ({info['seconds']:.1f}s, "
+                f"{rate}Hz, 16-bit). Now click Refresh Inputs, choose "
+                "a microphone/interface and headphone output, then manually "
+                "press Record Along With Backing. Nothing is recording yet.")
+            return True
+        except (CaptureError,OSError,ValueError) as error:
+            self.status.setText("Cannot select the rendered backing: "+str(error)[:280])
+            return False
 
     def select_cue(self):
         if self.worker is not None and self.worker.isRunning():
