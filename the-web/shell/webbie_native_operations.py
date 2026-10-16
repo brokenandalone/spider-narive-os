@@ -15,7 +15,8 @@ from webbie_unified_workflow import WebbieUnifiedWorkflowDialog
 
 
 class WebbieNativeOperations(QWidget):
-    def __init__(self, assistant, workspace_callback, parent=None):
+    def __init__(self, assistant, workspace_callback, parent=None,
+                 workspace_opener=None):
         super().__init__(parent)
         self.setObjectName("webbieNativeOperations")
         self.assistant = assistant
@@ -39,6 +40,7 @@ class WebbieNativeOperations(QWidget):
         cognitive = WebbieCognitiveDialog(
             self,
             workspace_callback=workspace_callback,
+            workspace_opener=workspace_opener,
             emergency_callback=assistant.stop_sensitive_actions,
             workflow_callback=lambda: tabs.setCurrentIndex(2),
             mission_callback=lambda: tabs.setCurrentIndex(1),
@@ -69,6 +71,9 @@ class WebbieNativeOperations(QWidget):
         workflow.setWindowFlags(Qt.Widget)
         workflow.setObjectName("webbieEmbeddedGuidedWorkflow")
         self.workflow = workflow
+        # One existing supervised workflow serves both candidate and preserved
+        # owner-side Webbie controls. No duplicate dialog/authority is created.
+        cognitive.workflow_dialog = workflow
         self._add_scroll_tab(workflow, "Guided workflows")
 
     def _add_scroll_tab(self, widget, title):
