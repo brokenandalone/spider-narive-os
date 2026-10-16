@@ -21,6 +21,7 @@ class RegionArrangement(QWidget):
         self.drag_row=None
         self.drag_anchor=0
         self.drag_initial=0
+        self.drag_extent=VISIBLE_MIN_MS
         self.setMinimumWidth(600)
         self.setMouseTracking(True)
         self.setAccessibleName("Interactive WAV clip placement lanes; drag a region to move it in the song")
@@ -88,6 +89,7 @@ class RegionArrangement(QWidget):
             self.drag_row=row
             self.drag_anchor=event.x()
             self.drag_initial=parts[row]["at_ms"]
+            self.drag_extent=self._extent(parts)
             self.setCursor(Qt.ClosedHandCursor)
         self.update()
 
@@ -99,7 +101,7 @@ class RegionArrangement(QWidget):
         if not 0<=row<len(parts):
             return
         duration=self._duration(parts[row])
-        extent=self._extent(parts)
+        extent=self.drag_extent
         width=max(40,self.width()-MARGIN*2)
         moved_ms=round((event.x()-self.drag_anchor)*extent/width)
         # 25 ms snap; never position the final PCM outside two hours.
