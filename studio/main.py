@@ -224,6 +224,14 @@ class SpiderStudio(QMainWindow):
         capture_scroll.setWidget(self.audio_capture_panel)
         self.tool_tabs.addTab(capture_scroll, 'Record Audio · Multitrack')
         self.audio_capture_page = capture_scroll
+        # Owner-selected audio stems can enter the real native mixer directly.
+        # No terminal, outside DAW, or automatic microphone access.
+        if __package__:
+            from .stem_import_panel import StemImportPanel
+        else:
+            from stem_import_panel import StemImportPanel
+        self.stem_import_panel = StemImportPanel(self)
+        self.tool_tabs.addTab(self.stem_import_panel, 'Import WAVs · Create Song')
         # Read-only recording inventory inside native Studio; no hardware access.
         if __package__:
             from .recording_audit_panel import RecordingAuditPanel
@@ -399,9 +407,12 @@ class SpiderStudio(QMainWindow):
         # WAV. Preserve the existing MAX worker closure protection as well.
         for panel in (self.native_max_tools, self.song_production_panel,
                       self.waveform_edit_panel, self.dj_deck_panel,
-                      self.auto_performer_panel, self.audio_capture_panel):
+                      self.auto_performer_panel, self.audio_capture_panel,
+                      self.stem_import_panel):
             worker = getattr(panel, 'worker', None)
             if worker is not None and worker.isRunning():
+                if panel is self.stem_import_panel:
+                    self.stem_import_panel.cancel_import()
                 if panel is self.audio_capture_panel:
                     self.audio_capture_panel.stop()
                 self.status.setText('Finish or safely stop the current recording/export before closing Spider Studio.')
