@@ -1450,7 +1450,8 @@ class StudyWindow(QMainWindow):
             selected_id = self.selected_assignment_id() if course else None
             record = self.store.assignment_record(selected_id) if selected_id else None
             workspace = self.store.get_assignment_workspace(selected_id) if record else None
-            folder = self.store.course_folder(self.current_course_id)
+            folder = (self.store.course_folder(self.current_course_id)
+                      if self.current_course_id else None)
             dialog = HomeworkDialog(
                 self,
                 course=course["name"] if course else "",
