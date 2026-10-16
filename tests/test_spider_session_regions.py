@@ -196,10 +196,36 @@ class MultiRegionQtTests(unittest.TestCase):
                 self.assertEqual(editor.rows()[0]["at_ms"],250)
                 editor.add_region()
                 self.assertEqual(editor.table.rowCount(),2)
+                self.assertGreater(editor.arrangement.minimumHeight(),80)
+                self.assertGreater(editor.arrangement._extent(editor.rows()),0)
+                self.assertIsNotNone(editor.arrangement)
                 self.assertEqual(editor.rows()[1]["at_ms"],550)
                 self.assertEqual(len(editor.values()),2)
                 editor.table.cellWidget(1,1).setValue(.800)
                 self.assertEqual(editor.values()[1]["end_ms"],800)
+                # Simulate a genuine Qt left-button drag on second song lane.
+                from PyQt5.QtCore import QPointF,QEvent,Qt
+                from PyQt5.QtGui import QMouseEvent
+                timeline=editor.arrangement
+                timeline.resize(900,timeline.minimumHeight())
+                positions=editor.rows()
+                xa,ya,ww,hh=timeline._plot(
+                    positions[1],1,timeline._extent(positions))
+                initial=editor.rows()[1]["at_ms"]
+                press=QMouseEvent(
+                    QEvent.MouseButtonPress,QPointF(xa+5,ya+6),
+                    Qt.LeftButton,Qt.LeftButton,Qt.NoModifier)
+                timeline.mousePressEvent(press)
+                move=QMouseEvent(
+                    QEvent.MouseMove,QPointF(xa+95,ya+6),
+                    Qt.NoButton,Qt.LeftButton,Qt.NoModifier)
+                timeline.mouseMoveEvent(move)
+                release=QMouseEvent(
+                    QEvent.MouseButtonRelease,QPointF(xa+95,ya+6),
+                    Qt.LeftButton,Qt.NoButton,Qt.NoModifier)
+                timeline.mouseReleaseEvent(release)
+                self.assertGreater(editor.rows()[1]["at_ms"],initial)
+                self.assertEqual(editor.rows()[1]["at_ms"]%25,0)
                 editor.move_region(-1)
                 self.assertEqual(editor.table.currentRow(),0)
                 editor.remove_region()
