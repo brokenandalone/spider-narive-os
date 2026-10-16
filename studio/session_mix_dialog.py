@@ -19,6 +19,8 @@ if __package__:
     from .mastering_dialog import MasteringDialog
     from .session_channel_strip import ChannelStripDialog
     from .session_track_fx import normalize_track_effects
+    from .session_clip_edit import normalize_clip_edit
+    from .session_clip_dialog import TrackClipDialog
 else:
     from session_project import inspect_session
     from session_mix import render_session
@@ -28,6 +30,8 @@ else:
     from mastering_dialog import MasteringDialog
     from session_channel_strip import ChannelStripDialog
     from session_track_fx import normalize_track_effects
+    from session_clip_edit import normalize_clip_edit
+    from session_clip_dialog import TrackClipDialog
 
 
 class SessionAudioQcWorker(QThread):
@@ -107,6 +111,7 @@ class SessionMixDialog(QDialog):
         self.quality_worker = None
         self.rendered = None
         self.channel_effects = {}
+        self.clip_edits = {}
         layout = QVBoxLayout(self)
         note = QLabel(
             "Reopen a Spider Studio multitrack session, inspect real independent WAVs, "
@@ -142,9 +147,9 @@ class SessionMixDialog(QDialog):
         self.quality_report.setReadOnly(True)
         self.quality_report.setMaximumHeight(110)
         layout.addWidget(self.quality_report)
-        self.table = QTableWidget(0, 9)
+        self.table = QTableWidget(0, 10)
         self.table.setHorizontalHeaderLabels(
-            ["File", "Role", "Gain", "Pan", "Mute", "Solo", "Start delay (ms)", "Label", "Channel FX"]
+            ["File", "Role", "Gain", "Pan", "Mute", "Solo", "Start delay (ms)", "Label", "Channel FX", "Clip edits"]
         )
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -161,6 +166,10 @@ class SessionMixDialog(QDialog):
         self.track_fx_button.setEnabled(False)
         self.track_fx_button.clicked.connect(self.edit_track_effects)
         layout.addWidget(self.track_fx_button)
+        self.clip_button=QPushButton("Edit Selected Recorded Clip · Waveform / Trim / Fade / Place")
+        self.clip_button.setEnabled(False)
+        self.clip_button.clicked.connect(self.edit_recorded_clip)
+        layout.addWidget(self.clip_button)
         self.include_reference = QCheckBox(
             "Explicitly include a full-song reference mix (may double recorded instruments)"
         )
@@ -218,7 +227,9 @@ class SessionMixDialog(QDialog):
             return
         self.session = None
         self.channel_effects.clear()
+        self.clip_edits.clear()
         self.track_fx_button.setEnabled(False)
+        self.clip_button.setEnabled(False)
         self.quality_button.setEnabled(False)
         self.quality_report.clear()
         self.table.setRowCount(0)
@@ -249,7 +260,9 @@ class SessionMixDialog(QDialog):
             self.table.setItem(index, 1, QTableWidgetItem(track["role"].replace("_", " ")))
             self.table.setItem(index, 7, QTableWidgetItem(track["label"]))
             self.channel_effects[track["filename"]]=normalize_track_effects()
+            self.clip_edits[track["filename"]]=normalize_clip_edit(track)[0]
             self.table.setItem(index, 8, QTableWidgetItem("Dry / unprocessed"))
+            self.table.setItem(index, 9, QTableWidgetItem("Full source · No fades"))
             gain = QDoubleSpinBox()
             gain.setRange(0.0, 2.0)
             gain.setSingleStep(0.05)
@@ -285,6 +298,7 @@ class SessionMixDialog(QDialog):
         )
         self.mix_button.setEnabled(True)
         self.track_fx_button.setEnabled(True)
+        self.clip_button.setEnabled(True)
         self.table.setCurrentCell(0,0)
         self.quality_button.setEnabled(True)
         self.save_preset_button.setEnabled(True)
@@ -368,6 +382,54 @@ class SessionMixDialog(QDialog):
         self.status.setText(
             "Track processing updated for the next offline mix. No source WAV was touched.")
 
+    def _describe_clip(self,track):
+        saved=self.clip_edits.get(track["filename"])
+        offset=self.table.cellWidget(
+            next(i for i,src in enumerate(self.session["tracks"])
+                 if src["filename"]==track["filename"]),6).value()
+        options,region=normalize_clip_edit(track,saved,delay_ms=offset)
+        changes=[]
+        if options["trim_start_ms"] or options["trim_end_ms"]:
+            changes.append(
+                f"Source {region.start_frame/region.sample_rate:.3f}–"
+                f"{region.end_frame/region.sample_rate:.3f}s")
+        if options["fade_in_ms"]:
+            changes.append(f"In {options['fade_in_ms']}ms")
+        if options["fade_out_ms"]:
+            changes.append(f"Out {options['fade_out_ms']}ms")
+        if offset:
+            changes.append(f"At +{offset/1000:.3f}s")
+        return " · ".join(changes) if changes else "Full source · No fades"
+
+    def edit_recorded_clip(self):
+        if (self.session is None or self.worker is not None or
+                self.checker is not None or self.quality_worker is not None):
+            return
+        row=self.table.currentRow()
+        if not 0<=row<len(self.session["tracks"]):
+            self.status.setText("Select a real recorded WAV in the session track table.")
+            return
+        track=self.session["tracks"][row]
+        if track["role"]=="click_guide":
+            self.status.setText("Tracking click guides cannot enter a finished session mix.")
+            return
+        filename=track["filename"]
+        offset=self.table.cellWidget(row,6).value()
+        try:
+            dialog=TrackClipDialog(track,self.clip_edits.get(filename),offset,self)
+            if dialog.exec_()!=dialog.Accepted:
+                return
+            new_edit,new_offset,region=dialog.values()
+            self.clip_edits[filename]=new_edit
+            self.table.cellWidget(row,6).setValue(new_offset)
+            self.table.setItem(row,9,QTableWidgetItem(self._describe_clip(track)))
+            self.status.setText(
+                f"Clip edit saved for the NEXT mix: "
+                f"{region.duration_seconds:.3f}s retained. "
+                "Original recorded WAV remains untouched.")
+        except (SessionError,OSError,ValueError) as error:
+            self.status.setText("Clip editor rejected: "+str(error)[:220])
+
     def mix_controls(self):
         if self.session is None:
             raise SessionError("Verify a saved session before mixing.")
@@ -381,6 +443,9 @@ class SessionMixDialog(QDialog):
                 "delay_ms": self.table.cellWidget(index, 6).value(),
                 "effects": normalize_track_effects(
                     self.channel_effects.get(track["filename"])),
+                "clip": normalize_clip_edit(
+                    track,self.clip_edits.get(track["filename"]),
+                    delay_ms=self.table.cellWidget(index,6).value())[0],
             }
         return result
 
@@ -435,6 +500,11 @@ class SessionMixDialog(QDialog):
                     settings.get("effects"))
                 self.table.setItem(index,8,
                                    QTableWidgetItem(self._describe_fx(track["filename"])))
+                self.clip_edits[track["filename"]]=normalize_clip_edit(
+                    track,settings.get("clip"),
+                    delay_ms=settings["delay_ms"])[0]
+                self.table.setItem(index,9,
+                                   QTableWidgetItem(self._describe_clip(track)))
             self.include_reference.setChecked(preset["include_reference"])
             self.status.setText(f"Restored preset: {preset['name']}. No render was started.")
         except (OSError, SessionError, ValueError) as error:
@@ -447,6 +517,7 @@ class SessionMixDialog(QDialog):
         self.mix_button.setEnabled(False)
         self.quality_button.setEnabled(False)
         self.track_fx_button.setEnabled(False)
+        self.clip_button.setEnabled(False)
         self.check_button.setEnabled(False)
         self.choose_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -472,6 +543,7 @@ class SessionMixDialog(QDialog):
         self.quality_button.setEnabled(self.session is not None)
         self.mix_button.setEnabled(self.session is not None)
         self.track_fx_button.setEnabled(self.session is not None)
+        self.clip_button.setEnabled(self.session is not None)
         self.check_button.setEnabled(True)
         self.choose_button.setEnabled(True)
         self.stop_button.setEnabled(False)
