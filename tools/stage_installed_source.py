@@ -195,6 +195,7 @@ def install_checkout_only(repo: Path, entries: list[tuple[str, bytes, int]]) -> 
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.is_symlink():
                 raise ValueError(f"Symlink destination refused: {rel}")
+            previous.append((target, before, old_mode))
             fd, tmp = tempfile.mkstemp(prefix=".spider-reconcile-", dir=target.parent)
             try:
                 with os.fdopen(fd, "wb") as stream:
@@ -206,7 +207,6 @@ def install_checkout_only(repo: Path, entries: list[tuple[str, bytes, int]]) -> 
             finally:
                 if os.path.exists(tmp):
                     os.unlink(tmp)
-            previous.append((target, before, old_mode))
     except Exception:
         for dest, old, old_mode in reversed(previous):
             if old is None:
