@@ -102,6 +102,7 @@ APP_FILES = (
     'webbie/brain/brain.py', 'webbie/brain/context_awareness.py',
     'webbie/brain/jarvis_context.py',
     'webbie/brain/local_models.py', 'webbie/brain/local_model_inventory.py',
+    'webbie/brain/heretic_lab.py',
     'webbie/brain/focus_tasks.py', 'webbie/brain/privacy_controls.py',
     'webbie/brain/model_resilience.py',
     'webbie/brain/unified_workflow.py',
