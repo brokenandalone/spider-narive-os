@@ -7,6 +7,7 @@ from pathlib import Path
 NATIVE = {
     'author': ('author', 'main.py', 'AuthorWindow'),
     'studio': ('studio', 'main.py', 'SpiderStudio'),
+    'art-lab': ('art_lab', 'main.py', 'SpiderArtLab'),
     'study': ('study', 'study.py', 'StudyWindow'),
     'forage': ('forage', 'forage.py', 'ForageWindow'),
     'deep-forage': ('forage', 'deep-forage/deep_forage.py', 'DeepForageWindow'),
