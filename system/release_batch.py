@@ -284,6 +284,7 @@ APP_FILES = (
     'studio/session_clip_dialog.py',
     'studio/session_regions.py',
     'studio/session_regions_dialog.py',
+    'studio/session_regions_timeline.py',
     'studio/package/build_standalone.py',
     'studio/backing_cue.py',
     'studio/band_backing_worker.py',
