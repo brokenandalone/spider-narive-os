@@ -1095,78 +1095,66 @@ def proactive_loop():
             time.sleep(2)
 
 
+
 def socket_server():
-    try:
-        if SOCKET_PATH.exists():
-            SOCKET_PATH.unlink()
-    except OSError:
-        pass
-
-    server = socket.socket(
-        socket.AF_UNIX,
-        socket.SOCK_STREAM,
-    )
-
-    server.bind(
-        str(SOCKET_PATH)
-    )
-
-    os.chmod(
-        SOCKET_PATH,
-        0o600,
-    )
-
-    server.listen(5)
-    server.settimeout(1)
-
-    while running:
-        try:
-            client, _ = server.accept()
-
-        except socket.timeout:
-            continue
-
-        except OSError:
-            break
-
-        with client:
-            try:
-                data = client.recv(
-                    65536
-                )
-
-                command = data.decode(
-                    "utf-8",
-                    errors="replace",
-                ).strip()
-
-                reply = handle_command(
-                    command,
-                    voice=False,
-                )
-
-                client.sendall(
-                    reply.encode("utf-8")
-                )
-
-            except Exception as error:
-                try:
-                    client.sendall(
-                        (
-                            "Webbie error: "
-                            + str(error)
-                        ).encode("utf-8")
-                    )
-
-                except Exception:
-                    pass
-
-    server.close()
-
-    try:
+    """Bounded concurrent text IPC; a slow AI call cannot freeze built-ins."""
+    if SOCKET_PATH.is_symlink():
+        raise PermissionError("Webbie socket path must not be a symlink")
+    if SOCKET_PATH.exists():
         SOCKET_PATH.unlink()
-    except OSError:
-        pass
+
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(SOCKET_PATH))
+    os.chmod(SOCKET_PATH, 0o600)
+    server.listen(8)
+    server.settimeout(1)
+    slots = threading.BoundedSemaphore(8)
+
+    def answer_one(client):
+        try:
+            with client:
+                client.settimeout(40)
+                try:
+                    data = client.recv(65536)
+                    command = data.decode("utf-8", errors="replace").strip()
+                    reply = handle_command(command, voice=False)
+                except Exception as error:
+                    # Never echo exception details or private source paths.
+                    reply = "Webbie could not complete that command (" + type(error).__name__ + ")."
+                try:
+                    client.sendall(str(reply or "").encode("utf-8"))
+                except (OSError, UnicodeError):
+                    pass
+        finally:
+            slots.release()
+
+    try:
+        while running:
+            try:
+                client, _ = server.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            if not slots.acquire(blocking=False):
+                try:
+                    client.sendall(b"Webbie is handling other requests. Try again shortly.")
+                except OSError:
+                    pass
+                finally:
+                    client.close()
+                continue
+            try:
+                threading.Thread(target=answer_one, args=(client,), daemon=True).start()
+            except Exception:
+                slots.release()
+                client.close()
+    finally:
+        server.close()
+        try:
+            SOCKET_PATH.unlink()
+        except OSError:
+            pass
 
 
 def stop_service(signum, frame):
