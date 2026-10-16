@@ -10,6 +10,35 @@ Ubuntu Studio 26.10 Stonking Stingray released today and officially supports upg
 
 The migration branch configuration points to the final 26.10 ISO, release channel, and stonking codename.
 
+## Confirmed target, release offer, and potential off-disk storage (October 16)
+
+**Target is Ubuntu Studio 26.10 (Stonking Stingray), not plain Ubuntu.**
+The current computer remains Ubuntu Studio 26.04.1 LTS; the
+installed `ubuntustudio-desktop-core` package was previously verified.
+The read-only host preflight now explicitly blocks upgrade preparation
+if the Ubuntu Studio desktop metapackage/core cannot be found, to
+prevent treating a generic Ubuntu install as the requested destination.
+
+Ubuntu Studio officially published 26.10 on October 15 and states
+that an upgrade from 26.04 LTS is supported:
+https://discourse.ubuntu.com/t/ubuntu-studio-26-10-release-notes/88657
+
+On October 16 the owner reran `do-release-upgrade -c` and it still
+returned **No new release found**. `Prompt=normal` and
+`plasma-distro-release-notifier` were already confirmed. Thus the
+official upgrade pathway is **not yet being offered on this PC**.
+Do not use development `-d`, swap apt codenames or replace packages
+in order to force the version before boot/backup safeguards pass.
+
+The current mount inventory showed **no independent backup filesystem**;
+`rclone listremotes` revealed `webbie_onedrive:`. This is a
+potential backup destination, NOT a verified one. Check reachability
+with `rclone about webbie_onedrive:` and verify sufficient capacity,
+confidentiality, recoverability and independent access before uploading
+anything. No contents or secrets should be exposed in logs. A cloud
+remote name by itself does not establish that the user's irreplaceable
+SpiderOS installation is backed up.
+
 ## Primary installation policy: in-place, no USB
 
 **Owner requirement (October 15, 2026): No USB creation, no reformat, no clean install.**
