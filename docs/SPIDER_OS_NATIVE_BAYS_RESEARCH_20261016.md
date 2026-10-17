@@ -174,3 +174,89 @@ Dev Bay; `tests/test_native_feature_adoption.py`. These entries are
 **proposals and readiness requirements**, not implemented packages, new
 applications, Plasma installation, or authorization to modify the
 resident desktop.
+
+## Best interim Linux apps → approved Spider-native replacements (October 16)
+
+The owner has clarified a **two-stage application policy**: use the best
+proven Linux applications in existing Spider OS bays now, **replace weaker
+current defaults with verified choices**, and eventually replace those
+third-party defaults with *native Spider applications that meet or exceed
+their actual capabilities*. This is a new desired migration policy, not
+permission to remove apps from the currently installed system sight-unseen.
+
+This is implemented as part of the **same** `native_feature_adoption.py`
+review exposed through **Dev Bay → Show best ideas for Spider OS**.
+The view optionally uses the existing `app_catalog.discover_apps()` XDG
+menu reader so the report distinguishes visible installed-menu candidates
+from not-yet-inventoried options. No new launcher or package service exists.
+
+**Why replacement is staged:** the current host has been reported to have
+174 visible menu entries and customized software and services. A visible
+desktop file is not proof an app works; absence from the menu does not
+establish package absence. Source code in GitHub has not read the live
+machine's complete installed package list.
+
+| Existing bay and task | Strong interim contender(s) | Replacement rule |
+|---|---|---|
+| Home/System, file management | **Dolphin**; Krusader only if dual-pane power workflows are truly needed | Keep working Dolphin and KDE integration; Spider file workspace later |
+| Forage, browsing | **Firefox** (already in use) | Retain user sessions, extensions and Webbie integrations; privacy alternatives only after browser-task acceptance |
+| Study/Office, Office compatibility | **ONLYOFFICE Desktop Editors**, with **LibreOffice** retained | Evaluate DOCX/XLSX/PPTX formatting round-trip against current school work; never delete LibreOffice |
+| Author, chapter writing | **novelWriter**, in addition to working Spider Author and LibreOffice | Prefer only if imported manuscripts and exports preserve established canon, formatting and source files |
+| Study, citations | **Zotero** | Local research and citations, enable localhost API only with user choice; Spider citation library later |
+| Study, memorization | **Anki** | Verified deck import/export, no automatic school-account changes |
+| Notes/Study, optional OneDrive notes | **Joplin** | Trial local data and OneDrive sync alongside existing working OneDrive path; never overwrite syncing originals |
+| Dev Bay | **Kate** for lightweight editing, **VSCodium** for advanced projects | Keep Git/Konsole and existing source workflows; editor selection only after extension and project testing |
+| Art Lab | **Krita**, **GIMP**, **Inkscape**, **Blender** | Already strong professional tools; keep if installed, add native Spider project and asset handoff, not redundant clones |
+| Art Lab, RAW photography | **darktable** | Non-destructive development and export tests; keep original images |
+| Media/Art Lab, editing | **Kdenlive** | Existing professional editing pipeline; preserve native project round-trip |
+| Media, video playback | **Haruna** (libmpv), **VLC** fallback | Test hardware/software decoding, subtitles, file formats and theater bay integration |
+| Media, music library | **Strawberry** | Test album/music-tag fidelity and playback; preserve live Nova/BCN queue, broadcaster and canonical track metadata |
+| Communications | **Kontact** (KMail, KOrganizer, contacts) | Compare with any existing Thunderbird and online accounts; require authorized configuration and backup |
+| Studio integration | **Ardour**, **qpwgraph** and existing compatible creative tools | Do not rebuild Spider Audio Studio here; preserve JACK/PipeWire and station routing |
+| Devices | **KDE Connect** | Authorized pairing, file transfer and device notifications without a second device platform |
+| Kali Bay | **Wireshark**, plus existing Kali isolated container | Authorized defensive analysis only; preserve Kali Podman isolation |
+| System | **Plasma System Monitor** | Preserve existing health tools and Spider Guardian/Vault |
+
+**Implementation stages for each candidate**
+
+1. **Inventory:** Identify the actual installed package/binary, desktop entry,
+   project types, settings, extensions, device access and service dependencies.
+2. **Shortlist and test:** Check upstream trust, security updates, performance
+   on the owner's PC, Flatpak permissions or Ubuntu package compatibility,
+   accessibility and task-level advantages. Never default to an arbitrary
+   newest version if the current one is better.
+3. **Side by side:** Install a compatible, trusted candidate only in an
+   owner-approved transaction, with rollback and **no removal**.
+   Trial real files on **copies**; verify round-trip, plugins and output.
+4. **Change the preferred bay app:** Only after explicit selection and
+   integration acceptance, switch the bay's task action or file association
+   to the verified candidate. Preserve fallback and undo. Do not replace
+   the native bay with an application launcher.
+5. **Spider native parity:** Implement equivalent core functionality in
+   **the existing native bay**, testing against the current best interim
+   app. Once parity, accessibility, performance and data migration pass,
+   switch the preference back to Spider.
+6. **Optional retirement:** Only with a later reviewed removal plan:
+   check reverse package dependencies and exported settings,
+   projects, history, backup, data retention, and rollback. Never
+   `apt autoremove` or mass purge during these migrations.
+
+**Hard limits:** Never remove or switch an active audio, microphone, video,
+camera, browser, synced storage or broadcast integration without
+device-specific testing. For KDE Plasma 6.8 and Ubuntu Studio 26.10,
+keep the independent release gates in PR #115. For Flatpak candidates,
+prefer an upstream-verified Flathub package with least privilege;
+review permissions. Privileged native audio/Kali applications may require
+a compatible distro package instead. Avoid mixing foreign distro repositories.
+
+**Primary official candidate references:** https://krita.org/ ,
+https://kdenlive.org/ , https://novelwriter.io/ ,
+https://www.zotero.org/support/dev/web_api/v3/local_api ,
+https://joplinapp.org/help/ , https://www.strawberrymusicplayer.org/ ,
+https://apps.kde.org/haruna/ , https://kontact.kde.org/ ,
+https://docs.flathub.org/docs/for-users/permissions .
+
+**Source state:** this commit adds a read-only app recommendation view,
+no installed apps, package scripts, replacements, file associations,
+system defaults, project migrations or uninstall operations. Real preferred-app
+switching is a later, gated native-bay implementation and remains unfinished.
