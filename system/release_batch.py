@@ -104,6 +104,8 @@ APP_FILES = (
     'webbie/brain/local_models.py', 'webbie/brain/local_model_inventory.py',
     'webbie/brain/heretic_lab.py',
     'webbie/brain/resident_model_choice.py',
+    'tools/install_everyday_heretic.sh',
+    'tools/activate_heretic_brain.py',
     'tools/setup_heretic_lab.sh',
     'webbie/brain/focus_tasks.py', 'webbie/brain/privacy_controls.py',
     'webbie/brain/model_resilience.py',
