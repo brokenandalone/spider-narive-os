@@ -18,9 +18,13 @@ from PyQt5.QtWidgets import (
 
 from bay_missions import MissionStore, BLUEPRINTS
 try:
-    from native_feature_adoption import summary_text as native_idea_summary
+    from native_feature_adoption import (
+        summary_text as native_idea_summary,
+        app_transition_text as native_app_transition_text,
+    )
 except ImportError:
-    native_idea_summary = None  # Existing bay remains functional without this optional module.
+    native_idea_summary = None  # Existing bay remains usable without this optional module.
+    native_app_transition_text = None
 
 
 def hardware_summary(sys_root=Path("/sys")):
@@ -322,12 +326,21 @@ class DevBayPanel(QWidget):
         body.addWidget(adoption)
 
     def show_adoption_priorities(self):
-        if native_idea_summary is None:
+        if native_idea_summary is None or native_app_transition_text is None:
             self.output.setPlainText(
                 "Feature review is not installed in this source snapshot. "
                 "No OS or bay changes made.")
             return
-        self.output.setPlainText(native_idea_summary())
+        # Reuse the XDG discovery already used by The Web. It does not
+        # execute any application, query APT or change user preferences.
+        try:
+            from app_catalog import discover_apps
+            visible_apps = discover_apps()
+        except (ImportError, OSError, ValueError):
+            visible_apps = None
+        self.output.setPlainText(
+            native_idea_summary() + "\n\n" +
+            native_app_transition_text(visible_apps))
 
     def inspect(self):
         name = QFileDialog.getExistingDirectory(
