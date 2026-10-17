@@ -83,3 +83,22 @@ No inspection of these source files establishes that the user's currently runnin
 **Already approved:** One integrated Web, original bay purposes, immersive visual direction, original projects and applications preserved, private owner review, consolidated install, Spider Eye eventually replacing God's Eye, and the Webbie/Nova integration boundary.
 
 **Fresh recommendations requiring compatibility verification, not yet claimed as installed or approved:** KDE 6.8 / Wayland migration work, Qt Quick 3D, AT-SPI2/portals for Spider Eye, SQLite FTS5 unification, Zotero, Restic, Kup, Jellyfin, Element, additional scanning/reporting tools. Choosing a technology does not authorize installation, credential access, account pairing, device capture, or changes to external services.
+
+## Implemented: choose the best ideas without replacing the operating system (October 16)
+
+The existing Dev Bay now has **Show best ideas for Spider OS**. It reads the one reviewed catalog in `the-web/shell/native_feature_adoption.py` and ranks options by owner benefit, engineering effort and integration risk. This is an **in-bay read-only report**, not an additional launcher, Webbie or update service.
+
+**One repeatable method, for each approved improvement:**
+
+1. **Select:** Identify a feature already requested or explicitly recommended, then attach an upstream source and the correct existing bay.
+2. **Prefer reuse:** Choose Spider OS source changes or stable, supported desktop APIs first. Reject a second launcher, another AI instance, or a duplicate application when an existing bay can own the capability.
+3. **Rank:** Evaluate benefit (1–5), effort (1–5), risk (1–5), re-use of existing code and dependency mode. Best value goes first, **not** newest version first.
+4. **Prototype privately:** Isolated experiments for major 3D/UI/API transitions; do not mix Ubuntu 26.10 or Plasma 6.8 packages directly into 26.04's normal APT sources.
+5. **Prove compatibility:** Require source compatibility, native-bay workflow, regression tests, owner-customization reconciliation, tested backup/rollback and real installed-host acceptance. Special changes add mandatory gates (e.g., Wayland for KDE 6.8, boot and independent backup for 26.10, explicit screen-capture permission).
+6. **Merge once:** Implement successful work in the **same existing Spider OS branch and original native bay**. No competing assistant, shell or launch program.
+7. **Release through the existing installer only:** The catalog never approves or performs installs, even if all its review gates are marked. Existing release preflight remains authoritative.
+8. **Validate after installation:** Verify actual project/file/audio/camera/window/service behavior, preserve a rollback path, and mark complete only after hardware-level acceptance.
+
+**Practical access after a separately approved release:** Open **Dev Bay → Show best ideas for Spider OS**. In a source checkout, `python3 the-web/shell/native_feature_adoption.py` produces the same static report. The report does not inspect the installed system, establish real gate completion or certify that a migration is safe.
+
+**Specific direction for 26.10 / Plasma 6.8:** Adopt well-supported API-level features and native-bay changes first. Keep the **Ubuntu Studio 26.10 migration on HOLD** while boot synchronization, independent backups, verified restore, official upgrader availability and host acceptance are unresolved. Plasma 6.8 needs real Wayland compatibility testing and supported distribution packages before considering a runtime switch. Installing all newer binaries is **not** a shortcut.
