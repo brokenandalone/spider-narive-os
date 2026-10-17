@@ -1,3 +1,9 @@
+# Historical Spider OS repository
+
+**This is not the current Spider OS development source.** The authoritative maintained repository is [brokenandalone/spider-os-current](https://github.com/brokenandalone/spider-os-current). Webbie AI V2, Heretic integration and the native workspace reconciliation were consolidated into that repository's `main` branch. Retain this repository only as a historical source reference. Do not use its ISO builder, installer, or release checks to update the currently installed Spider OS.
+
+---
+
 # Spider Narive OS
 
 Native Spider OS development build based on Ubuntu Studio 24.04.5 and KDE Plasma.
