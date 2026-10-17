@@ -58,3 +58,15 @@ For CPU-constrained runs, the separate AI V2 worker now allows an owner-selected
 ### Practical status
 
 This is a **GitHub source integration**, not an installation on the owner's customized Spider OS. Testing on the owner's computer, compatible Heretic-derived GGUF/Ollama model, voice calibration, and remaining installed-source reconciliation are still pending. Do not claim that Heretic was activated on the PC or that it gives Webbie unrestricted shell/root/device control.
+
+## Direct Q4 model installation for everyday Webbie, without running Heretic training
+
+The owner can now choose Webbie Cognitive Center > My everyday AI brain > **Install Heretic Q4 and use it every day**. This is a one-time, explicit GUI confirmation, not a separate assistant.
+
+The approved installer uses community quantization `hf.co/mradermacher/Qwen3-8B-heretic-GGUF:Q4_K_M` of `p-e-w/Qwen3-8B-heretic`. Sources: https://huggingface.co/mradermacher/Qwen3-8B-heretic-GGUF and https://huggingface.co/p-e-w/Qwen3-8B-heretic . Hugging Face lists the Q4_K_M model at approximately **5.03 GB**, far smaller than the 16.4 GB unquantized file. The quantizer is a third party; review origin and suitability before installation.
+
+The native button launches the packaged `tools/install_everyday_heretic.sh --approved-by-owner` through Konsole after a visible owner Yes confirmation. The script checks local Ollama, 10 GiB available disk, a private lock to avoid duplicate pulls, and then runs `ollama pull` for the single fixed source. Only after confirming the exact model appears in local Ollama does `tools/activate_heretic_brain.py --owner-approved-install` select it as Webbie's persistent conversation model. An installation/download failure leaves original Qwen3 preferred. No model is automatically downloaded by a voice command or browser result; the user can cancel the Konsole download with Ctrl+C.
+
+This option **does not require running the Heretic model-ablation CLI** on the 15 GiB CPU-only machine. The Heretic research lab remains available separately for experimental model development. Neither this script nor the research lab grants new filesystem/terminal/Kali/other application permissions to model output. It changes only the language model used for ordinary answers. Natasha, memory, normal voice behavior and pre-existing owner grants remain the same.
+
+**Actual deployment status:** GitHub branch only. The model download has NOT occurred on the owner's PC, and the new model has NOT been benchmarked against owner audio latency or native tool workflows. The installed-source drift and owner-hardware release gate still apply.
