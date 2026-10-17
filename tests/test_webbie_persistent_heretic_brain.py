@@ -81,6 +81,15 @@ class PersistentBrainTests(unittest.TestCase):
         self.assertIn("if chosen:\n        return chosen",src)
         self.assertIn('"model": preferred_model() if model is None else model',src)
 
+    def test_owner_selected_model_gets_cpu_time_without_changing_default(self):
+        worker=(ROOT/"webbie"/"agent"/"webbie_ai_worker.py").read_text()
+        outer=(ROOT/"webbie"/"agent"/"webbie_ai_isolation.py").read_text()
+        self.assertIn("default_wait = 70 if read_choice() else 14",worker)
+        self.assertIn("default_wait = 90 if read_choice() else 28",outer)
+        self.assertIn("max_wait = min(120, max(4, max_wait))",outer)
+        self.assertIn('"model": "qwen3:8b"',worker)
+        self.assertIn('from resident_model_choice import read_choice',worker)
+
     def test_native_ui_has_permanent_choice_and_restore(self):
         src=(ROOT/"the-web"/"shell"/"webbie_cognitive_center.py").read_text()
         self.assertIn("class ResidentBrainDialog",src)
