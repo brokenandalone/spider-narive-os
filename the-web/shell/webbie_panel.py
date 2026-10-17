@@ -23,7 +23,7 @@ from webbie_computer_panel import WebbieComputerDialog, parse_open_request, app_
 from webbie_reminders_dialog import WebbieRemindersDialog
 from webbie_cognitive_center import WebbieCognitiveDialog
 from webbie_unified_workflow import WebbieUnifiedWorkflowDialog
-from webbie_jarvis_mission_center import JarvisMissionCenter
+from webbie_jarvis_mission_center import JarvisMissionCenter, JarvisCore
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'webbie/agent'))
 from browser_routes import parse_browser_command
 from jarvis_commands import gui_guide
@@ -278,6 +278,8 @@ class WebbiePanel(QWidget):
         self.cognitive_dialog = None
         self.workflow_dialog = None
         self.jarvis_mission_dialog = None
+        # One mission controller shared by dock and embedded native bay.
+        self.jarvis_core = JarvisCore()
         self.unified_workflow = UnifiedWorkflow()
         self.awareness = AwarenessState()
         self.awareness.set_workspace(self.workspace_label, self.workspace_mode)
@@ -840,25 +842,64 @@ class WebbiePanel(QWidget):
                 'Could not request local checks: ' + str(error))
 
     def stop_sensitive_actions(self):
-        """One owner GUI action to drop camera and all desktop grants."""
-        self.unified_workflow.stop()
+        """Attempt every STOP surface; never claim revocation without verifying it.
+
+        The STOP button is an owner GUI action, not an instruction from a
+        model, page, microphone, or screenshot. A write failure must never be
+        presented as successfully revoked desktop authorization.
+        """
+        failures = []
+        steps = [
+            ("guided workflow", self.unified_workflow.stop),
+        ]
+        # One shared JARVIS core is stopped whether either view has opened.
+        shared_core = getattr(self, 'jarvis_core', None)
+        if shared_core is not None:
+            steps.append(("shared JARVIS core", shared_core.stop))
         if self.jarvis_mission_dialog is not None:
-            self.jarvis_mission_dialog.core.stop()
+            mission_core = self.jarvis_mission_dialog.core
+            if mission_core is not shared_core:
+                steps.append(("JARVIS mission", mission_core.stop))
         if self.computer_dialog is not None:
-            self.computer_dialog.stop()
+            steps.append(("computer control", self.computer_dialog.stop))
+        steps.extend((
+            ("camera", self.stop_camera),
+            ("screen awareness",
+             lambda: self.awareness.revoke_observation('screen')),
+            ("advisory context", self.publish_jarvis_context),
+        ))
+        # Keep attempting the remaining stops even when one control fails.
+        for label, action in steps:
+            try:
+                action()
+            except Exception:
+                failures.append(label)
+
+        # Check persistent authorization AFTER closing active control surfaces.
+        # The Computer Control STOP path may itself update the saved grant.
+        paused = False
+        try:
+            policy = read_policy()
+            if policy.get('authorized') and not policy.get('paused'):
+                update_policy('pause')
+            verified = read_policy()
+            paused = (not verified.get('authorized')
+                      or bool(verified.get('paused')))
+        except (OSError, ValueError, PermissionError, TypeError, KeyError):
+            failures.append('saved desktop permission')
+
+        if paused and not failures:
+            self.append_message(
+                'Webbie',
+                'STOP confirmed. Sensitive controls stopped; saved desktop '
+                'authorization is paused or disabled. Background checks remain active.')
         else:
-            # Persist STOP even when the control dialog has not been opened.
-            if read_policy().get('authorized'):
-                try:
-                    update_policy('pause')
-                except (OSError,ValueError,PermissionError):
-                    pass
-        self.stop_camera()
-        self.awareness.revoke_observation('screen')
-        self.publish_jarvis_context()
-        self.append_message(
-            'Webbie',
-            'Camera off and desktop approvals revoked. Background checks remain active.')
+            detail = ', '.join(failures) if failures else 'permission pause not verified'
+            self.append_message(
+                'Security',
+                'STOP was attempted, but complete revocation was NOT verified '
+                '(' + detail + '). Avoid additional desktop control until '
+                'the grant and service states are checked.')
 
     def open_cognitive_center(self):
         if self.cognitive_dialog is None:
@@ -876,7 +917,8 @@ class WebbiePanel(QWidget):
         """Single entrypoint to owner-scoped local research/diagnostics."""
         if self.jarvis_mission_dialog is None:
             self.jarvis_mission_dialog=JarvisMissionCenter(
-                self,stop_callback=self.stop_sensitive_actions)
+                self,core=self.jarvis_core,
+                stop_callback=self.stop_sensitive_actions)
         self.jarvis_mission_dialog.show()
         self.jarvis_mission_dialog.raise_()
         self.jarvis_mission_dialog.activateWindow()

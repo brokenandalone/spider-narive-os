@@ -24,6 +24,33 @@ SOURCE_AREAS = {
         "the-web/shell/app_catalog.py",
         "spider_max_source/spider_monster/max_catalog.py",
     ),
+    "Ubuntu Studio app preservation and Webbie tool guidance": (
+        "the-web/shell/app_catalog.py",
+        "the-web/shell/workspace_files.py",
+        "webbie/agent/app_bay_lookup.py",
+        "tools/ubuntu_studio_app_inventory.py",
+    ),
+    "Spider Studio playable instruments and art workbench": (
+        "studio/instrument_engine.py",
+        "studio/instrument_panel.py",
+        "the-web/shell/art_workbench.py",
+    ),
+    "Native Home dashboard in place of extra control centers": (
+        "the-web/shell/home_dashboard.py",
+    ),
+    "Native Webbie control center integration": (
+        "the-web/shell/webbie_native_operations.py",
+        "the-web/shell/legacy_control_centers.py",
+    ),
+    "Native bay mission desks and shared project workflow": (
+        "the-web/shell/bay_missions.py",
+        "the-web/shell/bay_mission_panel.py",
+        "the-web/shell/native_utility_bays.py",
+    ),
+    "Webbie private evidence and research agenda": (
+        "webbie/brain/research_agenda.py",
+        "the-web/shell/webbie_research_panel.py",
+    ),
     "Webbie resident AI and voice": (
         "webbie/agent/webbie.py", "webbie/voice/whisper_listener.py",
         "webbie/actions/gateway.py", "webbie/brain/brain.py",

@@ -31,7 +31,7 @@ class CatalogTests(unittest.TestCase):
                 self.assertEqual(catalog.launch_command(apps[0]),['/usr/bin/gio','launch',str(valid)])
 
     def test_category_mapping(self):
-        for name,categories,expected in [('Kdenlive',['Video'],'studio'),('VLC',['AudioVideo','Player'],'media'),('Krita',['Graphics'],'art-lab'),('Writer',['Office'],'author'),('Firefox',['Network','WebBrowser'],'forage'),('Thunderbird',['Network'],'communications'),('Konsole',['TerminalEmulator'],'dev-bay'),('Calculator',['Science'],'study'),('Timeshift',['System'],'recovery'),('Steam',['Game'],'games')]:
+        for name,categories,expected in [('Kdenlive',['Video'],'studio'),('VLC',['AudioVideo','Player'],'media'),('Krita',['Graphics'],'art-lab'),('Writer',['Office'],'author'),('Firefox',['Network','WebBrowser'],'forage'),('Thunderbird',['Network'],'communications'),('Konsole',['TerminalEmulator'],'dev-bay'),('Calculator',['Science'],'study'),('Timeshift',['System'],'system'),('Steam',['Game'],'media')]:
             self.assertEqual(catalog.workspace_for(name,name,categories),expected)
 
 if __name__=='__main__':unittest.main()

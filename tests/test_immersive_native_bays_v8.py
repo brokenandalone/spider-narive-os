@@ -28,6 +28,13 @@ class NativeImmersiveBays(unittest.TestCase):
         compile(self.scene, str(SCENE_FILE), "exec")
         compile(self.shell, str(SHELL_FILE), "exec")
 
+    def test_owner_svg_background_preserved_with_fallback(self):
+        self.assertIn("from PyQt5.QtSvg import QSvgRenderer", self.scene)
+        self.assertIn("from app_visuals import app_art", self.scene)
+        self.assertIn("self.svg_background.render(painter", self.scene)
+        self.assertIn("painter.fillRect(self.rect(), bg)", self.scene)
+        self.assertIn("QColor(10, 7, 19, 144)", self.scene)
+
     def test_exact_eight_existing_bays(self):
         assignment = next(
             n for n in self.scene_ast.body if isinstance(n, ast.Assign)
@@ -40,11 +47,28 @@ class NativeImmersiveBays(unittest.TestCase):
     def test_native_page_is_not_replaced(self):
         self.assertIn("from immersive_bays import ImmersiveBay, SCENES", self.shell)
         self.assertIn("layout.addWidget(ImmersiveBay(name, page))", self.shell)
-        self.assertIn("bay_row.addWidget(self.application_panel(name))", self.shell)
-        self.assertIn("bay_row.addWidget(area, 1)", self.shell)
-        self.assertIn("bay_row.addWidget(surface, 1)", self.shell)
+        self.assertIn("workspace_tabs.addTab(self.application_panel(name), 'Optional installed tools')", self.shell)
+        self.assertIn("workspace_tabs.addTab(mission_desk, 'Projects & missions')", self.shell)
+        self.assertIn("workspace_tabs.addTab(area, 'Native workspace')", self.shell)
+        self.assertIn("workspace_tabs.addTab(surface, 'Native workspace')", self.shell)
         self.assertIn("else: native = create_native(name, SPIDER_ROOT)", self.shell)
-        self.assertIn("if name == 'webbie': native = WebbiePanel(SPIDER_ROOT)", self.shell)
+        # Webbie has one resident panel and reuses it in the native bay.
+        resident = [call for call in ast.walk(self.shell_ast)
+                    if isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id == "WebbiePanel"]
+        self.assertEqual(len(resident), 1)
+        self.assertIn("workspace_tabs.addTab(operations, 'Webbie controls')", self.shell)
+        self.assertIn("native.setObjectName('webbieResidentBayOverview')", self.shell)
+
+    def test_actual_devices_productivity_and_communications_bays(self):
+        self.assertIn("elif name == 'devices': native = DevicesPanel()", self.shell)
+        self.assertIn("elif name == 'productivity': native = ProductivityPanel()", self.shell)
+        self.assertIn("elif name == 'communications': native = CommunicationsPanel()", self.shell)
+        self.assertIn("elif name == 'dev-bay': native = DevBayPanel()", self.shell)
+        self.assertIn("elif name == 'art-lab': native = ArtLabPanel()", self.shell)
+        self.assertIn("workspace_tabs.addTab(research_panel, 'Research mind')", self.shell)
+        self.assertIn("workspace_tabs.addTab(recovery_panel, 'Recovery & backups')", self.shell)
 
     def test_source_preserves_active_services_and_models(self):
         forbidden = (

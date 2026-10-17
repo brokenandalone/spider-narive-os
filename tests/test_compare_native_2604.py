@@ -41,6 +41,24 @@ class LocalReconciliationTests(unittest.TestCase):
         self.assertEqual(summary["changed_common"], 1)
         self.assertNotIn("PRIVATE-OWNER-CODE", str(summary))
 
+    def test_only_reviewed_development_branches_are_allowed(self):
+        self.assertEqual(tool.APPROVED_BRANCHES, {
+            "reconciliation/ubuntu-studio-26.04-lts-20261015",
+            "feature/native-monster-bays-20261015",
+        })
+        self.assertNotIn("main", tool.APPROVED_BRANCHES)
+        self.assertNotIn("", tool.APPROVED_BRANCHES)
+
+    def test_prioritized_merges_start_with_native_desktop_and_webbie(self):
+        desktop = tool.PRIORITY_GROUPS["desktop"]
+        webbie = tool.PRIORITY_GROUPS["webbie"]
+        self.assertEqual(desktop[0], "the-web/shell/main.py")
+        self.assertIn("the-web/shell/app_catalog.py", desktop)
+        self.assertIn("the-web/shell/workspace_files.py", desktop)
+        self.assertIn("webbie/agent/webbie.py", webbie)
+        self.assertIn("webbie/voice/whisper_listener.py", webbie)
+        self.assertTrue(set(desktop).isdisjoint(webbie))
+
     def test_reports_customization_and_new_module(self):
         self.write(self.src, "the-web/shell/main.py", "def common(): return 2\n")
         self.write(self.host, "the-web/shell/main.py", "def common(): return 1\n")

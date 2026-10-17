@@ -15,10 +15,12 @@ class NativeMaxIntegrationTests(unittest.TestCase):
 
     def test_native_original_app_kept(self):
         self.assertIn("create_native(name, SPIDER_ROOT)", SHELL)
-        self.assertIn("native = WebbiePanel(SPIDER_ROOT)", SHELL)
+        self.assertIn("WebbieNativeOperations(", SHELL)
+        self.assertIn("self.webbie_assistant,", SHELL)
+        self.assertIn("native.setObjectName('webbieResidentBayOverview')", SHELL)
         self.assertIn("native = MediaPanel(self.launch_media)", SHELL)
-        self.assertIn("workspace_tabs.addTab(area, 'Original workspace')", SHELL)
-        self.assertIn("workspace_tabs.addTab(surface, 'Original workspace')", SHELL)
+        self.assertIn("workspace_tabs.addTab(area, 'Native workspace')", SHELL)
+        self.assertIn("workspace_tabs.addTab(surface, 'Native workspace')", SHELL)
         self.assertIn("workspace_tabs.addTab(advanced, 'Advanced tools & tasks')", SHELL)
 
     def test_operations_embedded_not_launched(self):
@@ -55,7 +57,7 @@ class NativeMaxIntegrationTests(unittest.TestCase):
 
     def test_eight_immersive_bays_preserved(self):
         self.assertIn("layout.addWidget(ImmersiveBay(name, page))", SHELL)
-        self.assertIn("bay_row.addWidget(self.application_panel(name))", SHELL)
+        self.assertIn("workspace_tabs.addTab(self.application_panel(name), 'Optional installed tools')", SHELL)
 
 
 if __name__ == "__main__":

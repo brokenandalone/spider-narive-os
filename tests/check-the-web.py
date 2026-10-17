@@ -7,7 +7,7 @@ from unittest.mock import patch
 root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'the-web/shell'))
 from PyQt5.QtWidgets import QApplication, QPushButton
-from PyQt5.QtGui import QColor,QPixmap
+from PyQt5.QtGui import QColor,QPixmap,QImage
 from PyQt5.QtCore import Qt
 import main
 main.SPIDER_ROOT = root
@@ -59,7 +59,74 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     for name in main.WORKSPACES:
         window.open_workspace(name)
         assert not window.wallpaper.isNull(),name
-    assert window.tabs.count()==15
+    assert window.tabs.count()==len(main.WORKSPACES)
+    assert isinstance(window.home_dashboard, main.SpiderHomeDashboard)
+    assert len(window.home_dashboard.buttons) == 14
+    assert 'studio' in window.home_dashboard.buttons
+    assert 'webbie' in window.home_dashboard.buttons
+    for bay, widget in (
+        ('devices', main.DevicesPanel),
+        ('productivity', main.ProductivityPanel),
+        ('art-lab', main.ArtLabPanel),
+        ('communications', main.CommunicationsPanel),
+        ('dev-bay', main.DevBayPanel),
+    ):
+        assert isinstance(window.workspace_widgets[bay].native, widget), bay
+    for bay in main.WORKSPACES:
+        if bay == 'default':
+            continue
+        assert isinstance(window.workspace_widgets[bay].mission_desk, main.BayMissionPanel), bay
+    art_workbench = window.workspace_widgets['art-lab'].art_workbench
+    assert isinstance(art_workbench, main.ArtWorkbench)
+    assert art_workbench.mode.count() == 5
+    image = QImage(16, 16, QImage.Format_RGB32)
+    image.fill(QColor('white'))
+    for pixel in range(16):
+        image.setPixelColor(8, pixel, QColor('black'))
+    art_workbench.canvas.load_outline(image)
+    assert art_workbench.canvas.undo()
+    studio_rack = window.workspace_widgets['studio'].instrument_rack
+    assert isinstance(studio_rack, main.InstrumentRack)
+    assert studio_rack.mode.count() == 4
+    assert len(studio_rack.steps['Kick']) == 16
+    studio_rack.mode.setCurrentText('Drums')
+    assert not studio_rack.drums_group.isHidden()
+    assert studio_rack.wav().startswith(b'RIFF')
+    studio_rack.mode.setCurrentText('Guitar')
+    assert studio_rack.wav('E').startswith(b'RIFF')
+    webbie_operations = window.workspace_widgets['webbie'].webbie_operations
+    assert isinstance(webbie_operations, main.WebbieNativeOperations)
+    assert webbie_operations.assistant is window.webbie_assistant
+    assert webbie_operations.workflow.session is window.webbie_assistant.unified_workflow
+    assert webbie_operations.missions.core is window.webbie_assistant.jarvis_core
+    assert window.workspace_widgets['webbie'].native.objectName() == 'webbieResidentBayOverview'
+    assert len(window.findChildren(main.WebbiePanel)) == 1
+    assert webbie_operations.tabs.count() == 3
+    assert webbie_operations.cognitive is not None
+    assert webbie_operations.missions is not None
+    assert webbie_operations.workflow is not None
+    assert webbie_operations.cognitive.workflow_dialog is webbie_operations.workflow
+    assert webbie_operations.cognitive.workspace_opener.__self__ is window
+    assert webbie_operations.cognitive.workspace_callback() == window.current_workspace
+    assert webbie_operations.can_close()
+    # Legacy control-center launchers route into existing native bays;
+    # no subprocess is ever spawned and Ubuntu Studio entries stay intact.
+    with patch.object(window, 'launch') as legacy_launch:
+        window.open_installed('spider-webbie-intelligence.desktop')
+        assert window.current_workspace == 'webbie'
+        assert window.workspace_widgets['webbie'].workspace_tabs.tabText(
+            window.workspace_widgets['webbie'].workspace_tabs.currentIndex()
+        ) == 'Webbie controls'
+        window.open_installed('spider-os-workspace-max.desktop')
+        assert window.current_workspace == 'default'
+        legacy_launch.assert_not_called()
+    research = window.workspace_widgets['webbie'].findChildren(main.WebbieResearchPanel)
+    assert len(research) == 1, 'Webbie research mind not present in native bay'
+    mission_store = window.workspace_widgets['studio'].mission_desk.store
+    saved = mission_store.add('studio', 'Mix session for Qt integration test')
+    assert any(m['id'] == saved['id'] for m in mission_store.for_bay('studio'))
+    mission_store.update(saved['id'], destination='productivity', status='active')
+    assert any(m['id'] == saved['id'] for m in mission_store.for_bay('productivity'))
     for name in ['system', 'recovery']:
         panel = window.workspace_widgets[name].native
         assert panel is not None and panel.tables['storage'].rowCount() > 0
@@ -86,7 +153,7 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     window.open_audio(); assert system.tabs.currentWidget() is system.audio_page
     author=window.workspace_widgets['author'].native
     window.open_author();window.open_author();assert window.workspace_widgets['author'].native is author
-    assert window.tabs.count()==15
+    assert window.tabs.count()==len(main.WORKSPACES)
     for name in ['author','study','studio','forage','deep-forage','webbie','kali-bay']:
         assert window.workspace_widgets[name].native is not None, (name, getattr(window.workspace_widgets[name], 'native_error', 'no error detail'))
     book=author.store.create_book('Desktop test');chapter=author.store.create_chapter(book,'One','Original')
@@ -107,6 +174,24 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     fake=InstalledApp('ardour.desktop',Path('/tmp/Ardour.desktop'),'Ardour','Record','ardour','studio')
     window.installed_apps=[fake];window.start_menu.populate()
     window.start_menu.search.setText('ardour');assert window.start_menu.results.count()==1
+    # All installed programs stay reachable, even if the primary bay differs.
+    krita = InstalledApp('krita.desktop', Path('/tmp/Krita.desktop'),
+                         'Krita', 'Paint artwork', 'krita', 'art-lab')
+    window.installed_apps = [fake, krita]
+    window.populate_app_list('studio')
+    assert window.app_lists['studio'].count() == 1
+    window.app_scopes['studio'].setCurrentIndex(1)
+    assert window.app_lists['studio'].count() == 2
+    window.app_queries['studio'].setText('krita')
+    assert window.app_lists['studio'].count() == 1
+    assert window.app_lists['studio'].item(0).data(Qt.UserRole) == 'krita.desktop'
+    window.app_lists['studio'].setCurrentRow(0)
+    with (patch.object(main, 'save_app_assignment') as save,
+          patch.object(window, 'refresh_apps') as refresh):
+        window.assign_selected_app('studio')
+        save.assert_called_once_with('krita.desktop', 'studio')
+        refresh.assert_called_once()
+    window.app_queries['studio'].clear()
     with patch.object(main,'launch_command',return_value=['gio','launch',str(fake.path)]),patch.object(main.subprocess,'Popen') as process, patch.object(main,'wm_command') as wm:
         # Exercise real desktop code paths: launching Firefox-like XDG apps must
         # never turn on KDE Show Desktop and hide the newly opened window.
@@ -126,11 +211,11 @@ with tempfile.TemporaryDirectory() as folder, patch('pathlib.Path.home',return_v
     wallpaper_id=window.wallpaper_catalog.defaults['deep-forage']
     window.wallpaper_picker.setCurrentIndex(window.wallpaper_picker.findData(wallpaper_id))
     window.open_author();assert window.close()
-    reopened=main.TheWeb();assert reopened.tabs.count()==15;assert reopened.current_workspace=='author'
+    reopened=main.TheWeb();assert reopened.tabs.count()==len(main.WORKSPACES);assert reopened.current_workspace=='author'
     assert reopened.appearance=='light'
     assert reopened.background_surface.appearance=='light'
     assert reopened.taskbar.styleSheet()==reopened.styleSheet()
     assert reopened.workspace_widgets['author'].native.store.chapter(chapter)['content']=='Edited inside the workspace tab'
     assert reopened.wallpaper_catalog.selected_id('deep-forage')==wallpaper_id
     assert reopened.close();app.processEvents()
-print('DESKTOP INTEGRATION PASSED: 15 tabs, seven native workspaces, saved editing/state/wallpapers, installed-app launching and safe close')
+print('DESKTOP INTEGRATION PASSED: full native bay registry, project workbenches, saved editing/state/wallpapers and safe close')

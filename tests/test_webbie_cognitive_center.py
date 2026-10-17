@@ -43,6 +43,128 @@ class CognitiveCenterTests(unittest.TestCase):
         finally:
             center.close()
 
+    def test_preserved_owner_workflow_slots_are_distinct_from_workspace_getter(self):
+        opened = Mock()
+        guided = Mock()
+        getter = Mock(return_value="studio")
+        center = WebbieCognitiveDialog(
+            workspace_callback=getter, workspace_opener=opened,
+            workflow_callback=guided)
+        try:
+            self.assertIs(center.workspace_opener, opened)
+            self.assertIsNone(center.workflow_dialog)
+            self.assertEqual(center.workspace_callback(), "studio")
+            center.open_workflow()
+            guided.assert_called_once_with()
+            opened.assert_not_called()
+            # Old workspace-opener and active supervised workflow slots can
+            # coexist without triggering any navigation on constructor entry.
+        finally:
+            center.close()
+
+    def test_cognitive_does_not_treat_workspace_getter_as_navigation_grant(self):
+        getter = Mock(return_value="webbie")
+        center = WebbieCognitiveDialog(workspace_callback=getter)
+        try:
+            self.assertIsNone(center.workspace_opener)
+            self.assertIsNone(center.workflow_dialog)
+        finally:
+            center.close()
+
+    def test_stop_sensitive_verifies_persisted_pause_after_stopping_each_surface(self):
+        state = {"authorized": True, "paused": False}
+        def pause(action):
+            self.assertEqual(action, "pause")
+            state["paused"] = True
+        fake = SimpleNamespace(
+            unified_workflow=SimpleNamespace(stop=Mock()),
+            jarvis_mission_dialog=SimpleNamespace(core=SimpleNamespace(stop=Mock())),
+            computer_dialog=SimpleNamespace(stop=Mock()),
+            stop_camera=Mock(),
+            awareness=SimpleNamespace(revoke_observation=Mock()),
+            publish_jarvis_context=Mock(),
+            append_message=Mock(),
+        )
+        with patch("webbie_panel.read_policy",
+                   side_effect=lambda: dict(state)) as read, patch(
+                       "webbie_panel.update_policy", side_effect=pause) as change:
+            WebbiePanel.stop_sensitive_actions(fake)
+        fake.unified_workflow.stop.assert_called_once()
+        fake.jarvis_mission_dialog.core.stop.assert_called_once()
+        fake.computer_dialog.stop.assert_called_once()
+        fake.stop_camera.assert_called_once()
+        fake.awareness.revoke_observation.assert_called_once_with("screen")
+        fake.publish_jarvis_context.assert_called_once()
+        self.assertGreaterEqual(read.call_count, 2)
+        change.assert_called_once_with("pause")
+        self.assertEqual(fake.append_message.call_args.args[0], "Webbie")
+        self.assertIn("STOP confirmed", fake.append_message.call_args.args[1])
+
+    def test_stop_sensitive_never_false_confirms_failed_persistence(self):
+        state = {"authorized": True, "paused": False}
+        fake = SimpleNamespace(
+            unified_workflow=SimpleNamespace(stop=Mock()),
+            jarvis_mission_dialog=None,
+            computer_dialog=None,
+            stop_camera=Mock(),
+            awareness=SimpleNamespace(revoke_observation=Mock()),
+            publish_jarvis_context=Mock(),
+            append_message=Mock(),
+        )
+        with patch("webbie_panel.read_policy",
+                   side_effect=lambda: dict(state)), patch(
+                       "webbie_panel.update_policy",
+                       side_effect=PermissionError("private permission failure")):
+            WebbiePanel.stop_sensitive_actions(fake)
+        fake.stop_camera.assert_called_once()
+        fake.awareness.revoke_observation.assert_called_once_with("screen")
+        self.assertEqual(fake.append_message.call_args.args[0], "Security")
+        self.assertIn("NOT verified", fake.append_message.call_args.args[1])
+
+    def test_stop_sensitive_attempts_remaining_surfaces_after_individual_failures(self):
+        state = {"authorized": False, "paused": True}
+        fake = SimpleNamespace(
+            unified_workflow=SimpleNamespace(
+                stop=Mock(side_effect=RuntimeError("workflow busy"))),
+            jarvis_mission_dialog=SimpleNamespace(core=SimpleNamespace(stop=Mock())),
+            computer_dialog=SimpleNamespace(stop=Mock()),
+            stop_camera=Mock(side_effect=RuntimeError("camera busy")),
+            awareness=SimpleNamespace(revoke_observation=Mock()),
+            publish_jarvis_context=Mock(),
+            append_message=Mock(),
+        )
+        with patch("webbie_panel.read_policy", return_value=state), patch(
+                "webbie_panel.update_policy") as change:
+            WebbiePanel.stop_sensitive_actions(fake)
+        fake.jarvis_mission_dialog.core.stop.assert_called_once()
+        fake.computer_dialog.stop.assert_called_once()
+        fake.awareness.revoke_observation.assert_called_once_with("screen")
+        fake.publish_jarvis_context.assert_called_once()
+        change.assert_not_called()
+        self.assertEqual(fake.append_message.call_args.args[0], "Security")
+
+    def test_stop_reaches_shared_jarvis_core_without_any_dialog(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        shared = SimpleNamespace(stop=Mock())
+        fake = SimpleNamespace(
+            unified_workflow=SimpleNamespace(stop=Mock()),
+            jarvis_core=shared,
+            jarvis_mission_dialog=None,
+            computer_dialog=None,
+            stop_camera=Mock(),
+            awareness=SimpleNamespace(revoke_observation=Mock()),
+            publish_jarvis_context=Mock(),
+            append_message=Mock(),
+        )
+        with patch("webbie_panel.read_policy",
+                   return_value={"authorized": False, "paused": True}):
+            WebbiePanel.stop_sensitive_actions(fake)
+        shared.stop.assert_called_once_with()
+        fake.stop_camera.assert_called_once_with()
+        fake.awareness.revoke_observation.assert_called_once_with("screen")
+        self.assertIn("STOP confirmed", fake.append_message.call_args.args[1])
+
     def test_sleep_revokes_desktop_grant_and_turns_camera_off(self):
         mock=SimpleNamespace(
             awareness=SimpleNamespace(sleep=Mock()),

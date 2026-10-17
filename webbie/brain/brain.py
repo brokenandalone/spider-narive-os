@@ -719,6 +719,24 @@ RESEARCH_SUMMARIES = RESEARCH_ROOT / "summaries"
 def research_response(message):
     lower = message.lower().strip()
 
+    # Deliberate conversational access to the owner's local research agenda.
+    # Queued questions are requests for investigation, NOT completed findings.
+    if any(phrase in lower for phrase in (
+        "research queue", "research agenda", "what should you research next",
+        "what research questions are waiting")):
+        try:
+            from research_agenda import ResearchAgenda
+            entries = ResearchAgenda().read()
+            waiting = [item["question"] for item in entries
+                       if item["status"] in ("queued", "investigating")]
+            if waiting:
+                return ("My research queue contains " + str(len(waiting)) +
+                        " open questions. Next: " + "; ".join(waiting[:4]) +
+                        ". These are not verified findings yet.")
+            return "My research queue is empty. Add a question in the Research Mind bay."
+        except (OSError, ValueError, ImportError):
+            return "I couldn't read the local research queue safely."
+
     research_phrases = (
         "what have you researched",
         "what did you research",
