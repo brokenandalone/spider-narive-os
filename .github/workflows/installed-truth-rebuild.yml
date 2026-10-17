@@ -21,6 +21,9 @@ on:
       - 'tests/test_webbie_kali_doctor.py'
       - 'tests/test_webbie_speaker_provider.py'
       - 'tests/test_webbie_heretic_lab.py'
+      - 'tests/test_webbie_persistent_heretic_brain.py'
+      - 'webbie/brain/resident_model_choice.py'
+      - 'webbie/brain/brain.py'
       - 'tests/test_author_native_voice_navigation.py'
       - 'tests/test_studio_reconciled_band_workbench.py'
       - 'tests/test_study_saved_reading_handoff.py'
@@ -106,6 +109,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_webbie_natural_speech.py' -v
       - name: Verify saved Study course-reading integration
         run: python3 -m unittest discover -s tests -p 'test_study_saved_reading_handoff.py' -v
+      - name: Verify persistent owner-selected Heretic-derived brain across sessions
+        run: python3 -m unittest discover -s tests -p 'test_webbie_persistent_heretic_brain.py' -v
       - name: Enforce no invented PC snapshot in Git history
         run: |
           test ! -e docs/installed-pc-manifest.json
