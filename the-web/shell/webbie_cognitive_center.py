@@ -22,7 +22,7 @@ from local_models import configured_choice
 from local_model_inventory import inspect_local_models, report_lines
 from local_models import installed_models
 from resident_model_choice import (read_choice, select_installed_model,
-                                   restore_default)
+                                   restore_default, launch_prebuilt_heretic)
 from heretic_lab import (inspect_heretic, plan_experiment, launch_experiment,
                          launch_lab_setup, EXPERIMENT_MODELS)
 from proactive_checks import status_message
@@ -511,6 +511,10 @@ class ResidentBrainDialog(QDialog):
         layout.addWidget(self.status)
         row=QHBoxLayout()
         layout.addLayout(row)
+        self.install_heretic=QPushButton("Install Heretic Q4 and use it every day")
+        self.install_heretic.setObjectName("webbieInstallEverydayHereticButton")
+        self.install_heretic.clicked.connect(self.install_everyday_heretic)
+        row.addWidget(self.install_heretic)
         self.activate=QPushButton("Make this Webbie's everyday brain")
         self.activate.setObjectName("webbieActivatePermanentBrain")
         self.activate.clicked.connect(self.select)
@@ -548,6 +552,36 @@ class ResidentBrainDialog(QDialog):
         if chosen and chosen not in installed:
             state+="\n\nThe saved model is not installed. Restore the original model below."
         self.status.setPlainText(state)
+
+    def install_everyday_heretic(self):
+        """One owner decision; the terminal verifies download before activation."""
+        warning=(
+            "Install an approximately 5 GB Q4_K_M Qwen3-8B-Heretic GGUF "
+            "from Hugging Face community quantizer mradermacher into local "
+            "Ollama, then make it Webbie's permanent conversation model?\n\n"
+            "This affects normal AI conversations, including future sessions. "
+            "Heretic changes a model's refusal behavior; it does not give "
+            "Webbie new computer permissions. Natasha, memory, the original "
+            "Qwen3 8B, and native apps remain installed.\n\n"
+            "Konsole shows progress. You may interrupt the download with "
+            "Ctrl+C. The original brain remains selected if download or "
+            "local model verification fails.")
+        if QMessageBox.question(
+            self, "Install permanent Heretic-derived brain", warning,
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No
+        )!=QMessageBox.Yes:
+            return
+        try:
+            launch_prebuilt_heretic(owner_clicked=True)
+        except (OSError,RuntimeError,PermissionError,ValueError) as error:
+            self.status.setPlainText(
+                "Heretic model download NOT started: "+str(error)[:400])
+            return
+        self.status.setPlainText(
+            "Heretic download and activation requested in Konsole. "
+            "The original model stays selected until the reviewed model "
+            "is installed and verified locally. Refresh to check the "
+            "new everyday preference. No desktop permission was changed.")
 
     def select(self):
         name=self.models.currentData()
