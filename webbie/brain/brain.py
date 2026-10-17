@@ -10,6 +10,7 @@ import threading
 import urllib.error
 import urllib.request
 from privacy_controls import private_session_active
+from resident_model_choice import read_choice
 from model_resilience import (
     MODEL_GOVERNOR, response_timeout, model_health_message,
 )
@@ -23,7 +24,14 @@ CONFIG_FILE = Path(__file__).resolve().parents[1] / 'config/default.json'
 
 
 def preferred_model(path=CONFIG_FILE):
-    """Use the owner's local Ollama model choice; do not pull new models."""
+    """Owner's once-selected model is the everyday brain until explicitly reset.
+
+    This preference is read for each turn by the existing long-lived worker,
+    so no second agent or service restart is required to switch models.
+    """
+    chosen = read_choice()
+    if chosen:
+        return chosen
     try:
         config = json.loads(Path(path).read_text(encoding='utf-8'))
         name = config.get('ollama', {}).get('model')
