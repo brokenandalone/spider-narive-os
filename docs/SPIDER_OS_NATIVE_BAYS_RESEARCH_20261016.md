@@ -1,0 +1,85 @@
+# Spider OS native bays: approved vision and researched integration targets
+
+**Research date:** 2026-10-16. **Branch:** `feature/native-monster-bays-20261015`. **Scope:** Operating system, The Web, real existing native bays and their integrations. Spider Audio Studio engine, resident Webbie model/voice development, Nova DJ creative development, Broken World website hosting, and Spider OS Mobile firmware development are maintained in their respective projects. This document addresses only their integration points.
+
+**Status:** Planning and source inspection, NOT a release, permission grant, live-hardware validation, or package-install instruction. No owner's private staged source has been included.
+
+## Non-negotiable user decisions already agreed
+
+1. ONE Spider OS and the actual installed The Web desktop; enhance the existing program, never replace it with new launchers/control centers.
+2. A native bay is a functioning workspace. Merge features previously demonstrated in launcher/MAX/universal variants into that same bay; do not invent alternate versions.
+3. ONE resident Webbie reachable from every bay, shared identity/voice/memory/state and a single STOP/consent authority. No duplicate Webbie service or interface hierarchy; Nova remains the approved on-air persona linked through Media.
+4. Preserve **all** Ubuntu Studio apps and host packages, all personal projects, studio assets, manuscripts, music, Kali environment, authorization choices, legacy KDE fallback, and custom wallpapers/SVG where supported. An optional installed-app browser is not a substitute for workspace functions.
+5. Cinematic purple/violet-black Spider visual identity, real interactions and immersive 3D, without claiming a decorative canvas is the finished experience.
+6. Same GitHub development build, owner-only review of modified installed files, one checked backup/rollback and install transaction; no unverified 26.10 boot changes or surprise restarts.
+7. Professional environments: recording Studio; atmospheric Author with interactive Broken City; futuristic Study; cybersecurity Kali; cinema/BCN Media; resident Webbie; evidence-rich Deep Forage; creative Art Lab; and Home, Communications, Productivity, Devices, Dev, Forage, System/Recovery.
+
+## Existing source that must be upgraded rather than duplicated
+
+Inspected in the native-monster-bays development branch on 2026-10-16:
+- `the-web/shell/home_dashboard.py`: native Home overview of bays, installed program categorization and missions.
+- `the-web/shell/bay_missions.py`: one local mission store across existing bays; user-entered task/state references.
+- `the-web/shell/native_utility_bays.py`: Devices, Productivity, Communications, Art Lab, Dev Bay native panels. Devices currently has kernel inventory; Productivity shares missions.
+- `the-web/shell/art_workbench.py`: basic drawing canvas and outline processing, not yet a complete professional art environment.
+- `the-web/shell/immersive_bays.py`: animated bay canvases and an Author point-map with Apartment 17, Mercer & Ninth, City Hall, Platform Six, House of Echoes. **This is not yet a true navigable 3D Broken World.**
+- `system/release_batch.py`: single-transaction source release gate, fails closed on owner customizations.
+- `docs/NATIVE_MONSTER_BAYS_20261015.md`: 174 owner-reported app menu entries preserved in inventory, 4,360 installed packages previously audited. Counts are prior host observations, **not** a fresh post-install audit.
+- Existing private review reported 34 blocked customized release paths and 15 candidate additions on Oct 16; other documents still mention 33. **Re-run the live preflight after any source changes.**
+
+No inspection of these source files establishes that the user's currently running installed OS contains the candidate additions.
+
+## Research-backed integration targets by native bay
+
+| Native surface | Agreed user goal | Integrate into existing code | Evidence / release gates |
+|---|---|---|---|
+| **The Web / Home** | Native immersive desktop and one mission control | KWin workspace scripting, KDE Activities/window grouping, real task history, launcher-free bay navigation, drag/drop file handoff, restore sessions, global settings and notifications | Validate against KDE session and X11/Wayland; keyboard navigation, multi-monitor; no replacement shell/service |
+| **System / Guardian / Vault / Recovery** | Service health, upgrades, backups, rollback, safe maintenance | systemd status/timers, KDE System Monitor metrics, Kup or restic verification, restore rehearsals, update health; optional read-only Spider Eye status | Never touch encryption/bootloader or copy user keys; verify backup integrity and rollbacks |
+| **Devices** | Manage real cameras, microphones, audio interfaces, peripherals, connectivity, tablet | Existing /sys inventory plus UPower, NetworkManager, BlueZ, KDE Connect, explicit pair/unpair/transfer controls; camera privacy state; Spider Eye observation status | Hardware permission prompts; no unconsented capture or destructive disk writes; SM-T290 native OS firmware is a separate project |
+| **Communications** | Accounts, inboxes, messages, calendar and notifications in one bay | Kontact/KOrganizer, existing mail/browser integrations, optional Matrix/Element as an existing app, calendar tasks and drafts; Firefox Native Messaging if owner-approved | No duplicate mail database; authentication scoped to account; send is an explicit action |
+| **Productivity** | One cross-bay project board | Expand existing MissionStore with dependencies, due dates, source links, activity log, project handoff and daily briefing | No second task store; respect project privacy |
+| **Studio (integration ONLY)** | Real professional recording room, equipment, session handoff | Embed controls/status for existing Spider Audio Studio, Ardour, JACK/PipeWire, Carla, installed MIDI/effects and project library; do not code another DAW here | Verify existing audio paths and real recording before claiming feature; separate Audio Studio implementation |
+| **Author / Broken World** | Writing environment plus immersive city | Existing chapter/canon tools, manuscript search and revision, named character/scene artwork, verified Broken City map, Blender glTF assets rendered in compatible Qt 3D or selected engine; export via Pandoc | Preserve canon, private assets, source chapters; no imaginary neighborhoods or premature 3D claims |
+| **Study** | Futuristic learning/citation system | Course/rubric dashboard, OneDrive document access, Zotero local API / LibreOffice citations, APA checker, offline document text search, teaching/review workflow | Consent to account linking; no sync overwrite; preserve notes and feedback |
+| **Forage / Deep Forage** | Genuine source-driven research, evidence relationships | One document index backed initially by SQLite FTS5; provenance/citations, comparisons, saved sources, knowledge graph, full-text ingestion where approved | Separate source evidence from inference, avoid private-file traversal without scope; no unnecessary vector DB service |
+| **Kali Bay** | Native cyber operations with defensive/forensic labs | Integrate existing rootless Podman Kali environment, open only authorized tools, Wireshark, OWASP ZAP and optional Greenbone reports, evidence ledger, saved repeatable authorized test plans | Kali remains isolated; no unrestricted host root, blind scans or autonomous offensive activity |
+| **Media Center / Nova / BCN** | Immersive theater and radio/media management | Existing broadcaster status, Liquidsoap/Icecast health, Nova schedule/program queue, music catalog and playback, FFmpeg decoder preflight; optional Jellyfin library browsing after cost review | Preserve active broadcast and music metadata; do not restart station during UI work |
+| **Art Lab** | Real creation, edit, painting and image pipeline | Existing drawing/outline tools + open real installed Krita, GIMP, Inkscape, Blender and Kdenlive with project-specific handoff; asset library, versioning and export | Never recreate missing Broken World album art or overwrite originals |
+| **Dev Bay** | Build, test, package and validate OS/software | Existing read-only git tools, CI checks, test reports, dependency/build truth, PR review, reproducible install manifests | Keep owner-private code off public GitHub; do not auto-apply privileged steps |
+| **Webbie bay (integration ONLY)** | Same Webbie embedded into the entire OS | Show and interact with the *existing* resident service, read-only capability/state summaries, in-bay context/handoff, permission-aware Spider Eye status, one STOP | No new model/voice/agent service here; independent Webbie development belongs to its project |
+| **Spider Eye (System/Devices integration)** | Ultimately replace God's Eye after parity proven | Desktop accessibility via AT-SPI2, consented PipeWire/portal screen capture, app/window metadata, user-visible permission and evidence log | Preserve God’s Eye until actual feature parity, rollback and consent testing |
+
+## Important fresh 2026 platform findings
+
+- **Ubuntu 26.10 released October 15, 2026**, with nine months of support through July 2027. Keep installed Ubuntu Studio 26.04.1 LTS safe and test first: https://documentation.ubuntu.com/release-notes/26.10/
+- **Plasma 6.8 released October 14, 2026**, and retires KDE Plasma **X11 sessions**. Individual legacy X11 apps continue via XWayland. Verify The Web's Qt5/X11-specific window and capture techniques on Wayland **before** adopting Plasma 6.8. KDE's new Union styling is still beta, so test theme parity before enabling: https://kde.org/announcements/plasma/6/6.8.0/
+- KWin offers supported window scripting: https://develop.kde.org/docs/plasma/kwin/
+- KDE desktop scripting exposes Activities and panel control: https://develop.kde.org/docs/plasma/scripting/api/
+- Qt Quick 3D supports mixing Qt Quick 2D and 3D content, but the current **PyQt5** The Web shell cannot simply import a Qt6/PySide6 UI in the same running process as a drop-in widget. First test a compatible rendering strategy and GPU overhead: https://doc.qt.io/qt-6/qtquick3d-index.html
+- XDG ScreenCast portals mediate display capture and can manage consent/persistence; AT-SPI2 provides semantics for accessible applications: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.ScreenCast.html and https://www.freedesktop.org/wiki/Accessibility/AT-SPI2/
+- KDE Connect can integrate devices and files: https://apps.kde.org/kdeconnect/
+- SQLite FTS5 has ranked full-text search without a separately operated DB service: https://sqlite.org/fts5.html
+- Zotero local API supports offline lookup with explicit user enablement and write authorization: https://www.zotero.org/support/dev/web_api/v3/local_api
+- Existing-source Podman rootless isolation: https://docs.podman.io/en/latest/markdown/podman.1.html
+- Liquidsoap streaming chain: https://liquidsoap.readthedocs.io/en/latest/content/quick_start.html
+- KOrganizer account-backed calendar and task features: https://kontact.kde.org/components/korganizer/
+- Blender glTF exporter and Krita automation: https://docs.blender.org/api/dev/bpy.ops.export_scene.html and https://docs.krita.org/en/user_manual/python_scripting.html
+- Restic verifiable backups: https://restic.readthedocs.io/en/stable/index.html
+- For OneDrive, MS Graph delta supports change tracking; **rclone bisync can cause data loss if used incorrectly**. Treat read-only status or one-way copy as first integration, not immediate automated two-way sync: https://learn.microsoft.com/graph/api/driveitem-delta and https://rclone.org/bisync/
+
+## Priority and definition of done
+
+**P0: Release safety and compatibility.** Reconcile current installed owner-specific code against source, fix missing dependencies, audit all services and KDE/X11/Wayland compatibility; never approve install from source-only checks. Test rollback/recovery and preserve all Ubuntu Studio programs.
+
+**P1: Finish functionality already present.** One Home with live services/mission state; real author manuscript and canon tools; real Study course and file/citation flow; real Kali lab operations; Media radio/playback and metadata; Art Lab editing handoff; Devices management; Productivity and Communications. Eliminate dependence on old MAX/Universal launchers while preserving specialized installed applications.
+
+**P2: Deep functionality without service bloat.** Shared optional search, project files and evidence, connections, creative asset library, device sync, previews and audits.
+
+**P3: Production immersion.** Consistent original purple cinematic bay visuals, interactive Godot/Qt-compatible 3D scene where technically sustainable, performance budgets for HDD/CPU graphics, visual accessibility, offline fallback, tested target hardware. Do not pretend current 2D canvases are completed 3D bays.
+
+**Done means:** native bay starts from the real Web desktop; feature actually works against the correct local files/service; preserves previous functionality; keyboard/mouse and multi-monitor tested; untrusted inputs/permissions controlled; installs once, with backup and rollback; owner checks on running machine. The development PR stays draft until all blocked owner files are reviewed and acceptance checks pass.
+
+## Newly recommended tools versus user approvals
+
+**Already approved:** One integrated Web, original bay purposes, immersive visual direction, original projects and applications preserved, private owner review, consolidated install, Spider Eye eventually replacing God's Eye, and the Webbie/Nova integration boundary.
+
+**Fresh recommendations requiring compatibility verification, not yet claimed as installed or approved:** KDE 6.8 / Wayland migration work, Qt Quick 3D, AT-SPI2/portals for Spider Eye, SQLite FTS5 unification, Zotero, Restic, Kup, Jellyfin, Element, additional scanning/reporting tools. Choosing a technology does not authorize installation, credential access, account pairing, device capture, or changes to external services.
