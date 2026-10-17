@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 import re
 import stat
@@ -105,3 +107,42 @@ def model_readiness(*, path=DEFAULT_CHOICE_PATH, available=None):
         "heretic_available": tuple(model for model in models
                                    if "heretic" in model.casefold()),
     }
+
+
+# The reviewed Q4 GGUF is downloaded only through direct owner opt-in.
+PREBUILT_SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "install_everyday_heretic.sh"
+
+
+def launch_prebuilt_heretic(*, owner_clicked=False, script=PREBUILT_SCRIPT,
+                           popen=None, console=None, disk_free_bytes=None):
+    """Request one owner-directed download/activation terminal.
+
+    The terminal script confirms this exact model exists in local Ollama and
+    only then selects it for permanent resident conversations.
+    """
+    if owner_clicked is not True:
+        raise PermissionError("A deliberate local owner confirmation is required")
+    script = Path(script)
+    if (script.is_symlink() or not script.is_file()
+            or script.resolve() != PREBUILT_SCRIPT.resolve()):
+        raise PermissionError("Reviewed resident Heretic setup is unavailable")
+    mode = script.stat()
+    if not stat.S_ISREG(mode.st_mode) or mode.st_mode & 0o022:
+        raise PermissionError("Untrusted Heretic install script permissions")
+    which = shutil.which if console is None else console
+    if not which("konsole"):
+        raise RuntimeError("Open the native Webbie lab from a desktop with Konsole")
+    if not which("ollama"):
+        raise RuntimeError("Local Ollama is required")
+    free = (shutil.disk_usage(Path.home()).free
+            if disk_free_bytes is None else disk_free_bytes)
+    if free < 10 * 1024 ** 3:
+        raise RuntimeError("Need at least 10 GiB free disk for the quantized model")
+    runner = popen or subprocess.Popen
+    runner(["konsole", "--hold", "-e", "bash", str(script),
+            "--approved-by-owner"],
+           stdin=subprocess.DEVNULL,
+           stdout=subprocess.DEVNULL,
+           stderr=subprocess.DEVNULL,
+           start_new_session=True)
+    return True
