@@ -61,6 +61,60 @@ class NativeFeatureAdoptionTests(unittest.TestCase):
                       result["outstanding_gates"])
         self.assertFalse(result["installation_authorized"])
 
+    def test_plasma_68_is_a_target_not_claimed_as_installed(self):
+        plan = next(row for row in policy.prioritized()
+                    if row["key"] == "plasma-68")
+        self.assertIn("target", plan["title"].lower())
+        self.assertEqual(plan["stage"], "proposal_only")
+        self.assertIn("Plasma 6.8 is a TARGET", policy.summary_text())
+        self.assertFalse(plan["installation_authorized"])
+
+    def test_26_10_best_features_remain_separate_from_distro_upgrade(self):
+        keys = {idea.key: idea for idea in policy.IDEAS}
+        for name in (
+            "ubuntustudio-audio-2610",
+            "ubuntustudio-app-selection-2610",
+            "ubuntustudio-livecode-2610",
+            "ubuntustudio-creative-suite-2610",
+            "ubuntu-2610-system-audit",
+        ):
+            self.assertIn(name, keys)
+            self.assertNotEqual(keys[name].mode, "release_upgrade")
+            self.assertFalse(policy.evaluate(keys[name])["installation_authorized"])
+        self.assertEqual(keys["ubuntu-2610"].mode, "release_upgrade")
+        self.assertIn("independent_backup_proven",
+                      policy.evaluate(keys["ubuntu-2610"])["outstanding_gates"])
+
+    def test_cross_distro_patterns_reuse_existing_spider_code(self):
+        keys = {idea.key: idea for idea in policy.IDEAS}
+        for name in (
+            "opensuse-update-batches", "opensuse-rollback-design",
+            "fedora-atomic-release-principles", "nixos-declarative-inventory",
+            "cosmic-native-tiling",
+        ):
+            with self.subTest(name=name):
+                self.assertTrue(keys[name].reuses_existing)
+                self.assertNotEqual(keys[name].mode, "release_upgrade")
+                self.assertFalse(policy.evaluate(keys[name])["installation_authorized"])
+        self.assertIn("ext4_btrfs_strategy_isolated",
+                      policy.evaluate(keys["opensuse-rollback-design"])
+                      ["outstanding_gates"])
+        self.assertIn("wayland_screen_and_window_parity",
+                      policy.evaluate(keys["cosmic-native-tiling"])
+                      ["outstanding_gates"])
+
+    def test_optional_audio_and_visual_features_require_non_disruption(self):
+        ideas = {idea.key: idea for idea in policy.IDEAS}
+        self.assertIn("broadcast_no_interruption",
+                      policy.evaluate(ideas["ubuntustudio-audio-2610"])
+                      ["outstanding_gates"])
+        self.assertIn("project_roundtrip_verified",
+                      policy.evaluate(ideas["ubuntustudio-creative-suite-2610"])
+                      ["outstanding_gates"])
+        self.assertIn("stop_revocation_verified",
+                      policy.evaluate(ideas["xdg-portal-permissions"])
+                      ["outstanding_gates"])
+
     def test_invalid_or_duplicate_release_policy_is_refused(self):
         source = policy.IDEAS[0]
         from dataclasses import replace
