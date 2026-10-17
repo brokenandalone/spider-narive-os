@@ -1,0 +1,136 @@
+"""Spider OS Home: living map of the actual native bays, not an app launcher.
+
+The Universal/MAX control centers are no longer required to find projects,
+advanced analysis or the proper installed Ubuntu Studio program. Navigation
+only opens native bay tabs already part of The Web, never new executables.
+"""
+from __future__ import annotations
+
+from collections import Counter
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QFrame, QGridLayout, QLabel, QPushButton,
+                              QScrollArea, QVBoxLayout, QWidget)
+
+from app_catalog import VISIBLE_WORKSPACES
+from bay_missions import MissionStore, BLUEPRINTS
+
+PURPOSES = {
+    "webbie": "Resident intelligence, research, voice, privacy and owner-controlled JARVIS operations",
+    "studio": "Record, play instruments, program drums, mix and publish original music",
+    "author": "Write novels, inspect canon, manage chapters and enter Broken World",
+    "study": "Learn, complete coursework, organize reference materials and prepare APA work",
+    "art-lab": "Draw, paint, make photo outlines and build cinematic visual artwork",
+    "media": "Watch films, manage your music and run BCN radio with Nova",
+    "kali-bay": "Use your authorized security laboratory and document findings",
+    "forage": "Gather sources, search and verify information",
+    "deep-forage": "Compare evidence and pursue deeper scientific or creative research",
+    "dev-bay": "Build and verify Spider OS source changes and software projects",
+    "communications": "Draft messages and connect approved communications services",
+    "productivity": "Review priorities and move work between native bays",
+    "devices": "Inspect cameras, keyboards, audio interfaces and connected hardware",
+    "system": "Inspect health, backups, rollback checkpoints and recovery status",
+}
+
+
+def dashboard_rows(missions, installed_apps):
+    """Pure summary for UI and tests; no files or programs are opened."""
+    tally = Counter()
+    for item in missions:
+        if (isinstance(item, dict) and item.get("bay") in PURPOSES
+                and item.get("status") not in ("done",)):
+            tally[item["bay"]] += 1
+    installed = Counter()
+    for app in installed_apps:
+        bay = getattr(app, "workspace", None)
+        if bay in PURPOSES:
+            installed[bay] += 1
+    return [
+        {
+            "bay": ident,
+            "name": BLUEPRINTS[ident][0],
+            "purpose": PURPOSES[ident],
+            "missions": tally[ident],
+            "programs": installed[ident],
+        }
+        for ident in VISIBLE_WORKSPACES if ident in PURPOSES
+    ]
+
+
+class SpiderHomeDashboard(QWidget):
+    def __init__(self, workspace_opener, installed_supplier, parent=None, store=None):
+        super().__init__(parent)
+        self.setObjectName("spiderNativeHomeDashboard")
+        self.workspace_opener = workspace_opener
+        self.installed_supplier = installed_supplier
+        self.store = store if store is not None else MissionStore()
+        self.buttons = {}
+        self.summaries = {}
+        root = QVBoxLayout(self)
+        header = QLabel("YOUR LIFE. ONE WEB.")
+        header.setStyleSheet(
+            "font-size:27px;font-weight:bold;color:#dfc5ff")
+        root.addWidget(header)
+        description = QLabel(
+            "These are native Spider OS workspaces, not another set of launchers. "
+            "Enter the real bay to use its projects, Webbie, instruments, advanced "
+            "analysis and all available Ubuntu Studio programs.")
+        description.setWordWrap(True)
+        root.addWidget(description)
+        self.status = QLabel("")
+        root.addWidget(self.status)
+        refresh = QPushButton("Refresh workspaces and installed tools")
+        refresh.clicked.connect(self.refresh)
+        root.addWidget(refresh)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        contents = QWidget()
+        grid = QGridLayout(contents)
+        grid.setSpacing(12)
+        for position, bay in enumerate(PURPOSES):
+            row, col = divmod(position, 3)
+            card = QFrame()
+            card.setObjectName("spiderHomeBayCard")
+            card.setStyleSheet(
+                "QFrame#spiderHomeBayCard {background:#1d1428;"
+                "border:1px solid #7848a8;border-radius:10px;"
+                "padding:8px;}")
+            stack = QVBoxLayout(card)
+            label = QLabel(BLUEPRINTS[bay][0].upper())
+            label.setStyleSheet("font-weight:bold;color:#dcb8ff")
+            stack.addWidget(label)
+            purpose = QLabel(PURPOSES[bay])
+            purpose.setWordWrap(True)
+            stack.addWidget(purpose, 1)
+            status = QLabel("")
+            status.setWordWrap(True)
+            self.summaries[bay] = status
+            stack.addWidget(status)
+            button = QPushButton("Enter " + BLUEPRINTS[bay][0])
+            button.clicked.connect(
+                lambda checked=False, selected=bay: self.workspace_opener(selected))
+            self.buttons[bay] = button
+            stack.addWidget(button)
+            grid.addWidget(card, row, col)
+        scroll.setWidget(contents)
+        root.addWidget(scroll, 1)
+        self.refresh()
+
+    def refresh(self):
+        try:
+            missions = self.store.read()
+            self.status.setText("Workspaces loaded. Project count is local-only.")
+        except (ValueError, OSError):
+            missions = []
+            self.status.setText(
+                "Project list unavailable. All native bays remain accessible.")
+        try:
+            applications = self.installed_supplier()
+        except (ValueError, OSError, TypeError):
+            applications = []
+        rows = dashboard_rows(missions, applications)
+        for row in rows:
+            self.summaries[row["bay"]].setText(
+                "{} unfinished missions · {} installed tool entries".format(
+                    row["missions"], row["programs"]))

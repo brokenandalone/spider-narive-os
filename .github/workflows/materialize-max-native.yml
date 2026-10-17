@@ -1,0 +1,35 @@
+name: Materialize reviewed MAX source in GitHub
+
+on:
+  push:
+    branches:
+      - feature/native-immersive-bays-v8-20261015
+    paths:
+      - 'tools/native_max_payload/part*.b85'
+      - 'tools/materialize_max_bundle.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  source-vendor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and extract reviewed v4 MAX source
+        run: |
+          /usr/bin/python3 tools/materialize_max_bundle.py
+          /usr/bin/python3 -m compileall -q spider_max_source/spider_monster
+      - name: Add the plain readable source modules to this feature branch
+        run: |
+          git config user.name 'spider-os-source-bot'
+          git config user.email 'spider-os-source-bot@users.noreply.github.com'
+          git add spider_max_source/spider_monster
+          if ! git diff --cached --quiet; then
+            git commit -m 'Vendor all 137 reviewed MAX operations into native bay source'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo 'Native MAX source already present and verified.'
+          fi

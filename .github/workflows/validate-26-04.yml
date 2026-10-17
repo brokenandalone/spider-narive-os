@@ -1,0 +1,75 @@
+name: Validate Ubuntu Studio 26.04 LTS baseline
+on:
+  push:
+    branches:
+      - reconciliation/ubuntu-studio-26.04-lts-20261015
+    paths:
+      - '.github/workflows/validate-26-04.yml'
+      - 'distro/**'
+      - 'tools/audit_installed_sources.py'
+      - 'tests/test_installed_source_audit.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-base-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out pinned reconciliation branch
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Check source and installation-audit syntax
+        run: |
+          bash -n distro/build-iso.sh
+          bash -n distro/verify-iso.sh
+          bash -n tests/qemu-install.sh
+          python3 -m py_compile tools/audit_installed_sources.py tests/test_installed_source_audit.py
+          python3 -m unittest discover -s tests -p 'test_installed_source_audit.py' -v
+          python3 tools/audit_installed_sources.py --help >/dev/null
+
+      - name: Verify official 26.04.1 image metadata and signatures
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          source distro/config/base.env
+          test "$UBUNTU_RELEASE" = "26.04"
+          test "$UBUNTU_CODENAME" = "resolute"
+          test "$UBUNTU_CHANNEL" = "release"
+          test "$UBUNTU_IMAGE_VERSION" = "26.04.1"
+          test "$UBUNTU_IMAGE_NAME" = "ubuntustudio-26.04.1-desktop-amd64.iso"
+          base="$UBUNTU_CDIMAGE_BASE/$UBUNTU_RELEASE_PATH"
+          mkdir -p build/upstream-probe
+          curl -fsSL --retry 3 --max-time 90 "$base/SHA256SUMS" -o build/upstream-probe/SHA256SUMS
+          curl -fsSL --retry 3 --max-time 90 "$base/SHA256SUMS.gpg" -o build/upstream-probe/SHA256SUMS.gpg
+          curl -fsSL --retry 3 --max-time 90 "$base/${UBUNTU_IMAGE_NAME%.iso}.manifest" -o build/upstream-probe/base.manifest
+          gpgv --keyring /usr/share/keyrings/ubuntu-archive-keyring.gpg build/upstream-probe/SHA256SUMS.gpg build/upstream-probe/SHA256SUMS
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from re import fullmatch
+          base = Path("build/upstream-probe")
+          image = "ubuntustudio-26.04.1-desktop-amd64.iso"
+          matches = [line.split() for line in (base / "SHA256SUMS").read_text().splitlines()
+                     if len(line.split()) == 2 and line.split()[1].lstrip("*") == image]
+          if len(matches) != 1 or not fullmatch(r"[a-fA-F0-9]{64}", matches[0][0]):
+              raise SystemExit("Expected one signed checksum for the pinned LTS image")
+          if not (base / "base.manifest").stat().st_size > 1000:
+              raise SystemExit("Upstream package manifest missing")
+          print("Official Ubuntu Studio 26.04.1 image checksum metadata: verified")
+          print("A signed checksum is NOT evidence an ISO was downloaded, built or installed.")
+          PY
+          printf '%s\n' 'LTS source contract and signed upstream image metadata verified.' 'Not verified: actual installed PC contents, full ISO, layer layout, encrypted boot, USB, GPU/audio, Webbie, or workspace runtime.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save upstream metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-studio-26-04-lts-source-metadata
+          path: build/upstream-probe/
+          if-no-files-found: ignore
+          retention-days: 14

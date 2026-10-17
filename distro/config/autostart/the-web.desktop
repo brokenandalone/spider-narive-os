@@ -1,8 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=The Web
-Comment=Spider OS native shell
+Name=The Web Preview
+Comment=Open the Spider OS desktop shell in a window
 Exec=python3 /usr/local/lib/spider-os/the-web/shell/main.py
+Icon=/usr/local/lib/spider-os/branding/icons/spider-os-logo.png
 Terminal=false
-X-GNOME-Autostart-enabled=true
+Categories=System;DesktopSettings;
+Hidden=true
 StartupNotify=false
