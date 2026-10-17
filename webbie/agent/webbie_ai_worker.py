@@ -15,6 +15,10 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# Share one owner-selected local model preference with the existing brain.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "brain"))
+from resident_model_choice import read_choice
+
 HERE = Path(__file__).resolve().parent
 PRIMARY_PATH = HERE / "webbie_brain_primary.py"
 _PRIMARY = None
@@ -167,7 +171,11 @@ def _answer(data):
         raise ValueError("Context name too large")
     start = time.monotonic()
     try:
-        wait = min(18.0, max(2.0, float(os.environ.get("WEBBIE_PRIMARY_WAIT_SECONDS", "14"))))
+        # Give a persistent alternate model enough CPU time to reply.
+        # Do not silently fall back to Qwen3 8B after the old 14s limit.
+        default_wait = 70 if read_choice() else 14
+        wait = min(105.0, max(2.0, float(os.environ.get(
+            "WEBBIE_PRIMARY_WAIT_SECONDS", str(default_wait)))))
         answer = _primary_reply(request_id, message, context_name, advisory_context, seconds=wait)
         _log("PRIMARY_SUCCESS", seconds=round(time.monotonic() - start, 2))
         mode = "primary"
