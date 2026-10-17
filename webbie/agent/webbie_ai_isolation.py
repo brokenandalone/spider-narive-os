@@ -15,6 +15,10 @@ import time
 import uuid
 from pathlib import Path
 
+# Share one owner-selected local model preference with the existing brain.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "brain"))
+from resident_model_choice import read_choice
+
 HERE = Path(__file__).resolve().parent
 WORKER = HERE / "webbie_ai_worker.py"
 _LOCK = threading.Lock()
@@ -86,10 +90,14 @@ def respond(message, context_name="Spider", advisory_context=None):
     """Compatible with brain.respond(message, context_name, advisory_context)."""
     global _BUFFER
     try:
-        max_wait = float(os.environ.get("WEBBIE_AI_WORKER_TIMEOUT", "28"))
+        # A full-size owner-selected local model can take longer to respond
+        # on the installed CPU. The original 8B default remains quick.
+        default_wait = 90 if read_choice() else 28
+        max_wait = float(os.environ.get(
+            "WEBBIE_AI_WORKER_TIMEOUT", str(default_wait)))
     except (ValueError, OverflowError):
-        max_wait = 28
-    max_wait = min(50, max(4, max_wait))
+        max_wait = 90 if read_choice() else 28
+    max_wait = min(120, max(4, max_wait))
     if not _LOCK.acquire(timeout=2):
         return "I am finishing another AI request. My desktop controls are still available."
     try:
