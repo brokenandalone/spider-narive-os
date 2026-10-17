@@ -51,7 +51,7 @@ No inspection of these source files establishes that the user's currently runnin
 ## Important fresh 2026 platform findings
 
 - **Ubuntu 26.10 released October 15, 2026**, with nine months of support through July 2027. Keep installed Ubuntu Studio 26.04.1 LTS safe and test first: https://documentation.ubuntu.com/release-notes/26.10/
-- **Plasma 6.8 released October 14, 2026**, and retires KDE Plasma **X11 sessions**. Individual legacy X11 apps continue via XWayland. Verify The Web's Qt5/X11-specific window and capture techniques on Wayland **before** adopting Plasma 6.8. KDE's new Union styling is still beta, so test theme parity before enabling: https://kde.org/announcements/plasma/6/6.8.0/
+- **Plasma 6.8 released October 14, 2026**, and retires KDE Plasma **X11 sessions**. Individual legacy X11 apps continue via XWayland. **Plasma 6.8 is the owner-approved TARGET, not the installed version.** Verify The Web's Qt5/X11-specific window and capture techniques on Wayland **before** adopting Plasma 6.8. KDE's new Union styling is still beta, so test theme parity before enabling: https://kde.org/announcements/plasma/6/6.8.0/
 - KWin offers supported window scripting: https://develop.kde.org/docs/plasma/kwin/
 - KDE desktop scripting exposes Activities and panel control: https://develop.kde.org/docs/plasma/scripting/api/
 - Qt Quick 3D supports mixing Qt Quick 2D and 3D content, but the current **PyQt5** The Web shell cannot simply import a Qt6/PySide6 UI in the same running process as a drop-in widget. First test a compatible rendering strategy and GPU overhead: https://doc.qt.io/qt-6/qtquick3d-index.html
@@ -101,4 +101,76 @@ The existing Dev Bay now has **Show best ideas for Spider OS**. It reads the one
 
 **Practical access after a separately approved release:** Open **Dev Bay → Show best ideas for Spider OS**. In a source checkout, `python3 the-web/shell/native_feature_adoption.py` produces the same static report. The report does not inspect the installed system, establish real gate completion or certify that a migration is safe.
 
-**Specific direction for 26.10 / Plasma 6.8:** Adopt well-supported API-level features and native-bay changes first. Keep the **Ubuntu Studio 26.10 migration on HOLD** while boot synchronization, independent backups, verified restore, official upgrader availability and host acceptance are unresolved. Plasma 6.8 needs real Wayland compatibility testing and supported distribution packages before considering a runtime switch. Installing all newer binaries is **not** a shortcut.
+**Specific direction for 26.10 / Plasma 6.8:** Adopt well-supported API-level features and native-bay changes first. Keep the **Ubuntu Studio 26.10 migration on HOLD** while boot synchronization, independent backups, verified restore, official upgrader availability and host acceptance are unresolved. Plasma 6.8 is the TARGET, not installed. Its adoption needs real Wayland compatibility testing and supported distribution packages before a runtime switch. Installing all newer binaries is **not** a shortcut.
+
+## Cross-distro feature adoption: best of 26.10 and beyond (owner correction October 16)
+
+**Ground truth: Plasma 6.8 is a GOAL, not Spider OS's installed Plasma version.**
+The installed Spider OS is still based on Ubuntu Studio 26.04.1 LTS
+(owner-reported), with custom The Web/X11 source. The separate Ubuntu Studio
+26.10 release migration remains **HOLD** because of the active `/dev/sda1`
+boot arrangement and unverified full independent backup/restore.
+
+**Never install foreign distro repositories or mix Fedora RPMs, Arch AUR,
+openSUSE zypper, NixOS generations, COSMIC compositor binaries or Plasma 6.8
+packages into the live Ubuntu Studio 26.04 APT environment.** Borrow their
+principles and supported app APIs, then implement them in the same existing
+Spider OS and bays.
+
+### Ubuntu Studio 26.10: portable NOW vs future operating-system migration
+
+Official release (2026-10-15):
+https://ubuntustudio.org/2026/10/ubuntu-studio-26-10-released/
+
+| Worth adopting into existing bay | How to adapt without 26.10 upgrade | Verification |
+|---|---|---|
+| Single-window audio settings, clearer PipeWire quantum controls | System/Studio integration surface the existing WirePlumber/PipeWire state and provide explicitly authorized changes only after preserving routing | Compare working mic/camera/audio chain and active BCN broadcast before and after; **do not touch live station automatically** |
+| Per-package selection rather than bundled audio/video/graphics installs | Improve the existing optional installed-tools catalog to show already installed vs compatible optional packages; no removal or automatic installation | Preserve every currently installed Ubuntu Studio package/app |
+| Sonic Pi, SuperCollider, SC3 plugins, JNoise | Optional controls/open-existing-program handoff within native Studio (audio engine built in separate Studio thread) | Confirm actual binary availability and permissions; low-latency testing; no duplicate DAW |
+| Updated Ardour, Krita, GIMP, Kdenlive, OBS, Audacity | Provide compatible file/project handoffs in existing Studio, Art Lab, Media; do **not** promise their 26.10 binary versions are supported by 26.04 | Check project round-trip and plugin compatibility |
+| Ubuntu kernel 7.3, systemd 261, OpenSSL 4, Rust coreutils and KDE Gear refresh | **Compatibility auditing only** in System/Dev Bay; these are distro-level replacements, not source features we can safely cherry-pick | Active sda1 boot/kernel parity, SysV generator removal, legacy PKCS#11 engines and script behavior; normal distribution upgrade later |
+| Opt-in local dictation (Myna) in desktop release announcement | Investigate permission-gated dictation handoff in Communications/Study *only if it can use the existing speech path* | No duplicate resident Webbie or always-on microphone |
+
+Official release base (26.10; Linux kernel/systemd/OpenSSL):
+https://documentation.ubuntu.com/release-notes/26.10/
+Ubuntu 26.10 announcement (opt-in Myna):
+https://lists.ubuntu.com/archives/ubuntu-announce/2026-October/000330.html
+
+### Best ideas from other Linux distributions
+
+| Source | Borrow the principle, not the distribution | Existing Spider OS home | Technical limit |
+|---|---|---|---|
+| **openSUSE Tumbleweed / openQA** | Tested batches of interoperating updates and functional smoke tests | Existing GitHub tests, Dev Bay, System | Tests must exercise real bay/services, not merely green Python imports; https://doc.opensuse.org/documentation/tumbleweed/updating_upgrading_reverting/ |
+| **openSUSE transactional-update / Snapper** | Atomic update receipts and documented recovery | Existing release_batch + private backups | Their snapshot implementation relies on Btrfs; Spider's current root is not Btrfs. **Never claim Btrfs snapshots are available.** https://manpages.opensuse.org/Tumbleweed/transactional-update/transactional-update.8.en.html |
+| **Fedora Atomic / Kinoite** | Versioned and checksum-verified update, rollback of application/system payload without deleting personal projects | Existing single Spider OS release manifest, rollback | Do **not** install rpm-ostree or rebase Ubuntu to Fedora. https://coreos.github.io/rpm-ostree/administrator-handbook/ |
+| **NixOS** | Desired-state inventory, reproducible configs, generations as a design principle | Native apps and services manifests, Dev/System | Do **not** replace Ubuntu package management with NixOS or publish private machine configuration. https://wiki.nixos.org/wiki/Overview_of_the_NixOS_Linux_distribution |
+| **Pop!_OS / COSMIC** | Dynamic per-workspace tiling, pinned workspaces, theme design principles | Existing The Web and KDE/KWin window management | Do **not** run a second compositor/desktop. https://system76.com/cosmic |
+| **Freedesktop XDG portals** (cross-distro) | User-consented window sharing and Wayland screen awareness | Existing Spider Eye in System/Devices; use existing global STOP | Revocable user consent, PipeWire, desktop portal backend; https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.ScreenCast.html |
+
+### Execution rule
+
+1. Rank candidate features using the **already implemented** Dev Bay
+   `native_feature_adoption.py` report. Distro of origin is research
+   provenance, not an install request.
+2. Choose the applicable **existing** The Web/bay entry point; no new
+   launchers, independent agents, duplicate dashboard, second audio studio.
+3. Prefer a source-only change on the installed OS version, then a supported
+   API, then an isolated test. Require separate OS migration for
+   kernel/Plasma/systemd/OpenSSL changes.
+4. Preserve all owner-specific behavior and check that the existing release
+   manifest cannot overwrite protected customized installed files.
+5. For Plasma 6.8, prove Wayland/KWin/portals/Qt5 compatibility, live-bay
+   startup, input/audio status and rollback in a protected test
+   environment. Plasma 6.8 is never silently marked as installed.
+6. For 26.10, respect the independent backup, active sda1 boot
+   synchronization, restore rehearsal, upgrader availability and
+   host-acceptance gates in existing PR #115.
+7. Only apply after owner-reviewed backup/rollback and **actual installed
+   system** validation. A green source-only CI run never suffices.
+
+Implementation updated in the **same existing native-bays branch**:
+`the-web/shell/native_feature_adoption.py`, shown from the existing
+Dev Bay; `tests/test_native_feature_adoption.py`. These entries are
+**proposals and readiness requirements**, not implemented packages, new
+applications, Plasma installation, or authorization to modify the
+resident desktop.
