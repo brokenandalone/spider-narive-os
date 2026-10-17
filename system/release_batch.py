@@ -248,6 +248,7 @@ APP_FILES = (
     'the-web/shell/workspace_files.py',
     'tools/ubuntu_studio_app_inventory.py',
     'tools/ubuntu_studio_package_inventory.py',
+    'the-web/shell/native_feature_adoption.py',
     'the-web/shell/native_utility_bays.py',
     'the-web/shell/webbie_research_panel.py',
     'the-web/shell/webbie_native_operations.py',
