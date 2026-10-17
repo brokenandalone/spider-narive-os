@@ -61,6 +61,55 @@ class NativeFeatureAdoptionTests(unittest.TestCase):
                       result["outstanding_gates"])
         self.assertFalse(result["installation_authorized"])
 
+    def test_app_catalog_reuses_existing_bays_and_sources(self):
+        self.assertGreaterEqual(len(policy.APP_CHOICES), 20)
+        keys = [choice.key for choice in policy.APP_CHOICES]
+        self.assertEqual(len(keys), len(set(keys)))
+        for row in policy.app_choices():
+            self.assertEqual(row["visibility"], "not_audited")
+            self.assertFalse(row["preferred_app_changed"])
+            self.assertFalse(row["old_application_removed"])
+            self.assertFalse(row["spider_app_completed"])
+            self.assertGreaterEqual(len(row["required_checks"]), 8)
+            self.assertTrue(row["source"].startswith("https://"))
+        report = policy.app_transition_text()
+        self.assertIn("No current apps uninstalled", report)
+        self.assertIn("optional later removal", report)
+        self.assertNotIn("apt install", report)
+
+    def test_menu_discovery_cannot_claim_installed_or_replaced(self):
+        from types import SimpleNamespace
+        apps = [
+            SimpleNamespace(desktop_id="org.mozilla.firefox.desktop",
+                            name="Firefox"),
+            SimpleNamespace(desktop_id="org.kde.krita.desktop",
+                            name="Krita"),
+        ]
+        choices = {row["key"]: row for row in policy.app_choices(apps)}
+        self.assertEqual(choices["web-research"]["visibility"], "visible_in_app_menu")
+        self.assertEqual(choices["art-paint"]["visibility"], "visible_in_app_menu")
+        self.assertEqual(choices["research-citations"]["visibility"], "not_seen_in_app_menu")
+        self.assertEqual(choices["file-manager"]["visibility"], "not_seen_in_app_menu")
+        self.assertFalse(choices["art-paint"]["preferred_app_changed"])
+        self.assertFalse(choices["art-paint"]["old_application_removed"])
+        self.assertIn("Menu visibility is not a functional test",
+                      policy.app_transition_text(apps))
+        with self.assertRaises(TypeError):
+            policy.app_choices([SimpleNamespace(name=None, desktop_id=1)])
+
+    def test_dev_bay_shows_apps_in_same_feature_button(self):
+        shell = (ROOT / "the-web/shell/native_utility_bays.py").read_text()
+        tree = ast.parse(shell)
+        dev = next(node for node in tree.body
+                   if isinstance(node, ast.ClassDef) and
+                   node.name == "DevBayPanel")
+        methods = {node.name for node in dev.body
+                   if isinstance(node, ast.FunctionDef)}
+        self.assertIn("show_adoption_priorities", methods)
+        self.assertIn("native_app_transition_text(visible_apps)", shell)
+        self.assertIn("discover_apps()", shell)
+        self.assertEqual(shell.count("spiderNativeFeatureAdoptionButton"), 1)
+
     def test_plasma_68_is_a_target_not_claimed_as_installed(self):
         plan = next(row for row in policy.prioritized()
                     if row["key"] == "plasma-68")
