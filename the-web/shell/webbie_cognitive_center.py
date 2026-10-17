@@ -20,6 +20,9 @@ from focus_tasks import current_focus, focus_answer
 from privacy_controls import private_session_active, set_private_session, privacy_explanation
 from local_models import configured_choice
 from local_model_inventory import inspect_local_models, report_lines
+from local_models import installed_models
+from resident_model_choice import (read_choice, select_installed_model,
+                                   restore_default)
 from heretic_lab import (inspect_heretic, plan_experiment, launch_experiment,
                          launch_lab_setup, EXPERIMENT_MODELS)
 from proactive_checks import status_message
@@ -81,6 +84,7 @@ class WebbieCognitiveDialog(QDialog):
         self.model_worker=None
         self.hearing_worker=None
         self.heretic_dialog=None
+        self.resident_model_dialog=None
         root=QVBoxLayout(self)
         title=QLabel("WEBBIE · COGNITIVE CONTROL CENTER")
         title.setStyleSheet("font-size:19px; font-weight:bold; color:#c4b5fd")
@@ -112,6 +116,10 @@ class WebbieCognitiveDialog(QDialog):
         inspect.setObjectName("webbieInspectModelsButton")
         inspect.clicked.connect(self.inspect_models)
         actions.addWidget(inspect)
+        choose_brain=QPushButton("My everyday AI brain")
+        choose_brain.setObjectName("webbiePersistentBrainButton")
+        choose_brain.clicked.connect(self.choose_brain)
+        actions.addWidget(choose_brain)
         readiness=QPushButton("Inspect Webbie readiness")
         readiness.setObjectName("webbieReadinessButton")
         readiness.clicked.connect(self.inspect_readiness)
@@ -162,7 +170,10 @@ class WebbieCognitiveDialog(QDialog):
             item=current_focus(workspace)
         except (ValueError,OSError):
             item=None
+        chosen=read_choice()
         lines=[f"Workspace: {workspace}",
+               "Everyday AI brain: "+(chosen or configured_choice("brain") or "default")
+               + (" (owner-selected across restarts)" if chosen else " (Spider OS default)"),
                "Active focus: "+(
                    item["title"]+" | Next: "+item["next_step"]
                    if item else "No owner-created task selected"),
@@ -171,6 +182,14 @@ class WebbieCognitiveDialog(QDialog):
                "SPEAKER TRUST",trust_status(),
                "This is advisory status. No PC task has been executed."]
         self.report.setPlainText("\n".join(lines))
+
+    def choose_brain(self):
+        if self.resident_model_dialog is None:
+            self.resident_model_dialog=ResidentBrainDialog(self)
+        self.resident_model_dialog.refresh()
+        self.resident_model_dialog.show()
+        self.resident_model_dialog.raise_()
+        self.resident_model_dialog.activateWindow()
 
     def open_missions(self):
         if callable(self.mission_callback):
@@ -365,6 +384,10 @@ class HereticExperimentDialog(QDialog):
         self.setup_button.setObjectName("webbieHereticSetupButton")
         self.setup_button.clicked.connect(self.install_setup)
         actions.addWidget(self.setup_button)
+        self.use_brain_button = QPushButton("Use installed model as Webbie's everyday brain")
+        self.use_brain_button.setObjectName("webbieHereticEverydayBrainButton")
+        self.use_brain_button.clicked.connect(self.open_resident_brain)
+        actions.addWidget(self.use_brain_button)
         self.run_button = QPushButton("Start supervised experiment in Konsole")
         self.run_button.setObjectName("webbieHereticStartButton")
         self.run_button.clicked.connect(self.start)
@@ -391,6 +414,14 @@ class HereticExperimentDialog(QDialog):
             "The interactive Konsole run is managed there; press Ctrl+C in "
             "that Konsole to stop it.")
 
+
+    def open_resident_brain(self):
+        """Switch her normal conversation model, not Heretic's training CLI."""
+        parent=self.parent()
+        if isinstance(parent, WebbieCognitiveDialog):
+            parent.choose_brain()
+        else:
+            self.report.setPlainText("Choose everyday AI brain in Webbie's Cognitive Center.")
 
     def install_setup(self):
         """Only a deliberate GUI button plus in-terminal consent installs."""
@@ -452,3 +483,110 @@ class HereticExperimentDialog(QDialog):
             self.report.setPlainText(
                 "Heretic did not start: " + str(error)[:500] +
                 "\nNo Webbie production model was changed.")
+
+
+class ResidentBrainDialog(QDialog):
+    """Choose one existing local Ollama model to answer Webbie ALL THE TIME."""
+
+    def __init__(self,parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Webbie · Everyday AI brain")
+        self.setObjectName("webbieResidentBrainDialog")
+        self.resize(640, 440)
+        layout=QVBoxLayout(self)
+        intro=QLabel(
+            "Choose a locally installed Ollama model as Webbie's ongoing "
+            "conversational brain. A Heretic-derived model is eligible once "
+            "it's compatible with Ollama and installed here. The choice "
+            "persists across computer restarts and Webbie conversations. "
+            "Natasha, memories, existing services and all native bay tools stay "
+            "part of the SAME resident Webbie. No model downloads occur here.")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        self.models=QComboBox()
+        self.models.setObjectName("webbieInstalledBrainChoices")
+        layout.addWidget(self.models)
+        self.status=QTextEdit()
+        self.status.setReadOnly(True)
+        layout.addWidget(self.status)
+        row=QHBoxLayout()
+        layout.addLayout(row)
+        self.activate=QPushButton("Make this Webbie's everyday brain")
+        self.activate.setObjectName("webbieActivatePermanentBrain")
+        self.activate.clicked.connect(self.select)
+        row.addWidget(self.activate)
+        reset=QPushButton("Use original Qwen3 brain")
+        reset.setObjectName("webbieRestoreOriginalBrain")
+        reset.clicked.connect(self.reset)
+        row.addWidget(reset)
+        close=QPushButton("Close")
+        close.clicked.connect(self.close)
+        row.addWidget(close)
+        self.refresh()
+
+    def refresh(self):
+        # Only the installed Ollama model inventory; no pulls, cloud calls,
+        # process launches or changes to any resident service.
+        installed=installed_models(timeout=2)
+        chosen=read_choice()
+        self.models.blockSignals(True)
+        self.models.clear()
+        for name in installed:
+            label=name+(" · HERETIC" if "heretic" in name.casefold() else "")
+            self.models.addItem(label, name)
+        if chosen and chosen in installed:
+            self.models.setCurrentIndex(installed.index(chosen))
+        self.models.blockSignals(False)
+        self.activate.setEnabled(bool(installed))
+        state=("Current owner selection: "+(chosen or "Original Spider OS model")
+               + "\nAvailable local Ollama models: "+str(len(installed))
+               + "\n\nThis changes NORMAL conversation replies immediately, "
+               "and remains in effect after restart. The full memory-aware "
+               "brain and native tool authorization stay in place.\n"
+               "Heretic model processing itself is never continuously run. "
+               "Only its finished model can be used as the resident brain.")
+        if chosen and chosen not in installed:
+            state+="\n\nThe saved model is not installed. Restore the original model below."
+        self.status.setPlainText(state)
+
+    def select(self):
+        name=self.models.currentData()
+        if not isinstance(name,str):
+            return
+        message=(
+            "Use "+name+" as Webbie's EVERYDAY conversation model, including "
+            "future chats and restarts?\n\n"
+            "This model stays local to Ollama. Webbie's long-term memory, "
+            "Natasha voice, native workspaces and owner control are unchanged.\n\n"
+            "The original Qwen3 8B remains installed and selectable."
+        )
+        if QMessageBox.question(
+            self,"Choose Webbie's permanent brain",message,
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No
+        )!=QMessageBox.Yes:
+            return
+        try:
+            select_installed_model(name,owner_clicked=True)
+        except (OSError,ValueError,PermissionError) as error:
+            self.status.setPlainText(
+                "The model was NOT selected: "+str(error)[:400])
+            return
+        self.refresh()
+        self.status.append(
+            "\nActive preference saved. Webbie will use this model for "
+            "subsequent normal conversational turns without another prompt.")
+
+    def reset(self):
+        if QMessageBox.question(
+            self,"Restore original Webbie brain",
+            "Return everyday conversations to the installed Spider OS "
+            "Qwen3 model? This keeps other downloaded models available.",
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No
+        )!=QMessageBox.Yes:
+            return
+        try:
+            restore_default(owner_clicked=True)
+        except (OSError,ValueError,PermissionError) as error:
+            self.status.setPlainText("Could not restore model: "+str(error)[:400])
+            return
+        self.refresh()
