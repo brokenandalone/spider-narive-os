@@ -47,12 +47,14 @@ def _verified_files(folder,session):
     if presets.exists():
         if not presets.is_dir():
             raise SessionError("Invalid preset folder.")
+        preset_count=0
         for entry in presets.iterdir():
             if (entry.is_symlink() or not entry.is_file() or
                     PRESET_FILE.fullmatch(entry.name) is None or
                     not 0<entry.stat().st_size<=MAX_PRESET_BYTES):
                 raise SessionError("Unrecognized saved mix preset; archive was not created.")
-            if len(sources)>=MAX_PRESETS+25:
+            preset_count+=1
+            if preset_count>MAX_PRESETS:
                 raise SessionError("Limit of 100 mix presets per backup.")
             sources["mix-presets/"+entry.name]=entry
     size=0
