@@ -44,3 +44,17 @@ It requests the typed confirmation INSTALL HERETIC, checks for disk space, and i
 6. Reconcile remaining owner-installed code and pass hosted CI plus on-PC end-to-end voice/desktop tests before any single daily release.
 
 **No installation of the rebuilt system is authorized or performed by this branch.**
+
+## Persistent everyday brain: integrated in the native Webbie Cognitive Center
+
+Owner's intent: Heretic's *finished model behavior* should be available in every Webbie conversation, not just a standalone training panel. The real resident `webbie/brain/brain.py` now checks `resident_model_choice.read_choice()` on **each normal model turn**, before the original `webbie/config/default.json` model. The choice is owner-only and stored at `~/.config/spider-os/webbie-brain-choice.json` with 0600 permissions, without modifying root-owned Spider OS files. Restarting Webbie or the computer does not reset it.
+
+Open the **existing Webbie Cognitive Center > My everyday AI brain** or, in the Heretic panel, **Use installed model as Webbie's everyday brain**. Select a model that is already present in local Ollama and approve it once. Existing Natasha speech, Webbie long-term memory, offline/online modes, and native tool permissions continue through the same agent. Choose **Use original Qwen3 brain** to roll back the preference; this does not delete any model.
+
+A Hugging Face Heretic weight folder is not automatically an Ollama model. First convert/quantize it into a compatible local Ollama model, test its quality on the actual computer, and ensure it appears in the local `/api/tags` inventory. No model import, benchmark, replacement, download or training was performed by this GitHub commit. The selector does not automatically remove refusals from existing Qwen3 model weights, nor does it give the model more OS permissions. Emergency fallback intentionally remains the original `qwen3:8b` when the full brain fails.
+
+For CPU-constrained runs, the separate AI V2 worker now allows an owner-selected model up to a 70-second default primary wait and a 90-second outer response boundary, subject to configured caps. Existing default Qwen3 retains its previous lower limits. STOP and voice-turn cancellation remain as previously implemented; pending model inference itself may finish later in the background of the existing process.
+
+### Practical status
+
+This is a **GitHub source integration**, not an installation on the owner's customized Spider OS. Testing on the owner's computer, compatible Heretic-derived GGUF/Ollama model, voice calibration, and remaining installed-source reconciliation are still pending. Do not claim that Heretic was activated on the PC or that it gives Webbie unrestricted shell/root/device control.
