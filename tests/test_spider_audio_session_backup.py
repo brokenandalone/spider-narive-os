@@ -124,6 +124,17 @@ class PortableSongBackupTests(unittest.TestCase):
         with self.assertRaises(SessionError):
             _portable_manifest(suspect,self.session)
 
+    def test_backup_refuses_more_than_100_mix_presets(self):
+        presets=self.folder/"mix-presets"
+        for number in range(1,101):
+            (presets/f"preset-{number:032x}.json").write_text("{}")
+        backup=self.root/"too-many-presets.zip"
+        with self.assertRaisesRegex(SessionError,"Limit of 100 mix presets"):
+            create_backup(self.folder,backup)
+        self.assertFalse(backup.exists())
+        self.assertEqual(self.original_hash,
+                         inspect_session(self.folder)["tracks"][0]["sha256"])
+
     def test_backup_rejects_linked_presets_and_a_linked_output(self):
         link=self.folder/"mix-presets"/("preset-"+"a"*32+".json")
         link.symlink_to(self.preset)
