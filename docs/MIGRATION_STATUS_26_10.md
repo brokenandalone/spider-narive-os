@@ -1,0 +1,138 @@
+# Spider OS 26.10 Migration Status
+
+Updated: 2026-10-04
+
+## Repository policy
+
+The upgrade is being carried in both:
+
+- `brokenandalone/spider-narive-os`
+- `brokenandalone/Spider-OS1`
+
+`spider-narive-os` is the authoritative bootable implementation because it is the repository that produced the install that actually boots. `Spider-OS1` mirrors the roadmap and migration work without replacing the mature installer/qualification logic.
+
+## Real-machine preflight result
+
+Preflight run: 2026-10-04 21:28 local
+
+Result: PASS for the checks reviewed so far.
+
+Observed on the currently booting Spider OS:
+
+- UEFI boot
+- 465.8 GB internal disk
+- 512 MB FAT32 EFI System Partition mounted at /boot/efi
+- 449 MB ext4 /boot
+- LUKS2 encrypted /dev/sda5 with existing password unlock
+- LVM inside LUKS
+- 449 GB ext4 root volume
+- approximately 385 GiB free on /
+- no dpkg audit errors
+- no failed systemd units
+- release upgrader configured with Prompt=lts
+- current Spider OS identity reports Ubuntu 24.04 / Noble base
+
+Before invoking do-release-upgrade, still review:
+
+- lsb_release output
+- non-Ubuntu apt sources
+- package holds
+- Spider Core service state
+- Webbie user-service state
+- GRUB probe/version
+- recent high-severity boot errors
+- external backup of user/project data
+
+Do not use do-release-upgrade -d.
+
+## Real-machine preflight follow-up
+
+Observed after USB and service/repository checks:
+
+- 64 GB Kingston DataTraveler detected as /dev/sdb, 57.6 GiB usable, with /dev/sdb1 FAT32 label KINGSTON
+- package holds: none
+- Spider Core: active and enabled
+- Webbie user service: active and enabled
+- Webbie currently captures microphone audio through parec
+- GRUB 2.12-1ubuntu7.3
+- grub-probe reports ext2 for the ext4 root filesystem, which is normal for GRUB's ext2/ext3/ext4 filesystem module naming
+- third-party apt sources are present for Tailscale and Cloudflare/cloudflared
+- official Ubuntu Noble sources are also present
+- the third-party apt sources must be disabled before the release upgrade and restored/reconfigured only after the target release is stable
+- external backup to the 64 GB USB is still required before invoking do-release-upgrade
+
+## External backup completed
+
+Status: PASS
+
+- 64 GB Kingston DataTraveler reformatted as ext4 with label `SPIDER_BACKUP`
+- backup mounted at `/media/spider/SPIDER_BACKUP`
+- pre-upgrade backup includes the user's home directory, Spider OS payload, Spider Media Center, original Spider Media Player, critical system configuration, and preflight diagnostics
+- checksum verification completed successfully with no reported failures
+- approximately 48 GiB remained free on the backup drive after the backup
+- this external backup is the recovery anchor before the in-place release upgrade
+
+Next step: temporarily disable third-party apt repositories, fully update Ubuntu 24.04/Noble, reboot once, then re-run health checks before invoking the 24.04 -> 26.04.1 release upgrade.
+
+## Current phase
+
+### Phase 0: Preserve working system
+Status: COMPLETE IN GIT
+
+- working baseline branch exists
+- main remains untouched by 26.10 base changes
+- migration work is isolated from the current booting installation
+- current LUKS password unlock behavior remains unchanged
+
+### Phase 1: Ubuntu Studio 26.10 migration foundation
+Status: IN PROGRESS
+
+Implemented on `migration/ubuntu-studio-26.10`:
+
+- base configuration points to Ubuntu Studio 26.10 beta
+- codename is Stonking Stingray / `stonking`
+- beta image naming is centralized in `distro/config/base.env`
+- ISO builder now reads base settings from `base.env`
+- installed and live Spider OS identity follows the configured base
+- GitHub Actions resolves the Spider ISO name from configuration
+- build publishing notes follow the configured base
+- master plan and dual-repository sync rules are present on the migration branch
+
+Next gate:
+
+- validate the exact 26.10 ISO layer layout
+- adapt installer/source handling if 26.10 changed the Casper layout
+- build the migration ISO
+- boot live image
+- install to disposable virtual disk
+- remove ISO
+- boot installed virtual disk
+- verify writable root
+- verify Spider Core
+- verify Webbie
+- verify The Web
+- verify backgrounds/workspaces
+- reboot installed virtual disk again
+
+Do not merge into `main` until the installed-boot gate passes.
+
+## Shared feature queue after the 26.10 boot gate
+
+1. Rebuild The Web workspace framework and workspace backgrounds.
+2. School workspace with SNHU integration and the former Study background.
+3. Author workspace with manuscript/canon/research/publishing tools.
+4. Spider Studio upgrade on the 26.10 creative stack.
+5. Spider Media Center reintegration and qualification.
+6. Webbie Jarvis upgrade: continuous voice, modes, permissions, browser/site control, local/online routing, system/app control.
+7. Webbie autonomous research plus at least one self-selected learning topic every day.
+8. 256 GB Webbie Intelligence Vault.
+9. 64 GB Portable AI DJ.
+10. Kali Purple / Kali Bay.
+11. System + Recovery.
+12. Full final qualification.
+
+## Boot safety rule
+
+A feature is not worth losing the currently booting Spider OS.
+
+Any change that touches the base OS, bootloader, initramfs, encryption, Plasma startup, installer, Spider Core startup, Webbie startup, or The Web startup must have a tested rollback path before it is promoted.

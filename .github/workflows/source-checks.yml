@@ -1,0 +1,53 @@
+name: Spider OS source checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml python3-docx python3-pyqt5 dbus-bin
+      - name: Source and recovery regression tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Check complete native upgrade coverage and packaged payload
+        run: |
+          python3 tools/audit_upgrade_coverage.py --json
+          python3 -m py_compile tools/audit_upgrade_coverage.py
+      - name: Validate feature scripts
+        run: |
+          bash distro/validate-feature-complete.sh
+          bash -n tools/try-native-26-04.sh
+          bash -n system/bin/spider-guardian
+          bash -n system/bin/spider-vault
+          python3 -m py_compile system/guardian.py system/vault.py
+      - name: Shell and wallpaper smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_ACCESSIBILITY: '0'
+        run: timeout --kill-after=5 120 dbus-run-session -- python3 -u tests/check-the-web.py .
+      - name: Single bundled Spider OS release preflight and rollback syntax
+        run: |
+          python3 -m py_compile system/release_batch.py
+          python3 system/release_batch.py --check
+          python3 -m py_compile system/release_readiness.py
+          python3 system/release_readiness.py --json > /tmp/spider-release-readiness.json
+          bash -n the-web/package/install-author-webbie.sh
+          bash -n the-web/package/rollback-author-webbie.sh
+          bash -n the-web/package/check-webbie-vision-readiness.sh
+      - name: Legacy optional Webbie extras preflight
+        run: |
+          bash -n the-web/package/install-webbie-extras.sh
+          bash the-web/package/install-webbie-extras.sh --check
+      - name: School dashboard and APA export smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_ACCESSIBILITY: '0'
+        run: timeout --kill-after=5 120 dbus-run-session -- python3 -u tests/check-school-ui.py

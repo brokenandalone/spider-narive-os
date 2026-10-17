@@ -1,0 +1,12 @@
+[Unit]
+Description=Optional background Webbie OneDrive sync; does not block Webbie startup
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+AccuracySec=2min
+Persistent=false
+Unit=webbie-onedrive.service
+
+[Install]
+WantedBy=timers.target

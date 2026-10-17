@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import json, os, re, shutil, subprocess, time, urllib.request, uuid
+import json, os, re, shutil, subprocess, sys, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nova_host import NovaHost, HOST as ON_AIR_HOST, STATION as STATION_NAME, clean
 from nova_voice import synthesize, available_profiles, normalize_voice, configured_voice
 
@@ -129,9 +130,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json_headers(413)
                 self.wfile.write(b'{"error":"Invalid Nova request size"}')
                 return
-            body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            try:
+                body = json.loads(self.rfile.read(length).decode("utf-8"))
+            except (ValueError, UnicodeError):
+                self.send_json_headers(400)
+                self.wfile.write(b'{"error":"Invalid JSON request"}')
+                return
             if not isinstance(body, dict):
-                raise ValueError("Nova expects a JSON object")
+                self.send_json_headers(400)
+                self.wfile.write(b'{"error":"Nova expects a JSON object"}')
+                return
             context = body.get("context") if isinstance(body.get("context"), dict) else {}
             if self.path == "/dj/draft":
                 _, kind = production_context(body)

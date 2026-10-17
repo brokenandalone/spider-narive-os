@@ -1,0 +1,80 @@
+name: Verify Immersive Native Bays
+
+on:
+  pull_request:
+    paths:
+      - 'the-web/shell/immersive_bays.py'
+      - 'the-web/shell/main.py'
+      - 'tests/test_immersive_native_bays_v8.py'
+      - 'tests/test_workspace_max_native_integrated.py'
+      - 'tests/test_max_real_native_apps.py'
+      - 'tests/test_vendored_max_native_engine.py'
+      - 'spider_max_source/**'
+      - 'studio/main.py'
+      - 'author/main.py'
+      - 'study/study.py'
+      - 'kali-bay/ui/kali_bay.py'
+      - 'the-web/shell/workspace_max_native.py'
+      - '.github/workflows/verify-immersive-bays.yml'
+  push:
+    branches:
+      - feature/native-immersive-bays-v8-20261015
+    paths:
+      - 'the-web/shell/immersive_bays.py'
+      - 'the-web/shell/main.py'
+      - 'tests/test_immersive_native_bays_v8.py'
+      - '.github/workflows/verify-immersive-bays.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-bays:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and verify source
+        run: |
+          /usr/bin/python3 -m py_compile the-web/shell/immersive_bays.py the-web/shell/workspace_max_native.py the-web/shell/main.py studio/main.py author/main.py study/study.py kali-bay/ui/kali_bay.py
+          /usr/bin/python3 -m unittest discover -s tests -p 'test_immersive_native_bays_v8.py' -v
+          /usr/bin/python3 -m unittest discover -s tests -p 'test_workspace_max_native_integrated.py' -v
+          /usr/bin/python3 -m unittest discover -s tests -p 'test_max_real_native_apps.py' -v
+          /usr/bin/python3 -m unittest discover -s tests -p 'test_vendored_max_native_engine.py' -v
+      - name: Install Qt for offscreen smoke test
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y python3-pyqt5
+      - name: Construct and render all eight native scenes
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_ACCESSIBILITY: '0'
+          PYTHONPATH: the-web/shell
+        run: |
+          /usr/bin/python3 - <<'PY'
+          from PyQt5.QtWidgets import QApplication
+          from PyQt5.QtGui import QImage, QPainter
+          from immersive_bays import ImmersiveBay, SCENES
+          from workspace_max_native import NativeWorkspaceTools
+          app = QApplication([])
+          for workspace in SCENES:
+              widget = ImmersiveBay(workspace)
+              widget.resize(1000, 280)
+              widget.show()
+              app.processEvents()
+              image = QImage(widget.size(), QImage.Format_ARGB32)
+              image.fill(0)
+              painter = QPainter(image)
+              widget.render(painter)
+              painter.end()
+              assert not image.isNull(), workspace
+              widget.close()
+              tools = NativeWorkspaceTools(workspace)
+              tools.resize(750, 500)
+              tools.show()
+              app.processEvents()
+              assert tools.action.count() > 0, workspace
+              tools.close()
+              print("PASS", workspace)
+          PY

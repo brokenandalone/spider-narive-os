@@ -1,0 +1,11 @@
+[Unit]
+Description=Webbie optional OneDrive workspace sync (local first)
+ConditionPathExists=%h/.config/spider-os/onedrive.json
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/spider-os/system/onedrive.py sync
+TimeoutStartSec=3min
+NoNewPrivileges=true
+UMask=0077

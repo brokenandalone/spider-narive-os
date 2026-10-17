@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Spider Guardian
+Comment=Read-only Spider OS service and hardware diagnostics
+Exec=/usr/local/lib/spider-os/system/bin/spider-guardian
+Icon=spider-os-logo
+Terminal=true
+Categories=System;Utility;
