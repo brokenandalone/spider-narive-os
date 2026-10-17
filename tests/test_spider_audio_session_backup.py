@@ -101,6 +101,29 @@ class PortableSongBackupTests(unittest.TestCase):
         self.assertEqual(set(self.sessions.iterdir()),set(original))
         self.assertEqual(self.session["tracks"][0]["sha256"],self.original_hash)
 
+    def test_portable_backup_removes_private_source_paths_without_modifying_song(self):
+        before=(self.folder/"session.json").read_bytes()
+        self.assertIn(str(self.track).encode(),before)
+        backup=self.root/"portable.zip"
+        create_backup(self.folder,backup)
+        with zipfile.ZipFile(backup) as archive:
+            payload=archive.read("session.json")
+            self.assertNotIn(str(self.track).encode(),payload)
+            self.assertNotIn("source_path",json.loads(payload)["tracks"][0])
+        self.assertEqual((self.folder/"session.json").read_bytes(),before)
+        restored=restore_backup(backup,output_root=self.sessions)
+        self.assertEqual(inspect_session(restored)["tracks"][0]["sha256"],
+                         self.original_hash)
+
+    def test_portable_backup_rejects_changed_manifest_track_identity(self):
+        from studio.session_archive import _portable_manifest
+        altered=json.loads((self.folder/"session.json").read_text())
+        altered["tracks"][0]["sha256"]="0"*64
+        suspect=self.root/"altered.json"
+        suspect.write_text(json.dumps(altered))
+        with self.assertRaises(SessionError):
+            _portable_manifest(suspect,self.session)
+
     def test_backup_rejects_linked_presets_and_a_linked_output(self):
         link=self.folder/"mix-presets"/("preset-"+"a"*32+".json")
         link.symlink_to(self.preset)
