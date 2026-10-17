@@ -16,12 +16,12 @@ import tempfile
 import uuid
 import zipfile
 try:
-    from .session_project import inspect_session
-    from .multitrack import DEFAULT_OUTPUT,MAX_TOTAL_BYTES,SessionError
+    from .session_project import inspect_session,MAX_MANIFEST_BYTES
+    from .multitrack import DEFAULT_OUTPUT,MAX_TOTAL_BYTES,MAX_TRACKS,SessionError
     from .session_presets import PRESET_FILE,MAX_PRESET_BYTES
 except ImportError:
-    from session_project import inspect_session
-    from multitrack import DEFAULT_OUTPUT,MAX_TOTAL_BYTES,SessionError
+    from session_project import inspect_session,MAX_MANIFEST_BYTES
+    from multitrack import DEFAULT_OUTPUT,MAX_TOTAL_BYTES,MAX_TRACKS,SessionError
     from session_presets import PRESET_FILE,MAX_PRESET_BYTES
 
 LIMIT=MAX_TOTAL_BYTES+16*1024*1024
@@ -83,6 +83,37 @@ def _checked_copy(reader,writer,limit,expected=None):
     return amount,value
 
 
+
+def _portable_manifest(path,session):
+    """Return a checked archive copy without private original recording paths.
+
+    The saved session.json on disk is never changed.
+    """
+    if path.is_symlink() or not 0 < path.stat().st_size <= MAX_MANIFEST_BYTES:
+        raise SessionError("Saved song manifest is missing or oversized.")
+    try:
+        with path.open("r",encoding="utf-8") as source:
+            manifest=json.load(source)
+    except (OSError,ValueError,UnicodeError) as exc:
+        raise SessionError("Saved song manifest changed or cannot be read.") from exc
+    if type(manifest) is not dict:
+        raise SessionError("Saved song manifest changed during backup.")
+    tracks=manifest.get("tracks")
+    if (type(manifest.get("project_title")) is not str
+            or manifest["project_title"].strip()!=session["title"]
+            or type(tracks) is not list or len(tracks)!=len(session["tracks"])):
+        raise SessionError("Saved song manifest changed during backup.")
+    for row,verified in zip(tracks,session["tracks"]):
+        if (type(row) is not dict or row.get("filename")!=verified["filename"]
+                or row.get("sha256")!=verified["sha256"]):
+            raise SessionError("Saved song track metadata changed during backup.")
+        row.pop("source_path",None)
+    portable=json.dumps(manifest,sort_keys=True,ensure_ascii=False).encode("utf-8")
+    if not 0<len(portable)<=MAX_MANIFEST_BYTES:
+        raise SessionError("Portable song manifest is oversized.")
+    return portable
+
+
 def create_backup(folder,output_file):
     directory=Path(folder).expanduser()
     if directory.is_symlink() or not directory.is_dir():
@@ -102,9 +133,15 @@ def create_backup(folder,output_file):
                "project_title":session["title"],"members":{}}
         with zipfile.ZipFile(temp,"w",compression=zipfile.ZIP_STORED,allowZip64=True) as archive:
             for name,path in sorted(sources.items()):
-                with path.open("rb") as original, archive.open(name,"w",force_zip64=True) as stored:
-                    size,digest=_checked_copy(
-                        original,stored,LIMIT,originals.get(name))
+                if name=="session.json":
+                    portable=_portable_manifest(path,session)
+                    with archive.open(name,"w",force_zip64=True) as stored:
+                        stored.write(portable)
+                    size,digest=len(portable),hashlib.sha256(portable).hexdigest()
+                else:
+                    with path.open("rb") as original, archive.open(name,"w",force_zip64=True) as stored:
+                        size,digest=_checked_copy(
+                            original,stored,LIMIT,originals.get(name))
                 index["members"][name]={"size":size,"sha256":digest}
             archive.writestr(ARCHIVE_NAME,json.dumps(index,sort_keys=True))
         if output.is_symlink() or output.exists():
@@ -131,6 +168,22 @@ def _index_archive(archive):
         if (not legal or item.is_dir() or item.compress_type!=zipfile.ZIP_STORED
                 or item.flag_bits & 1 or item.file_size<1):
             raise SessionError("Archive has unsupported or unsafe file contents.")
+    wav_count=0
+    preset_count=0
+    for item in members:
+        name=item.filename
+        if name=="session.json" and item.file_size>MAX_MANIFEST_BYTES:
+            raise SessionError("Archived session manifest is oversized.")
+        if WAV_NAME.fullmatch(name):
+            wav_count+=1
+            if item.file_size>2*1024**3:
+                raise SessionError("Archived WAV exceeds the 2 GiB track limit.")
+        elif name.startswith("mix-presets/"):
+            preset_count+=1
+            if item.file_size>MAX_PRESET_BYTES:
+                raise SessionError("Archived mix preset is oversized.")
+    if not 1<=wav_count<=MAX_TRACKS or preset_count>MAX_PRESETS:
+        raise SessionError("Archive contains an unsupported number of song files.")
     entry=archive.getinfo(ARCHIVE_NAME)
     if entry.file_size>128*1024:
         raise SessionError("Backup index is oversized.")
