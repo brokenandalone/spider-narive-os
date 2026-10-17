@@ -17,6 +17,10 @@ from PyQt5.QtWidgets import (
 )
 
 from bay_missions import MissionStore, BLUEPRINTS
+try:
+    from native_feature_adoption import summary_text as native_idea_summary
+except ImportError:
+    native_idea_summary = None  # Existing bay remains functional without this optional module.
 
 
 def hardware_summary(sys_root=Path("/sys")):
@@ -311,6 +315,19 @@ class DevBayPanel(QWidget):
         button.setMinimumHeight(44)
         button.clicked.connect(self.inspect)
         body.addWidget(button)
+        adoption = QPushButton("Show best ideas for Spider OS")
+        adoption.setObjectName("spiderNativeFeatureAdoptionButton")
+        adoption.setMinimumHeight(44)
+        adoption.clicked.connect(self.show_adoption_priorities)
+        body.addWidget(adoption)
+
+    def show_adoption_priorities(self):
+        if native_idea_summary is None:
+            self.output.setPlainText(
+                "Feature review is not installed in this source snapshot. "
+                "No OS or bay changes made.")
+            return
+        self.output.setPlainText(native_idea_summary())
 
     def inspect(self):
         name = QFileDialog.getExistingDirectory(
