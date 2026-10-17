@@ -23,6 +23,8 @@ on:
       - 'tests/test_webbie_heretic_lab.py'
       - 'tests/test_webbie_persistent_heretic_brain.py'
       - 'webbie/brain/resident_model_choice.py'
+      - 'tools/install_everyday_heretic.sh'
+      - 'tools/activate_heretic_brain.py'
       - 'webbie/brain/brain.py'
       - 'tests/test_author_native_voice_navigation.py'
       - 'tests/test_studio_reconciled_band_workbench.py'
@@ -98,7 +100,10 @@ jobs:
       - name: Verify guarded daily release policy imports and compiles
         run: python3 -m py_compile system/daily_install_policy.py system/release_batch.py
       - name: Check optional Heretic setup script syntax
-        run: bash -n tools/setup_heretic_lab.sh
+        run: |
+          bash -n tools/setup_heretic_lab.sh
+          bash -n tools/install_everyday_heretic.sh
+          python3 -m py_compile tools/activate_heretic_brain.py
       - name: Verify owner-approved Heretic lab never replaces resident Webbie
         run: python3 -m unittest discover -s tests -p 'test_webbie_heretic_lab.py' -v
       - name: Verify native Author voice controls
