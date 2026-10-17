@@ -152,6 +152,197 @@ IDEAS = (
 )
 
 
+# Best-app interim tool choices are part of the SAME native feature review.
+# These candidates may be installed, absent, or already better than their
+# alternatives on a particular host. No entry blindly displaces an app.
+@dataclass(frozen=True)
+class AppChoice:
+    key: str
+    bay: str
+    task: str
+    candidate: str
+    detect_names: tuple[str, ...]
+    strategy: str  # keep_if_present | trial_as_preferred
+    spider_goal: str
+    upstream: str
+    special_checks: tuple[str, ...] = ()
+
+
+APP_CHOICES = (
+    AppChoice("file-manager", "Home / System", "File browsing, tabs and search",
+              "Dolphin", ("dolphin",), "keep_if_present",
+              "Native Spider file workspace", "https://apps.kde.org/dolphin/"),
+    AppChoice("web-research", "Forage", "Browser with current project/session compatibility",
+              "Firefox", ("firefox",), "keep_if_present",
+              "Spider integrated browser and research tools", "https://www.mozilla.org/firefox/",
+              ("current_web_sessions_preserved",)),
+    AppChoice("office-docs", "Study / Productivity", "Office-compatible editing alongside LibreOffice",
+              "ONLYOFFICE Desktop Editors", ("onlyoffice",), "trial_as_preferred",
+              "Native Spider documents", "https://www.onlyoffice.com/desktop.aspx",
+              ("docx_roundtrip", "libreoffice_retained_as_fallback")),
+    AppChoice("longform-writing", "Author", "Novel chapter and manuscript assembly",
+              "novelWriter", ("novelwriter",), "trial_as_preferred",
+              "Spider Author manuscript editor", "https://novelwriter.io/",
+              ("owner_original_manuscripts_unchanged", "docx_export_roundtrip")),
+    AppChoice("research-citations", "Study / Deep Forage", "Local citation library and academic research",
+              "Zotero", ("zotero",), "trial_as_preferred",
+              "Spider citation and evidence library", "https://www.zotero.org/",
+              ("zotero_api_local_only", "study_library_permission")),
+    AppChoice("study-flashcards", "Study", "Spaced repetition and course review",
+              "Anki", ("anki",), "trial_as_preferred",
+              "Native Spider spaced repetition", "https://apps.ankiweb.net/",
+              ("course_material_private",)),
+    AppChoice("notes-sync", "Study / Productivity", "Local notes with optional OneDrive sync",
+              "Joplin", ("joplin",), "trial_as_preferred",
+              "Native Spider notes and sync", "https://joplinapp.org/",
+              ("onedrive_preserve_current", "no_auto_sync_until_checked")),
+    AppChoice("code-editor", "Dev Bay", "Lightweight coding and project editing",
+              "Kate", ("kate",), "keep_if_present",
+              "Native Spider source editor", "https://apps.kde.org/kate/"),
+    AppChoice("code-ide", "Dev Bay", "Advanced extensions and code intelligence",
+              "VSCodium", ("vscodium", "codium"), "trial_as_preferred",
+              "Native Spider development workbench", "https://vscodium.com/",
+              ("extensions_migration_review",)),
+    AppChoice("art-paint", "Art Lab", "Digital painting, brushes and layered illustrations",
+              "Krita", ("krita",), "keep_if_present",
+              "Native Spider drawing and painting", "https://krita.org/",
+              ("native_artwork_roundtrip",)),
+    AppChoice("art-pictures", "Art Lab", "Photo retouching and bitmap manipulation",
+              "GIMP", ("gimp",), "keep_if_present",
+              "Native Spider image editor", "https://www.gimp.org/",
+              ("existing_image_projects_unchanged",)),
+    AppChoice("art-vector", "Art Lab", "Vectors, SVG and technical illustrations",
+              "Inkscape", ("inkscape",), "keep_if_present",
+              "Native Spider vector studio", "https://inkscape.org/"),
+    AppChoice("art-3d", "Art Lab / Author", "3D assets and cinematic environments",
+              "Blender", ("blender",), "keep_if_present",
+              "Native Spider world editor", "https://www.blender.org/",
+              ("cpu_gpu_budget_verified",)),
+    AppChoice("art-raw", "Art Lab", "RAW photography workflow",
+              "darktable", ("darktable",), "trial_as_preferred",
+              "Native Spider photo development", "https://www.darktable.org/",
+              ("photo_raw_non_destructive",)),
+    AppChoice("video-editor", "Media / Art Lab", "Video editing and production timeline",
+              "Kdenlive", ("kdenlive",), "keep_if_present",
+              "Native Spider video editor", "https://kdenlive.org/",
+              ("existing_video_projects_unchanged",)),
+    AppChoice("video-player", "Media Center", "Modern local film playback",
+              "Haruna", ("haruna",), "trial_as_preferred",
+              "Spider Cinema player", "https://apps.kde.org/haruna/",
+              ("video_decode_and_subtitles_verified",)),
+    AppChoice("music-library", "Media Center", "Personal music library and high-quality playback",
+              "Strawberry", ("strawberry",), "trial_as_preferred",
+              "Spider Media music library", "https://www.strawberrymusicplayer.org/",
+              ("bcn_broadcast_uninterrupted", "music_tags_preserved")),
+    AppChoice("communications", "Communications / Productivity", "Email, calendar and contacts",
+              "Kontact", ("kontact",), "trial_as_preferred",
+              "Native Spider communications", "https://kontact.kde.org/",
+              ("email_calendar_backup", "account_signin_explicit")),
+    AppChoice("audio-daw", "Studio integration", "Professional multitrack recording",
+              "Ardour", ("ardour",), "keep_if_present",
+              "Existing Spider Audio Studio", "https://ardour.org/",
+              ("audio_plugins_preserved", "bcn_broadcast_uninterrupted")),
+    AppChoice("audio-routing", "Studio / Devices", "PipeWire audio and MIDI patchbay",
+              "qpwgraph", ("qpwgraph",), "keep_if_present",
+              "Native Spider audio routing", "https://github.com/rncbc/qpwgraph",
+              ("audio_graph_preserved",)),
+    AppChoice("devices-transfer", "Devices", "Pairing and file handoff between supported devices",
+              "KDE Connect", ("kde connect", "kdeconnect"), "keep_if_present",
+              "Native Spider devices integration", "https://apps.kde.org/kdeconnect/",
+              ("user_approved_pairing",)),
+    AppChoice("security-packets", "Kali Bay", "Authorized packet inspection",
+              "Wireshark", ("wireshark",), "trial_as_preferred",
+              "Native Spider packet analysis", "https://www.wireshark.org/",
+              ("authorized_lab_only", "kali_isolation_preserved")),
+    AppChoice("system-monitor", "System", "Real resource and process monitoring",
+              "Plasma System Monitor", ("plasma system monitor", "plasma-systemmonitor"),
+              "keep_if_present", "Native Spider system telemetry",
+              "https://apps.kde.org/plasma-systemmonitor/"),
+)
+
+APP_TRANSITION_GATES = (
+    "installed_application_inventory",
+    "trusted_package_source",
+    "real_task_test",
+    "project_import_export_roundtrip",
+    "native_bay_handoff",
+    "acceptable_hardware_cost",
+    "owner_selected_preferred_app",
+    "former_app_available_for_rollback",
+)
+
+
+def app_choices(installed_apps=None) -> list[dict]:
+    """Plan replacements using XDG menu items, never package removals.
+
+    A visible menu hit is not evidence of functioning software; a menu miss
+    is not proof the package is absent. None means not yet inventoried.
+    """
+    if installed_apps is None:
+        inventory = None
+    else:
+        inventory = []
+        for app in installed_apps:
+            if isinstance(app, str):
+                inventory.append(app.casefold())
+            else:
+                name = getattr(app, "name", "")
+                desktop_id = getattr(app, "desktop_id", "")
+                if not isinstance(name, str) or not isinstance(desktop_id, str):
+                    raise TypeError("Installed application entry must be a name or XDG app")
+                inventory.extend((name.casefold(), desktop_id.casefold()))
+    output = []
+    for choice in APP_CHOICES:
+        if choice.strategy not in ("keep_if_present", "trial_as_preferred"):
+            raise ValueError("Unsupported app selection strategy")
+        if not choice.upstream.startswith("https://"):
+            raise ValueError("Application needs authoritative source")
+        matched = () if inventory is None else tuple(
+            label for label in inventory
+            if any(hint in label for hint in choice.detect_names))
+        output.append({
+            "key": choice.key, "bay": choice.bay, "task": choice.task,
+            "candidate": choice.candidate, "spider_goal": choice.spider_goal,
+            "strategy": choice.strategy, "source": choice.upstream,
+            "visibility": "not_audited" if inventory is None else (
+                "visible_in_app_menu" if matched else "not_seen_in_app_menu"),
+            "required_checks": list(dict.fromkeys((
+                *APP_TRANSITION_GATES, *choice.special_checks))),
+            "preferred_app_changed": False,
+            "old_application_removed": False,
+            "spider_app_completed": False,
+        })
+    return output
+
+
+def app_transition_text(installed_apps=None) -> str:
+    """One in-bay review, no launcher, package action or default changes."""
+    rows = app_choices(installed_apps)
+    lines = [
+        "BEST APPS / INTERIM TOOLS FOR EXISTING SPIDER OS BAYS",
+        "Use proven software while original Spider applications mature.",
+        "Menu visibility is not a functional test or a package audit.",
+        "No current apps uninstalled, disabled, hidden or replaced.",
+        "No app becomes preferred until tested, backed up and owner-approved.",
+        "",
+    ]
+    for row in rows:
+        kind = "KEEP IF WORKING" if row["strategy"] == "keep_if_present" else "TRIAL"
+        lines.extend((
+            "{} | {} | {}".format(row["bay"], row["candidate"], kind),
+            "  Task: {} | Inventory: {}".format(row["task"], row["visibility"]),
+            "  Spider destination: {}".format(row["spider_goal"]),
+            "  Source: {}".format(row["source"]),
+        ))
+    lines.extend((
+        "",
+        "Stage: compare → test on host → owner selects default → retain fallback",
+        "       → build Spider parity → verified switch → optional later removal.",
+        "Uninstall and system-default changes are NEVER performed by this review.",
+    ))
+    return "\n".join(lines)
+
+
 def validate(idea: Idea) -> None:
     if not isinstance(idea, Idea):
         raise TypeError("Expected a Spider OS feature idea")
