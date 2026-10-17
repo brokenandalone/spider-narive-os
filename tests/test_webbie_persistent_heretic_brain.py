@@ -90,6 +90,60 @@ class PersistentBrainTests(unittest.TestCase):
         self.assertIn('"model": "qwen3:8b"',worker)
         self.assertIn('from resident_model_choice import read_choice',worker)
 
+    def test_one_owner_click_can_launch_local_heretic_download_and_activation(self):
+        from resident_model_choice import launch_prebuilt_heretic, PREBUILT_SCRIPT
+        self.assertTrue(PREBUILT_SCRIPT.is_file())
+        self.assertTrue((ROOT/"tools"/"activate_heretic_brain.py").is_file())
+        launched=[]
+        def runner(argv,**kwargs):
+            launched.append((argv,kwargs))
+        fake_console=lambda program: "/usr/bin/"+program
+        with self.assertRaises(PermissionError):
+            launch_prebuilt_heretic(owner_clicked=False,popen=runner,
+                                   console=fake_console,disk_free_bytes=100*1024**3)
+        self.assertFalse(launched)
+        self.assertTrue(launch_prebuilt_heretic(
+            owner_clicked=True,popen=runner,console=fake_console,
+            disk_free_bytes=100*1024**3))
+        self.assertEqual(len(launched),1)
+        args,kw=launched[0]
+        self.assertEqual(args,["konsole","--hold","-e","bash",
+                               str(PREBUILT_SCRIPT),"--approved-by-owner"])
+        self.assertFalse(kw.get("shell",False))
+        with self.assertRaisesRegex(RuntimeError,"10 GiB"):
+            launch_prebuilt_heretic(
+                owner_clicked=True,popen=runner,console=fake_console,
+                disk_free_bytes=2*1024**3)
+        self.assertEqual(len(launched),1)
+
+    def test_post_pull_selection_is_exactly_one_reviewed_model(self):
+        import importlib.util
+        helper=ROOT/"tools"/"activate_heretic_brain.py"
+        spec=importlib.util.spec_from_file_location("heretic_import_test",helper)
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        model=module.MODEL
+        with self.assertRaisesRegex(RuntimeError,"not found"):
+            module.activate_prebuilt(model_list=["qwen3:8b"],path=self.file)
+        self.assertIsNone(read_choice(path=self.file))
+        selection=module.activate_prebuilt(
+            model_list=("qwen3:8b",model),path=self.file)
+        self.assertEqual(selection,model)
+        self.assertEqual(read_choice(path=self.file),model)
+        self.assertEqual(module.main(["--unknown"]),2)
+
+    def test_shell_source_only_installs_fixed_quantization(self):
+        script=(ROOT/"tools"/"install_everyday_heretic.sh").read_text()
+        self.assertIn("ollama pull \"$MODEL\"",script)
+        self.assertIn("ollama show \"$MODEL\"",script)
+        self.assertIn("10 GiB free disk",script)
+        self.assertIn("flock -n 9",script)
+        self.assertNotIn("sudo ",script)
+        self.assertNotIn("ollama rm",script)
+        src=(ROOT/"the-web"/"shell"/"webbie_cognitive_center.py").read_text()
+        self.assertIn("webbieInstallEverydayHereticButton",src)
+        self.assertIn("launch_prebuilt_heretic(owner_clicked=True)",src)
+
     def test_native_ui_has_permanent_choice_and_restore(self):
         src=(ROOT/"the-web"/"shell"/"webbie_cognitive_center.py").read_text()
         self.assertIn("class ResidentBrainDialog",src)
