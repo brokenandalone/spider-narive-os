@@ -153,8 +153,10 @@ def prioritized(completed=None) -> list[dict]:
     return sorted(rows, key=lambda row: (-row["score"], row["key"]))
 
 
-def summary_text(completed=None, limit=15) -> str:
+def summary_text(completed=None, limit=None) -> str:
     """Owner-readable Dev Bay report with explicit non-installable status."""
+    if limit is None:
+        limit = len(IDEAS)
     if type(limit) is not int or limit < 1 or limit > len(IDEAS):
         raise ValueError("Invalid report limit")
     lines = [
