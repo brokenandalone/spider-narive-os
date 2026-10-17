@@ -132,8 +132,8 @@ def ffmpeg_command(ffmpeg, plan, output):
                 "aformat=sample_fmts=fltp:channel_layouts=stereo"
                 f"[source{index}]")
             pad=f"[source{index}]"
-        # FFmpeg input labels must connect directly to the first filter,
-        # with no comma between [source] and EQ or volume.
+        # FFmpeg rejects a comma immediately following an input label.
+        # An input pad must connect directly to the first filter name.
         filters.append(
             f"{pad}{effect_section}"
             f"volume={entry['gain']:.4f},"

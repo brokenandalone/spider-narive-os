@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "product": "Spider Audio Studio",
+  "distribution_model": "undecided",
+  "checks": {
+    "owner_approved_business_model": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "pyqt5_distribution_rights": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "qt_distribution_rights": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "ffmpeg_redistribution": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "asset_and_soundfont_rights": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "source_license_review": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "installer_security_review": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "linux_hardware_acceptance": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "user_support_and_refunds": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "privacy_policy_and_telemetry": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "accessibility_and_docs": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    },
+    "owner_approves_public_release": {
+      "state": "pending",
+      "evidence": "",
+      "reviewer": ""
+    }
+  },
+  "notes": "Owner must choose and document GPL-compatible or properly commercially licensed redistribution. Do not change these to approved solely because automated source tests pass. Commercial publication and payment collection remain blocked."
+}
